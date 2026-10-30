@@ -36,36 +36,6 @@ void tms320c54x_test_state::start_repeat_endpoint_case(unsigned index)
 	m_check_timer->adjust(attotime::from_usec(100));
 }
 
-void tms320c54x_test_state::start_loop_xc_case(unsigned index)
-{
-	m_cpu->reset();
-	auto &program = m_cpu->space(AS_PROGRAM);
-	bool const long_body = index & 1, nmi = index >= 2;
-	program.write_word(0x0800, 0xf072); // RPTB end
-	program.write_word(0x0801, long_body ? 0x0805 : 0x0804);
-	program.write_word(0x0802, 0xe809); // LD #9,A: the next loop's first word.
-	program.write_word(0x0803, long_body ? 0xff4d : 0xfd4d); // XC 2/1,BEQ
-	program.write_word(0x0804, long_body ? 0xf020 : 0xe801); // LD #1,A
-	if (long_body) program.write_word(0x0805, 1);
-	program.write_word(long_body ? 0x0806 : 0x0805, 0xf4e1);
-	u16 const vector = nmi ? 0x0004 : 0x0048;
-	program.write_word(vector, 0x0083); // Passive ISR observation through *AR3.
-	program.write_word(vector + 1, 0xf4e1);
-	set_registers(*m_cpu, {
-		{cpu_regs::STATE_BRC, 1}, {cpu_regs::STATE_B, 0}, {cpu_regs::STATE_AR3, 0x0061}, {cpu_regs::STATE_SP, 0x1000},
-		{cpu_regs::STATE_ST1, 0}, {cpu_regs::STATE_PMST, 0}, {cpu_regs::STATE_IMR, 4}, {cpu_regs::STATE_PC, 0x0800},
-	});
-	m_irq_accumulator = 0xdead;
-	m_xc_irq_fetches = 0;
-	m_xc_irq_tap.remove();
-	m_xc_irq_tap = program.install_read_tap(0x0804, 0x0804, "xc_loop_pending_irq",
-		[this, nmi](offs_t, u16 &, u16) {
-			if (!machine().side_effects_disabled() && !m_xc_irq_fetches++)
-				m_cpu->set_input_line(nmi ? INPUT_LINE_NMI : 2, ASSERT_LINE);
-		});
-	m_phase = 85000 + index;
-	m_check_timer->adjust(attotime::from_usec(100));
-}
 
 
 
@@ -1084,23 +1054,6 @@ bool tms320c54x_test_state::check_repeat_endpoints_results()
 		m_cpu->set_input_line(index >= 6 ? INPUT_LINE_NMI : 0, CLEAR_LINE);
 		if (index < 11) { start_repeat_endpoint_case(index + 1); return true; }
 		osd_printf_info("TMS320C54x repeat endpoints: PASS cases=12 endpoints=ordinary,ffff,0000 counts=short,long sources=irq,nmi\n");
-		return true;
-	}
-	if (m_phase >= 85000 && m_phase < 85004)
-	{
-		unsigned const index = m_phase - 85000;
-		auto &data = m_cpu->space(AS_DATA);
-		osd_printf_info("C54x loop XC case=%u entry_a=%04x continuation=%04x\n", index,
-			unsigned(m_irq_accumulator), data.read_word(0x0fff));
-		expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) &&
-			!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Loop XC fixture reaches ISR");
-		expect(m_irq_accumulator == (index & 1 ? 1 : 9) &&
-			data.read_word(0x0fff) == (index & 1 ? 0x0802 : 0x0803),
-			"XC word protection survives block-loop redirection and expires after two words");
-		m_xc_irq_tap.remove();
-		m_cpu->set_input_line(index >= 2 ? INPUT_LINE_NMI : 2, CLEAR_LINE);
-		if (index < 3) { start_loop_xc_case(index + 1); return true; }
-		osd_printf_info("TMS320C54x loop XC protection: PASS cases=4 body_words=1,2 sources=irq,nmi\n");
 		return true;
 	}
 	return false;

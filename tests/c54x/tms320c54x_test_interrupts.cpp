@@ -6,83 +6,12 @@
 
 namespace c54x_test {
 
-void tms320c54x_test_state::start_xc_irq_case(unsigned index)
-{
-	m_cpu->reset();
-	auto &program = m_cpu->space(AS_PROGRAM);
-	bool const two = index >= 2, accepted = !(index & 1);
-	program.write_word(0x0800, two ? 0xff4d : 0xfd4d); // XC n,BEQ
-	program.write_word(0x0801, 0xe801); // LD #1,A: conditionally executed.
-	program.write_word(0x0802, 0xe809); // LD #9,A: outside XC 1, inside protection.
-	program.write_word(0x0803, 0xf4e1); // IDLE1
-	program.write_word(0x0048, 0x0083); // ISR reads *AR3 to observe entry A.
-	program.write_word(0x0049, 0xf4eb); // RETE
-	set_registers(*m_cpu, {
-		{cpu_regs::STATE_A, 0}, {cpu_regs::STATE_B, accepted ? 0 : 1}, {cpu_regs::STATE_AR3, 0x0061},
-		{cpu_regs::STATE_SP, 0x1000}, {cpu_regs::STATE_ST1, 0}, {cpu_regs::STATE_PMST, 0}, {cpu_regs::STATE_IMR, 4},
-		{cpu_regs::STATE_PC, 0x0800},
-	});
-	m_irq_accumulator = 0xdead;
-	m_xc_irq_fetches = 0;
-	m_xc_irq_tap.remove();
-	m_xc_irq_tap = program.install_read_tap(0x0800, 0x0800, "xc_pending_irq",
-		[this](offs_t, u16 &, u16) {
-			if (!machine().side_effects_disabled() && !m_xc_irq_fetches++)
-				m_cpu->set_input_line(2, ASSERT_LINE);
-		});
-	m_phase = 81000 + index;
-	m_check_timer->adjust(attotime::from_usec(100));
-}
 
 
 
 
 
 
-void tms320c54x_test_state::start_block_xc_irq(unsigned variant)
-{
-	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-	bool const endpoint = profile_is("block-xc-end-irq");
-	if (endpoint) variant = variant % 4 + 24 * ((variant / 4) % 2) + 48 * ((variant / 8) % 2) + 96 * (variant / 16);
-	unsigned const count = std::array<unsigned, 4>{3, 0, 1, 7}[variant % 4], gap = (variant / 8) % 3;
-	bool const nmi = (variant / 24) % 2;
-	u32 const base = (variant / 48) % 2 ? 0x20000 : 0;
-	u16 const end = endpoint ? 0x603 : 0x604 + gap, vector = nmi ? 4 : 0x40;
-	auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
-	for (unsigned i = 0; i < 32; ++i) program.write_word(base + 0x600 + i, 0xf495);
-	program.write_word(base + 0x600, 0xf072); program.write_word(base + 0x601, end);
-	program.write_word(base + 0x602, (variant / 4) % 2 ? 0xff00 : 0xfd00);
-	program.write_word(base + 0x603, 0x8c93); program.write_word(base + 0x604, 0x8d94);
-	program.write_word(base + end + 9, 0xf4e1); program.write_word(base + vector, 0xf4e1);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xa608); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x100);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 1); m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
-	m_cpu->set_state_int(tms320c54x_device::STATE_T, 0xbeef); m_cpu->set_state_int(tms320c54x_device::STATE_TRN, 0x5aa5);
-	m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x5100); m_cpu->set_state_int(tms320c54x_device::STATE_AR4, 0x5200); m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x3000); m_cpu->set_state_int(tms320c54x_device::STATE_BRC, count);
-	m_cpu->set_input_line(0, CLEAR_LINE); m_cpu->set_input_line(INPUT_LINE_NMI, CLEAR_LINE);
-	m_pipeline_memory_case = false;
-	m_pipeline_store_writes = m_pipeline_register_writes = m_pipeline_extensions_reads = m_vector_reads = 0;
-	m_pipeline_operand_tap = data.install_read_tap(0, 0xffff, "block_xc_irq_no_read", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) expect(false, "Short XC loops and vector IDLE have no data reads"); });
-	m_pipeline_write_tap = data.install_write_tap(0, 0xffff, "block_xc_irq_writes", [this, count, end, nmi, endpoint](offs_t at, u16 &word, u16) {
-		if (machine().side_effects_disabled()) return;
-		if (at == 0x2fff) { expect(!m_pipeline_extensions_reads++ && word > end && word <= end + 9, "Protected repeat stacks one post-loop continuation"); return; }
-		if (at >= 0x5100 && at < 0x5200)
-		{
-			expect(m_pipeline_store_writes <= count && at == 0x5100 + m_pipeline_store_writes++ && word == 0xbeef, "Every first protected store executes once");
-			if (!m_pipeline_memory_case) { m_pipeline_memory_case = true; m_cpu->set_input_line(nmi ? INPUT_LINE_NMI : 0, ASSERT_LINE); }
-			return;
-		}
-		expect(m_pipeline_register_writes < (endpoint ? 1U : count + 1) && at == 0x5200 + m_pipeline_register_writes++ && word == 0x5aa5, "Every second protected store executes once");
-	});
-	m_vector_prefetch_tap = program.install_read_tap(base + vector, base + vector, "block_xc_irq_vector", [this, count, nmi, endpoint](offs_t, u16 &, u16) {
-		if (machine().side_effects_disabled()) return;
-		if (m_pipeline_store_writes != count + 1 || m_pipeline_register_writes != (endpoint ? 1U : count + 1)) osd_printf_info("Short XC protection failure: variant=%u first=%u second=%u expected=%u cycle=%llu\n", m_pipeline_peripheral_case, m_pipeline_store_writes, m_pipeline_register_writes, count + 1, (unsigned long long)m_cpu->pipeline_cycles());
-		expect(m_pipeline_memory_case && !m_vector_reads++ && m_pipeline_store_writes == count + 1 && m_pipeline_register_writes == (endpoint ? 1U : count + 1), "Pending IRQ/NMI waits for all overlapping short-loop XC spans");
-		m_cpu->set_input_line(nmi ? INPUT_LINE_NMI : 0, CLEAR_LINE);
-	});
-	m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 255660;
-	m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-}
 
 
 
@@ -182,13 +111,7 @@ u16 tms320c54x_test_state::repeat_irq_r(offs_t offset)
 {
 	if (m_phase == 6517 || m_phase == 6518 || m_phase == 251210 || m_phase == 62162 || m_phase == 62163)
 		return m_stack_mmr[offset];
-	if (offset)
-	{
-		m_irq_operand_cycle = m_cpu->total_cycles();
-		m_irq_accumulator = m_cpu->state_int(tms320c54x_device::STATE_A);
-		m_port_writes_at_irq = m_port_writes;
-		return 0;
-	}
+	if (offset) return 0;
 	m_last_operand_cycle = m_cpu->total_cycles();
 	if (++m_repeat_reads == 1)
 	{
@@ -257,26 +180,6 @@ bool tms320c54x_test_state::check_idle_pll_results()
 	return false;
 }
 
-bool tms320c54x_test_state::check_xc_interrupt_results()
-{
-	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
-	if (m_phase >= 81000 && m_phase < 81004)
-	{
-		unsigned const index = m_phase - 81000;
-		osd_printf_info("C54x XC IRQ case=%u entry_a=%llx continuation=%04x\n", index,
-			(unsigned long long)m_irq_accumulator, data.read_word(0x0fff));
-		expect(m_xc_irq_fetches == 1 && m_cpu->state_int(tms320c54x_device::STATE_IDLE) &&
-			!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "XC pending-IRQ fixture terminates normally");
-		expect(m_irq_accumulator == (index == 3 ? 0 : 9) && data.read_word(0x0fff) == 0x0803,
-			"XC protects two following words independently of conditional span and acceptance");
-		m_cpu->set_input_line(2, CLEAR_LINE);
-		m_xc_irq_tap.remove();
-		if (index < 3) { start_xc_irq_case(index + 1); return true; }
-		osd_printf_info("TMS320C54x XC interrupt protection: PASS cases=4 spans=1,2 accepted,rejected=1 physical_pipeline_claim=0\n");
-		return true;
-	}
-	return false;
-}
 
 
 
@@ -389,34 +292,6 @@ bool tms320c54x_test_state::check_repeat_mvdp_irq_results()
 }
 
 
-bool tms320c54x_test_state::check_block_xc_irq_results()
-{
-	if (m_phase == 255660)
-	{
-		bool const endpoint = profile_is("block-xc-end-irq");
-		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick, count = std::array<unsigned, 4>{3, 0, 1, 7}[variant % 4], checkpoint = std::array<unsigned, 4>{3, 7, 10, 14}[variant / (endpoint ? 16 : 96)];
-		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Short in-block XC stays staged");
-		if (tick == checkpoint && !m_pipeline_replay) { m_recurring_irq_snapshot = {m_pipeline_store_writes, m_pipeline_register_writes, m_pipeline_extensions_reads, m_vector_reads, unsigned(m_pipeline_memory_case)}; expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save overlapping XC instances and pending interrupt"); }
-		if (tick == 120)
-		{
-			bool const complete = m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_vector_reads == 1 && m_pipeline_extensions_reads == 1 && m_pipeline_store_writes == count + 1 && m_pipeline_register_writes == (endpoint ? 1U : count + 1) && m_cpu->state_int(tms320c54x_device::STATE_BRC) == 0 && m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x2fff && m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x5101 + count && m_cpu->state_int(tms320c54x_device::STATE_AR4) == (endpoint ? 0x5201U : 0x5201 + count);
-			if (!complete) osd_printf_info("Short XC final failure: variant=%u idle=%u vector=%u stack=%u first=%u second=%u brc=%04x sp=%04x ar3=%04x ar4=%04x pc=%06x\n", variant, unsigned(m_cpu->state_int(tms320c54x_device::STATE_IDLE)), m_vector_reads, m_pipeline_extensions_reads, m_pipeline_store_writes, m_pipeline_register_writes, unsigned(m_cpu->state_int(tms320c54x_device::STATE_BRC)), unsigned(m_cpu->state_int(tms320c54x_device::STATE_SP)), unsigned(m_cpu->state_int(tms320c54x_device::STATE_AR3)), unsigned(m_cpu->state_int(tms320c54x_device::STATE_AR4)), unsigned(m_cpu->state_int(STATE_GENPC)));
-			if (!complete) osd_printf_info("Short XC pending state: requested=%u ifr=%04x imr=%04x st1=%04x cycles=%llu\n", unsigned(m_pipeline_memory_case), unsigned(m_cpu->state_int(tms320c54x_device::STATE_IFR)), unsigned(m_cpu->state_int(tms320c54x_device::STATE_IMR)), unsigned(m_cpu->state_int(tms320c54x_device::STATE_ST1)), (unsigned long long)m_cpu->pipeline_cycles());
-			expect(complete, "Pending interrupt enters once after the complete short XC repeat");
-			// IFR and the NMI latch are restored by the CPU. Resubmitting an
-			// input here would queue a new edge before scheduler settlement.
-			if (!m_pipeline_replay) { m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; m_pipeline_store_writes = m_recurring_irq_snapshot[0]; m_pipeline_register_writes = m_recurring_irq_snapshot[1]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[2]; m_vector_reads = m_recurring_irq_snapshot[3]; m_pipeline_memory_case = m_recurring_irq_snapshot[4]; if (endpoint) m_cpu->set_pipeline_frontend(true); return restore_pipeline_at(255670, "Restore XC overlap without losing the pending physical source"); }
-			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_vector_prefetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (variant < (endpoint ? 63U : 383U)) { start_block_xc_irq(variant + 1); return true; }
-			if (endpoint) { osd_printf_info("TMS320C54x endpoint XC protection: PASS cases=64 restore=64 counts=0,1,3,7 loop_words=2 sources=IRQ,NMI pages=2 snapshots=4 wrapped_protection=1 final_fallthrough=1 all_stores_before_vector=1 vector_fetches=1 stack_writes=1 reset_before_restore=1 physical_phase_claim=0\n"); throw emu_fatalerror(0, "TMS320C54x isolated endpoint XC protection complete"); }
-			osd_printf_info("TMS320C54x short block XC protection: PASS cases=384 restore=384 counts=0,1,3,7 forms=XC1,XC2 loop_words=3,4,5 sources=IRQ,NMI pages=2 snapshots=4 all_stores_before_vector=1 vector_fetches=1 stack_writes=1 physical_phase_claim=0\n");
-			throw emu_fatalerror(0, "TMS320C54x isolated short block XC protection complete");
-		}
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 255670) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 255660; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true; }
-	return false;
-}
 
 
 

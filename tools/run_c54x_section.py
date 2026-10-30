@@ -313,6 +313,8 @@ def main():
     counts['stack_interrupt_order'] = 16
     counts['ifr_ack_pair'] = 32
     counts['poll_interrupt'] = 64
+    counts['block_xc_interrupt'] = 56
+    counts['atomic_xc_interrupt'] = 8
     counts['accumulator_call_frames'] = 216
     parser.add_argument('section', choices=[*counts, 'all'])
     parser.add_argument('--jobs', type=int, default=8)

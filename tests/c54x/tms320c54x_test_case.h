@@ -51,11 +51,12 @@ struct clocked_line_sample { unsigned cycle; bool level; bool check_cycle = true
 struct clocked_data_event
 {
 	bool write; std::uint32_t address; u16 value; unsigned cycle; bool check_cycle = true;
-	std::optional<int> raise_input{};
+	std::optional<int> raise_input{}; // Assert a physical input after accepting this bus event.
 	std::optional<unsigned> cycles_from_previous{}; // CPU clocks between selected bus events, including atomic execution.
 	std::optional<unsigned> cycles_from_first{};
 	std::vector<register_check> registers{}; // State visible inside the selected bus callback.
-	std::optional<unsigned> minimum_program_events{}; // Required captured instruction words before this bus event.
+	std::optional<unsigned> minimum_program_events{}; // Required prior program events, e.g. instruction extensions.
+	std::optional<std::array<u16,2>> value_range{}; // Inclusive bounds when the contract deliberately leaves the exact word open.
 };
 struct clocked_irq_expectation
 {
@@ -70,8 +71,11 @@ inline bool accept_data_event(std::vector<clocked_data_event> const &events, uns
 {
 	if (cursor >= events.size()) return false;
 	auto const &expected = events[cursor];
+	bool const value_matches = expected.value_range ?
+		actual.value >= (*expected.value_range)[0] && actual.value <= (*expected.value_range)[1] : actual.value == expected.value;
 	if (actual.write != expected.write || actual.address != expected.address ||
-		actual.value != expected.value || (expected.check_cycle && actual.cycle != expected.cycle)) return false;
+		!value_matches ||
+		(expected.check_cycle && actual.cycle != expected.cycle)) return false;
 	++cursor;
 	return true;
 }

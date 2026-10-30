@@ -2737,18 +2737,27 @@ same PC in a previous iteration must not release that younger span. Release
 therefore checks the live Decode/Access/Read owners, using already-saved
 pipeline state rather than a new timing counter. PC-only release can admit a
 pending IRQ before the complete protected group retires.
-`block-xc-irq` passes 384 cases/restores for XC1/XC2, three-/four-/five-word
-loops, counts 0/1/3/7, IRQ/NMI, two pages and four snapshots. The source is
+The general bank in `block_xc_interrupt` passes 48 cases/restores for XC1/XC2,
+three-/four-/five-word loops, counts 0/1/3/7 and IRQ/NMI. Pages and four
+snapshot positions are distributed rather than multiplying the grid to 384.
+The source is
 asserted by the first protected RAM write; speculative opcode fetches are not
 treated as Execute entries. The pipeline's overlapping groups finish before
-one vector fetch and stack write. This is a declared pipeline-ownership
+one acknowledgement, vector fetch and stack write. The stacked continuation
+keeps the original inclusive bound `(end+1)..(end+9)` rather than inventing an
+exact physical pipeline PC. This is a declared pipeline-ownership
 contract, not measured interrupt latency for physical NOP gaps. Restoring
 IFR/NMI state does not resubmit an external line before scheduler settlement.
 
-`xc-controls`, `xc-signed`, `rptb-br-edges`, `rptbd-edge`, `rptb-bcd`,
-`rptb-single` and `repeat-rearm` pass as focused controls. Predicated control
-transfers, crossing loop boundaries and silicon phase timing remain outside
-this composition scope. Original-firmware execution is separately counted
+`atomic_xc_interrupt` separately retains all eight atomic XC/follower and
+loop-wrap controls. A physical IRQ/NMI is asserted on the actual trigger-word
+Fetch; a zero-valued normal RAM read in the ISR observes A at that bus boundary.
+Frame words, two-word protection, loop redirection and RETE where applicable
+are checked through save/replay. This replaces custom observer RAM callbacks
+and is distinct from the pipeline contracts above.
+
+Other crossing spans, predicated control transfers and silicon phase timing
+remain outside this composition scope. Original-firmware execution is separately counted
 in [Current boundary](5510_bringup.md#current-boundary), not inferred from static bytes.
 
 Original recorder NAND data writes are observed at `02:891c`. NAND traffic alone
@@ -3881,12 +3890,14 @@ cases plus replay retain guards when the *conditionally selected* span crosses
 the endpoint: XC 1 at the endpoint, or XC 2 at/just before it. These are
 model-scope exclusions, not silicon traps.
 
-`block-xc-end-irq` passes 64 cases plus replay: a two-word XC 1/store loop,
-counts 0/1/3/7, pending IRQ/NMI, two pages and four snapshots. Every repeated
+The endpoint bank in `block_xc_interrupt` passes eight cases plus replay: a
+two-word XC 1/store loop, counts 0/1/3/7 and pending IRQ/NMI. Pages and four
+snapshots are distributed. Every repeated
 store and the final protected continuation store must precede the one vector
 fetch and stack write. The live pipeline is cleared before restoration so
-protection cannot survive accidentally from the completed run. The existing
-384-case short-loop IRQ/NMI control also passes. These establish the bounded
+protection cannot survive accidentally from the completed run. The combined
+section replaces both old profiles, their private taps and phase handlers;
+all 56 cases replay. These establish the bounded
 staged protection contract, not measured physical pipeline phases.
 
 ## Repeated parallel store/ADD/SUB

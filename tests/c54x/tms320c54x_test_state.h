@@ -50,8 +50,6 @@ private:
 	void xf_w(int state);
 	bool m_xf_pin = true;
 	void start_repeat_endpoint_case(unsigned index);
-	void start_loop_xc_case(unsigned index);
-	void start_xc_irq_case(unsigned index);
 	void check_control_disassembler();
 	void start_idle_nmi_case(unsigned index);
 	void check_idle_nmi_result(unsigned index);
@@ -339,7 +337,6 @@ private:
 	static delay_multiply_fixture delay_square_case(unsigned variant);
 	static delay_multiply_fixture delay_memory_square_case(unsigned variant);
 	void start_delay_multiply(unsigned variant = 0);
-	void start_block_xc_irq(unsigned variant = 0);
 	struct block_xc_fixture
 	{
 		unsigned predicate, layout, count, snapshot, rotation;
@@ -987,7 +984,6 @@ private:
 	}
 	bool check_bsp_interrupt_results();
 	bool check_idle_pll_results();
-	bool check_xc_interrupt_results();
 	bool check_repeat_endpoints_results();
 	bool check_pipeline_idle_results();
 	bool check_instruction_observer_results();
@@ -1026,7 +1022,6 @@ private:
 	bool check_block_branch_count_results();
 	bool check_bd_long_accumulator_results();
 	bool check_block_xc_results();
-	bool check_block_xc_irq_results();
 	bool check_move_repeat_owner_results();
 	bool check_block_branch_edge_results();
 	bool check_delay_dld_results();
@@ -1121,8 +1116,6 @@ private:
 	u16 m_timer_probe_return_pc = 0;
 	memory_passthrough_handler m_repeat_boundary_tap;
 	unsigned m_repeat_boundary_requests = 0;
-	memory_passthrough_handler m_xc_irq_tap;
-	unsigned m_xc_irq_fetches = 0;
 	memory_passthrough_handler m_operand_data_tap;
 	unsigned m_phase = 0;
 	bool (tms320c54x_test_state::*m_result_owner)() = nullptr;
@@ -1140,8 +1133,6 @@ private:
 	unsigned m_repeat_reads = 0;
 	u16 m_stack_mmr[2] = {};
 	unsigned m_irq_trigger_read = 1;
-	u64 m_irq_accumulator = 0;
-	u64 m_irq_operand_cycle = 0;
 	u16 m_idle_timer_counter = 0;
 	u16 m_idle_timer_control = 0;
 	optional_device<tms320c54x_mcbsp_device> m_idle_mcbsp;
@@ -1152,7 +1143,6 @@ private:
 	attotime m_idle_dma_start = attotime::zero;
 	u32 m_idle_dma_rate = 0;
 	u8 m_idle_dma_first_ticks = 4;
-	unsigned m_port_writes_at_irq = 0;
 	u64 m_first_operand_cycle = 0;
 	u64 m_last_operand_cycle = 0;
 	u64 m_first_port_cycle = 0;

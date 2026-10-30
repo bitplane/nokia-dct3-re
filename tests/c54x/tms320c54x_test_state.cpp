@@ -67,7 +67,6 @@ void tms320c54x_test_state::machine_reset()
 		{ {"st-mvmm"}, [](self &test) { test.start_pipeline_store_mvmm(); } },
 		{ {"st-acc-mvmm"}, [](self &test) { test.start_pipeline_store_mvmm(); } },
 		{ {"move-rpt-owner"}, [](self &test) { test.start_move_repeat_owner(); } },
-		{ {"block-xc-irq", "block-xc-end-irq"}, [](self &test) { test.start_block_xc_irq(); } },
 		{ {"block-xc"}, [](self &test) { test.start_block_xc(); } },
 		{ {"ldu-periph"}, [](self &test) { test.start_ldu_peripheral(); } },
 		{ {"ldu-imr"}, [](self &test) { test.start_ldu_imr(); } },

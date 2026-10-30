@@ -136,11 +136,14 @@ private:
 		if (index < events.size() && events[index].minimum_program_events)
 			require(m_program_cursor >= *events[index].minimum_program_events, "instruction extensions precede operand bus access");
 		if (!accept_data_event(events,cursor,actual)) return false;
-		auto const disable = m_machine.disable_side_effects();
-		for (auto const &reg : events[index].registers)
-			if ((m_cpu.state_int(reg.index) & reg.mask) != (reg.value & reg.mask))
-				throw emu_fatalerror("C54x bus-state case=%u event=%u clock=%u register=%d actual=%llx expected=%llx",m_case,index,
-					actual.cycle,reg.index,(unsigned long long)m_cpu.state_int(reg.index),(unsigned long long)reg.value);
+		{
+			auto const disable = m_machine.disable_side_effects();
+			for (auto const &reg : events[index].registers)
+				if ((m_cpu.state_int(reg.index) & reg.mask) != (reg.value & reg.mask))
+					throw emu_fatalerror("C54x bus-state case=%u event=%u clock=%u register=%d actual=%llx expected=%llx",m_case,index,
+						actual.cycle,reg.index,(unsigned long long)m_cpu.state_int(reg.index),(unsigned long long)reg.value);
+		}
+		if (events[index].raise_input) m_cpu.set_input_line(*events[index].raise_input,ASSERT_LINE);
 		return true;
 	}
 	void begin()
@@ -198,7 +201,6 @@ private:
 						m_case, m_data_cursor, unsigned(write), unsigned(at), word, (unsigned long long)m_cpu.pipeline_cycles());
 				m_last_data_total = m_cpu.total_cycles();
 				if (!m_first_data_total) m_first_data_total = m_last_data_total;
-				if (expected && expected->raise_input) m_cpu.set_input_line(*expected->raise_input,ASSERT_LINE);
 				if (m_data_observer) m_data_observer(write, u32(at), word);
 			};
 			m_data_tap = m_cpu.space(m_input.observed_data_space).install_readwrite_tap(0, 0xffff, "register_sequence_data",
