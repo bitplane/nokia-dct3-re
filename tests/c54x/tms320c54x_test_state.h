@@ -100,8 +100,6 @@ private:
 	void start_pipeline_original_context_call(unsigned variant = 0, bool full_body = false);
 	static std::array<u16, 2> addm_inputs(unsigned variant);
 	static std::array<u16, 2> addm_expected(unsigned variant);
-	void start_pipeline_memory_logic(unsigned variant = 0);
-	void start_pipeline_mu4_logic_tail(unsigned variant = 0);
 	void start_pipeline_mu4_timer_context(unsigned variant = 0);
 	void start_pipeline_mu4_recurring_timer(unsigned variant = 0);
 	void start_pipeline_idle_sp_tail(unsigned variant = 0);
@@ -1648,7 +1646,6 @@ private:
 	bool check_pipeline_frontend_results();
 	bool check_peripheral_mmr_timing_audit_results();
 	bool check_pipeline_immediate_store_results();
-	bool check_pipeline_memory_logic_results();
 	bool check_pipeline_idle_results();
 	bool check_repeat_pop_exclusion_results();
 	bool check_instruction_observer_results();

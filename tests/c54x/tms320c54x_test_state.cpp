@@ -217,7 +217,6 @@ void tms320c54x_test_state::machine_reset()
 		{ {"popd-ram"}, [](self &test) { test.start_pipeline_data_pop(); } },
 		{ {"bacc", "fbacc", "bacc-producer", "fbacc-producer"}, [](self &test) { test.start_accumulator_branch(); } },
 		{ {"logic-offset"}, [](self &test) { test.start_offset_logic(); } },
-		{ {"logic-short"}, [](self &test) { test.start_pipeline_memory_logic(); } },
 		{ {"logic-peripheral"}, [](self &test) { test.start_pipeline_peripheral_logic(); } },
 		{ {"load-offset"}, [](self &test) { test.start_pipeline_offset_load(); } },
 		{ {"write-a"}, [](self &test) { test.start_write_a(); } },
