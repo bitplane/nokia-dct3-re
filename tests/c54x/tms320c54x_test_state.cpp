@@ -407,18 +407,6 @@ void tms320c54x_test_state::machine_reset()
 		start_pipeline_rptb(); return;
 	}
 	if (!strcmp(machine().system().name, "tms54test") &&
-			profile_is("swap-join"))
-	{
-		start_pipeline_swap_join();
-		return;
-	}
-	if (!strcmp(machine().system().name, "tms54test") &&
-			profile_is("swap-body"))
-	{
-		start_pipeline_swap_body();
-		return;
-	}
-	if (!strcmp(machine().system().name, "tms54test") &&
 			profile_is("timer"))
 	{
 		start_stopped_timer_reload_case(0);

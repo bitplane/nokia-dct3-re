@@ -608,8 +608,6 @@ private:
 	static banzd_fixture banzd_case(unsigned variant);
 	void start_pipeline_banzd(unsigned variant = 0);
 	static u16 swap_body_source(unsigned variant);
-	void start_pipeline_swap_body(unsigned variant = 0);
-	void start_pipeline_swap_join(unsigned variant = 0);
 	static unsigned rptb_count(unsigned variant);
 	static u16 rptb_source(unsigned variant, unsigned index);
 	void start_pipeline_rptb(unsigned variant = 0);
@@ -2029,7 +2027,6 @@ private:
 	bool check_immediate_arithmetic_results();
 	bool check_memory_repeat_results();
 	bool check_banzd_results();
-	bool check_pipeline_swap_body_results();
 	bool check_push_pop_same_results();
 	bool check_asm_store_results_part2();
 	bool check_repeat_rearm_results();

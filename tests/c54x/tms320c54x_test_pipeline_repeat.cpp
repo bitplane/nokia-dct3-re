@@ -255,7 +255,6 @@ void tms320c54x_test_state::start_pipeline_rptb(unsigned variant)
 	bool const irq = variant >= 6144;
 	unsigned const flags = irq ? 0 : (variant >> 7) & 15;
 	u32 const base = (irq ? (variant - 6144) & 2 : variant & 64) ? 0x20000 : 0;
-	start_pipeline_swap_body((flags << 4) | (base ? 256 : 0));
 	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
 	m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove();
 	static constexpr u16 words[] = {0xf072, 0x0606, 0x1386, 0xf678, 0xf3e8, 0xf1a0, 0x8196, 0xf4e1};
