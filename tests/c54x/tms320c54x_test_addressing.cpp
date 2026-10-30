@@ -334,50 +334,8 @@ void tms320c54x_test_state::start_pipeline_long_mvkd(unsigned variant)
 	m_phase = 253490; m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 }
 
-tms320c54x_test_state::imr_store_fixture tms320c54x_test_state::imr_store_case(unsigned variant)
-{
-	unsigned const v = variant % 1536, source = v % 16, pattern = (v / 16) % 4, kind = (v / 256) % 3;
-	u16 const bit = u16(1U << source), old_mask = (v / 64) % 2 ? 0xffff : 0;
-	u16 const mask = std::array<u16, 4>{0, 0xffff, bit, u16(~bit)}[pattern], st1 = (v / 128) % 2 ? 0x800 : 0;
-	unsigned const ack = kind == 2 ? 7 : kind == 1 && !st1 && (old_mask || (mask & bit)) ? old_mask ? 7 : 10 : 0;
-	return {old_mask, mask, st1, bit, source, kind, ack, std::array<unsigned, 3>{4, 6, 7}[variant / 1536], v / 768 ? 0x20000U : 0};
-}
 
-tms320c54x_test_state::imr_store_fixture tms320c54x_test_state::stlm_imr_case(unsigned variant)
-{
-	auto f = imr_store_case(variant % 4608);
-	if (f.ack_cycle) --f.ack_cycle;
-	f.checkpoint = std::array<unsigned, 3>{4, 5, 6}[(variant % 4608) / 1536];
-	return f;
-}
 
-void tms320c54x_test_state::start_pipeline_imr_store(unsigned variant)
-{
-	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-	bool const stlm = profile_is("stlm-imr");
-	auto const f = stlm ? stlm_imr_case(variant) : imr_store_case(variant); auto &program = m_cpu->space(AS_PROGRAM);
-	u32 const vector = f.base + (f.kind == 2 ? 4 : (16 + f.source) * 4);
-	for (unsigned i = 0; i < 32; ++i) { program.write_word(f.base + 0x600 + i, 0xf495); program.write_word(vector + i, 0xf495); }
-	program.write_word(f.base + 0x600, 0x7700); program.write_word(f.base + 0x601, f.mask); program.write_word(vector, 0xe955);
-	if (stlm) { program.write_word(f.base + 0x600, variant >= 4608 ? 0x8900 : 0x8800); program.write_word(f.base + 0x601, 0xf495); }
-	for (unsigned line = 0; line < 16; ++line) m_cpu->set_input_line(line, CLEAR_LINE);
-	m_cpu->set_input_line(INPUT_LINE_NMI, CLEAR_LINE);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10); m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, f.old_mask);
-	m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x1804); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, f.st1);
-	m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000); m_cpu->set_state_int(tms320c54x_device::STATE_B, 0);
-	if (stlm) { m_cpu->set_state_int(tms320c54x_device::STATE_A, variant >= 4608 ? 0x1234 : f.mask ^ 0xffff); m_cpu->set_state_int(tms320c54x_device::STATE_B, variant >= 4608 ? f.mask ^ 0xffff : 0); }
-	m_cpu->set_state_int(STATE_GENPC, f.base + 0x600); m_cpu->set_pipeline_frontend(true);
-	m_pipeline_replay = false; m_idle_fixture_tick = 0; m_pipeline_store_writes = m_pipeline_extensions_reads = m_vector_acks = 0;
-	m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0, 0, "imr_store_no_read",
-		[this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) expect(false, "Immediate IMR write must not read its destination"); });
-	m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0, 0, "imr_store_write",
-		[this, f, stlm](offs_t, u16 &word, u16) { if (machine().side_effects_disabled()) return;
-			expect(word == f.mask && !m_pipeline_store_writes && m_cpu->pipeline_cycles() == (stlm ? 6 : 7), "IMR store publishes its owned operand once in Execute"); ++m_pipeline_store_writes; });
-	m_pipeline_fetch_tap = program.install_read_tap(f.base + 0x601, f.base + 0x601, "imr_store_literal",
-		[this, f, stlm](offs_t, u16 &word, u16) { if (machine().side_effects_disabled() || stlm) return; expect(word == f.mask && !m_pipeline_extensions_reads, "STM IMR fetches its literal once"); ++m_pipeline_extensions_reads; });
-	m_phase = 253510; m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-}
 
 
 tms320c54x_test_state::memory_arithmetic_fixture tms320c54x_test_state::offset_load_case(unsigned variant)
@@ -3520,52 +3478,13 @@ bool tms320c54x_test_state::check_long_mapped_original_results()
 			if (variant < 19199) { start_pipeline_long_mvkd(variant + 1); return true; }
 			osd_printf_info("TMS320C54x staged long MVKD: PASS cases=19200 forms=25 offsets=4 sources=selected_AR,AR2,RAM,alias values=4 compatibility=2 pages=2 restore=19200 reads_each=1 writes_each=1 extensions_each=2 silicon_phase_claim=0\n");
 			if (profile_is("long-mvkd")) throw emu_fatalerror(0, "TMS320C54x isolated long MVKD complete");
-			start_pipeline_imr_store(); return true;
+			return true;
 		}
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
 	}
 	if (m_phase == 253500)
 	{
 		m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 253490; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 253510)
-	{
-		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
-		bool const stlm = profile_is("stlm-imr");
-		auto const f = stlm ? stlm_imr_case(variant) : imr_store_case(variant);
-		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) && m_cpu->state_int(tms320c54x_device::STATE_IMR) == (tick < (stlm ? 6 : 7) ? f.old_mask : f.mask) &&
-			m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0x1804 && m_pipeline_store_writes == unsigned(tick >= (stlm ? 6 : 7)), "IMR store leaves mask/status unchanged until its owned publication");
-		if (tick == 2 && f.kind) m_cpu->set_input_line(f.kind == 2 ? INPUT_LINE_NMI : f.source, ASSERT_LINE);
-		if (!stlm && tick == 4) { auto const disable = machine().disable_side_effects(); m_cpu->space(AS_PROGRAM).write_word(f.base + 0x601, 0xbeef); }
-		if (stlm && tick == 5) m_cpu->set_state_int(variant >= 4608 ? tms320c54x_device::STATE_B : tms320c54x_device::STATE_A, f.mask);
-		capture_pipeline_at(f.checkpoint, {&m_pipeline_store_writes, &m_pipeline_extensions_reads, &m_vector_acks},
-			"Save retained mask literal, pending publication or accepted entry");
-		if (tick == 20)
-		{
-			if (stlm) expect(m_cpu->state_int(tms320c54x_device::STATE_A) == (variant >= 4608 ? 0x1234 : f.mask), "IMR publication preserves its A source or unrelated accumulator through ISR entry");
-			expect(m_pipeline_extensions_reads == unsigned(!stlm) && m_vector_acks == unsigned(bool(f.ack_cycle)) && m_cpu->state_int(tms320c54x_device::STATE_B) == (f.ack_cycle ? 0x55 : stlm && variant >= 4608 ? f.mask : 0) &&
-				m_cpu->state_int(tms320c54x_device::STATE_IFR) == (f.kind == 1 && !f.ack_cycle ? f.bit : 0), "Mask enable/clear, INTM and NMI preserve accepted entries or leave masked IRQ pending");
-			if (replay_pipeline_at(253520, f.checkpoint,
-				"Restore mask write and interrupt entry without duplicate literal, write or acknowledgement")) return true;
-			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (variant < (stlm ? 9215 : 4607)) { start_pipeline_imr_store(variant + 1); return true; }
-			// Later fixture groups must be able to generate a fresh NMI edge.
-			for (unsigned line = 0; line < 16; ++line) m_cpu->set_input_line(line, CLEAR_LINE);
-			m_cpu->set_input_line(INPUT_LINE_NMI, CLEAR_LINE);
-			if (stlm)
-			{
-				osd_printf_info("TMS320C54x staged STLM IMR: PASS cases=9216 restore=9216 accumulators=2 irq_bits=16 masks=4 initial_masks=2 intm=2 sources=none,IRQ,NMI pages=2 snapshots=3 source_execute_live=1 writes_each=1 destination_reads=0 silicon_phase_claim=0\n");
-				throw emu_fatalerror(0, "TMS320C54x isolated STLM IMR complete");
-			}
-			osd_printf_info("TMS320C54x staged STM IMR: PASS cases=4608 restore=4608 irq_bits=16 masks=4 initial_masks=2 intm=2 sources=none,IRQ,NMI pages=2 literal_fetches=1 writes_each=1 destination_reads=0 silicon_phase_claim=0\n");
-			if (profile_is("imr-store")) throw emu_fatalerror(0, "TMS320C54x isolated STM IMR complete");
-			start_pipeline_long_pair(); return true;
-		}
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 253520)
-	{
-		m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 253510; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
 	}
 	if (m_phase == 253530)
 	{

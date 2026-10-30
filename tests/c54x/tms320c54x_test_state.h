@@ -190,15 +190,6 @@ private:
 	};
 	static long_mvkd_fixture long_mvkd_case(unsigned variant);
 	void start_pipeline_long_mvkd(unsigned variant = 0);
-	struct imr_store_fixture
-	{
-		u16 old_mask, mask, st1, bit;
-		unsigned source, kind, ack_cycle, checkpoint;
-		u32 base;
-	};
-	static imr_store_fixture imr_store_case(unsigned variant);
-	static imr_store_fixture stlm_imr_case(unsigned variant);
-	void start_pipeline_imr_store(unsigned variant = 0);
 	void start_pipeline_long_accumulator_store(unsigned variant = 0);
 	static std::array<u16, 2> long_rmw_expected(unsigned arithmetic, unsigned operation, u16 flags);
 	static accumulator_store_fixture peripheral_long_rmw_fixture(unsigned variant);

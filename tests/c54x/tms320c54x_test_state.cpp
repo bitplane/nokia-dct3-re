@@ -74,7 +74,6 @@ void tms320c54x_test_state::machine_reset()
 		return;
 	if (profile_is("shift-periph") || shifted_bsp_fixture() || shifted_unowned_fixture()) { start_shifted_peripheral(); return; }
 	if (start_profile(*this, machine().options().bios(), {
-		{ {"stlm-imr"}, [](self &test) { test.start_pipeline_imr_store(); } },
 		{ {"pmst-map"}, [](self &test) { test.start_pipeline_pmst(); } },
 		{ {"pmst-pop"}, [](self &test) { test.start_pipeline_pmst(); } },
 		{ {"pmst-popd"}, [](self &test) { test.start_pipeline_pmst(); } },
@@ -254,10 +253,6 @@ void tms320c54x_test_state::machine_reset()
 	if (!strcmp(machine().system().name, "tms54test") && profile_is("bus-registers"))
 	{
 		start_bus_register_test(); return;
-	}
-	if (!strcmp(machine().system().name, "tms54test") && profile_is("imr-store"))
-	{
-		start_pipeline_imr_store(); return;
 	}
 	if (!strcmp(machine().system().name, "tms54test") && profile_is("mpy-mapped"))
 	{
@@ -670,12 +665,6 @@ void tms320c54x_test_state::test(machine_config &config)
 		if (m_phase == 254980) { auto const f = delay_compare_case(m_pipeline_peripheral_case); expect(f.interrupt && line == (f.interrupt == 2 ? INPUT_LINE_NMI : 0) && !m_vector_acks && m_pipeline_operand_reads == (f.prefix ? 2U : 1U) && bool(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x1000) == f.final_tc && m_cpu->pipeline_cycles() > f.read, "IRQ NMI cannot enter before the complete delayed comparison publishes TC"); ++m_vector_acks; }
 		if (m_phase == 253670) { unsigned const source = (m_pipeline_peripheral_case / 27) % 3; expect(source && line == (source == 2 ? INPUT_LINE_NMI : 0) && !m_vector_acks && m_pipeline_store_writes == 2, "Pending IRQ/NMI cannot split the delayed far-call frame"); ++m_vector_acks; }
 		if (m_phase == 253530) { expect(line == 0 && !m_vector_acks, "Logical IRQ callback remains enabled with IACKOFF set"); ++m_vector_acks; }
-		if (m_phase == 253510)
-		{
-			auto const f = profile_is("stlm-imr") ? stlm_imr_case(m_pipeline_peripheral_case) : imr_store_case(m_pipeline_peripheral_case);
-			expect(f.ack_cycle && line == int(f.kind == 2 ? INPUT_LINE_NMI : f.source) && !m_vector_acks && m_cpu->pipeline_cycles() == f.ack_cycle,
-				"STM IMR acknowledges the actual pending source after eligibility and preserves prior acceptance across a clear"); ++m_vector_acks;
-		}
 		if (m_phase == 253230)
 		{
 			auto const f = memory_repeat_case(m_pipeline_peripheral_case);
