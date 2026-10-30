@@ -2816,40 +2816,7 @@ u16 tms320c54x_test_state::block_banz_resolved(unsigned v, unsigned iteration)
 	return resolved;
 }
 
-tms320c54x_test_state::push_pop_same_fixture tms320c54x_test_state::push_pop_same_case(unsigned v)
-{
-	u16 const source = 8 + v % 8;
-	u16 value = std::array<u16, 4>{0, 1, 0x8000, 0xffff}[(v / 8) % 4];
-	if (source == 0x0a || source == 0x0d) value &= 0xff;
-	return {source, std::array<u16, 4>{0x0e, 0x13, 0x19, 0x18}[(v / 32) % 4], value, u16(0x3000 + (v / 128) % 2),
-		(v / 256) % 2 ? 0x20000U : 0U, std::array<unsigned, 4>{4, 5, 6, 7}[v / 512]};
-}
 
-void tms320c54x_test_state::start_push_pop_same(unsigned variant)
-{
-	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-	auto const f = push_pop_same_case(variant); auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
-	for (unsigned i = 0; i < 16; ++i) program.write_word(f.base + 0x600 + i, 0xf495);
-	program.write_word(f.base + 0x600, 0x4a00 | f.source); program.write_word(f.base + 0x601, 0x8a00 | f.destination); program.write_word(f.base + 0x602, 0xf4e1);
-	m_cpu->set_pipeline_frontend(false);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0); m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xa608); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x900); m_cpu->set_state_int(tms320c54x_device::STATE_SP, f.sp);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
-	m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x123456789aULL); m_cpu->set_state_int(tms320c54x_device::STATE_B, 0xfedcba9876ULL);
-	data.write_word(f.source, f.value); data.write_word(f.sp - 1, 0xbeef);
-	m_pipeline_operand_reads = m_fast_stack_reads = m_pipeline_store_writes = m_pipeline_register_writes = 0;
-	m_pipeline_operand_tap = data.install_read_tap(0, 0xffff, "push_pop_same_read", [this, f](offs_t at, u16 &word, u16) {
-		if (machine().side_effects_disabled()) return;
-		if (at == f.source) { expect(!m_pipeline_operand_reads && word == f.value && m_cpu->pipeline_cycles() == 5, "PSHM captures the mapped source once before later mutation"); ++m_pipeline_operand_reads; return; }
-		expect(at == f.sp - 1 && word == f.value && !m_fast_stack_reads && m_pipeline_store_writes == 1 && m_cpu->pipeline_cycles() == 6, "Adjacent POPM receives the pending PSHM word, not old RAM"); ++m_fast_stack_reads;
-		auto const disable = machine().disable_side_effects(); m_cpu->space(AS_DATA).write_word(at, 0xbeef); });
-	m_pipeline_write_tap = data.install_write_tap(0, 0xffff, "push_pop_same_write", [this, f](offs_t at, u16 &word, u16) {
-		if (machine().side_effects_disabled()) return;
-		if (at == f.sp - 1) { expect(!m_pipeline_store_writes && word == f.value && m_pipeline_operand_reads == 1 && m_cpu->pipeline_cycles() == 6, "PSHM publishes its retained word once in Execute"); ++m_pipeline_store_writes; return; }
-		expect(at == f.destination && word == f.value && !m_pipeline_register_writes && m_fast_stack_reads == 1 && m_cpu->pipeline_cycles() == (f.destination == 0x0e ? 7 : 6), "POPM publishes the captured word at the destination's existing owned clock"); ++m_pipeline_register_writes; });
-	m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 255500;
-	m_cpu->set_state_int(STATE_GENPC, f.base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-}
 
 bool tms320c54x_test_state::mvdd_source_owned(u16 address)
 {
@@ -4129,32 +4096,6 @@ bool tms320c54x_test_state::check_memory_repeat_results()
 }
 
 
-bool tms320c54x_test_state::check_push_pop_same_results()
-{
-	if (m_phase == 255500)
-	{
-		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick; auto const f = push_pop_same_case(variant);
-		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Adjacent stack pair stays within admitted forms");
-		if (tick == 5) { auto const disable = machine().disable_side_effects(); m_cpu->space(AS_DATA).write_word(f.source, 0xdead); }
-		capture_pipeline_at(f.checkpoint, {&m_pipeline_operand_reads, &m_fast_stack_reads, &m_pipeline_store_writes, &m_pipeline_register_writes},
-			"Save PSHM capture, pending write or retained POPM operand");
-		if (tick == 16)
-		{
-			{ auto const disable = machine().disable_side_effects(); expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_cpu->state_int(STATE_GENPC) == f.base + 0x603 &&
-				m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0xa608 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == 0x900 && m_cpu->state_int(tms320c54x_device::STATE_SP) == (f.destination == 0x18 ? f.value : f.sp) &&
-				m_pipeline_operand_reads == 1 && m_fast_stack_reads == 1 && m_pipeline_store_writes == 1 && m_pipeline_register_writes == 1 && m_cpu->space(AS_DATA).read_word(f.destination) == f.value, "Adjacent PSHM POPM preserves the forwarded word, stack ownership and flags across replay"); }
-			if (replay_pipeline_at(255510, f.checkpoint,
-				"Restore adjacent stack pair without rereading or duplicating either publication")) return true;
-			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (variant < 2047) { start_push_pop_same(variant + 1); return true; }
-			osd_printf_info("TMS320C54x adjacent PSHM POPM: PASS cases=2048 restore=2048 sources=8 destinations=T,AR3,BK,SP patterns=4 pages=2 stack_alignments=2 snapshots=4 source_reads=1 stack_reads=1 stack_writes=1 register_writes=1 source_mutation_after_read=1 stack_mutation_after_read=1 logical_bypass=1 interrupt_composition=unvalidated physical_phase_claim=0\n");
-			throw emu_fatalerror(0, "TMS320C54x isolated adjacent PSHM POPM complete");
-		}
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 255510) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 255500; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true; }
-	return false;
-}
 
 bool tms320c54x_test_state::check_asm_store_results_part2()
 {

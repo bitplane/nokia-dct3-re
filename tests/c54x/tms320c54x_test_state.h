@@ -1064,14 +1064,6 @@ private:
 	static repeat_context_fixture repeat_context_case(unsigned v);
 	u16 repeat_context_word(repeat_context_fixture const &f, unsigned part) const;
 	void start_repeat_context(unsigned variant = 0);
-	struct push_pop_same_fixture
-	{
-		u16 source, destination, value, sp;
-		u32 base;
-		unsigned checkpoint;
-	};
-	static push_pop_same_fixture push_pop_same_case(unsigned v);
-	void start_push_pop_same(unsigned variant = 0);
 	static bool mvdd_source_owned(u16 address);
 	static u64 mvdd_source_a(unsigned pattern);
 	static u64 mvdd_source_b(unsigned pattern);
@@ -1383,7 +1375,6 @@ private:
 	bool check_staged_load_results();
 	bool check_immediate_arithmetic_results();
 	bool check_memory_repeat_results();
-	bool check_push_pop_same_results();
 	bool check_asm_store_results_part2();
 	bool check_fcala_delay_results();
 	bool check_body_repeat_results();

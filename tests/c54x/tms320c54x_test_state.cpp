@@ -204,7 +204,6 @@ void tms320c54x_test_state::machine_reset()
 		{ {"repeat-pmst"}, [](self &test) { test.start_repeat_context(); } },
 		{ {"repeat-popd"}, [](self &test) { test.start_repeat_context(); } },
 		{ {"rptb-bcd", "rptb-bd", "rptb-banz", "rptb-tc-delay"}, [](self &test) { test.start_block_bcd(); } },
-		{ {"push-pop-same"}, [](self &test) { test.start_push_pop_same(); } },
 		{ {"fcala-producer"}, [](self &test) { test.start_accumulator_call(); } },
 		{ {"fcala-delay"}, [](self &test) { test.start_fcala_delay(); } },
 		{ {"fcala"}, [](self &test) { test.start_accumulator_call(); } },

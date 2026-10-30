@@ -172,6 +172,7 @@ def main():
     counts['load_status'] = 48
     counts['status_consumer'] = 128
     counts['repeat_prefix'] = 14
+    counts['push_pop_forwarding'] = 256
     parser.add_argument('section', choices=[*counts, 'all'])
     parser.add_argument('--jobs', type=int, default=8)
     parser.add_argument('--negative-control', action='store_true', help='require failure of an intentionally wrong expectation')
