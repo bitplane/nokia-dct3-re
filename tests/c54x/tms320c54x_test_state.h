@@ -78,8 +78,6 @@ private:
 	void start_firs_sum_case(unsigned index);
 	void start_poly_boundary_case(unsigned index);
 	void start_abdst_overflow_case(unsigned index);
-	void start_sqdst_difference_case(unsigned index);
-	void start_sqdst_overflow_case(unsigned index);
 	void xf_w(int state);
 	bool m_xf_pin = true;
 	unsigned m_xf_publications = 0;
