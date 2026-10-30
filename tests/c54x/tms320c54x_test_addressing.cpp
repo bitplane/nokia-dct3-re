@@ -1905,42 +1905,6 @@ u16 tms320c54x_test_state::square_repeat_memory(poly_fixture const &f, unsigned 
 
 
 
-void tms320c54x_test_state::start_mvdp(unsigned variant)
-{
-	m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
-	m_pipeline_peripheral_case = variant;
-	unsigned const form = variant % 7, reg = (variant / 7) % 8;
-	u32 const base = (variant / 56) % 2 ? 0x20000 : 0;
-	bool const extended = form >= 3;
-	u16 const source = std::array<u16, 7>{0x1203, 0x1203, 0x1230, 0x1230, 0x122f, 0x1231, 0x1201}[form];
-	u8 const mode = form < 2 ? 3 : form == 2 ? 0x90 + reg : form == 3 ? 0xf8 : 0xe0 + (form - 4) * 8 + reg;
-	auto &program = m_cpu->space(AS_PROGRAM);
-	for (unsigned i = 0; i < 16; ++i) program.write_word(base + 0x600 + i, 0xf495);
-	program.write_word(base + 0x600, 0x7d00 | mode);
-	// Absolute Smem precedes pmad; long-offset Smem follows pmad.
-	program.write_word(base + 0x601, form == 3 ? source : 0x2e00);
-	if (extended) program.write_word(base + 0x602, form == 3 ? 0x2e00 : form == 4 ? 0xffff : form == 5 ? 1 : 2);
-	program.write_word(base + 0x602 + extended, 0xf4e1);
-	program.write_word(base + 0x2e00, 0xbeef);
-	m_cpu->space(AS_DATA).write_word(source, 0x2468);
-	set_registers(*m_cpu, {
-		{cpu_regs::STATE_IDLE, 0}, {cpu_regs::STATE_ILLEGAL, 0}, {cpu_regs::STATE_PMST, 0},
-		{cpu_regs::STATE_ST0, 0xa624}, {cpu_regs::STATE_ST1, 0x800 | (form == 1 ? 0x4000 : 0)},
-		{cpu_regs::STATE_IFR, 0}, {cpu_regs::STATE_IMR, 0}, {cpu_regs::STATE_TCR, 0x10}, {cpu_regs::STATE_SP, 0x1200},
-		{cpu_regs::STATE_BK, 16},
-	});
-	for (unsigned ar = 0; ar < 8; ++ar)
-		m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + ar, ar == reg ? form == 6 ? 0x120f : 0x1230 : 0x3000 + ar);
-	m_pipeline_operand_reads = m_pipeline_store_writes = 0;
-	m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0, 0xffff, "mvdp_source",
-		[this, source](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return; expect(at == source && word == 0x2468 && !m_pipeline_operand_reads, "MVDP reads the retained source exactly once"); ++m_pipeline_operand_reads; });
-	m_pipeline_write_tap = program.install_write_tap(0, 0x7fffff, "mvdp_destination",
-		[this, base](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return; expect(at == base + 0x2e00 && word == 0x2468 && !m_pipeline_store_writes, "MVDP writes once in its instruction page"); ++m_pipeline_store_writes; });
-	m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 259900;
-	m_cpu->set_state_int(STATE_GENPC, base + 0x600);
-	m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE);
-	m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-}
 
 
 
@@ -1954,8 +1918,17 @@ void tms320c54x_test_state::start_repeat_mvdp(unsigned variant)
 	u32 const base = (variant / 200) % 2 ? 0x20000 : 0;
 	bool const mapped = (variant / 1600) % 2;
 	u16 const destination = (variant / 800) % 2 ? 0xfffc : 0x2e00;
-	start_mvdp((form == 1 ? 1 : 0) + reg * 7 + (base ? 56 : 0));
-	m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove();
+	m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
+	set_registers(*m_cpu, {
+		{cpu_regs::STATE_IDLE, 0}, {cpu_regs::STATE_ILLEGAL, 0}, {cpu_regs::STATE_PMST, 0},
+		{cpu_regs::STATE_ST0, 0xa624}, {cpu_regs::STATE_ST1, 0x800 | (form == 1 ? 0x4000 : 0)},
+		{cpu_regs::STATE_IFR, 0}, {cpu_regs::STATE_IMR, 0}, {cpu_regs::STATE_TCR, 0x10},
+		{cpu_regs::STATE_SP, 0x1200}, {cpu_regs::STATE_BK, 16},
+	});
+	for (unsigned ar = 0; ar < 8; ++ar)
+		m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + ar, ar == reg ? 0x1230 : 0x3000 + ar);
+	m_pipeline_operand_reads = m_pipeline_store_writes = 0;
+	m_pipeline_replay = false; m_idle_fixture_tick = 0;
 	m_pipeline_peripheral_case = variant;
 	auto &program = m_cpu->space(AS_PROGRAM);
 	unsigned const prefix = long_count ? 2 : 1;
@@ -1997,26 +1970,10 @@ void tms320c54x_test_state::start_repeat_mvdp(unsigned variant)
 			++m_pipeline_store_writes;
 		});
 	m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_phase = 259940;
+	m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE);
+	m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 }
 
-void tms320c54x_test_state::start_mvdp_pair(unsigned variant)
-{
-	start_mvdp(16 + (variant / 6) * 56);
-	m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove();
-	m_pipeline_peripheral_case = variant;
-	u32 const base = variant / 6 ? 0x20000 : 0;
-	auto &program = m_cpu->space(AS_PROGRAM);
-	program.write_word(base + 0x602, 0x7d92);
-	program.write_word(base + 0x603, 0x2e01);
-	program.write_word(base + 0x604, 0xf4e1);
-	program.write_word(base + 0x2e01, 0xbeef);
-	m_cpu->space(AS_DATA).write_word(0x1231, 0x1357);
-	m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0, 0xffff, "mvdp_pair_source",
-		[this](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return; expect(m_pipeline_operand_reads < 2 && at == 0x1230 + m_pipeline_operand_reads && word == (m_pipeline_operand_reads ? 0x1357 : 0x2468), "Adjacent MVDP sources are read once in order"); ++m_pipeline_operand_reads; });
-	m_pipeline_write_tap = program.install_write_tap(0, 0x7fffff, "mvdp_pair_destination",
-		[this, base](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return; expect(m_pipeline_store_writes < 2 && at == base + 0x2e00 + m_pipeline_store_writes && word == (m_pipeline_store_writes ? 0x1357 : 0x2468), "Adjacent MVDP destinations remain instruction-owned"); ++m_pipeline_store_writes; });
-	m_phase = 259920;
-}
 
 void tms320c54x_test_state::start_write_a(unsigned variant)
 {
@@ -3594,61 +3551,6 @@ bool tms320c54x_test_state::check_program_transfer_results()
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
 	}
 	if (m_phase == 259950) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 259940; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true; }
-	if (m_phase == 259920)
-	{
-		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
-		unsigned const checkpoint = std::array<unsigned, 6>{5, 6, 8, 9, 10, 12}[variant % 6];
-		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Adjacent standalone MVDP remains admitted");
-		capture_pipeline_at(checkpoint, {&m_pipeline_operand_reads, &m_pipeline_store_writes},
-			"Save adjacent MVDP transfers");
-		if (tick == 32)
-		{
-			expect(m_pipeline_operand_reads == 2 && m_pipeline_store_writes == 2 && m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x1232, "Adjacent MVDP completes both transfers and address updates");
-			if (replay_pipeline_at(259930, checkpoint,
-				"Restore adjacent MVDP without duplicate transfers")) return true;
-			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (variant < 11) { start_mvdp_pair(variant + 1); return true; }
-			osd_printf_info("TMS320C54x staged adjacent MVDP: PASS cases=12 restore=12 pages=2 snapshots=6 source_reads=2 program_writes=2\n");
-			throw emu_fatalerror(0, "TMS320C54x isolated adjacent MVDP complete");
-		}
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 259930) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 259920; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true; }
-	if (m_phase == 259900)
-	{
-		unsigned const variant = m_pipeline_peripheral_case, form = variant % 7, reg = (variant / 7) % 8;
-		unsigned const tick = ++m_idle_fixture_tick, extra = form >= 3;
-		unsigned const checkpoint = std::array<unsigned, 3>{5, 6, 8}[variant / 112] + extra;
-		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Legal standalone MVDP is admitted by the staged frontend");
-		if (tick == 5 + extra)
-		{
-			u16 const next = form == 6 ? 0x1201 : form == 2 || form == 5 ? 0x1231 : 0x1230;
-			expect(m_cpu->state_int(tms320c54x_device::STATE_AR0 + reg) == next, "MVDP modifies its address once in Access");
-			m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + reg, 0x4000);
-		}
-		if (tick == 6 + extra)
-		{
-			u16 const source = std::array<u16, 7>{0x1203, 0x1203, 0x1230, 0x1230, 0x122f, 0x1231, 0x1201}[form];
-			auto const disable = machine().disable_side_effects();
-			m_cpu->space(AS_DATA).write_word(source, 0xdead);
-		}
-		capture_pipeline_at(checkpoint, {&m_pipeline_operand_reads, &m_pipeline_store_writes},
-			"Save MVDP before source and during the retained transfer");
-		if (tick == 24)
-		{
-			{ auto const disable = machine().disable_side_effects();
-				expect(m_cpu->space(AS_PROGRAM).read_word(((variant / 56) % 2 ? 0x20000 : 0) + 0x2e00) == 0x2468, "MVDP publishes data in executable program storage"); }
-			expect(m_pipeline_operand_reads == 1 && m_pipeline_store_writes == 1 && m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_cpu->state_int(tms320c54x_device::STATE_AR0 + reg) == 0x4000, "MVDP retains its source without reapplying the address update");
-			if (replay_pipeline_at(259910, checkpoint,
-				"Restore MVDP without duplicate source or destination effects")) return true;
-			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (variant < 335) { start_mvdp(variant + 1); return true; }
-			osd_printf_info("TMS320C54x staged MVDP: PASS cases=336 restore=336 forms=7 registers=8 pages=2 snapshots=3 source_reads=1 program_writes=1 repeat=unvalidated silicon_phase_claim=0\n");
-			throw emu_fatalerror(0, "TMS320C54x isolated MVDP complete");
-		}
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 259910) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 259900; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true; }
 	if (m_phase == 254800)
 	{
 		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;

@@ -227,6 +227,7 @@ def main():
     counts['atomic_absolute_literals'] = 30
     counts['atomic_condition_edges'] = 6
     counts['pmst_store'] = 4608
+    counts['mvdp'] = 41
     parser.add_argument('section', choices=[*counts, 'all'])
     parser.add_argument('--jobs', type=int, default=8)
     parser.add_argument('--negative-control', action='store_true', help='require failure of an intentionally wrong expectation')

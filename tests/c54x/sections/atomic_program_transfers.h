@@ -35,7 +35,7 @@ inline std::vector<clocked_register_case> section_cases()
 			initial.program.push_back({v.program + i,v.to_program ? u16(0) : word});
 			final.expected_data.push_back({v.data + i,word}); final.expected_program.push_back({v.program + i,word});
 			c.data_events->push_back({!v.to_program,v.data + i,word,0,false});
-			if (!v.to_program) c.program_events.push_back({false,v.program + i,word,0,false});
+			c.program_events.push_back({v.to_program,v.program + i,word,0,false});
 		}
 		c.states = {{0,std::move(initial)},{1,observation("pre-transfer-snapshot", {{STATE_GENPC,0x600}})},
 			{2,observation("transfer-running", {})},{48,std::move(final)}};

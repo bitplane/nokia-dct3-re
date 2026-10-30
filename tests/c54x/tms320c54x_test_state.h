@@ -862,10 +862,8 @@ private:
 	static fcala_delay_fixture fcala_delay_case(unsigned v);
 	void start_fcala_delay(unsigned variant = 0);
 	void start_accumulator_call(unsigned variant = 0);
-	void start_mvdp(unsigned variant = 0);
 	void start_repeat_mvdp(unsigned variant = 0);
 	void start_repeat_mvdp_irq(unsigned variant = 0);
-	void start_mvdp_pair(unsigned variant = 0);
 	void start_write_a(unsigned variant = 0);
 	struct delayed_conditional_call_fixture
 	{

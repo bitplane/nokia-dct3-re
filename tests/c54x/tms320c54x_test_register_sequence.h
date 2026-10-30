@@ -143,19 +143,23 @@ private:
 				});
 		if (!m_input.program_events.empty())
 		{
-			require(m_input.retained_program_reads.empty(), "one program-read policy");
+			require(m_input.retained_program_reads.empty(), "one program-event policy");
 			u32 first = ~u32(0), last = 0;
 			for (auto const &event : m_input.program_events) { first = std::min(first,event.address); last = std::max(last,event.address); }
-			m_program_tap = m_cpu.space(AS_PROGRAM).install_read_tap(first,last,"register_sequence_program",
-				[this](offs_t at, u16 &word, u16) {
+			bool const writes = std::any_of(m_input.program_events.begin(),m_input.program_events.end(),[](auto const &event) { return event.write; });
+			auto access = [this,writes](bool write,offs_t at,u16 word) {
 					if (m_machine.side_effects_disabled()) return;
-					bool selected = false;
-					for (auto const &event : m_input.program_events) selected |= event.address == at;
+					bool selected = write && writes;
+					if (!write) for (auto const &event : m_input.program_events) selected |= !event.write && event.address == at;
 					if (selected && !accept_data_event(m_input.program_events,m_program_cursor,
-						{false,u32(at),word,unsigned(m_cpu.pipeline_cycles())}))
-						throw emu_fatalerror("C54x program case=%u event=%u address=%x value=%x clock=%llu",m_case,m_program_cursor,
+						{write,u32(at),word,unsigned(m_cpu.pipeline_cycles())}))
+						throw emu_fatalerror("C54x program case=%u event=%u write=%u address=%x value=%x clock=%llu",m_case,m_program_cursor,unsigned(write),
 							unsigned(at),word,(unsigned long long)m_cpu.pipeline_cycles());
-				});
+				};
+			// Write-owning cases observe the whole program bus; read-only cases retain their bounded tap.
+			m_program_tap = m_cpu.space(AS_PROGRAM).install_readwrite_tap(writes ? 0 : first,writes ? 0x7fffff : last,"register_sequence_program",
+				[access](offs_t at,u16 &word,u16) { access(false,at,word); },
+				[access](offs_t at,u16 &word,u16) { access(true,at,word); });
 		}
 		else if (!m_input.retained_program_reads.empty())
 		{
