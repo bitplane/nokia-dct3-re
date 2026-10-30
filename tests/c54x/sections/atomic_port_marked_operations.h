@@ -56,6 +56,27 @@ inline std::vector<clocked_register_case> section_cases()
 			{true,0x124,0x5678,0,false,{},call ? 6U : 7U}};
 		cases.push_back(std::move(c));
 	}
+	for (unsigned variant = 0; variant != 3; ++variant) {
+		bool const delayed = variant == 2;
+		bool const taken = variant != 0;
+		std::vector<u16> words{0x75d6,0x124,u16(delayed ? 0xfe00 : 0xfc30)};
+		if (delayed) words.insert(words.end(),{0xe801,0xe802});
+		words.insert(words.end(),{0x75d6,0x124,0xf4e1});
+		auto initial = initial_case("atomic-port-marked-conditional-or-delayed-return",{0xf495});
+		for (unsigned i = 0; i != words.size(); ++i) initial.program[1+i].value = words[i];
+		initial.program.insert(initial.program.end(),{{0x700,0x75d6},{0x701,0x124},{0x702,0xf4e1}});
+		initial.initial.insert(initial.initial.end(),{{r::STATE_SP,0x300},{r::STATE_AR6,0x103},{r::STATE_BK,4},
+			{r::STATE_ST0,variant == 1 ? 0x1000U : 0U},{r::STATE_ST1,0},{r::STATE_A,0}});
+		initial.data = {{0x300,0x700},{0x103,0x1234},{0x100,0x5678}};
+		auto final = observation("return-selection-delay-effects-stack-and-timing",{{STATE_GENPC,taken ? 0x703U : 0x607U},
+			{r::STATE_SP,taken ? 0x301U : 0x300U},{r::STATE_AR6,0x101},{r::STATE_A,delayed ? 2U : 0U}});
+		final.expected_data = initial.data;
+		clocked_register_case c{{{0,std::move(initial)},{1,observation("before-return-markers",{{STATE_GENPC,0x601}})},
+			{2,observation("return-markers-running",{})},{48,std::move(final)}},3,48};
+		c.pipeline_frontend = false; c.observed_data_space = AS_IO;
+		c.data_events = std::vector<clocked_data_event>{{true,0x124,0x1234,0,false},{true,0x124,0x5678,0,false,{},taken ? 7U : 5U}};
+		cases.push_back(std::move(c));
+	}
 	return cases;
 }
 }
