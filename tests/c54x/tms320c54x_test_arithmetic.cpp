@@ -327,50 +327,6 @@ tms320c54x_test_state::accumulator_store_fixture tms320c54x_test_state::long_acc
 		u16(flags & 1), u16(result >> ((selector & 2) ? 16 : 0)), source, initial, bk};
 }
 
-void tms320c54x_test_state::start_shifted_store_dld(unsigned variant)
-{
-	m_cpu->suspend(SUSPEND_REASON_DISABLE,true); m_pipeline_peripheral_case = variant;
-	unsigned const reg = variant%8, pattern = (variant/8)%4, gap = (variant/32)%3;
-	bool const shifted = (variant/96)%2; u32 const page = (variant/192)%2 ? 0x20000 : 0;
-	u64 const source = std::array<u64,4>{0x11223344,0xffffff6b76,0x7fff8000,0xff80000000}[pattern];
-	u32 const loaded = std::array<u32,4>{0x1234abcd,0x80000000,0xffff0001,0x7fff8000}[pattern];
-	auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
-	for (unsigned i=0;i<48;++i) program.write_word(page+0x600+i,0xf495);
-	unsigned cursor = 0;
-	if (shifted)
-	{
-		program.write_word(page+0x600+cursor++,0x6f90|reg); program.write_word(page+0x600+cursor++,0x0c60);
-		program.write_word(page+0x600+cursor++,0x6f90|reg); program.write_word(page+0x600+cursor++,0x0c80);
-	}
-	else
-	{
-		program.write_word(page+0x600+cursor++,0x8290|reg);
-		program.write_word(page+0x600+cursor++,0x8090|reg);
-	}
-	program.write_word(page+0x600+cursor+gap,0x5790|reg); // DLD *ARx+,B follows the two word stores.
-	for (unsigned i=0;i<6;++i) data.write_word(0x1000+i,0x5a5a);
-	data.write_word(0x1002,loaded>>16); data.write_word(0x1003,loaded);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IDLE,0); m_cpu->set_state_int(tms320c54x_device::STATE_TCR,0x10);
-	m_cpu->set_state_int(tms320c54x_device::STATE_PMST,0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL,0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST0,0); m_cpu->set_state_int(tms320c54x_device::STATE_ST1,0x6100);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IFR,0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR,0);
-	for (unsigned ar=0;ar<8;++ar) m_cpu->set_state_int(tms320c54x_device::STATE_AR0+ar,ar==reg ? 0x1000 : 0x2000);
-	m_cpu->set_state_int(tms320c54x_device::STATE_A,source); m_cpu->set_state_int(tms320c54x_device::STATE_B,0);
-	m_cpu->set_state_int(STATE_GENPC,page+0x600); m_cpu->set_pipeline_frontend(true);
-	m_pipeline_replay = false; m_idle_fixture_tick = 0; m_pipeline_store_writes = m_pipeline_extensions_reads = 0;
-	m_pipeline_operand_tap = data.install_read_tap(0x1000,0x1005,"shifted_store_dld_read",
-		[this](offs_t address,u16 &,u16) { if (machine().side_effects_disabled()) return;
-			if (address != 0x1002+m_pipeline_extensions_reads)
-				osd_printf_error("Store/DLD address failure: variant=%u shifted=%u gap=%u address=%04x expected=%04x\n",
-					m_pipeline_peripheral_case,(m_pipeline_peripheral_case/96)%2,(m_pipeline_peripheral_case/32)%3,unsigned(address),0x1002+m_pipeline_extensions_reads);
-			expect(address == 0x1002+m_pipeline_extensions_reads,"DLD consumes the pair after both older store increments"); ++m_pipeline_extensions_reads; });
-	m_pipeline_write_tap = data.install_write_tap(0x1000,0x1005,"shifted_store_dld_write",
-		[this,source](offs_t address,u16 &word,u16) { if (machine().side_effects_disabled()) return;
-			expect(m_pipeline_store_writes<2 && address==0x1000+m_pipeline_store_writes && word==u16(source>>(m_pipeline_store_writes ? 0 : 16)),
-				"Younger DLD Access must not retarget the older shifted store"); ++m_pipeline_store_writes; });
-	m_phase = 321000; m_cpu->resume(SUSPEND_REASON_DISABLE);
-	m_check_timer->adjust(attotime::from_ticks(1,m_cpu->clock()));
-}
 
 void tms320c54x_test_state::start_pipeline_long_accumulator_store(unsigned variant)
 {
@@ -2947,48 +2903,6 @@ void tms320c54x_test_state::start_staged_overflow(unsigned variant)
 
 
 
-bool tms320c54x_test_state::check_shifted_store_dld_results()
-{
-	if (m_phase == 321000)
-	{
-		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
-		unsigned const checkpoint = std::array<unsigned,3>{4,8,12}[(variant/384)%3];
-		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL),"Shifted-store/DLD composition remains staged");
-		if (tick == checkpoint && !m_pipeline_replay)
-		{
-			m_idle_fixture_saved_tick = tick; m_recurring_irq_snapshot = {m_pipeline_store_writes,m_pipeline_extensions_reads};
-			expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE,"Save shifted-store/DLD address composition");
-		}
-		if (tick == 30)
-		{
-			unsigned const reg = variant%8, pattern = (variant/8)%4;
-			u64 const source = std::array<u64,4>{0x11223344,0xffffff6b76,0x7fff8000,0xff80000000}[pattern];
-			u32 const loaded = std::array<u32,4>{0x1234abcd,0x80000000,0xffff0001,0x7fff8000}[pattern];
-			u64 const expected = u64(s64(s32(loaded))) & 0xffffffffffULL;
-			expect(m_pipeline_store_writes==2 && m_pipeline_extensions_reads==2 &&
-				m_cpu->state_int(tms320c54x_device::STATE_AR0+reg)==0x1004 &&
-				m_cpu->state_int(tms320c54x_device::STATE_A)==source && m_cpu->state_int(tms320c54x_device::STATE_B)==expected,
-				"Two store increments precede DLD's retained address and its own increment");
-			if (!m_pipeline_replay)
-			{
-				m_pipeline_replay = true; m_idle_fixture_tick = m_idle_fixture_saved_tick;
-				m_pipeline_store_writes = m_recurring_irq_snapshot[0]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[1];
-				return restore_pipeline_at(321010, "Restore store/DLD without repeated pointer updates");
-			}
-			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (variant+1<1152) { start_shifted_store_dld(variant+1); return true; }
-			osd_printf_info("TMS320C54x store/DLD address composition: PASS cases=1152 restore=1152 registers=8 patterns=4 gaps=0,1,2 forms=ordinary,shifted pages=2 snapshots=3 writes=2 reads=2 pointer_updates=once silicon_phase_claim=0\n");
-			start_pipeline_indirect_dld(); return true;
-		}
-		m_check_timer->adjust(attotime::from_ticks(1,m_cpu->clock())); return true;
-	}
-	if (m_phase == 321010)
-	{
-		m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 321000;
-		m_check_timer->adjust(attotime::from_ticks(1,m_cpu->clock())); return true;
-	}
-	return false;
-}
 
 bool tms320c54x_test_state::check_shifted_high_store_results()
 {

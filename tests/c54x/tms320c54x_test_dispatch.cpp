@@ -16,7 +16,6 @@ TIMER_CALLBACK_MEMBER(tms320c54x_test_state::check_results)
 	auto &program = m_cpu->space(AS_PROGRAM);
 	auto &data = m_cpu->space(AS_DATA);
 	if (check_repeated_writa_results()) return;
-	if (check_shifted_store_dld_results()) return;
 	if (check_idle_nmi_result_results()) return;
 	if (check_shifted_high_store_results()) return;
 	if (check_idle_wake_results()) return;

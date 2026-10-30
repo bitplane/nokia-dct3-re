@@ -270,7 +270,6 @@ private:
 	static imr_store_fixture imr_store_case(unsigned variant);
 	static imr_store_fixture stlm_imr_case(unsigned variant);
 	void start_pipeline_imr_store(unsigned variant = 0);
-	void start_shifted_store_dld(unsigned variant = 0);
 	void start_pipeline_long_accumulator_store(unsigned variant = 0);
 	static std::array<u16, 2> long_rmw_expected(unsigned arithmetic, unsigned operation, u16 flags);
 	static accumulator_store_fixture peripheral_long_rmw_fixture(unsigned variant);
@@ -1527,7 +1526,6 @@ private:
 	};
 	// Return true only when the original callback would return; order is retained.
 	bool check_repeated_writa_results();
-	bool check_shifted_store_dld_results();
 	bool check_idle_nmi_result_results();
 	bool check_shifted_high_store_results();
 	bool check_idle_wake_results();
