@@ -166,7 +166,6 @@ private:
 	{
 		if (profile_is("rom4-context")) m_context_coverage.add((bank << 8) | raw);
 	}
-	void start_pipeline_immediate_add(unsigned variant = 0);
 	void start_pipeline_logical_immediate(unsigned variant = 0);
 	void start_pipeline_conditional_branch(unsigned variant = 0);
 	void start_pipeline_plain_return(unsigned variant = 0);
@@ -1916,7 +1915,6 @@ private:
 	bool check_pipeline_immediate_store_results();
 	bool check_pipeline_far_return_results();
 	bool check_pipeline_far_irq_results();
-	bool check_pipeline_immediate_add_results();
 	bool check_pipeline_logical_immediate_results();
 	bool check_pipeline_conditional_branch_results();
 	bool check_pipeline_xc_irq_results();

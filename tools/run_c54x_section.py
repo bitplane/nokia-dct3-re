@@ -40,6 +40,7 @@ def main():
     counts['interrupt_mask'] = 12
     counts['status_bits'] = 128
     counts['paired_load'] = 64
+    counts['immediate_add'] = 128
     parser.add_argument('section', choices=[*counts, 'all'])
     parser.add_argument('--jobs', type=int, default=8)
     parser.add_argument('--negative-control', action='store_true', help='require failure of an intentionally wrong expectation')

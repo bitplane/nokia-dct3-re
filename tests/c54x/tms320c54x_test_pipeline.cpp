@@ -190,39 +190,6 @@ void tms320c54x_test_state::start_pipeline_mask_rmw_case()
 
 
 
-void tms320c54x_test_state::start_pipeline_immediate_add(unsigned variant)
-{
-	m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
-	m_pipeline_peripheral_case = variant;
-	bool const pattern = BIT(variant, 6);
-	unsigned const shift = std::array<unsigned, 4>{0, 1, 7, 15}[(variant >> 4) & 3];
-	u16 const literal = pattern ? 0xf495 : 1;
-	u64 const source = pattern ? 0xff80000000ULL : 0x007fffffffULL;
-	auto &program = m_cpu->space(AS_PROGRAM);
-	for (unsigned i = 0; i < 16; ++i) program.write_word(0x600 + i, 0xf495);
-	program.write_word(0x600, 0xf000 | (BIT(variant, 0) << 9) | (BIT(variant, 1) << 8) | shift);
-	program.write_word(0x601, literal);
-	set_registers(*m_cpu, {
-		{cpu_regs::STATE_TCR, 0x10}, {cpu_regs::STATE_PMST, 0}, {cpu_regs::STATE_ILLEGAL, 0},
-		{cpu_regs::STATE_ST0, 0x1b},
-	});
-	set_registers(*m_cpu, {
-		{cpu_regs::STATE_ST1, 0x800 | (BIT(variant, 2) << 8) | (BIT(variant, 3) << 9)},
-		{cpu_regs::STATE_A, BIT(variant, 0) ? 0x1111222233ULL : source},
-		{cpu_regs::STATE_B, BIT(variant, 0) ? source : 0x4444555566ULL}, {cpu_regs::STATE_IFR, 0},
-		{cpu_regs::STATE_IMR, 0}, {STATE_GENPC, 0x600},
-	});
-	m_cpu->set_pipeline_frontend(true);
-	m_pipeline_replay = false; m_pipeline_expected_cycle = 1; m_pipeline_operand_reads = 0;
-	m_pipeline_operand_tap = program.install_read_tap(0x601, 0x601, "staged_add_literal",
-		[this, literal](offs_t, u16 &value, u16) {
-			if (machine().side_effects_disabled()) return;
-			expect(value == literal && m_cpu->pipeline_cycles() == 3, "Immediate ADD fetches its retained literal once");
-			++m_pipeline_operand_reads;
-		});
-	m_phase = 251510; m_cpu->resume(SUSPEND_REASON_DISABLE);
-	m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-}
 
 void tms320c54x_test_state::start_pipeline_direct_move(unsigned variant)
 {
@@ -1340,58 +1307,6 @@ bool tms320c54x_test_state::check_pipeline_rmw_results()
 }
 
 
-bool tms320c54x_test_state::check_pipeline_immediate_add_results()
-{
-	if (m_phase == 251510)
-	{
-		u64 const cycle = m_cpu->pipeline_cycles();
-		unsigned const variant = m_pipeline_peripheral_case;
-		bool const source_b = BIT(variant, 0), destination_b = BIT(variant, 1), sxm = BIT(variant, 2), ovm = BIT(variant, 3), pattern = BIT(variant, 6);
-		unsigned const shift = std::array<unsigned, 4>{0, 1, 7, 15}[(variant >> 4) & 3];
-		u16 const literal = pattern ? 0xf495 : 1;
-		s64 const source = pattern ? -2147483648LL : 2147483647LL;
-		s64 const operand = (sxm ? s64(s16(literal)) : s64(literal)) * (s64(1) << shift);
-		s64 const sum = source + operand;
-		bool const overflow = sum < -2147483648LL || sum > 2147483647LL;
-		bool const carry = u64(u32(source)) + u32(operand) > 0xffffffffULL;
-		u64 const result = u64(ovm && overflow ? (sum < 0 ? -2147483648LL : 2147483647LL) : sum) & 0xffffffffffULL;
-		u64 const initial_a = source_b ? 0x1111222233ULL : u64(source) & 0xffffffffffULL;
-		u64 const initial_b = source_b ? u64(source) & 0xffffffffffULL : 0x4444555566ULL;
-		u64 const checkpoint = BIT(variant, 7) ? 4 : 3;
-		expect(cycle == m_pipeline_expected_cycle && !m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) &&
-			m_pipeline_operand_reads == unsigned(cycle >= 3) &&
-			m_cpu->state_int(tms320c54x_device::STATE_A) == (cycle >= 7 && !destination_b ? result : initial_a) &&
-			m_cpu->state_int(tms320c54x_device::STATE_B) == (cycle >= 7 && destination_b ? result : initial_b) &&
-			m_cpu->state_int(tms320c54x_device::STATE_ST0) == (0x1b | (cycle >= 7 ? (carry ? 0x800 : 0) | (overflow ? (destination_b ? 0x200 : 0x400) : 0) : 0)),
-			"Immediate ADD retires the retained literal with source/destination, carry, overflow and saturation semantics");
-		if (cycle == checkpoint && !m_pipeline_replay)
-		{
-			expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save partial/complete immediate ADD Decode");
-		}
-		if (cycle == 3) m_cpu->space(AS_PROGRAM).write_word(0x601, 0);
-		if (cycle == 9)
-		{
-			if (!m_pipeline_replay)
-			{
-				m_pipeline_replay = true; m_pipeline_operand_reads = 1;
-				expect(restore_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Restore retained ADD literal without a second program read");
-				return restart_pipeline_observer(251520, checkpoint + 1);
-			}
-			m_pipeline_operand_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (variant < 255) { start_pipeline_immediate_add(variant + 1); return true; }
-			osd_printf_info("TMS320C54x staged immediate ADD: PASS cases=256 selectors=4 shifts=0,1,7,15 sxm=0,1 ovm=0,1 restore=256 duplicate_literals=0\n");
-			start_pipeline_dst(); return true;
-		}
-		++m_pipeline_expected_cycle;
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 251520)
-	{
-		m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 251510;
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	return false;
-}
 
 
 bool tms320c54x_test_state::check_pipeline_sp_rmw_results()
