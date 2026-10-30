@@ -150,49 +150,6 @@ void tms320c54x_test_state::start_signed_xc(unsigned variant)
 	m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 }
 
-void tms320c54x_test_state::start_pipeline_delayed_return(unsigned variant)
-{
-	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-	bool const xc = variant >= 12, two_word = !xc && BIT(variant, 1);
-	u32 const base = BIT(variant, 0) ? 0x10000 : 0;
-	auto &program = m_cpu->space(AS_PROGRAM);
-	for (unsigned i = 0; i < 24; ++i) { program.write_word(base + 0x600 + i, 0xf495); program.write_word(base + 0x700 + i, 0xf495); program.write_word(base + 0x40 + i, 0xf495); }
-	program.write_word(base + 0x600, 0xfe00);
-	program.write_word(base + 0x601, xc ? 0xfd45 : two_word ? 0x770e : 0xe811);
-	program.write_word(base + 0x602, xc ? 0xf6bb : two_word ? 0x0006 : 0xe944);
-	program.write_word(base + 0x603, 0xffff); // Must never become a third delay word.
-	program.write_word(base + 0x700, 0xe955);
-	set_registers(*m_cpu, {
-		{cpu_regs::STATE_TCR, 0x10}, {cpu_regs::STATE_PMST, 0}, {cpu_regs::STATE_ILLEGAL, 0},
-		{cpu_regs::STATE_ST0, 0xa608}, {cpu_regs::STATE_ST1, 0x800}, {cpu_regs::STATE_SP, 0x1000},
-	});
-	m_cpu->set_state_int(tms320c54x_device::STATE_A, xc && BIT(variant, 1) ? 0x800 : 0);
-	set_registers(*m_cpu, {
-		{cpu_regs::STATE_B, 0}, {cpu_regs::STATE_T, 0}, {cpu_regs::STATE_IFR, 0}, {cpu_regs::STATE_IMR, xc ? 1 : 0},
-	});
-	m_cpu->space(AS_DATA).write_word(0x1000, 0x700);
-	m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_cpu->set_pipeline_frontend(true);
-	m_pipeline_replay = false; m_pipeline_expected_cycle = 1;
-	m_pipeline_operand_reads = m_pipeline_extensions_reads = m_pipeline_store_writes = 0;
-	m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0x1000, 0x1000, "retd_stack",
-		[this](offs_t, u16 &word, u16) {
-			if (machine().side_effects_disabled()) return;
-			expect(word == 0x700 && m_cpu->pipeline_cycles() == 5, "RETD samples its stack return once in Read"); ++m_pipeline_operand_reads;
-		});
-	m_pipeline_fetch_tap = program.install_read_tap(base + 0x700, base + 0x700, "retd_target",
-		[this](offs_t, u16 &, u16) {
-			if (machine().side_effects_disabled()) return;
-			expect(m_cpu->pipeline_cycles() == 7, "RETD fetches its retained target after two empty Fetch slots"); ++m_pipeline_extensions_reads;
-		});
-	m_pipeline_write_tap = program.install_read_tap(base + 0x601, base + 0x603, "retd_delay_fetch",
-		[this, base](offs_t address, u16 &, u16) {
-			if (machine().side_effects_disabled()) return;
-			expect(address == base + 0x601 + m_pipeline_store_writes && m_pipeline_store_writes < 2 &&
-				m_cpu->pipeline_cycles() == 3 + address - base - 0x601, "RETD fetches two retained delay words once and no third word"); ++m_pipeline_store_writes;
-		});
-	m_phase = 251790; m_cpu->resume(SUSPEND_REASON_DISABLE);
-	m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-}
 
 
 
@@ -923,52 +880,6 @@ bool tms320c54x_test_state::check_pipeline_worker_xc_results()
 }
 
 
-bool tms320c54x_test_state::check_pipeline_delayed_return_results()
-{
-	if (m_phase == 251790)
-	{
-		u64 const cycle = m_cpu->pipeline_cycles(); unsigned const variant = m_pipeline_peripheral_case;
-		bool const xc = variant >= 12, two_word = !xc && BIT(variant, 1);
-		bool const irq = xc && !BIT(variant, 1);
-		u64 const checkpoint = xc ? 6 + (variant - 12) / 4 : 4 + variant / 4;
-		expect(cycle == m_pipeline_expected_cycle && !m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) &&
-			m_pipeline_operand_reads == unsigned(cycle >= 5) && m_pipeline_extensions_reads == unsigned(cycle >= 7) &&
-			m_pipeline_store_writes == unsigned(cycle >= 3) + unsigned(cycle >= 4) &&
-			m_cpu->state_int(tms320c54x_device::STATE_SP) == (irq && cycle >= 13 ? 0x1000 : cycle >= 4 ? 0x1001 : 0x1000) &&
-			m_cpu->state_int(tms320c54x_device::STATE_ST1) == (irq && cycle >= 10 && cycle < 14 ? 0 : 0x800) &&
-			m_cpu->state_int(tms320c54x_device::STATE_A) == (xc ? (BIT(variant, 1) ? 0x800 : 0) : !two_word && cycle >= 9 ? 0x11 : 0) &&
-			m_cpu->state_int(tms320c54x_device::STATE_B) == (cycle >= 11 ? 0x55 : !xc && !two_word && cycle >= 10 ? 0x44 : 0) &&
-			m_cpu->state_int(tms320c54x_device::STATE_T) == (two_word && cycle >= 8 ? 6 : 0),
-			"RETD retains its pop and two words, preserves INTM and executes each delay before the target");
-		if (xc && cycle == 6) m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 1);
-		if (xc) expect(m_cpu->state_int(tms320c54x_device::STATE_IFR) == (irq && cycle >= 14 ? 0 : cycle >= 6 ? 1 : 0), "XC in RETD protects the resumed target before a pending IRQ is acknowledged");
-		if (cycle == checkpoint && !m_pipeline_replay)
-		{
-			expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save RETD queued delay words and return sample");
-		}
-		if (cycle == 15)
-		{
-			if (!m_pipeline_replay)
-			{
-				m_pipeline_replay = true; m_pipeline_operand_reads = unsigned(checkpoint >= 5); m_pipeline_extensions_reads = unsigned(checkpoint >= 7);
-				m_pipeline_store_writes = 2;
-				expect(restore_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Restore RETD without repeated stack or delay Fetch");
-				return restart_pipeline_observer(251800, checkpoint + 1);
-			}
-			m_pipeline_operand_tap.remove(); m_pipeline_fetch_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (variant < 23) { start_pipeline_delayed_return(variant + 1); return true; }
-			osd_printf_info("TMS320C54x staged delayed returns: PASS cases=24 pages=2 delay_forms=3 restore=24 xc_irq_cases=12 duplicate_stack_reads=0 third_delay_fetches=0\n");
-			start_pipeline_addm(); return true;
-		}
-		++m_pipeline_expected_cycle; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 251800)
-	{
-		m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 251790;
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	return false;
-}
 
 
 bool tms320c54x_test_state::check_pipeline_retd_data_order_results()

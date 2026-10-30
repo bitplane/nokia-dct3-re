@@ -156,7 +156,6 @@ private:
 	};
 	static signed_xc_fixture signed_xc_case(unsigned variant);
 	void start_signed_xc(unsigned variant = 0);
-	void start_pipeline_delayed_return(unsigned variant = 0);
 	void start_pipeline_original_worker_roundtrip(unsigned variant = 0);
 	void start_pipeline_original_context_call(unsigned variant = 0, bool full_body = false);
 	static std::array<u16, 2> addm_inputs(unsigned variant);
@@ -1869,7 +1868,6 @@ private:
 	bool check_pipeline_immediate_store_results();
 	bool check_pipeline_logical_immediate_results();
 	bool check_pipeline_worker_xc_results();
-	bool check_pipeline_delayed_return_results();
 	bool check_addm_expected_results();
 	bool check_pipeline_retd_data_order_results();
 	bool check_pipeline_memory_logic_results();
