@@ -349,6 +349,8 @@ Subsequent replacements use the same section-only workflow:
 
 | `atomic_basic_parallel_block.h` | Retain nine basic logical shift, short ASM load, delayed block repeat, dual MPY/MAC, parallel store/MACR, SQDST, delayed conditional branch and NEG examples. Explicit status/accumulators/T/pointers/BRC/memory, fixed numeric outcomes, exact dual reads or old-source store, observable delay loads, block count/BRAF retirement, carry mask and pre-operation replay. XF sink consistency remains checked for the status import. | Native9 cases/restores, unchanged count; build5.493s/run0.017s. Delete basic32 preparation and33..41 assertions/transitions; shrink basic routing to42 onward. Supersedes atomic_basic_alu_control's pending logical-shift setup. |
 
+| `atomic_accumulator_calls.h` | Retain CALA A/B and CALAD A target/return examples. Explicit accumulators, stack and subroutine store replace the phase chain. Exact call-frame write, target fetch, data write and return read; fixed continuation/SP and delayed loads prove target capture before A is overwritten. Pre-call replay, no private ROM. | Native3 cases/restores, unchanged count; build5.552s/run0.015s. Delete9107 call preparation,42..44 assertions/setup and owning route entries. |
+
 `python3 tools/run_c54x_section.py all` rebuilds/runs each replacement in
 sequence. Final measurements: immediate-store5.214/0.019s,
 basic-memory5.423/0.020s, stack5.262/0.069s, DAGEN5.406/0.126s (build/run).

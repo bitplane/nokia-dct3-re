@@ -11,23 +11,10 @@ bool tms320c54x_test_state::check_atomic_basic_results()
 {
 	[[maybe_unused]] auto &program = m_cpu->space(AS_PROGRAM);
 	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
-	if (m_phase == 9107 || m_phase == 68 || m_phase == 77)
+	if (m_phase == 68 || m_phase == 77)
 	{
 		switch (m_phase)
 		{
-		case 9107:
-			m_cpu->set_state_int(tms320c54x_device::STATE_B, 3);
-			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
-			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0);
-			program.write_word(0x0448, 0xf4e3); // CALA A
-			write_words(program, {
-				{0x0449, 0xf5e1}, {0x0450, 0x76f8}, {0x0451, 0x0944}, {0x0452, 0xbeef}, {0x0453, 0xfc00},
-			});
-			set_registers(*m_cpu, {
-				{cpu_regs::STATE_PC, 0x0448}, {cpu_regs::STATE_A, 0x0450}, {cpu_regs::STATE_SP, 0x0300},
-				{cpu_regs::STATE_IDLE, 0},
-			});
-			return next_atomic_phase(42);
 		case 68:
 			program.write_word(0x0580, 0x0082);
 			program.write_word(0x0581, 0xf020); // LD #1234, A
@@ -52,47 +39,6 @@ bool tms320c54x_test_state::check_atomic_basic_results()
 			});
 			return next_atomic_phase(78);
 		}
-	}
-	if (m_phase == 42)
-	{
-		expect(data.read_word(0x0944) == 0xbeef &&
-				m_cpu->state_int(tms320c54x_device::STATE_PC) == 0x044a &&
-				m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x0300,
-				"CALA A target and return address");
-		program.write_word(0x0460, 0xf5e3); // CALA B
-		write_words(program, {
-			{0x0461, 0xf5e1}, {0x0468, 0x76f8}, {0x0469, 0x0945}, {0x046a, 0xcafe}, {0x046b, 0xfc00},
-		});
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x0460);
-		m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x0468);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(43);
-	}
-	if (m_phase == 43)
-	{
-		expect(data.read_word(0x0945) == 0xcafe &&
-				m_cpu->state_int(tms320c54x_device::STATE_PC) == 0x0462 &&
-				m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x0300,
-				"CALA B target and return address");
-		program.write_word(0x0470, 0xf6e3); // CALAD A
-		write_words(program, {
-			{0x0471, 0xe801}, {0x0472, 0xe902}, {0x0473, 0xf5e1}, {0x0478, 0x76f8}, {0x0479, 0x0946}, {0x047a, 0x1234},
-			{0x047b, 0xfc00},
-		});
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x0470);
-		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x0478);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(44);
-	}
-	if (m_phase == 44)
-	{
-		expect(data.read_word(0x0946) == 0x1234 &&
-				m_cpu->state_int(tms320c54x_device::STATE_PC) == 0x0474 &&
-				m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x0300 &&
-				m_cpu->state_int(tms320c54x_device::STATE_A) == 1 &&
-				m_cpu->state_int(tms320c54x_device::STATE_B) == 2,
-				"CALAD delay slots and return address");
-		return true;
 	}
 	if (m_phase == 61)
 	{
