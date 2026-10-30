@@ -1075,7 +1075,6 @@ private:
 	static std::array<u64,3> register_product_reference(register_product_fixture const &f);
 	void start_register_product(unsigned variant = 0);
 	void start_mac_smem(unsigned variant = 0);
-	void start_mvmd_ar(unsigned variant = 0);
 	void start_ifr_pair(unsigned variant = 0);
 	struct mvkd_peripheral_fixture
 	{
@@ -1520,7 +1519,6 @@ private:
 	bool check_t_store_branch_results();
 	bool check_circular_portr_results();
 	bool check_ifr_pair_results();
-	bool check_mvmd_ar_results();
 	bool check_poly_results();
 	bool check_delayed_far_call_results();
 	bool check_mvkd_delay_results();

@@ -204,6 +204,8 @@ Subsequent replacements use the same section-only workflow:
 
 | `move_delay_irq.h` | Keep MVDM plus MVKD AR-source/postincrement/same-RAM forms ×all ARs ×taken/untaken BCD ×four word boundaries ×none/IRQ/NMI. Preserve move Read9/Write9 or10, two retained/poisoned literals, source poison, pointer/destination, branch marker, balanced SP and replay; acknowledgement requires both endpoint transactions first. Endpoint-scoped bus observation matches the original contract; return correctness uses PC/SP rather than claiming a complete stack trace. Retain the NOP continuation before added terminal IDLE so pending-interrupt wake is not an accidental extra subject. Distribute three checkpoints. | Native768 cases/restores versus2304; build5.530s/run0.306s. Delete setup/profile selector and routes, phases253650/253660 branches, declaration and phase-keyed ACK hook. Mixed checker retains other mapped-write banks. |
 
+| `mvmd_ar.h` | Keep all AR sources ×RAM/self-AR/other-AR destinations ×four word boundaries. Preserve retained absolute literal, source Read5/mapped Write5 or RAM Write6, post-Read source poison, destination/source/status/sibling state, terminal PC/IDLE and replay. Distribute pages and three snapshots rather than crossing them. | Native96 cases/restores versus576; build5.380s/run0.075s. Delete setup/checker, phases253710/253720, profile route/declarations/dispatch. |
+
 `python3 tools/run_c54x_section.py all` rebuilds/runs each replacement in
 sequence. Final measurements: immediate-store5.214/0.019s,
 basic-memory5.423/0.020s, stack5.262/0.069s, DAGEN5.406/0.126s (build/run).

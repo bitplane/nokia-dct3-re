@@ -83,7 +83,6 @@ TIMER_CALLBACK_MEMBER(tms320c54x_test_state::check_results)
 	if (check_t_store_branch_results()) return;
 	if (check_circular_portr_results()) return;
 	if (check_ifr_pair_results()) return;
-	if (check_mvmd_ar_results()) return;
 	if (check_poly_results()) return;
 	if (check_delayed_far_call_results()) return;
 	if (check_mvkd_delay_results()) return;
