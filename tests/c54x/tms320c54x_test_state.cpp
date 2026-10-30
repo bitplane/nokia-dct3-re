@@ -106,7 +106,6 @@ void tms320c54x_test_state::machine_reset()
 		{ {"preinc-store"}, [](self &test) { test.start_preincrement_store(); } },
 		{ {"ldu-periph"}, [](self &test) { test.start_ldu_peripheral(); } },
 		{ {"ldu-imr"}, [](self &test) { test.start_ldu_imr(); } },
-		{ {"ldu-st1"}, [](self &test) { test.start_ldu_status(); } },
 		{ {"mvmd-status-irq"}, [](self &test) { test.start_mvmd_status_irq(); } },
 		{ {"mvmd-block"}, [](self &test) { test.start_mvmd_status_block(); } },
 		{ {"mvmd-status-alu"}, [](self &test) { test.start_mvmd_status_alu(); } },

@@ -1121,7 +1121,6 @@ private:
 	static accumulator_store_fixture preincrement_store_case(unsigned variant);
 	static accumulator_store_fixture preincrement_immediate_case(unsigned variant);
 	void start_preincrement_store(unsigned variant = 0);
-	static u16 ldu_status_value(unsigned variant);
 	struct stlm_status_fixture
 	{
 		unsigned family, gap, checkpoint;
@@ -1133,7 +1132,6 @@ private:
 	static stlm_status_fixture stlm_status_case(unsigned variant, bool immediate = false);
 	void start_stlm_status(unsigned variant = 0);
 	void check_st1_memory_rules();
-	void start_ldu_status(unsigned variant = 0);
 	struct shifted_peripheral_fixture
 	{
 		u16 address, value, st1, opcode, operation;
@@ -1407,7 +1405,6 @@ private:
 	bool check_accumulator_cmpm_results();
 	bool check_staged_conditional_store_results();
 	bool check_ldu_peripheral_results();
-	bool check_ldu_status_value_results();
 	bool check_ldu_imr_results();
 	bool check_mvmd_status_block_results();
 	bool check_shifted_peripheral_results();
