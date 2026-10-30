@@ -386,6 +386,7 @@ def main():
     counts['shifted_ar_consumer'] = 5120
     counts['paired_indirect_load'] = 7680
     counts['paired_indirect_store'] = 4096
+    counts['paired_store_forwarding'] = 1152
     counts['shifted_unowned'] = 20480
     counts['shifted_bsp'] = 5120
     counts['accumulator_call_frames'] = 216

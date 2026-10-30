@@ -272,15 +272,6 @@ private:
 	void start_block_xc(unsigned variant = 0);
 	void start_move_repeat_owner(unsigned variant = 0);
 	void start_long_mapped_original(unsigned variant = 0);
-	struct dst_bypass_fixture
-	{
-		bool producer_b, sxm, sst, same;
-		unsigned kind, mode, gap, checkpoint;
-		u32 base, stored;
-		u64 source, loaded;
-	};
-	static dst_bypass_fixture dst_bypass_case(unsigned variant);
-	void start_dst_bypass(unsigned variant=0);
 	void start_pll_transition_case();
 	void start_rate_dma(bool input_clock = false);
 	void start_clkmd_rate_case();

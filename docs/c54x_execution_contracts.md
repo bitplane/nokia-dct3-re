@@ -3246,8 +3246,17 @@ Paired CPU ownership is now the independent DLD/DST sections described under
 Circular Fixture Domains. Historical `indirect-dld` profile assertion counts
 are not acceptance for these replacements or for native handset execution.
 The sections check exact opcodes, bus words/order, retained operands and CPU
-state through replay. Store/load composition and private-ROM attribution
-remain separate contracts; they are not implied by this migration.
+state through replay. Private-ROM attribution remains a separate contract.
+
+`paired_store_forwarding` owns 1,152 cases/restores: DST from A/B, high-word,
+low-word and DLD consumers, direct/short/absolute producer addressing, four
+source patterns, SST/SXM, zero/one NOP gaps and same/unrelated source pairs.
+Pages and pre/post-publication checkpoint choices are distributed. At zero
+gap, an aliased consumer uses the internal bypass with no RAM reads; other
+consumers perform exactly one/two reads in the complete ordered bus trace.
+Both physical writes remain mandatory, and final RAM and accumulators must
+match the independent saturation/sign-extension oracle. This contract checks
+transaction order, not exact bus-clock placement or physical contention.
 
 ## Mapped move and younger repeat ownership
 

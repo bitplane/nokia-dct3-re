@@ -489,66 +489,6 @@ void tms320c54x_test_state::start_long_mapped_original(unsigned variant)
 	m_cpu->set_state_int(STATE_GENPC,base+0xbdb6); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1,m_cpu->clock()));
 }
 
-tms320c54x_test_state::dst_bypass_fixture tms320c54x_test_state::dst_bypass_case(unsigned variant)
-{
-	unsigned v=variant, kind=v%3; v/=3; bool const b=v%2; v/=2;
-	unsigned const pattern=v%4; v/=4; unsigned const mode=v%3; v/=3;
-	unsigned const gap=v%2; v/=2; bool const same=v%2; v/=2;
-	bool const sxm=v%2; v/=2; bool const sst=v%2; v/=2;
-	u32 const base=v%2?0x20000:0; v/=2; unsigned const checkpoint=v%2?10:6;
-	u64 const source=std::array<u64,4>{0x0012345678ULL,0xff87654321ULL,0x0080000000ULL,0xff00000000ULL}[pattern];
-	s64 const signed_source=s64(source<<24)>>24;
-	u32 const stored=!sst?u32(source):!sxm?u32(std::min<u64>(source,0xffffffffULL)):
-		u32(std::clamp(signed_source,s64(-0x80000000LL),s64(0x7fffffffLL)));
-	u32 const memory=same?stored:0x13579bdf;
-	u16 const selected=kind==1?u16(memory):u16(memory>>16);
-	u64 const loaded=kind==2?(sxm&&BIT(memory,31)?u64(memory)|0xff00000000ULL:memory):
-		(sxm&&BIT(selected,15)?u64(selected)|0xffffff0000ULL:selected);
-	return {b,sxm,sst,same,kind,mode,gap,checkpoint,base,stored,source,loaded};
-}
-
-void tms320c54x_test_state::start_dst_bypass(unsigned variant)
-{
-	m_cpu->suspend(SUSPEND_REASON_DISABLE,true); m_cpu->set_pipeline_frontend(false); m_pipeline_peripheral_case=variant;
-	auto const f=dst_bypass_case(variant); auto &program=m_cpu->space(AS_PROGRAM); auto &data=m_cpu->space(AS_DATA);
-	for (unsigned i=0;i<16;++i) program.write_word(f.base+0x700+i,0xf495);
-	unsigned cursor=0;
-	program.write_word(f.base+0x700+cursor++,0x4e00|(f.producer_b?0x100:0)|(f.mode==0?4:f.mode==1?0x81:0xf8));
-	if (f.mode==2) program.write_word(f.base+0x700+cursor++,0x1800);
-	if (f.gap) ++cursor;
-	program.write_word(f.base+0x700+cursor++,(f.kind==2?0x5600:0x1000)|(f.producer_b?0:0x100)|0x82);
-	program.write_word(f.base+0x700+cursor,0xf4e1);
-	data.write_word(0x1800,0x2468); data.write_word(0x1801,0xace0); data.write_word(0x1900,0x1357); data.write_word(0x1901,0x9bdf);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IDLE,0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL,0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_PMST,f.sst?1:0); m_cpu->set_state_int(tms320c54x_device::STATE_ST0,0); m_cpu->set_state_int(tms320c54x_device::STATE_ST1,0x4800|(f.sxm?0x100:0));
-	m_cpu->set_state_int(tms320c54x_device::STATE_IFR,0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR,0); m_cpu->set_state_int(tms320c54x_device::STATE_TCR,0x10);
-	m_cpu->set_state_int(tms320c54x_device::STATE_SP,0x17fc); m_cpu->set_state_int(tms320c54x_device::STATE_AR1,0x1800);
-	m_cpu->set_state_int(tms320c54x_device::STATE_AR2,(f.same?0x1800:0x1900)+(f.kind==1?1:0));
-	m_cpu->set_state_int(tms320c54x_device::STATE_A,f.producer_b?0x5555:f.source); m_cpu->set_state_int(tms320c54x_device::STATE_B,f.producer_b?f.source:0x5555);
-	m_pipeline_operand_reads=m_pipeline_store_writes=0;
-	m_pipeline_operand_tap=data.install_read_tap(0,0xffff,"dst_bypass_read",[this,f](offs_t at,u16 &value,u16) {
-		if (machine().side_effects_disabled()) return;
-		u16 const first=(f.same?0x1800:0x1900)+(f.kind==1?1:0); u32 const memory=f.same?f.stored:0x13579bdf;
-		expect(at==first || (f.kind==2 && at==(first^1)),"DST consumer reads only its selected word/pair");
-		expect(value==(BIT(at,0)?u16(memory):u16(memory>>16)),"Non-bypassed DST consumer sees the stored or independent pair"); ++m_pipeline_operand_reads;
-	});
-	m_pipeline_write_tap=data.install_write_tap(0,0xffff,"dst_bypass_write",[this,f](offs_t at,u16 &value,u16) {
-		if (machine().side_effects_disabled()) return;
-		expect(m_pipeline_store_writes<2 && at==0x1800+m_pipeline_store_writes && value==(m_pipeline_store_writes?u16(f.stored):u16(f.stored>>16)),"DST preserves both ordered physical writes and saturated payload"); ++m_pipeline_store_writes;
-	});
-	m_pipeline_replay=false; m_idle_fixture_tick=0; m_phase=399960;
-	m_cpu->set_state_int(STATE_GENPC,f.base+0x700); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1,m_cpu->clock()));
-}
-
-
-
-
-
-
-
-
-
-
 tms320c54x_test_state::popd_fixture tms320c54x_test_state::popd_case(unsigned v, bool repeated)
 {
 	popd_fixture f{}; f.repeated = repeated;
@@ -2376,38 +2316,10 @@ bool tms320c54x_test_state::check_long_mapped_original_results()
 			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
 			if (variant<127) { start_long_mapped_original(variant+1); return true; }
 			osd_printf_info("TMS320C54x original escape store/load: PASS cases=128 restore=128 lengths=8 stale_values=4 sxm=2 pages=2 mapped_reads=BL,AL writes=0,5 backing_reload_reads=0 silicon_phase_claim=0\n");
-			start_dst_bypass(); return true;
 		}
 		m_check_timer->adjust(attotime::from_ticks(1,m_cpu->clock())); return true;
 	}
 	if (m_phase==399950) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase=399940; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1,m_cpu->clock())); return true; }
-	if (m_phase==399960)
-	{
-		unsigned const tick=++m_idle_fixture_tick, variant=m_pipeline_peripheral_case; auto const f=dst_bypass_case(variant);
-		if (tick==f.checkpoint && !m_pipeline_replay)
-		{
-			m_recurring_irq_snapshot={m_pipeline_operand_reads,m_pipeline_store_writes}; expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE,"Save DST forwarding dependency at selected checkpoint");
-		}
-		if (tick==48)
-		{
-			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) && m_cpu->state_int(tms320c54x_device::STATE_IDLE),"DST dependency completes cleanly");
-			expect(m_cpu->state_int(f.producer_b?tms320c54x_device::STATE_A:tms320c54x_device::STATE_B)==f.loaded && m_cpu->state_int(f.producer_b?tms320c54x_device::STATE_B:tms320c54x_device::STATE_A)==f.source,"DST consumers match independent word/pair and saturation oracle");
-			unsigned const reads=f.kind==2?2:1;
-			expect(m_pipeline_store_writes==2 && m_pipeline_operand_reads<=reads && ((f.same&&!f.gap)||m_pipeline_operand_reads==reads),"DST bypass suppresses only aliased pending reads, never real writes");
-			if (!m_pipeline_replay)
-			{
-				m_pipeline_replay=true; m_idle_fixture_tick=f.checkpoint; m_pipeline_operand_reads=m_recurring_irq_snapshot[0]; m_pipeline_store_writes=m_recurring_irq_snapshot[1];
-				return restore_pipeline_at(399970, "Restore DST dependency without duplicate reads or writes");
-			}
-			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (variant<4607) { start_dst_bypass(variant+1); return true; }
-			osd_printf_info("TMS320C54x DST read bypass: PASS cases=4608 restore=4608 accumulators=2 consumers=high,low,pair modes=3 patterns=4 gaps=0,1 aliases=2 sxm=2 sst=2 pages=2 save_points=2 writes_each=2 silicon_phase_claim=0\n");
-			if (profile_is("mpy-mapped")) throw emu_fatalerror(0,"TMS320C54x isolated MPY mapped consumer complete");
-			throw emu_fatalerror("Legacy timer probes retired: run timer_irq_mask");
-		}
-		m_check_timer->adjust(attotime::from_ticks(1,m_cpu->clock())); return true;
-	}
-	if (m_phase==399970) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase=399960; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1,m_cpu->clock())); return true; }
 	if (m_phase == 253530)
 	{
 		expect(m_vector_acks == 1 && m_cpu->state_int(tms320c54x_device::STATE_B) == 0x55 && !m_bus_iack_enable,
