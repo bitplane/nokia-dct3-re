@@ -214,6 +214,8 @@ Subsequent replacements use the same section-only workflow:
 
 | `mvmd_word_register.h` | Keep T/TRN/BK and STLM-NOP→BK contexts ×all AR/BK destinations ×four word boundaries. Preserve Read-owned source/mapped publication5 (or7 after producer), STLM Write6, post-Read source mutation including self-BK, untouched source sibling/ARs/accumulators/status/SP, terminal PC/IDLE and replay. Distribute pages and three checkpoints; no semantic input combinations lost. | Native144 cases/restores versus864; build5.279s/run0.068s. Delete two profile routes, setup/checker, phases254300/254310, declarations/dispatch. |
 
+| `push_sp_forwarding.h` | Keep one/two PSHM ×AR2/ST0/ST1/SP last sources ×three gaps ×all MVMM AR destinations ×normal/wrapping SP. Preserve every-clock Read-owned stack allocation, Decode-time mapped SP sample versus internally forwarded final SP, exact ordered source/stack/mapped transactions, opcode poison, source/status/sibling state, terminal PC/IDLE and cleared-pipeline replay. Equal-clock ordering explicitly separates PSHM Read, older stack Write, younger Decode SP read and MVMM publication (implementation contract, not measured silicon). Distribute pages/three checkpoints; no semantic combinations lost. | Native384 cases/restores versus2304; build5.577s/run0.158s. Delete setup/helper/fixture/checker, named phase pair/constant, route/declarations/dispatch. |
+
 `python3 tools/run_c54x_section.py all` rebuilds/runs each replacement in
 sequence. Final measurements: immediate-store5.214/0.019s,
 basic-memory5.423/0.020s, stack5.262/0.069s, DAGEN5.406/0.126s (build/run).

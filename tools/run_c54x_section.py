@@ -162,6 +162,7 @@ def main():
     counts['dual_memory_copy'] = 15360
     counts['branch_word_store'] = 8
     counts['mvmd_word_register'] = 144
+    counts['push_sp_forwarding'] = 384
     parser.add_argument('section', choices=[*counts, 'all'])
     parser.add_argument('--jobs', type=int, default=8)
     parser.add_argument('--negative-control', action='store_true', help='require failure of an intentionally wrong expectation')

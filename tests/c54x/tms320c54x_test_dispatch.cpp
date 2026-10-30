@@ -88,7 +88,6 @@ TIMER_CALLBACK_MEMBER(tms320c54x_test_state::check_results)
 	if (check_popd_mapped_results()) return;
 	if (check_accumulator_branch_results()) return;
 	if (check_mvdd_peripheral_results()) return;
-	if (check_push_mvmm_results()) return;
 	if (check_memory_immediate_results()) return;
 	if (check_block_branch_count_results()) return;
 	if (check_bd_long_accumulator_results()) return;

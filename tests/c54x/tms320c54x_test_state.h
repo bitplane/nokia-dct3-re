@@ -176,26 +176,6 @@ private:
 	static long_store_fixture peripheral_long_store_fixture(unsigned variant);
 	void start_pipeline_long_immediate_store(unsigned variant = 0);
 	void start_pipeline_bio_branch(unsigned variant = 0);
-	struct push_mvmm_fixture
-	{
-		unsigned pushes, mmr, gap, destination, checkpoint;
-		u16 sp;
-		u32 base;
-		unsigned read() const { return 3 + pushes + gap; }
-		u16 copied() const { return sp - pushes; }
-		u16 source(unsigned i) const { return pushes == 2 && !i ? 0x12 : mmr; }
-		u16 value(unsigned i) const { return source(i) == 0x18 ? u16(sp-i) : source(i) == 6 ? 0xa020 : source(i) == 7 ? 0x800 : 0x5002; }
-		std::vector<std::array<unsigned,3>> reads() const
-		{
-			std::vector<std::array<unsigned,3>> result;
-			for (unsigned i=0;i<pushes;++i) result.push_back({5+i,source(i),value(i)});
-			result.push_back({read(),0x18,u16(copied()+unsigned(!gap))});
-			std::stable_sort(result.begin(),result.end(),[](auto const &a,auto const &b) { return a[0]<b[0]; });
-			return result;
-		}
-	};
-	static push_mvmm_fixture push_mvmm_case(unsigned v);
-	void start_push_mvmm(unsigned variant=0);
 	void start_pipeline_mapped_load_age(unsigned variant = 0);
 	void start_pipeline_store_mvmm(unsigned variant = 0);
 	void start_pipeline_mvmm_producer(unsigned variant = 0);
@@ -1508,7 +1488,6 @@ private:
 	bool check_popd_mapped_results();
 	bool check_accumulator_branch_results();
 	bool check_mvdd_peripheral_results();
-	bool check_push_mvmm_results();
 	bool check_memory_immediate_results();
 	bool check_block_branch_count_results();
 	bool check_bd_long_accumulator_results();
@@ -1633,7 +1612,6 @@ private:
 	unsigned m_phase = 0;
 	bool (tms320c54x_test_state::*m_result_owner)() = nullptr;
 	static constexpr unsigned native_store_phase = 1'000'000; // Outside legacy phase bands.
-	static constexpr unsigned push_mvmm_phase = 1'000'060;
 	std::bitset<65536> m_asserted_opcodes;
 	std::array<u16, 3> m_native_store_context = {};
 	unsigned m_bleq_case = 0;

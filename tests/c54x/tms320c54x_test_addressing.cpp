@@ -370,47 +370,7 @@ void tms320c54x_test_state::start_pipeline_long_immediate_store(unsigned variant
 	m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 }
 
-tms320c54x_test_state::push_mvmm_fixture tms320c54x_test_state::push_mvmm_case(unsigned v)
-{
-	push_mvmm_fixture f{};
-	f.pushes=v%2+1;v/=2;f.mmr=std::array<unsigned,4>{0x12,6,7,0x18}[v%4];v/=4;
-	f.gap=v%3;v/=3;f.destination=v%8;v/=8;f.sp=v%2?0:0x3000;v/=2;
-	f.base=v%2?0x20000:0;v/=2;f.checkpoint=std::array<unsigned,3>{3,f.read(),f.read()+1}[v%3];
-	return f;
-}
 
-void tms320c54x_test_state::start_push_mvmm(unsigned variant)
-{
-	m_cpu->suspend(SUSPEND_REASON_DISABLE,true);m_pipeline_peripheral_case=variant;
-	auto const f=push_mvmm_case(variant);auto &program=m_cpu->space(AS_PROGRAM);
-	for(unsigned i=0;i<16;++i) program.write_word(f.base+0x600+i,0xf495);
-	for(unsigned i=0;i<f.pushes;++i) program.write_word(f.base+0x600+i,0x4a00|f.source(i));
-	program.write_word(f.base+0x600+f.pushes+f.gap,0xe780|f.destination);
-	program.write_word(f.base+0x601+f.pushes+f.gap,0xf4e1);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IDLE,0);m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL,0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST0,0xa020);m_cpu->set_state_int(tms320c54x_device::STATE_ST1,0x800);
-	m_cpu->set_state_int(tms320c54x_device::STATE_PMST,0);m_cpu->set_state_int(tms320c54x_device::STATE_TCR,0x10);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IFR,0);m_cpu->set_state_int(tms320c54x_device::STATE_IMR,0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_SP,f.sp);
-	m_cpu->set_state_int(tms320c54x_device::STATE_A,0x123456789aULL);m_cpu->set_state_int(tms320c54x_device::STATE_B,0xfedcba9876ULL);
-	m_cpu->set_state_int(tms320c54x_device::STATE_T,0x5aa5);m_cpu->set_state_int(tms320c54x_device::STATE_TRN,0x2468);
-	for(unsigned ar=0;ar<8;++ar) m_cpu->set_state_int(tms320c54x_device::STATE_AR0+ar,0x5000+ar);
-	m_pipeline_operand_reads=m_pipeline_store_writes=m_pipeline_register_writes=0;
-	m_pipeline_operand_tap=m_cpu->space(AS_DATA).install_read_tap(0,0xffff,"push_mvmm_reads",[this,f](offs_t at,u16 &word,u16) {
-		if(machine().side_effects_disabled()) return;
-		auto const reads=f.reads();unsigned const i=m_pipeline_operand_reads++;
-		expect(i<reads.size() && m_cpu->pipeline_cycles()==reads[i][0] && at==reads[i][1] && word==reads[i][2],"PSHM and MVMM own their ordered source samples before the internal SP bypass");
-	});
-	m_pipeline_write_tap=m_cpu->space(AS_DATA).install_write_tap(0,0xffff,"push_mvmm_writes",[this,f](offs_t at,u16 &word,u16) {
-		if(machine().side_effects_disabled()) return;
-		if(at==0x10+f.destination) { expect(!m_pipeline_register_writes++ && word==f.copied() && m_cpu->pipeline_cycles()==f.read()+1,"MVMM publishes the older pushes' SP once in Access");return; }
-		unsigned const i=m_pipeline_store_writes++;
-		expect(i<f.pushes && at==u16(f.sp-1-i) && word==f.value(i) && m_cpu->pipeline_cycles()==6+i,"PSHM retains its source and owns exactly one original stack write");
-	});
-	m_pipeline_replay=false;m_idle_fixture_tick=0;m_phase=push_mvmm_phase;
-	m_cpu->set_state_int(STATE_GENPC,f.base+0x600);m_cpu->set_pipeline_frontend(true);m_cpu->resume(SUSPEND_REASON_DISABLE);
-	m_check_timer->adjust(attotime::from_ticks(1,m_cpu->clock()));
-}
 
 
 void tms320c54x_test_state::start_pipeline_mapped_load_age(unsigned variant)
@@ -5757,40 +5717,6 @@ bool tms320c54x_test_state::check_popd_mapped_results()
 }
 
 
-bool tms320c54x_test_state::check_push_mvmm_results()
-{
-	if(m_phase==push_mvmm_phase)
-	{
-		unsigned const variant=m_pipeline_peripheral_case,tick=++m_idle_fixture_tick;auto const f=push_mvmm_case(variant);
-		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL),"PSHM and MVMM SP remain admitted");
-		unsigned const allocated=tick<5?0:std::min(tick-4,f.pushes);
-		expect(m_cpu->state_int(tms320c54x_device::STATE_SP)==u16(f.sp-allocated),"MVMM SP forwarding does not move or duplicate PSHM's Read allocation");
-		if(tick==f.read()) { auto const disable=machine().disable_side_effects();m_cpu->space(AS_PROGRAM).write_word(f.base+0x600+f.pushes+f.gap,0xffff); }
-		if(tick==f.checkpoint && !m_pipeline_replay)
-		{
-			m_recurring_irq_snapshot={m_pipeline_operand_reads,m_pipeline_store_writes,m_pipeline_register_writes};
-			expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE,"Save pending stack allocation and retained MVMM SP sample");
-		}
-		if(tick==24)
-		{
-			expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_pipeline_operand_reads==f.pushes+1 && m_pipeline_store_writes==f.pushes && m_pipeline_register_writes==1,"PSHM/MVMM performs no duplicate source, stack or register transactions");
-			for(unsigned ar=0;ar<8;++ar) expect(m_cpu->state_int(tms320c54x_device::STATE_AR0+ar)==(ar==f.destination?f.copied():0x5000+ar),"Only the selected MVMM destination changes");
-			expect(m_cpu->state_int(tms320c54x_device::STATE_ST0)==0xa020 && m_cpu->state_int(tms320c54x_device::STATE_ST1)==0x800 && m_cpu->state_int(tms320c54x_device::STATE_A)==0x123456789aULL && m_cpu->state_int(tms320c54x_device::STATE_B)==0xfedcba9876ULL && m_cpu->state_int(tms320c54x_device::STATE_T)==0x5aa5 && m_cpu->state_int(tms320c54x_device::STATE_TRN)==0x2468,"PSHM/MVMM preserves arithmetic and unrelated registers");
-			if(!m_pipeline_replay)
-			{
-				m_pipeline_replay=true;m_idle_fixture_tick=f.checkpoint;m_pipeline_operand_reads=m_recurring_irq_snapshot[0];m_pipeline_store_writes=m_recurring_irq_snapshot[1];m_pipeline_register_writes=m_recurring_irq_snapshot[2];
-				m_cpu->set_pipeline_frontend(true);return restore_pipeline_at(push_mvmm_phase+1, "Restore PSHM/MVMM after clearing the future pipeline");
-			}
-			m_pipeline_operand_tap.remove();m_pipeline_write_tap.remove();m_cpu->set_pipeline_frontend(false);
-			if(variant<2303) { start_push_mvmm(variant+1);return true; }
-			osd_printf_info("TMS320C54x PSHM MVMM SP: PASS cases=2304 restore=2304 pushes=1,2 last_sources=AR2,ST0,ST1,SP gaps=0,1,2 destinations=8 stack_wrap=1 pages=2 snapshots=3 source=Decode publication=Access stack_allocation=Read stack_write=Execute opcode_poison=1 duplicate_transactions=0 physical_phase_claim=0\n");
-			throw emu_fatalerror(3,"TMS320C54x isolated PSHM MVMM SP complete");
-		}
-		m_check_timer->adjust(attotime::from_ticks(1,m_cpu->clock()));return true;
-	}
-	if(m_phase==push_mvmm_phase+1) { m_cpu->resume(SUSPEND_REASON_DISABLE);m_phase=push_mvmm_phase;m_check_timer->enable(true);m_check_timer->adjust(attotime::from_ticks(1,m_cpu->clock()));return true; }
-	return false;
-}
 
 bool tms320c54x_test_state::check_t_move_results()
 {

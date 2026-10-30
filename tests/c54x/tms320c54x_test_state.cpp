@@ -93,7 +93,6 @@ void tms320c54x_test_state::machine_reset()
 		{ {"st-long-periph"}, [](self &test) { test.start_pipeline_long_immediate_store(); } },
 		{ {"st-mvmm"}, [](self &test) { test.start_pipeline_store_mvmm(); } },
 		{ {"st-acc-mvmm"}, [](self &test) { test.start_pipeline_store_mvmm(); } },
-		{ {"push-mvmm-sp"}, [](self &test) { test.start_push_mvmm(); } },
 		{ {"ldm-ar-age"}, [](self &test) { test.start_pipeline_mapped_load_age(); } },
 		{ {"mapped-load-age"}, [](self &test) { test.start_pipeline_mapped_load_age(); } },
 		{ {"shift16-load-age"}, [](self &test) { test.start_pipeline_mapped_load_age(); } },
