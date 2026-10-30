@@ -3058,11 +3058,12 @@ destination with signed X times T. FRCT doubles the product, OVM applies
 to the result, and SMUL does not apply the MAC-family product clamp.
 The atomic model's carry-preservation policy remains silicon-unvalidated.
 
-`st-par-mpy` passes 270,336 cases and cleared-pipeline replays: 73,728
-address cases and 196,608 numeric cases, all 1,024 encodings, linear and
+`st-par-mpy` passes 139,264 cases and cleared-pipeline replays: 73,728
+address cases and 65,536 numeric cases, all 1,024 encodings, linear and
 circular addressing, pointer/memory/accumulator aliases, all 32 ASM modes,
 signed word patterns, FRCT/OVM/SMUL/SXM/SST and sticky-status combinations,
-two pages and three checkpoints. T and source memory change after Read;
+two pages and the [parallel numeric checkpoint policy](#parallel-storeload).
+T and source memory change after Read;
 the accumulator changes before Execute and ASM changes after capture.
 Mapped/peripheral operands, arbitrary producer/
 interrupt/repeat composition and physical bus phases are not qualified.
@@ -3553,9 +3554,10 @@ accumulator plus the shifted memory operand. SUB reverses that order:
 accumulator bits must survive the subtraction; subtracting only high words
 is not equivalent.
 
-`st-par-alu` passes 540,672 cases plus replay: eight operation/source/destination
-forms, 147,456 addressing cases and 393,216 numeric cases, two pages and three
-snapshots. Independent integer expectations check bit-32 carry, sticky
+`st-par-alu` passes 278,528 cases plus replay: eight operation/source/destination
+forms, 147,456 addressing cases and 131,072 numeric cases, two pages and the
+[parallel numeric checkpoint policy](#parallel-storeload).
+Independent integer expectations check bit-32 carry, sticky
 destination overflow, OVM, shifted/saturated stores and preserved sibling
 state. The fixture changes accumulators after Read and changes ASM/pointers
 after their capture, poisons the sampled memory word, and checks one read and
@@ -4354,11 +4356,22 @@ extends X reads below `0060`. Mapped/peripheral Y remains
 excluded before pointer changes; single-repeat mapped sources are separately
 excluded.
 
-`stld` passes 405,504 cases and save-state replays: 110,592 address cases
-and 294,912 numeric cases, including aliased pointers/memory/accumulators,
+`stld`, `st-par-alu` and `st-par-mpy` retain every address-case ordinal:
+those cohorts couple checkpoint and status settings and are not duplicates.
+Their numeric cohorts instead retain each distinct consumed input once,
+selecting one of three checkpoints, balanced within every opcode-form,
+shift, flags and page group. The three former checkpoint copies have equal
+setup and asserted results; unused reference-generator metadata is not an
+input to the bench. Compiled factory comparisons and runtime original-key
+digests guard this projection. This retires 589,824 executions/restores across
+the three profiles; it deliberately gives up restoring every numeric input
+at every old checkpoint, not arithmetic, pointer or preservation expectations.
+
+`stld` passes 208,896 cases and save-state replays: 110,592 address cases
+and 98,304 numeric cases, including aliased pointers/memory/accumulators,
 circular and linear modes, eight words, eight accumulator patterns,
 all 32 ASM values across the address cases, eight numeric boundary shifts,
-SXM/SST/OVM/carry combinations, two pages and three snapshots. Source memory,
+SXM/SST/OVM/carry combinations, two pages and three checkpoint classes. Source memory,
 ASM, accumulators, pointers and T change after their respective capture
 points. Mapped sources have a separate positive fixture; destination-MMIO
 and mapped repeated operands are outside this bank's qualification.

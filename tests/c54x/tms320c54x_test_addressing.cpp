@@ -5,6 +5,7 @@
 #include "tms320c54x_test_state.h"
 #include "tms320c54x_test_memory_immediate_schedule.h"
 #include "tms320c54x_test_circular_move_schedule.h"
+#include "tms320c54x_test_parallel_schedule.h"
 
 namespace c54x_test {
 
@@ -4032,7 +4033,10 @@ void tms320c54x_test_state::start_parallel_load(unsigned variant)
 	bool const multiply = profile_is("st-par-mpy");
 	bool const bsp = profile_is("stld-bsp");
 	bool const bus = profile_is("stld-periph"), peripheral = bsp || bus;
-	auto const c = multiply ? parallel_multiply_case(variant) : bus ? peripheral_parallel_load_case(variant) : bsp ? bsp_parallel_load_case(variant) : mapped ? mapped_parallel_load_case(variant) : arithmetic ? parallel_arithmetic_case(variant) : parallel_load_case(variant); auto const &f = c.memory;
+	bool const projected = !mapped && !peripheral;
+	if (!variant && projected) m_parallel_coverage = {};
+	unsigned const key = projected ? parallel_schedule::key(variant) : variant;
+	auto const c = multiply ? parallel_multiply_case(key) : bus ? peripheral_parallel_load_case(variant) : bsp ? bsp_parallel_load_case(variant) : mapped ? mapped_parallel_load_case(variant) : arithmetic ? parallel_arithmetic_case(key) : parallel_load_case(key); auto const &f = c.memory;
 	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
 	auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
 	for (unsigned i = 0; i < 16; ++i) program.write_word(f.base + 0x600 + i, 0xf495);
@@ -10406,7 +10410,10 @@ bool tms320c54x_test_state::check_mapped_parallel_load_results()
 		bool const bus = profile_is("stld-periph"), peripheral = bsp || bus;
 		bool const arithmetic = profile_is("st-par-alu");
 		bool const mapped = profile_is("stld-map");
-		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick; auto const c = multiply ? parallel_multiply_case(variant) : bus ? peripheral_parallel_load_case(variant) : bsp ? bsp_parallel_load_case(variant) : mapped ? mapped_parallel_load_case(variant) : arithmetic ? parallel_arithmetic_case(variant) : parallel_load_case(variant); auto const &f = c.memory;
+		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
+		bool const projected = !mapped && !peripheral;
+		unsigned const key = projected ? parallel_schedule::key(variant) : variant;
+		auto const c = multiply ? parallel_multiply_case(key) : bus ? peripheral_parallel_load_case(variant) : bsp ? bsp_parallel_load_case(variant) : mapped ? mapped_parallel_load_case(variant) : arithmetic ? parallel_arithmetic_case(key) : parallel_load_case(key); auto const &f = c.memory;
 		unsigned const checkpoint = 4 + f.snapshot;
 		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Parallel operation remains admitted");
 		if (tick == unsigned(peripheral ? 6 : 5))
@@ -10435,19 +10442,20 @@ bool tms320c54x_test_state::check_mapped_parallel_load_results()
 			expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE), "Parallel store/load completes before IDLE");
 			if (!m_pipeline_replay) { m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_store_writes = m_recurring_irq_snapshot[1]; if (arithmetic || mapped || peripheral || multiply) m_cpu->set_pipeline_frontend(true); return restore_pipeline_at(62165, "Replay parallel store/load without duplicate samples publications or address effects"); }
 			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (variant + 1 < (multiply ? 270336U : bus ? 393216U : bsp ? 6144U : mapped ? 147456U : arithmetic ? 540672U : 405504U)) { start_parallel_load(variant + 1); return true; }
+			if (projected) m_parallel_coverage.add(key);
+			if (variant + 1 < (multiply ? 139264U : bus ? 393216U : bsp ? 6144U : mapped ? 147456U : arithmetic ? 278528U : 208896U)) { start_parallel_load(variant + 1); return true; }
 			if (multiply)
 			{
-				osd_printf_info("TMS320C54x parallel multiply: PASS cases=270336 restore=270336 forms=4 address_cases=73728 numeric_cases=196608 encodings=1024 asm_modes=32 pages=2 snapshots=3 source_sample=Read t_sample=Read store_source=Execute asm_source=Read old_source_store=1 smul_product_clamp=0 pointer_updates=once reset_before_restore=1 carry_policy=preserve_unvalidated physical_phase_claim=0\n"); throw emu_fatalerror(3, "TMS320C54x isolated parallel multiply complete");
+				osd_printf_info("TMS320C54x parallel multiply: PASS cases=%u restore=%u forms=4 address_cases=73728 numeric_cases=65536 encodings=1024 asm_modes=32 pages=2 address_snapshots=3 numeric_snapshot_policy=balanced source_sample=Read t_sample=Read store_source=Execute asm_source=Read old_source_store=1 smul_product_clamp=0 pointer_updates=once reset_before_restore=1 carry_policy=preserve_unvalidated physical_phase_claim=0 coverage_fnv64=%016llx\n", m_parallel_coverage.count, m_parallel_coverage.count, (unsigned long long)m_parallel_coverage.value); throw emu_fatalerror(3, "TMS320C54x isolated parallel multiply complete");
 			}
 			if (bus) { osd_printf_info("TMS320C54x parallel peripheral load: PASS cases=393216 restore=393216 forms=6 addresses=0020..005f selector_pairs=8 patterns=2 sxm_sst_ovm=8 pages=2 snapshots=4 extra_clock=1 reads=1 writes=1 volatile_source=1 store_source=Execute t_publish=Read reset_before_restore=1 carry_policy=preserve_unvalidated endpoint_identity_claim=0 physical_phase_claim=0\n"); throw emu_fatalerror(3, "TMS320C54x isolated parallel peripheral load complete"); }
 			if (bsp) { osd_printf_info("TMS320C54x parallel BSP load: PASS cases=6144 restore=6144 forms=6 selector_pairs=8 patterns=2 sxm_sst_ovm=8 pages=2 snapshots=4 extra_clock=1 reads=1 writes=1 ready_overrun_ack=1 next_frame_pending=1 store_source=Execute t_publish=Read reset_before_restore=1 carry_policy=preserve_unvalidated physical_phase_claim=0\n"); throw emu_fatalerror(3, "TMS320C54x isolated parallel BSP load complete"); }
 			if (mapped) { osd_printf_info("TMS320C54x mapped parallel load: PASS cases=147456 restore=147456 forms=6 source_addresses=0000..001f destination=RAM selector_pairs=8 patterns=2 sxm_sst_ovm=8 asm=0,-1 pages=2 snapshots=3 source_sample=Read store_source=Execute reads=1 writes=1 pointer_updates=once t_publish=Read carry_policy=preserve_unvalidated reset_before_restore=1 repeat_peripheral_composition=unvalidated endpoint_identity_claim=0 physical_phase_claim=0\n"); throw emu_fatalerror(3, "TMS320C54x isolated mapped parallel load complete"); }
 			if (arithmetic)
 			{
-				osd_printf_info("TMS320C54x parallel arithmetic: PASS cases=540672 restore=540672 forms=8 address_cases=147456 numeric_cases=393216 pages=2 snapshots=3 read_retained=1 asm_sample=Read accumulator_sample=Execute old_source_store=1 subtraction=memory_minus_other carry_bit=32 sticky_overflow=1 ovm=1 saturation=1 pointer_updates=once reset_before_restore=1 physical_phase_claim=0\n"); throw emu_fatalerror(3, "TMS320C54x isolated parallel arithmetic complete");
+				osd_printf_info("TMS320C54x parallel arithmetic: PASS cases=%u restore=%u forms=8 address_cases=147456 numeric_cases=131072 pages=2 address_snapshots=3 numeric_snapshot_policy=balanced read_retained=1 asm_sample=Read accumulator_sample=Execute old_source_store=1 subtraction=memory_minus_other carry_bit=32 sticky_overflow=1 ovm=1 saturation=1 pointer_updates=once reset_before_restore=1 physical_phase_claim=0 coverage_fnv64=%016llx\n", m_parallel_coverage.count, m_parallel_coverage.count, (unsigned long long)m_parallel_coverage.value); throw emu_fatalerror(3, "TMS320C54x isolated parallel arithmetic complete");
 			}
-			osd_printf_info("TMS320C54x parallel store/load: PASS cases=405504 restore=405504 forms=6 encodings=1536 address_cases=110592 numeric_cases=294912 words=8 patterns=8 asm_modes=32 pages=2 snapshots=3 read_retained=1 store_source=Execute asm_source=Read t_publication=Read alias_priority=X carry_policy=preserve_unvalidated physical_phase_claim=0\n"); throw emu_fatalerror(3, "TMS320C54x isolated parallel store/load complete");
+			osd_printf_info("TMS320C54x parallel store/load: PASS cases=%u restore=%u forms=6 encodings=1536 address_cases=110592 numeric_cases=98304 words=8 patterns=8 asm_modes=32 pages=2 address_snapshots=3 numeric_snapshot_policy=balanced read_retained=1 store_source=Execute asm_source=Read t_publication=Read alias_priority=X carry_policy=preserve_unvalidated physical_phase_claim=0 coverage_fnv64=%016llx\n", m_parallel_coverage.count, m_parallel_coverage.count, (unsigned long long)m_parallel_coverage.value); throw emu_fatalerror(3, "TMS320C54x isolated parallel store/load complete");
 		}
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
 	}

@@ -8,6 +8,24 @@
   },
   "families": [
     {
+      "id": "parallel-transfer-numeric-checkpoint-projection",
+      "classification": "architectural_interaction",
+      "decision": "merge",
+      "profiles": ["stld", "st-par-alu", "st-par-mpy"],
+      "case_ids": [],
+      "profile_coverage": {
+        "stld": {"cases": 208896, "fnv64": "41e5a5c35767ca59", "result_prefix": "TMS320C54x parallel store/load: PASS"},
+        "st-par-alu": {"cases": 278528, "fnv64": "3de2e358bb5ee4d3", "result_prefix": "TMS320C54x parallel arithmetic: PASS"},
+        "st-par-mpy": {"cases": 139264, "fnv64": "55a81cebe64489d8", "result_prefix": "TMS320C54x parallel multiply: PASS"}
+      },
+      "basis": "The 49152 numeric ordinals per opcode form contain three copies of 16384 consumed inputs at different checkpoints. The actual reference factories show identical setup and asserted result fields across those copies. flags/operation/yword/result in the shared dual-memory structure are unconsumed generator metadata; result_st0 is consumed only for arithmetic/multiply. Conversely, all 18432 address ordinals per form are retained because checkpoint changes also alter consumed status settings. Keep the fixture-owned signed/integer references and every distinct consumed input; select one balanced numeric checkpoint.",
+      "obligations": ["retain every original address ordinal in order", "retain each numeric input ordinal once in order within every opcode form", "retain the same input words, source/status modes, program pages, arithmetic/store/pointer results and post-capture mutations", "balance numeric checkpoints within every opcode-form, shift, flags and page group", "count completed replays and hash their original raw keys", "leave mapped, BSP, peripheral and successful repeated-transfer profiles unchanged"],
+      "limits": ["589824 duplicate numeric checkpoint executions/restores are removed", "not equivalent coverage of each numeric input at every old checkpoint", "address snapshots remain coupled to their original status settings, not projected", "carry-preservation and bus phase remain explicitly unvalidated silicon properties", "no CPU implementation change or expected result derived from a CPU helper"],
+      "baseline": "Fresh pre-change st-par-mpy passes all 270336 cases/restores in 115.18 seconds (native wrapper wall time).",
+      "verification": "Compiled schedule audit passes against all three actual factories, preserving address keys and numeric input identities and checking every consumed field across checkpoint copies, grouped checkpoint balance and the three frozen key digests. Rebuilt st-par-mpy (139264 cases/restores), st-par-alu (278528) and stld (208896) pass those digests and complete native oracles. The unchanged stld-bsp control passes all 6144 cases/restores. All 5078 host tests pass with one established skip. No renewal of full-default or handset checkpoints is claimed.",
+      "measurements": {"before_cpp_bytes": 3371527, "before_cpp_lines": 51051, "after_cpp_bytes": 3373392, "after_cpp_lines": 51087, "before_multiply_seconds": 115.18, "after_multiply_seconds": 59.36, "after_arithmetic_seconds": 118.29, "after_load_seconds": 88.44, "source_assessment": "Runtime reduction, not source reduction: the explicit schedule and runtime coverage observer add 1865 bytes and 36 C++ lines. Only multiply has a fresh paired wall-time baseline; all three timing figures include the native wrapper."}
+    },
+    {
       "id": "parallel-transfer-prototype-admission-branches",
       "classification": "implementation_limit",
       "decision": "delete",

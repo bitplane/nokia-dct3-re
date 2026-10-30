@@ -1034,7 +1034,7 @@ EXTRA_PROFILES = {
         "Fatal error: TMS320C54x isolated delay MPY complete",
     ),
     "st-par-mpy": (
-        "TMS320C54x parallel multiply: PASS cases=270336 restore=270336 forms=4 address_cases=73728 numeric_cases=196608 encodings=1024 asm_modes=32 pages=2 snapshots=3 source_sample=Read t_sample=Read store_source=Execute asm_source=Read old_source_store=1 smul_product_clamp=0 pointer_updates=once reset_before_restore=1 carry_policy=preserve_unvalidated physical_phase_claim=0",
+        "TMS320C54x parallel multiply: PASS cases=139264 restore=139264 forms=4 address_cases=73728 numeric_cases=65536 encodings=1024 asm_modes=32 pages=2 address_snapshots=3 numeric_snapshot_policy=balanced source_sample=Read t_sample=Read store_source=Execute asm_source=Read old_source_store=1 smul_product_clamp=0 pointer_updates=once reset_before_restore=1 carry_policy=preserve_unvalidated physical_phase_claim=0 coverage_fnv64=55a81cebe64489d8",
         "Fatal error: TMS320C54x isolated parallel multiply complete",
     ),
     "square-delay": (
@@ -1225,7 +1225,7 @@ EXTRA_PROFILES = {
         "Fatal error: TMS320C54x isolated unsigned mapped arithmetic complete",
     ),
     "stld": (
-        "TMS320C54x parallel store/load: PASS cases=405504 restore=405504 forms=6 encodings=1536 address_cases=110592 numeric_cases=294912 words=8 patterns=8 asm_modes=32 pages=2 snapshots=3 read_retained=1 store_source=Execute asm_source=Read t_publication=Read alias_priority=X carry_policy=preserve_unvalidated physical_phase_claim=0",
+        "TMS320C54x parallel store/load: PASS cases=208896 restore=208896 forms=6 encodings=1536 address_cases=110592 numeric_cases=98304 words=8 patterns=8 asm_modes=32 pages=2 address_snapshots=3 numeric_snapshot_policy=balanced read_retained=1 store_source=Execute asm_source=Read t_publication=Read alias_priority=X carry_policy=preserve_unvalidated physical_phase_claim=0 coverage_fnv64=41e5a5c35767ca59",
         "Fatal error: TMS320C54x isolated parallel store/load complete",
     ),
     "stack-page0": (
@@ -1289,7 +1289,7 @@ EXTRA_PROFILES = {
         "Fatal error: TMS320C54x isolated delayed comparison complete",
     ),
     "st-par-alu": (
-        "TMS320C54x parallel arithmetic: PASS cases=540672 restore=540672 forms=8 address_cases=147456 numeric_cases=393216 pages=2 snapshots=3 read_retained=1 asm_sample=Read accumulator_sample=Execute old_source_store=1 subtraction=memory_minus_other carry_bit=32 sticky_overflow=1 ovm=1 saturation=1 pointer_updates=once reset_before_restore=1 physical_phase_claim=0",
+        "TMS320C54x parallel arithmetic: PASS cases=278528 restore=278528 forms=8 address_cases=147456 numeric_cases=131072 pages=2 address_snapshots=3 numeric_snapshot_policy=balanced read_retained=1 asm_sample=Read accumulator_sample=Execute old_source_store=1 subtraction=memory_minus_other carry_bit=32 sticky_overflow=1 ovm=1 saturation=1 pointer_updates=once reset_before_restore=1 physical_phase_claim=0 coverage_fnv64=3de2e358bb5ee4d3",
         "Fatal error: TMS320C54x isolated parallel arithmetic complete",
     ),
     "asm-circular": (

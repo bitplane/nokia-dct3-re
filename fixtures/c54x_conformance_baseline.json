@@ -3017,11 +3017,11 @@
       "TMS320C54x parallel BSP load: PASS cases=6144 restore=6144 forms=6 selector_pairs=8 patterns=2 sxm_sst_ovm=8 pages=2 snapshots=4 extra_clock=1 reads=1 writes=1 ready_overrun_ack=1 next_frame_pending=1 store_source=Execute t_publish=Read reset_before_restore=1 carry_policy=preserve_unvalidated physical_phase_claim=0\n": 1,
       "TMS320C54x parallel MAC exclusions: PASS cases=%u restore=%u reads=0 writes=0 pointer_updates=0 silicon_trap_claim=0 coverage_fnv64=%016llx\n": 1,
       "TMS320C54x parallel MAC: PASS cases=%u restore=%u address_cases=147456 arithmetic_cases=524288 checkpoint_policy=balanced operations=MAC,MACR,MAS,MASR encodings=4096 source_destination_pairs=4 shifts=32 reads=1 writes=1 retained=T,X,ASM old_source_store=1 carry=unvalidated physical_banks=unvalidated interrupt_repeat_composition=unvalidated coverage_fnv64=%016llx\n": 1,
-      "TMS320C54x parallel arithmetic: PASS cases=540672 restore=540672 forms=8 address_cases=147456 numeric_cases=393216 pages=2 snapshots=3 read_retained=1 asm_sample=Read accumulator_sample=Execute old_source_store=1 subtraction=memory_minus_other carry_bit=32 sticky_overflow=1 ovm=1 saturation=1 pointer_updates=once reset_before_restore=1 physical_phase_claim=0\n": 1,
+      "TMS320C54x parallel arithmetic: PASS cases=%u restore=%u forms=8 address_cases=147456 numeric_cases=131072 pages=2 address_snapshots=3 numeric_snapshot_policy=balanced read_retained=1 asm_sample=Read accumulator_sample=Execute old_source_store=1 subtraction=memory_minus_other carry_bit=32 sticky_overflow=1 ovm=1 saturation=1 pointer_updates=once reset_before_restore=1 physical_phase_claim=0 coverage_fnv64=%016llx\n": 1,
       "TMS320C54x parallel load multiply conformance: PASS variants=64\n": 1,
-      "TMS320C54x parallel multiply: PASS cases=270336 restore=270336 forms=4 address_cases=73728 numeric_cases=196608 encodings=1024 asm_modes=32 pages=2 snapshots=3 source_sample=Read t_sample=Read store_source=Execute asm_source=Read old_source_store=1 smul_product_clamp=0 pointer_updates=once reset_before_restore=1 carry_policy=preserve_unvalidated physical_phase_claim=0\n": 1,
+      "TMS320C54x parallel multiply: PASS cases=%u restore=%u forms=4 address_cases=73728 numeric_cases=65536 encodings=1024 asm_modes=32 pages=2 address_snapshots=3 numeric_snapshot_policy=balanced source_sample=Read t_sample=Read store_source=Execute asm_source=Read old_source_store=1 smul_product_clamp=0 pointer_updates=once reset_before_restore=1 carry_policy=preserve_unvalidated physical_phase_claim=0 coverage_fnv64=%016llx\n": 1,
       "TMS320C54x parallel peripheral load: PASS cases=393216 restore=393216 forms=6 addresses=0020..005f selector_pairs=8 patterns=2 sxm_sst_ovm=8 pages=2 snapshots=4 extra_clock=1 reads=1 writes=1 volatile_source=1 store_source=Execute t_publish=Read reset_before_restore=1 carry_policy=preserve_unvalidated endpoint_identity_claim=0 physical_phase_claim=0\n": 1,
-      "TMS320C54x parallel store/load: PASS cases=405504 restore=405504 forms=6 encodings=1536 address_cases=110592 numeric_cases=294912 words=8 patterns=8 asm_modes=32 pages=2 snapshots=3 read_retained=1 store_source=Execute asm_source=Read t_publication=Read alias_priority=X carry_policy=preserve_unvalidated physical_phase_claim=0\n": 1,
+      "TMS320C54x parallel store/load: PASS cases=%u restore=%u forms=6 encodings=1536 address_cases=110592 numeric_cases=98304 words=8 patterns=8 asm_modes=32 pages=2 address_snapshots=3 numeric_snapshot_policy=balanced read_retained=1 store_source=Execute asm_source=Read t_publication=Read alias_priority=X carry_policy=preserve_unvalidated physical_phase_claim=0 coverage_fnv64=%016llx\n": 1,
       "TMS320C54x peripheral MMR timing: PASS cases=20 families=STM,ANDM,ORM,ST,LD extra_cycles=1 rmw_double_charge=0 scratch_wait=0\n": 1,
       "TMS320C54x peripheral MVDD: PASS cases=1536 restore=1536 destinations=3 values=4 dual_modifiers=16 pages=2 snapshots=4 source_reads=1 peripheral_writes=1 extra_cycles=1 retained_address=1 retained_source=1 repeat_acceptance=0 irq_acceptance=0 silicon_phase_claim=0\n": 1,
       "TMS320C54x polling loop interrupts: PASS cases=384 restore=384 sources=IRQ,NMI arrivals=32 pages=2 snapshots=3 release=handler balanced_frames=1 physical_phase_claim=0\n": 1,
@@ -12365,11 +12365,14 @@
         {
           "accumulator_sample": "Execute",
           "address_cases": "147456",
+          "address_snapshots": "3",
           "asm_sample": "Read",
           "carry_bit": "32",
-          "cases": "540672",
+          "cases": "278528",
+          "coverage_fnv64": "3de2e358bb5ee4d3",
           "forms": "8",
-          "numeric_cases": "393216",
+          "numeric_cases": "131072",
+          "numeric_snapshot_policy": "balanced",
           "old_source_store": "1",
           "ovm": "1",
           "pages": "2",
@@ -12377,15 +12380,14 @@
           "pointer_updates": "once",
           "read_retained": "1",
           "reset_before_restore": "1",
-          "restore": "540672",
+          "restore": "278528",
           "saturation": "1",
-          "snapshots": "3",
           "sticky_overflow": "1",
           "subtraction": "memory_minus_other"
         }
       ],
       "required": [
-        "TMS320C54x parallel arithmetic: PASS cases=540672 restore=540672 forms=8 address_cases=147456 numeric_cases=393216 pages=2 snapshots=3 read_retained=1 asm_sample=Read accumulator_sample=Execute old_source_store=1 subtraction=memory_minus_other carry_bit=32 sticky_overflow=1 ovm=1 saturation=1 pointer_updates=once reset_before_restore=1 physical_phase_claim=0"
+        "TMS320C54x parallel arithmetic: PASS cases=278528 restore=278528 forms=8 address_cases=147456 numeric_cases=131072 pages=2 address_snapshots=3 numeric_snapshot_policy=balanced read_retained=1 asm_sample=Read accumulator_sample=Execute old_source_store=1 subtraction=memory_minus_other carry_bit=32 sticky_overflow=1 ovm=1 saturation=1 pointer_updates=once reset_before_restore=1 physical_phase_claim=0 coverage_fnv64=3de2e358bb5ee4d3"
       ]
     },
     "st-par-mpy": {
@@ -12394,28 +12396,30 @@
       "reported_fields": [
         {
           "address_cases": "73728",
+          "address_snapshots": "3",
           "asm_modes": "32",
           "asm_source": "Read",
           "carry_policy": "preserve_unvalidated",
-          "cases": "270336",
+          "cases": "139264",
+          "coverage_fnv64": "55a81cebe64489d8",
           "encodings": "1024",
           "forms": "4",
-          "numeric_cases": "196608",
+          "numeric_cases": "65536",
+          "numeric_snapshot_policy": "balanced",
           "old_source_store": "1",
           "pages": "2",
           "physical_phase_claim": "0",
           "pointer_updates": "once",
           "reset_before_restore": "1",
-          "restore": "270336",
+          "restore": "139264",
           "smul_product_clamp": "0",
-          "snapshots": "3",
           "source_sample": "Read",
           "store_source": "Execute",
           "t_sample": "Read"
         }
       ],
       "required": [
-        "TMS320C54x parallel multiply: PASS cases=270336 restore=270336 forms=4 address_cases=73728 numeric_cases=196608 encodings=1024 asm_modes=32 pages=2 snapshots=3 source_sample=Read t_sample=Read store_source=Execute asm_source=Read old_source_store=1 smul_product_clamp=0 pointer_updates=once reset_before_restore=1 carry_policy=preserve_unvalidated physical_phase_claim=0"
+        "TMS320C54x parallel multiply: PASS cases=139264 restore=139264 forms=4 address_cases=73728 numeric_cases=65536 encodings=1024 asm_modes=32 pages=2 address_snapshots=3 numeric_snapshot_policy=balanced source_sample=Read t_sample=Read store_source=Execute asm_source=Read old_source_store=1 smul_product_clamp=0 pointer_updates=once reset_before_restore=1 carry_policy=preserve_unvalidated physical_phase_claim=0 coverage_fnv64=55a81cebe64489d8"
       ]
     },
     "st-shift-ar": {
@@ -12887,27 +12891,29 @@
       "reported_fields": [
         {
           "address_cases": "110592",
+          "address_snapshots": "3",
           "alias_priority": "X",
           "asm_modes": "32",
           "asm_source": "Read",
           "carry_policy": "preserve_unvalidated",
-          "cases": "405504",
+          "cases": "208896",
+          "coverage_fnv64": "41e5a5c35767ca59",
           "encodings": "1536",
           "forms": "6",
-          "numeric_cases": "294912",
+          "numeric_cases": "98304",
+          "numeric_snapshot_policy": "balanced",
           "pages": "2",
           "patterns": "8",
           "physical_phase_claim": "0",
           "read_retained": "1",
-          "restore": "405504",
-          "snapshots": "3",
+          "restore": "208896",
           "store_source": "Execute",
           "t_publication": "Read",
           "words": "8"
         }
       ],
       "required": [
-        "TMS320C54x parallel store/load: PASS cases=405504 restore=405504 forms=6 encodings=1536 address_cases=110592 numeric_cases=294912 words=8 patterns=8 asm_modes=32 pages=2 snapshots=3 read_retained=1 store_source=Execute asm_source=Read t_publication=Read alias_priority=X carry_policy=preserve_unvalidated physical_phase_claim=0"
+        "TMS320C54x parallel store/load: PASS cases=208896 restore=208896 forms=6 encodings=1536 address_cases=110592 numeric_cases=98304 words=8 patterns=8 asm_modes=32 pages=2 address_snapshots=3 numeric_snapshot_policy=balanced read_retained=1 store_source=Execute asm_source=Read t_publication=Read alias_priority=X carry_policy=preserve_unvalidated physical_phase_claim=0 coverage_fnv64=41e5a5c35767ca59"
       ]
     },
     "stld-bsp": {
@@ -15441,6 +15447,28 @@
       "decision": "rewrite",
       "family": "execute-owned-accumulator-square"
     },
+    "st-par-alu": {
+      "case_ids": [],
+      "classification": "architectural_interaction",
+      "coverage": {
+        "cases": 278528,
+        "fnv64": "3de2e358bb5ee4d3",
+        "result_prefix": "TMS320C54x parallel arithmetic: PASS"
+      },
+      "decision": "merge",
+      "family": "parallel-transfer-numeric-checkpoint-projection"
+    },
+    "st-par-mpy": {
+      "case_ids": [],
+      "classification": "architectural_interaction",
+      "coverage": {
+        "cases": 139264,
+        "fnv64": "55a81cebe64489d8",
+        "result_prefix": "TMS320C54x parallel multiply: PASS"
+      },
+      "decision": "merge",
+      "family": "parallel-transfer-numeric-checkpoint-projection"
+    },
     "st-t-long": {
       "case_ids": [],
       "classification": "architectural_interaction",
@@ -15474,6 +15502,17 @@
       },
       "decision": "rewrite",
       "family": "mapped-word-and-bitfield-clocked-contracts"
+    },
+    "stld": {
+      "case_ids": [],
+      "classification": "architectural_interaction",
+      "coverage": {
+        "cases": 208896,
+        "fnv64": "41e5a5c35767ca59",
+        "result_prefix": "TMS320C54x parallel store/load: PASS"
+      },
+      "decision": "merge",
+      "family": "parallel-transfer-numeric-checkpoint-projection"
     },
     "stmac": {
       "case_ids": [],
