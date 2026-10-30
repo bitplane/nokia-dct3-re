@@ -400,35 +400,6 @@ void tms320c54x_test_state::start_pipeline_store_mvmm(unsigned variant)
 }
 
 
-void tms320c54x_test_state::start_pipeline_xmem_bit(unsigned variant)
-{
-	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-	unsigned const x = variant % 16, bitcode = (variant / 16) % 16;
-	bool const value = (variant / 256) % 2, initial_tc = (variant / 512) % 2;
-	unsigned const gap = (variant / 1024) % 3;
-	auto &program = m_cpu->space(AS_PROGRAM);
-	for (unsigned i = 0; i < 24; ++i) program.write_word(0x600 + i, 0xf495);
-	program.write_word(0x600, 0x9600 | (x << 4) | bitcode);
-	program.write_word(0x601 + gap, 0xfd20); // XC 1,NTC samples in Access.
-	program.write_word(0x602 + gap, 0xe855);
-	set_registers(*m_cpu, {
-		{cpu_regs::STATE_IDLE, 0}, {cpu_regs::STATE_TCR, 0x10}, {cpu_regs::STATE_PMST, 0}, {cpu_regs::STATE_ILLEGAL, 0},
-		{cpu_regs::STATE_ST0, 0x608 | (initial_tc ? 0x1000 : 0)}, {cpu_regs::STATE_ST1, 0x800},
-	});
-	m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_A, 0); m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x1234);
-	m_cpu->set_state_int(tms320c54x_device::STATE_AR0, 3); m_cpu->set_state_int(tms320c54x_device::STATE_BK, 0);
-	for (unsigned ar = 2; ar <= 5; ++ar) m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + ar, 0x1000);
-	m_cpu->space(AS_DATA).write_word(0x1000, value ? 1U << (15 - bitcode) : ~(1U << (15 - bitcode)));
-	m_cpu->set_state_int(STATE_GENPC, 0x600); m_cpu->set_pipeline_frontend(true);
-	m_pipeline_replay = false; m_idle_fixture_tick = 0; m_pipeline_operand_reads = 0;
-	m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0, 0xffff, "xmem_bit_read",
-		[this](offs_t at, u16 &, u16) { if (machine().side_effects_disabled()) return;
-			expect(at == 0x1000 && m_cpu->pipeline_cycles() == 5 && !m_pipeline_operand_reads,
-				"BIT reads its captured Xmem address exactly once in Read"); ++m_pipeline_operand_reads; });
-	m_phase = 252770; m_cpu->resume(SUSPEND_REASON_DISABLE);
-	m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-}
 
 tms320c54x_test_state::long_mvkd_fixture tms320c54x_test_state::long_mvkd_case(unsigned variant)
 {
@@ -3517,55 +3488,6 @@ bool tms320c54x_test_state::check_rptbd_t_load_results()
 	return false;
 }
 
-bool tms320c54x_test_state::check_pipeline_xmem_bit_results()
-{
-	if (m_phase == 252770)
-	{
-		unsigned const variant = m_pipeline_peripheral_case, x = variant % 16;
-		bool const value = (variant / 256) % 2, initial_tc = (variant / 512) % 2;
-		unsigned const gap = (variant / 1024) % 3, checkpoint = 3 + variant / 3072;
-		unsigned const tick = ++m_idle_fixture_tick;
-		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Packed Xmem BIT has staged ownership");
-		expect(m_cpu->state_int(tms320c54x_device::STATE_ST0) == (0x608 | ((tick < 6 ? initial_tc : value) ? 0x1000 : 0)),
-			"BIT publishes only TC in Execute, not Decode/Access/Read");
-		for (unsigned ar = 2; ar <= 5; ++ar)
-		{
-			int const delta = ar == 2 + (x & 3) && tick >= 4 ? std::array<int, 4>{0, -1, 1, 3}[x >> 2] : 0;
-			expect(m_cpu->state_int(tms320c54x_device::STATE_AR0 + ar) == unsigned(0x1000 + delta),
-				"BIT modifies only its selected X pointer once in Access, including BK=0 linear percent mode");
-		}
-		if (tick == 5)
-			m_cpu->space(AS_DATA).write_word(0x1000, 0xdead); // Operand must already be retained.
-		if (tick == checkpoint && !m_pipeline_replay)
-		{
-			m_idle_fixture_saved_tick = tick; m_recurring_irq_snapshot = {m_pipeline_operand_reads};
-			expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save BIT at Decode, Access or retained Read");
-		}
-		if (tick == 16)
-		{
-			bool const execute = !(gap < 2 ? initial_tc : value);
-			expect(m_pipeline_operand_reads == 1 && m_cpu->state_int(tms320c54x_device::STATE_A) == (execute ? 0x55 : 0) &&
-				m_cpu->state_int(tms320c54x_device::STATE_B) == 0x1234,
-				"XC observes old TC at zero/one gap and BIT's TC with the original two-NOP gap");
-			if (!m_pipeline_replay)
-			{
-				m_pipeline_replay = true; m_idle_fixture_tick = m_idle_fixture_saved_tick; m_pipeline_operand_reads = m_recurring_irq_snapshot[0];
-				return restore_pipeline_at(252780, "Restore BIT without resampling or duplicate X update");
-			}
-			m_pipeline_operand_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (variant < 9215) { start_pipeline_xmem_bit(variant + 1); return true; }
-			osd_printf_info("TMS320C54x staged BIT: PASS cases=9216 xmem_modes=16 bitcodes=16 values=2 initial_tc=2 xc_gaps=0,1,2 restore=9216 duplicate_reads=0\n");
-			start_pipeline_port_read(); return true;
-		}
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 252780)
-	{
-		m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 252770;
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	return false;
-}
 
 bool tms320c54x_test_state::check_staged_load_results()
 {

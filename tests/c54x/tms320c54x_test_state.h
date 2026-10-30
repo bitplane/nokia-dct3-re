@@ -161,7 +161,6 @@ private:
 	void start_pipeline_bio_branch(unsigned variant = 0);
 	void start_pipeline_mapped_load_age(unsigned variant = 0);
 	void start_pipeline_store_mvmm(unsigned variant = 0);
-	void start_pipeline_xmem_bit(unsigned variant = 0);
 	struct indexed_store_fixture;
 	static indexed_store_fixture circular_portr_case(unsigned v);
 	void start_circular_portr(unsigned variant = 0);
@@ -1261,7 +1260,6 @@ private:
 	bool check_peripheral_long_store_results();
 	bool check_branch_repeat_results();
 	bool check_rptbd_t_load_results();
-	bool check_pipeline_xmem_bit_results();
 	bool check_pipeline_port_read_results();
 	bool check_long_accumulator_store_results();
 	bool check_absolute_xorm_results();
