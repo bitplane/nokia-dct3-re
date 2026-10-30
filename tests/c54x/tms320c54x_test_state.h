@@ -14,7 +14,6 @@
 #include "tms320c54x_test_selection.h"
 #include "tms320c54x_test_support.h"
 #include "tms320c54x_test_register_sequence.h"
-#include "tms320c54x_test_atomic_routes.h"
 #include "tms320c54x_test_repeat_state.h"
 #include "tms320c54x_test_snapshot.h"
 #include "tms320c54x_test_dual_input.h"
@@ -1066,7 +1065,6 @@ private:
 	bool check_idle_nmi_result_results();
 	bool check_idle_wake_results();
 	bool check_stopped_timer_reload_results();
-	bool check_atomic_program_results();
 	bool restart_pipeline_observer(unsigned phase, u64 next_cycle)
 	{
 		// This replaces the deadline with one CPU clock; timed restores keep theirs.
@@ -1109,34 +1107,6 @@ private:
 		m_check_timer->enable(true);
 		return true;
 	}
-	bool next_atomic_phase(unsigned phase)
-	{
-		m_phase = phase;
-		m_check_timer->adjust(attotime::from_usec(100));
-		return true; // Timer callback handled, not an assertion of test success.
-	}
-	bool resume_atomic_at(unsigned pc, unsigned phase)
-	{
-		// Preserve the inherited CPU state; only restart fetch and the observer.
-		m_cpu->set_state_int(cpu_regs::STATE_PC, pc);
-		m_cpu->set_state_int(cpu_regs::STATE_IDLE, 0);
-		return next_atomic_phase(phase);
-	}
-	bool begin_atomic_case(instruction_case const &test, unsigned phase)
-	{
-		m_port_writes = 0;
-		prepare_case(*m_cpu, test);
-		return next_atomic_phase(phase);
-	}
-	void verify_atomic_case(instruction_case const &test)
-	{
-		// A case without markers has no interval; ignore predecessor timestamps.
-		check_case(*m_cpu, test, m_port_writes, m_port_writes ? m_last_port_cycle - m_first_port_cycle : 0,
-			std::array<u64, 2>{m_middle_port_cycle - m_first_port_cycle, m_last_port_cycle - m_middle_port_cycle});
-		expect_opcode(test.opcode, true, "Literal atomic instruction case");
-		for (auto word : test.additional_opcodes) expect_opcode(word, true, "Literal atomic instruction case");
-	}
-	bool check_atomic_corpus_results();
 	bool check_bio_results();
 	bool check_bit_results();
 	bool check_intm_protection_results();

@@ -58,6 +58,7 @@ struct clocked_irq_expectation
 	unsigned earliest, latest, data_events_before;
 	std::optional<u16> return_pc{};
 	std::vector<register_check> registers{};
+	std::optional<unsigned> io_events_before{};
 };
 
 inline bool accept_data_event(std::vector<clocked_data_event> const &events, unsigned &cursor, clocked_data_event actual)
@@ -92,6 +93,7 @@ struct clocked_register_case
 	std::optional<std::vector<bool>> xf_events{}; // Instruction/debugger publications; setup and post-load re-drive are separate.
 	int observed_data_space = AS_DATA; // AS_IO selects port transactions using the same ordered-event policy.
 	std::vector<memory_word> initial_io{};
+	std::optional<std::vector<clocked_data_event>> io_events{}; // Additional IO observation when data_events covers RAM/MMRs.
 };
 
 // No implicit reset: the standalone runner owns reset_* metadata.

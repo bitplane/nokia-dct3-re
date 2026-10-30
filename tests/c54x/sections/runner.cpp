@@ -38,6 +38,7 @@ protected:
 			u64 const cycle = m_cpu->pipeline_cycles();
 			if (line != expected.line || cycle < expected.earliest || cycle > expected.latest ||
 				m_fixture->data_events_seen() != expected.data_events_before ||
+				(expected.io_events_before && m_fixture->io_events_seen() != *expected.io_events_before) ||
 				(expected.return_pc && m_cpu->state_int(tms320c54x_device::STATE_RTN) != *expected.return_pc))
 				throw emu_fatalerror("Section IRQ case=%u line=%d clock=%llu data_events=%u previous_case=%u return_pc=%04x",
 					index,line,(unsigned long long)cycle,m_fixture->data_events_seen(),m_last_irq_case,

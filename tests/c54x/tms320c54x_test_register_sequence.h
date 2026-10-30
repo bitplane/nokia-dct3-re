@@ -25,6 +25,7 @@ public:
 	unsigned count() const { return m_case; }
 	unsigned restores() const { return m_restores; }
 	unsigned data_events_seen() const { return m_data_cursor; }
+	unsigned io_events_seen() const { return m_io_cursor; }
 	void set_opcode_observer(std::function<void(u16, u16)> observer) { m_opcode_observer = std::move(observer); }
 	void set_data_observer(std::function<void(bool, u32, u16)> observer) { m_data_observer = std::move(observer); }
 	void observe_xf(bool value)
@@ -52,6 +53,7 @@ public:
 		{
 			m_saved_fetches = m_fetches;
 			m_saved_data_cursor = m_data_cursor;
+			m_saved_io_cursor = m_io_cursor;
 			m_saved_program_cursor = m_program_cursor;
 			m_saved_xf_cursor = m_xf_cursor;
 			m_saved_data_age = m_last_data_total ? std::optional<u64>(m_cpu.total_cycles() - *m_last_data_total) : std::nullopt;
@@ -64,6 +66,7 @@ public:
 			if (m_input.require_idle) require(m_cpu.state_int(tms320c54x_device::STATE_IDLE), "sequence reaches its real IDLE instruction");
 			if (m_input.single_fetch) require(m_fetches == 1, "one opcode fetch");
 			if (m_input.data_events) require(m_data_cursor == m_input.data_events->size(), "complete data-bus trace");
+			if (m_input.io_events) require(m_io_cursor == m_input.io_events->size(), "complete IO-bus trace");
 			if (m_input.xf_events) require(m_xf_cursor == m_input.xf_events->size(), "complete XF publication trace");
 			m_observing_outputs = false;
 			require(m_program_cursor == (m_input.program_events.empty() ? m_input.retained_program_reads.size() : m_input.program_events.size()), "complete retained-program trace");
@@ -71,6 +74,7 @@ public:
 			{
 				m_replay = true; m_tick = m_input.checkpoint; m_fetches = m_saved_fetches;
 				m_data_cursor = m_saved_data_cursor;
+				m_io_cursor = m_saved_io_cursor;
 				m_program_cursor = m_saved_program_cursor;
 				m_xf_cursor = m_saved_xf_cursor;
 				if (m_input.clear_pipeline_before_restore) m_cpu.set_pipeline_frontend(true);
@@ -80,7 +84,7 @@ public:
 				m_observing_outputs = true;
 				++m_restores; m_cpu.suspend(SUSPEND_REASON_DISABLE, true); m_resume = true; m_timer.enable(true); return false;
 			}
-			m_data_tap.remove(); m_fetch_tap.remove(); m_program_tap.remove(); m_cpu.set_pipeline_frontend(false);
+			m_data_tap.remove(); m_io_tap.remove(); m_fetch_tap.remove(); m_program_tap.remove(); m_cpu.set_pipeline_frontend(false);
 			m_coverage.add(m_input.identity.value_or(m_case));
 			if (++m_case < m_cases) { begin(); return false; }
 			return true;
@@ -125,11 +129,21 @@ private:
 		m_cpu.set_extended_program(m_input.extended_program);
 		prepare_case(m_cpu, m_input.states.front().observation);
 		for (auto const &word : m_input.initial_io) m_cpu.space(AS_IO).write_word(word.address,word.value);
-		m_fetches = m_data_cursor = m_program_cursor = 0;
+		m_fetches = m_data_cursor = m_program_cursor = m_io_cursor = 0;
 		m_xf_cursor = 0;
 		m_last_data_total.reset();
 		m_first_data_total.reset();
 		require(!(m_input.forbid_data_access && m_input.data_events), "one data-bus observation policy");
+		if (m_input.io_events) {
+			require(m_input.observed_data_space != AS_IO, "one IO observation policy");
+			auto access = [this](bool write,offs_t at,u16 value) {
+				if (m_machine.side_effects_disabled()) return;
+				require(accept_data_event(*m_input.io_events,m_io_cursor,{write,u32(at),value,unsigned(m_cpu.pipeline_cycles())}), "ordered IO transaction");
+			};
+			m_io_tap = m_cpu.space(AS_IO).install_readwrite_tap(0,0xffff,"register_sequence_io",
+				[access](offs_t at,u16 &value,u16) { access(false,at,value); },
+				[access](offs_t at,u16 &value,u16) { access(true,at,value); });
+		}
 		if (m_input.data_events)
 		{
 			auto access = [this](bool write, offs_t at, u16 word) {
@@ -216,6 +230,7 @@ private:
 	unsigned m_cases, m_case = 0, m_tick = 0, m_restores = 0;
 	unsigned m_fetches = 0, m_saved_fetches = 0;
 	unsigned m_data_cursor = 0, m_saved_data_cursor = 0;
+	unsigned m_io_cursor = 0, m_saved_io_cursor = 0;
 	unsigned m_program_cursor = 0, m_saved_program_cursor = 0;
 	unsigned m_xf_cursor = 0, m_saved_xf_cursor = 0;
 	std::optional<u64> m_last_data_total, m_saved_data_age;
@@ -229,7 +244,7 @@ private:
 	std::string m_label;
 	std::stringstream m_saved;
 	ordered_case_digest m_coverage;
-	memory_passthrough_handler m_data_tap, m_fetch_tap, m_program_tap;
+	memory_passthrough_handler m_data_tap, m_io_tap, m_fetch_tap, m_program_tap;
 };
 
 } // namespace c54x_test
