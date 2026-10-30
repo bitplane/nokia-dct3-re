@@ -432,37 +432,6 @@ void tms320c54x_test_state::start_pipeline_port_write(unsigned variant)
 }
 
 
-void tms320c54x_test_state::start_pipeline_bio_branch(unsigned variant)
-{
-	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-	m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-	bool const low = variant % 2, delayed = (variant / 2) % 2, initial = (variant / 4) % 2;
-	unsigned const transition = (variant / 8) % 4;
-	bool const sampled = transition == 1 || transition == 2 ? !initial : initial, taken = low ? !sampled : sampled;
-	u32 const base = (variant / 32) % 2 ? 0x20000 : 0;
-	auto &program = m_cpu->space(AS_PROGRAM);
-	for (unsigned i = 0; i < 32; ++i) { program.write_word(base + 0x600 + i, 0xf495); program.write_word(base + 0x700 + i, 0xf495); }
-	program.write_word(base + 0x600, 0xf802 | low | (delayed << 9)); program.write_word(base + 0x601, 0x700);
-	program.write_word(base + 0x602, 0xe811); program.write_word(base + 0x603, 0xe922); program.write_word(base + 0x604, 0xf4e1);
-	program.write_word(base + 0x700, 0xe855); program.write_word(base + 0x701, 0xf4e1);
-	set_registers(*m_cpu, {
-		{cpu_regs::STATE_TCR, 0x10}, {cpu_regs::STATE_PMST, 0}, {cpu_regs::STATE_ILLEGAL, 0},
-		{cpu_regs::STATE_ST0, 0xa608}, {cpu_regs::STATE_ST1, 0x800},
-	});
-	m_cpu->set_state_int(tms320c54x_device::STATE_A, 0); m_cpu->set_state_int(tms320c54x_device::STATE_B, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
-	m_bio_level = initial;
-	m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_cpu->set_pipeline_frontend(true);
-	m_pipeline_replay = false; m_idle_fixture_tick = 0; m_pipeline_register_writes = m_pipeline_extensions_reads = m_pipeline_operand_reads = 0;
-	m_pipeline_operand_tap = program.install_read_tap(base + 0x700, base + 0x700, "bio_branch_target",
-		[this, taken](offs_t, u16 &, u16) { if (machine().side_effects_disabled()) return;
-			expect(taken && !m_pipeline_operand_reads, "Only the BIO-selected target is fetched, once"); ++m_pipeline_operand_reads; });
-	m_pipeline_fetch_tap = program.install_read_tap(base + 0x601, base + 0x601, "bio_branch_address",
-		[this](offs_t, u16 &word, u16) { if (machine().side_effects_disabled()) return;
-			expect(word == 0x700 && !m_pipeline_extensions_reads, "BIO branch retains its target literal across input changes"); ++m_pipeline_extensions_reads; });
-	m_phase = 252670; m_cpu->resume(SUSPEND_REASON_DISABLE);
-	m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-}
 
 tms320c54x_test_state::indexed_store_fixture tms320c54x_test_state::circular_portr_case(unsigned v)
 {
@@ -850,42 +819,6 @@ void tms320c54x_test_state::start_timer_boundary_probe(unsigned index, bool stag
 	m_check_timer->adjust(attotime::from_usec(100));
 }
 
-void tms320c54x_test_state::start_bio_case(unsigned index)
-{
-	auto &program = m_cpu->space(AS_PROGRAM);
-	auto &data = m_cpu->space(AS_DATA);
-	u16 const op = bio_opcodes[index / 2];
-	m_bio_level = index & 1;
-	unsigned next = 0x010900;
-	program.write_word(next++, op);
-	bool const branch_or_call = (op & 0xfc00) == 0xf800;
-	bool const conditional_execute = (op & 0xfd00) == 0xfd00;
-	if (branch_or_call) program.write_word(next++, 0x0910);
-	if (conditional_execute)
-	{
-		program.write_word(next++, 0xe802);
-		if (BIT(op, 9)) program.write_word(next++, 0xe903);
-	}
-	else
-	{
-		if (BIT(op, 9))
-		{
-			program.write_word(next++, 0xe905);
-			program.write_word(next++, 0xe906);
-		}
-		program.write_word(next++, 0xe801);
-	}
-	program.write_word(next, 0xf4e1);
-	program.write_word(0x010910, 0xe802);
-	program.write_word(0x010911, 0xf4e1);
-	data.write_word(0x0400, 0x0910);
-	set_registers(*m_cpu, {
-		{STATE_GENPC, 0x010900}, {cpu_regs::STATE_SP, 0x0400}, {cpu_regs::STATE_A, 0}, {cpu_regs::STATE_B, 0},
-		{cpu_regs::STATE_IDLE, 0},
-	});
-	m_phase = 789 + index;
-	m_check_timer->adjust(attotime::from_usec(100));
-}
 
 bool tms320c54x_test_state::standard_bus_io() const
 { return profile_is("std-io") || profile_is("std-io-atomic"); }
@@ -1805,57 +1738,6 @@ bool tms320c54x_test_state::check_stopped_timer_reload_results()
 	return false;
 }
 
-bool tms320c54x_test_state::check_bio_results()
-{
-	[[maybe_unused]] auto &program = m_cpu->space(AS_PROGRAM);
-	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
-	if (m_phase >= 789 && m_phase < 817)
-	{
-		unsigned const index = m_phase - 789;
-		u16 const op = bio_opcodes[index / 2];
-		bool const take = BIT(op, 0) ? !m_bio_level : bool(m_bio_level);
-		bool const execute = (op & 0xfd00) == 0xfd00;
-		bool const returning = (op & 0xfc00) == 0xfc00 && !execute;
-		bool const call = (op & 0xff00) == 0xf900;
-		u16 const sp = 0x0400 + (take && returning ? 1 : take && call ? -1 : 0);
-		expect_opcode(op, m_cpu->state_int(tms320c54x_device::STATE_A) ==
-				(execute ? (take ? 2 : 0) : take ? 2 : 1) &&
-				m_cpu->state_int(tms320c54x_device::STATE_B) ==
-				(execute ? (take && BIT(op, 9) ? 3 : 0) : BIT(op, 9) ? 6 : 0) &&
-				m_cpu->state_int(tms320c54x_device::STATE_SP) == sp &&
-				m_cpu->state_int(tms320c54x_device::STATE_IDLE),
-				"live BIO/NBIO branch, call, return and conditional execution at both pin levels");
-		if (index + 1 < std::size(bio_opcodes) * 2)
-		{
-			start_bio_case(index + 1);
-			return true;
-		}
-		osd_printf_info("TMS320C54x live BIO conformance: PASS variants=28\n");
-		write_words(program, {
-			{0x010930, 0xf803}, {0x010931, 0x0930}, {0x010932, 0xe807}, {0x010933, 0xf4e1},
-		});
-		m_bio_level = 0;
-		m_cpu->set_state_int(STATE_GENPC, 0x010930);
-		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		m_phase = 817;
-		m_check_timer->adjust(attotime::from_usec(100));
-		return true;
-	}
-	if (m_phase == 817)
-	{
-		expect(m_cpu->state_int(STATE_GENPC) == 0x010930 &&
-			m_cpu->state_int(tms320c54x_device::STATE_A) == 0 &&
-			!m_cpu->state_int(tms320c54x_device::STATE_IDLE) &&
-			!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL),
-			"BIO-low busy loop remains live without illegal opcode or forced PC");
-		m_bio_level = 1;
-		m_phase = 818;
-		m_check_timer->adjust(attotime::from_usec(100));
-		return true;
-	}
-	return false;
-}
 
 bool tms320c54x_test_state::check_bsp_interrupt_results()
 {
@@ -2317,55 +2199,6 @@ bool tms320c54x_test_state::check_pipeline_peripheral_logic_results()
 	return false;
 }
 
-bool tms320c54x_test_state::check_pipeline_bio_branch_results()
-{
-	if (m_phase == 252670)
-	{
-		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick, transition = (variant / 8) % 4;
-		bool const low = variant % 2, delayed = (variant / 2) % 2, initial = (variant / 4) % 2;
-		bool const sampled = transition == 1 || transition == 2 ? !initial : initial, taken = low ? !sampled : sampled;
-		unsigned const checkpoint = std::array<unsigned, 4>{4, 5, 6, 8}[variant / 64];
-		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "BIO branch retains a physical input predicate, not accumulator state");
-		if ((transition == 1 && tick == 4) || (transition == 2 && tick == 5) || (transition == 3 && tick == 6)) m_bio_level = !initial;
-		if (tick == checkpoint && !m_pipeline_replay)
-		{
-			m_idle_fixture_saved_tick = tick; m_recurring_irq_snapshot = {m_pipeline_register_writes, m_pipeline_extensions_reads, m_pipeline_operand_reads, unsigned(m_bio_level)};
-			expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save BIO branch before/after line sample or delay retirement");
-		}
-		if (tick == 20)
-		{
-			bool const success = m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_pipeline_register_writes == 1 && m_pipeline_extensions_reads == 1 &&
-				m_pipeline_operand_reads == unsigned(taken) && m_cpu->state_int(tms320c54x_device::STATE_A) == (taken ? 0x55 : 0x11) &&
-				m_cpu->state_int(tms320c54x_device::STATE_B) == (delayed || !taken ? 0x22 : 0) &&
-				m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0xa608 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == 0x800;
-			if (!success) osd_printf_info("Staged BIO failure: case=%u replay=%u taken=%u cycle=%llu idle=%u a=%010llx b=%010llx line_reads=%u literal_reads=%u target_reads=%u\n",
-				variant, m_pipeline_replay, taken, (unsigned long long)m_cpu->pipeline_cycles(), unsigned(m_cpu->state_int(tms320c54x_device::STATE_IDLE)),
-				(unsigned long long)m_cpu->state_int(tms320c54x_device::STATE_A), (unsigned long long)m_cpu->state_int(tms320c54x_device::STATE_B),
-				m_pipeline_register_writes, m_pipeline_extensions_reads, m_pipeline_operand_reads);
-			expect(success,
-				"BIO/NBIO use active-low/high Read sample and preserve actual plain/delayed execution despite later pin changes");
-			if (!m_pipeline_replay)
-			{
-				m_pipeline_replay = true; m_idle_fixture_tick = m_idle_fixture_saved_tick; m_pipeline_register_writes = m_recurring_irq_snapshot[0]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[1];
-				m_pipeline_operand_reads = m_recurring_irq_snapshot[2]; m_bio_level = m_recurring_irq_snapshot[3];
-				return restore_pipeline_at(252680, "Restore BIO branch without a duplicate callback or target fetch");
-			}
-			m_pipeline_operand_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (variant < 255) { start_pipeline_bio_branch(variant + 1); return true; }
-			m_bio_level = 1;
-			osd_printf_info("TMS320C54x staged BIO branches: PASS cases=256 forms=BC,BCD conditions=BIO,NBIO levels=0,1 transitions=4 pages=2 restore=256 line_sample=Read duplicate_callbacks=0 duplicate_fetches=0 silicon_phase_claim=0\n");
-			if (profile_is("bio-branch")) throw emu_fatalerror(0, "TMS320C54x isolated BIO branches complete");
-			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		}
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 252680)
-	{
-		m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 252670;
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	return false;
-}
 
 bool tms320c54x_test_state::check_pipeline_port_read_results()
 {

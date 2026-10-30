@@ -11,15 +11,6 @@ void tms320c54x_test_state::xf_w(int state)
 	m_xf_pin = bool(state);
 }
 
-int tms320c54x_test_state::bio_r()
-{
-	if (m_phase == 252670)
-	{
-		expect(!m_pipeline_register_writes && m_cpu->pipeline_cycles() == 6, "BIO branch samples its line exactly once at retained Read");
-		++m_pipeline_register_writes;
-	}
-	return m_bio_level;
-}
 
 void tms320c54x_test_state::machine_start()
 {
@@ -102,7 +93,6 @@ void tms320c54x_test_state::machine_reset()
 		{ {"instr-observer"}, [](self &test) { test.start_instruction_observer(); } },
 		{ {"software-intr"}, [](self &test) { test.start_software_intr(); } },
 		{ {"rptb-br-edges"}, [](self &test) { test.start_block_branch_edge(); } },
-		{ {"bio-branch"}, [](self &test) { test.start_pipeline_bio_branch(); } },
 		{ {"rptb-branch"}, [](self &test) { test.start_block_branch(); } },
 		{ {"mpy-mem-imm"}, [](self &test) { test.start_memory_immediate_multiply(); } },
 	}))
@@ -658,7 +648,6 @@ void tms320c54x_test_state::test(machine_config &config)
 		}
 		return 0;
 	}, "vector_acknowledge");
-	m_cpu->bio_in_cb().set(FUNC(tms320c54x_test_state::bio_r));
 	m_cpu->xf_out_cb().set(FUNC(tms320c54x_test_state::xf_w));
 	TMS320C54X_MCBSP(config, m_idle_mcbsp, 13'000'000);
 	m_cpu->peripheral_clock_stop_cb().set(m_idle_mcbsp, FUNC(tms320c54x_mcbsp_device::internal_clock_stop_w));

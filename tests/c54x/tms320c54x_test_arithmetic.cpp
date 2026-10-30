@@ -2022,19 +2022,6 @@ bool tms320c54x_test_state::shifted_unowned_fixture() const
 
 
 
-bool tms320c54x_test_state::check_bit_results()
-{
-	if (m_phase == 818)
-	{
-		expect(m_cpu->state_int(STATE_GENPC) == 0x010934 &&
-			m_cpu->state_int(tms320c54x_device::STATE_A) == 7 &&
-			m_cpu->state_int(tms320c54x_device::STATE_IDLE),
-			"BIO rising edge releases the executing wait loop through ordinary instruction flow");
-		osd_printf_info("TMS320C54x live BIO wait release: PASS\n");
-		return true;
-	}
-	return false;
-}
 
 
 

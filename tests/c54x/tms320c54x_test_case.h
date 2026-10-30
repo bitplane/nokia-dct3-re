@@ -44,7 +44,9 @@ struct clocked_register_action
 	std::vector<register_setting> input_lines{};
 	std::vector<memory_word> data{};
 	bool reset_cpu = false;
+	std::optional<bool> bio_level{};
 };
+struct clocked_line_sample { unsigned cycle; bool level; bool check_cycle = true; };
 struct clocked_data_event
 {
 	bool write; std::uint32_t address; u16 value; unsigned cycle; bool check_cycle = true;
@@ -94,6 +96,8 @@ struct clocked_register_case
 	int observed_data_space = AS_DATA; // AS_IO selects port transactions using the same ordered-event policy.
 	std::vector<memory_word> initial_io{};
 	std::optional<std::vector<clocked_data_event>> io_events{}; // Additional IO observation when data_events covers RAM/MMRs.
+	bool initial_bio = true;
+	std::optional<std::vector<clocked_line_sample>> bio_samples{};
 };
 
 // No implicit reset: the standalone runner owns reset_* metadata.

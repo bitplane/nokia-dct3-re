@@ -26,6 +26,15 @@ public:
 	unsigned restores() const { return m_restores; }
 	unsigned data_events_seen() const { return m_data_cursor; }
 	unsigned io_events_seen() const { return m_io_cursor; }
+	int sample_bio()
+	{
+		if (m_observing_outputs && m_input.bio_samples) {
+			require(m_bio_cursor < m_input.bio_samples->size(), "BIO sample count");
+			auto const &expected = (*m_input.bio_samples)[m_bio_cursor++];
+			require(expected.level == m_bio_level && (!expected.check_cycle || expected.cycle == m_cpu.pipeline_cycles()), "BIO sampled level and clock");
+		}
+		return m_bio_level;
+	}
 	void set_opcode_observer(std::function<void(u16, u16)> observer) { m_opcode_observer = std::move(observer); }
 	void set_data_observer(std::function<void(bool, u32, u16)> observer) { m_data_observer = std::move(observer); }
 	void observe_xf(bool value)
@@ -54,6 +63,7 @@ public:
 			m_saved_fetches = m_fetches;
 			m_saved_data_cursor = m_data_cursor;
 			m_saved_io_cursor = m_io_cursor;
+			m_saved_bio_cursor = m_bio_cursor; m_saved_bio_level = m_bio_level;
 			m_saved_program_cursor = m_program_cursor;
 			m_saved_xf_cursor = m_xf_cursor;
 			m_saved_data_age = m_last_data_total ? std::optional<u64>(m_cpu.total_cycles() - *m_last_data_total) : std::nullopt;
@@ -67,6 +77,7 @@ public:
 			if (m_input.single_fetch) require(m_fetches == 1, "one opcode fetch");
 			if (m_input.data_events) require(m_data_cursor == m_input.data_events->size(), "complete data-bus trace");
 			if (m_input.io_events) require(m_io_cursor == m_input.io_events->size(), "complete IO-bus trace");
+			if (m_input.bio_samples) require(m_bio_cursor == m_input.bio_samples->size(), "complete BIO sample trace");
 			if (m_input.xf_events) require(m_xf_cursor == m_input.xf_events->size(), "complete XF publication trace");
 			m_observing_outputs = false;
 			require(m_program_cursor == (m_input.program_events.empty() ? m_input.retained_program_reads.size() : m_input.program_events.size()), "complete retained-program trace");
@@ -75,6 +86,7 @@ public:
 				m_replay = true; m_tick = m_input.checkpoint; m_fetches = m_saved_fetches;
 				m_data_cursor = m_saved_data_cursor;
 				m_io_cursor = m_saved_io_cursor;
+				m_bio_cursor = m_saved_bio_cursor; m_bio_level = m_saved_bio_level;
 				m_program_cursor = m_saved_program_cursor;
 				m_xf_cursor = m_saved_xf_cursor;
 				if (m_input.clear_pipeline_before_restore) m_cpu.set_pipeline_frontend(true);
@@ -97,6 +109,7 @@ private:
 		for (auto const &action : m_input.actions) if (m_tick == action.tick && action.before_observation == before)
 		{
 			if (action.reset_cpu) m_cpu.reset();
+			if (action.bio_level) m_bio_level = *action.bio_level;
 			for (auto const &value : action.values) m_cpu.set_state_int(value.index, value.value);
 			for (auto const &line : action.input_lines) m_cpu.set_input_line(line.index, int(line.value));
 			if (!action.program.empty() || !action.data.empty())
@@ -129,7 +142,8 @@ private:
 		m_cpu.set_extended_program(m_input.extended_program);
 		prepare_case(m_cpu, m_input.states.front().observation);
 		for (auto const &word : m_input.initial_io) m_cpu.space(AS_IO).write_word(word.address,word.value);
-		m_fetches = m_data_cursor = m_program_cursor = m_io_cursor = 0;
+		m_fetches = m_data_cursor = m_program_cursor = m_io_cursor = m_bio_cursor = 0;
+		m_bio_level = m_input.initial_bio;
 		m_xf_cursor = 0;
 		m_last_data_total.reset();
 		m_first_data_total.reset();
@@ -231,6 +245,8 @@ private:
 	unsigned m_fetches = 0, m_saved_fetches = 0;
 	unsigned m_data_cursor = 0, m_saved_data_cursor = 0;
 	unsigned m_io_cursor = 0, m_saved_io_cursor = 0;
+	unsigned m_bio_cursor = 0, m_saved_bio_cursor = 0;
+	bool m_bio_level = true, m_saved_bio_level = true;
 	unsigned m_program_cursor = 0, m_saved_program_cursor = 0;
 	unsigned m_xf_cursor = 0, m_saved_xf_cursor = 0;
 	std::optional<u64> m_last_data_total, m_saved_data_age;

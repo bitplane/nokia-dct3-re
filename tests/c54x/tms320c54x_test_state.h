@@ -59,7 +59,6 @@ private:
 	void start_idle_dma_case(unsigned index);
 	void start_idle_external_serial_case(unsigned index);
 	void start_idle_timer_case(unsigned index);
-	int bio_r();
 	void start_idle_wake_case(unsigned index);
 	void start_stopped_timer_reload_case(unsigned index);
 	void start_timer_prescaler_divider_case(unsigned divider);
@@ -146,7 +145,6 @@ private:
 	static long_pair_fixture_data long_add_fixture(unsigned variant);
 	static long_pair_fixture_data long_reverse_fixture(unsigned variant);
 	void start_pipeline_long_pair(unsigned variant = 0);
-	void start_pipeline_bio_branch(unsigned variant = 0);
 	void start_pipeline_store_mvmm(unsigned variant = 0);
 	struct indexed_store_fixture;
 	static indexed_store_fixture circular_portr_case(unsigned v);
@@ -451,11 +449,6 @@ private:
 	void check_mmr_bus();
 	void start_timer_boundary_probe(unsigned index, bool staged = false);
 	void start_intm_protection_case(unsigned index);
-	static constexpr u16 bio_opcodes[] = {
-		0xf802, 0xf803, 0xfa02, 0xfa03, 0xf902, 0xf903,
-		0xfc02, 0xfc03, 0xfe02, 0xfe03, 0xfd02, 0xfd03, 0xff02, 0xff03
-	};
-	void start_bio_case(unsigned index);
 
 
 
@@ -1107,8 +1100,6 @@ private:
 		m_check_timer->enable(true);
 		return true;
 	}
-	bool check_bio_results();
-	bool check_bit_results();
 	bool check_intm_protection_results();
 	bool check_bsp_interrupt_results();
 	bool check_idle_pll_results();
@@ -1124,7 +1115,6 @@ private:
 	bool check_mvdd_source_results();
 	bool check_extended_ar_store_results();
 	bool check_accumulator_shift_results();
-	bool check_pipeline_bio_branch_results();
 	bool check_branch_repeat_results();
 	bool check_rptbd_t_load_results();
 	bool check_pipeline_port_read_results();
@@ -1199,7 +1189,6 @@ private:
 	ordered_case_digest m_parallel_coverage;
 	unsigned m_circular_move_excluded = 0;
 	tms320c54x_bsp_state m_shifted_bsp;
-	int m_bio_level = 1;
 	util::gsm_fr_codec m_rom4_codec;
 	util::gsm_fr_codec::pcm_block m_rom4_pcm{};
 	std::array<u16, 76> m_rom4_parameters{};

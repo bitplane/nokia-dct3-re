@@ -17,6 +17,7 @@ public:
 		m_cpu->set_addrmap(AS_PROGRAM, &section_state::program);
 		m_cpu->set_addrmap(AS_DATA, &section_state::data);
 		m_cpu->set_addrmap(AS_IO, &section_state::data);
+		m_cpu->bio_in_cb().set([this]() { return m_fixture ? m_fixture->sample_bio() : 1; });
 		m_cpu->xf_out_cb().set([this](int value) {
 			m_xf = bool(value);
 			if (m_fixture) m_fixture->observe_xf(m_xf);
