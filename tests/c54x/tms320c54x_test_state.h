@@ -174,15 +174,6 @@ private:
 	void start_pipeline_far_irq(unsigned variant = 0);
 	void start_pipeline_intm(unsigned variant = 0);
 	void start_pipeline_status_bit(unsigned variant = 0);
-	struct irq_pop_fixture
-	{
-		u16 destination, value, pending, mask;
-		u32 base;
-		unsigned checkpoint;
-	};
-	static irq_pop_fixture irq_pop_case(unsigned variant);
-	void start_pipeline_mmr_pop(unsigned variant = 0);
-	void start_pipeline_pop_dagen_conflict(unsigned variant = 0);
 	void start_pipeline_mu4_prologue(unsigned variant = 0);
 	void observe_context_irq(int line);
 	bool check_rom4_context_results();
@@ -233,7 +224,6 @@ private:
 	void start_pipeline_original_idle(unsigned variant = 0);
 	void start_pipeline_pmst(unsigned variant = 0);
 	void start_stack_irq_order(unsigned variant = 0);
-	void start_repeat_pop_exclusion(unsigned variant = 0);
 	void start_pipeline_mvpd(unsigned variant = 0);
 	void start_extended_mvpd(unsigned variant = 0);
 	void start_literal_guard(unsigned variant = 0);
@@ -2029,7 +2019,6 @@ private:
 	bool check_pipeline_far_return_results();
 	bool check_pipeline_far_irq_results();
 	bool check_pipeline_intm_results();
-	bool check_pipeline_mmr_pop_results();
 	bool check_pipeline_load_add_results();
 	bool check_pipeline_logical_immediate_results();
 	bool check_pipeline_conditional_branch_results();

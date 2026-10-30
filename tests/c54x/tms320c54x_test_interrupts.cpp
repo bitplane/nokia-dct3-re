@@ -78,12 +78,6 @@ void tms320c54x_test_state::start_pipeline_far_irq(unsigned variant)
 	m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 }
 
-tms320c54x_test_state::irq_pop_fixture tms320c54x_test_state::irq_pop_case(unsigned variant)
-{
-	return {u16(variant % 2),std::array<u16,4>{0,1,0x5a5a,0xffff}[(variant / 2) % 4],
-		std::array<u16,4>{0,4,0xa5a5,0xffff}[(variant / 8) % 4],0x1357,
-		(variant / 32) % 2 ? 0x10000U : 0U,4 + variant / 64};
-}
 
 
 void tms320c54x_test_state::start_pipeline_xc_irq(unsigned variant)
