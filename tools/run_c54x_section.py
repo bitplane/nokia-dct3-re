@@ -44,6 +44,7 @@ def main():
     counts['data_move'] = 40
     counts['compiler_stack'] = 40
     counts['stack_alignment'] = 32
+    counts['address_pointer'] = 64
     parser.add_argument('section', choices=[*counts, 'all'])
     parser.add_argument('--jobs', type=int, default=8)
     parser.add_argument('--negative-control', action='store_true', help='require failure of an intentionally wrong expectation')

@@ -316,7 +316,6 @@ private:
 	void start_repeat_store(unsigned variant = 0);
 	void start_rptz(unsigned variant = 0);
 	void start_ar_addm_load(unsigned variant = 0);
-	void start_pipeline_arp(unsigned variant = 0);
 	void start_pipeline_read_a(unsigned variant = 0);
 	void start_instruction_observer(unsigned variant = 0);
 	void start_pipeline_add_sp_context(unsigned variant = 0);
@@ -1924,7 +1923,7 @@ private:
 	bool check_pipeline_far_call_results();
 	bool check_pipeline_idle_results();
 	bool check_repeat_pop_exclusion_results();
-	bool check_pipeline_address_control_results();
+	bool check_pipeline_read_a_results();
 	bool check_instruction_observer_results();
 	bool check_block_page_results();
 	bool check_mvkd_sp_results();

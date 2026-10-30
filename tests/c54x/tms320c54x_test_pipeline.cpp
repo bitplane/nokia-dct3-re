@@ -335,38 +335,6 @@ u32 tms320c54x_test_state::repeated_writa_destination(repeated_writa_fixture con
 }
 
 
-void tms320c54x_test_state::start_pipeline_arp(unsigned variant)
-{
-	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-	unsigned const arp = variant % 8, encoded = BIT(variant, 3) ? 2 : 0;
-	bool const compatibility = BIT(variant, 4), advance = BIT(variant, 5);
-	unsigned const selected = compatibility && !encoded ? arp : encoded;
-	u32 const base = BIT(variant, 6) ? 0x20000 : 0;
-	auto &program = m_cpu->space(AS_PROGRAM);
-	for (unsigned i = 0; i < 24; ++i) program.write_word(base + 0x600 + i, 0xf495);
-	program.write_word(base + 0x600, 0xf4a0 | arp);
-	program.write_word(base + 0x601, 0x1000 | (advance ? 0x90 : 0x80) | encoded);
-	set_registers(*m_cpu, {
-		{cpu_regs::STATE_TCR, 0x10}, {cpu_regs::STATE_PMST, 0}, {cpu_regs::STATE_ILLEGAL, 0},
-		{cpu_regs::STATE_ST0, 0xa608}, {cpu_regs::STATE_ST1, 0x800 | (compatibility ? 0x20 : 0)},
-		{cpu_regs::STATE_SP, 0x1000}, {cpu_regs::STATE_A, 0}, {cpu_regs::STATE_IFR, 0}, {cpu_regs::STATE_IMR, 0},
-	});
-	for (unsigned i = 0; i < 8; ++i)
-	{
-		m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + i, 0x420 + i * 0x10);
-		m_cpu->space(AS_DATA).write_word(0x420 + i * 0x10, 0x1100 + i);
-	}
-	m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_cpu->set_pipeline_frontend(true);
-	m_pipeline_replay = false; m_idle_fixture_tick = 0; m_pipeline_operand_reads = 0;
-	m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0x420, 0x490, "arp_selected_source",
-		[this, selected](offs_t at, u16 &word, u16) {
-			if (machine().side_effects_disabled()) return;
-			expect(!m_pipeline_operand_reads && at == 0x420 + selected * 0x10 && word == 0x1100 + selected && m_cpu->pipeline_cycles() == 6,
-				"Immediate ARP has zero latency to the following compatibility consumer; encoded registers still select themselves"); ++m_pipeline_operand_reads;
-		});
-	m_phase = 252350; m_cpu->resume(SUSPEND_REASON_DISABLE);
-	m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-}
 
 void tms320c54x_test_state::start_pipeline_read_a(unsigned variant)
 {
@@ -1165,47 +1133,8 @@ bool tms320c54x_test_state::check_pipeline_rmw_results()
 
 
 
-bool tms320c54x_test_state::check_pipeline_address_control_results()
+bool tms320c54x_test_state::check_pipeline_read_a_results()
 {
-	if (m_phase == 252350)
-	{
-		unsigned const variant = m_pipeline_peripheral_case, arp = variant % 8, encoded = BIT(variant, 3) ? 2 : 0;
-		bool const compatibility = BIT(variant, 4), advance = BIT(variant, 5);
-		unsigned const selected = compatibility && !encoded ? arp : encoded;
-		unsigned const tick = ++m_idle_fixture_tick;
-		unsigned const checkpoint = 3 + variant / 128;
-		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Staged immediate ARP is distinct from compare and status-bit operations");
-		if (tick == 6) { auto const disable = machine().disable_side_effects(); m_cpu->space(AS_DATA).write_word(0x420 + selected * 0x10, 0x9999); }
-		if (tick == checkpoint && !m_pipeline_replay)
-		{
-			m_idle_fixture_saved_tick = tick; m_pipeline_branch_case = m_pipeline_operand_reads;
-			expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save ARP load, selected address, auxiliary update or retained Read");
-		}
-		if (tick == 10)
-		{
-			expect(m_pipeline_operand_reads == 1 && m_cpu->state_int(tms320c54x_device::STATE_A) == 0x1100 + selected &&
-				m_cpu->state_int(tms320c54x_device::STATE_ST0) == (0x608 | ((compatibility && encoded ? encoded : arp) << 13)) &&
-				m_cpu->state_int(tms320c54x_device::STATE_ST1) == (0x800 | (compatibility ? 0x20 : 0)),
-				"ARP load preserves unrelated status and does not re-publish over a younger encoded indirect ARP update");
-			for (unsigned i = 0; i < 8; ++i) expect(m_cpu->state_int(tms320c54x_device::STATE_AR0 + i) == 0x420 + i * 0x10 + (advance && i == selected ? 1 : 0),
-				"ARP selection modifies only its owned auxiliary register once");
-			if (!m_pipeline_replay)
-			{
-				m_pipeline_replay = true; m_idle_fixture_tick = m_idle_fixture_saved_tick; m_pipeline_operand_reads = m_pipeline_branch_case;
-				return restore_pipeline_at(252360, "Restore ARP consumer without retargeting or repeating its auxiliary update");
-			}
-			m_pipeline_operand_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (variant < 511) { start_pipeline_arp(variant + 1); return true; }
-			osd_printf_info("TMS320C54x staged immediate ARP: PASS cases=512 arp_values=8 encoded_modes=2 cmpt_states=2 postincrement_states=2 pages=2 restore=512 zero_latency=1 duplicate_reads=0 duplicate_auxiliary_updates=0\n");
-			start_pipeline_read_a(); return true;
-		}
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 252360)
-	{
-		m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 252350;
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
 	if (m_phase == 252370)
 	{
 		unsigned const variant = m_pipeline_peripheral_case;
