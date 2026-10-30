@@ -27,69 +27,6 @@ void tms320c54x_test_state::start_cala_rtn_case(unsigned index)
 
 
 
-void tms320c54x_test_state::start_pipeline_call(unsigned variant)
-{
-	m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
-	m_pipeline_peripheral_case = variant;
-	bool const t_delay = variant >= 24;
-	u16 const parameter = t_delay ? std::array<u16, 9>{6, 0, 0x8000, 0xf495, 0xffff, 0x76e6, 0x4ee6, 0x7001, 0x54e6}[(variant - 24) / 12] : 0;
-	unsigned const adjacent = t_delay ? BIT(variant, 1) : variant >= 12;
-	bool const delayed = t_delay || BIT(variant, 1);
-	u32 const base = BIT(variant, 0) ? 0x10000 : 0;
-	u16 const continuation = 0x600 + adjacent + (delayed ? 4 : 2);
-	u16 const stack = 0xfff - adjacent;
-	auto &program = m_cpu->space(AS_PROGRAM);
-	for (unsigned i = 0; i < 32; ++i) { program.write_word(base + 0x600 + i, 0xf495); program.write_word(base + 0x700 + i, 0xf495); }
-	if (adjacent) program.write_word(base + 0x600, 0x4a11);
-	program.write_word(base + 0x600 + adjacent, delayed ? 0xf274 : 0xf074);
-	program.write_word(base + 0x601 + adjacent, 0x700);
-	if (delayed) { program.write_word(base + 0x602 + adjacent, t_delay ? 0x770e : 0xe811); program.write_word(base + 0x603 + adjacent, t_delay ? parameter : 0xe922); }
-	program.write_word(base + continuation, 0xe966);
-	program.write_word(base + 0x700, t_delay ? 0x490e : 0xe955);
-	program.write_word(base + 0x701, 0xfc00);
-	set_registers(*m_cpu, {
-		{cpu_regs::STATE_TCR, 0x10}, {cpu_regs::STATE_PMST, 0}, {cpu_regs::STATE_ILLEGAL, 0},
-		{cpu_regs::STATE_ST0, 0xa61b}, {cpu_regs::STATE_ST1, 0x800}, {cpu_regs::STATE_SP, 0x1000},
-		{cpu_regs::STATE_RTN, 0x8888}, {cpu_regs::STATE_T, 0xbeef}, {cpu_regs::STATE_AR1, 0x7777},
-		{cpu_regs::STATE_A, 0}, {cpu_regs::STATE_B, 0}, {cpu_regs::STATE_IFR, 0}, {cpu_regs::STATE_IMR, 0},
-	});
-	m_cpu->space(AS_DATA).write_word(0xffe, 0xaaaa);
-	m_cpu->space(AS_DATA).write_word(0xfff, 0xaaaa);
-	m_cpu->set_state_int(STATE_GENPC, base + 0x600);
-	m_cpu->set_pipeline_frontend(true);
-	m_pipeline_replay = false; m_pipeline_expected_cycle = 1;
-	m_pipeline_operand_reads = m_pipeline_store_writes = m_pipeline_drained_fetches = 0;
-	m_pipeline_extensions_reads = 0;
-	m_pipeline_register_writes = 0;
-	m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0x0e, 0xfff, "staged_call_stack",
-		[this, stack, continuation, adjacent, t_delay, parameter](offs_t address, u16 &value, u16) {
-			if (machine().side_effects_disabled()) return;
-			if (address == 0x0e) {
-				expect(t_delay && value == parameter && m_cpu->pipeline_cycles() == 7 + adjacent, "CALLD's complete two-word STM delay publishes T once before callee Read");
-				++m_pipeline_register_writes;
-			} else if (address == stack) {
-				expect(value == continuation && m_cpu->pipeline_cycles() == 6 + adjacent, "CALL writes its retained return word in the opcode's Execute clock");
-				++m_pipeline_store_writes;
-			} else if (address == 0xfff) {
-				expect(adjacent && address == 0xfff && value == 0x7777 && m_cpu->pipeline_cycles() == 6, "Older push and younger CALL own distinct stack destinations");
-				++m_pipeline_drained_fetches;
-			}
-		});
-	m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(stack, stack, "staged_call_return_pop",
-		[this, continuation, adjacent](offs_t, u16 &value, u16) {
-			if (machine().side_effects_disabled()) return;
-			expect(value == continuation && m_cpu->pipeline_cycles() == 10 + adjacent, "Callee RET reads exactly the caller's retained stack word");
-			++m_pipeline_operand_reads;
-		});
-	m_pipeline_fetch_tap = program.install_read_tap(base + 0x700, base + 0x700, "staged_call_program_observer",
-		[this, adjacent](offs_t, u16 &, u16) {
-			if (machine().side_effects_disabled()) return;
-			expect(m_cpu->pipeline_cycles() == 6 + adjacent, "CALL target Fetch coincides with its return-address write");
-			++m_pipeline_extensions_reads;
-		});
-	m_phase = 251650; m_cpu->resume(SUSPEND_REASON_DISABLE);
-	m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-}
 
 void tms320c54x_test_state::start_pipeline_worker_xc(unsigned variant)
 {
@@ -929,58 +866,8 @@ bool tms320c54x_test_state::check_delayed_call_results()
 }
 
 
-bool tms320c54x_test_state::check_pipeline_call_results()
+bool tms320c54x_test_state::check_pipeline_worker_xc_results()
 {
-	if (m_phase == 251650)
-	{
-		u64 const cycle = m_cpu->pipeline_cycles();
-		bool const t_delay = m_pipeline_peripheral_case >= 24;
-		u16 const parameter = t_delay ? std::array<u16, 9>{6, 0, 0x8000, 0xf495, 0xffff, 0x76e6, 0x4ee6, 0x7001, 0x54e6}[(m_pipeline_peripheral_case - 24) / 12] : 0;
-		unsigned const adjacent = t_delay ? BIT(m_pipeline_peripheral_case, 1) : m_pipeline_peripheral_case >= 12;
-		bool const delayed = t_delay || BIT(m_pipeline_peripheral_case, 1);
-		u16 const continuation = 0x600 + adjacent + (delayed ? 4 : 2);
-		u64 const checkpoint = 4 + adjacent + (m_pipeline_peripheral_case / 4) % 3;
-		u64 const sp = cycle < 4 + adjacent ? 0x1000 : cycle >= 9 + adjacent ? 0x1000 - adjacent : 0xfff - adjacent;
-		u64 const expected_b = cycle >= 16 + adjacent ? 0x66 : cycle >= 10 + adjacent ? (t_delay ? parameter : 0x55) : delayed && !t_delay && cycle >= 9 + adjacent ? 0x22 : 0;
-		expect(cycle == m_pipeline_expected_cycle && !m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) &&
-			m_pipeline_store_writes == unsigned(cycle >= 6 + adjacent) &&
-			m_pipeline_drained_fetches == unsigned(adjacent && cycle >= 6) &&
-			m_pipeline_operand_reads == unsigned(cycle >= 10 + adjacent) &&
-			m_pipeline_extensions_reads == unsigned(cycle >= 6 + adjacent) &&
-			m_cpu->state_int(tms320c54x_device::STATE_SP) == sp &&
-			m_cpu->state_int(tms320c54x_device::STATE_RTN) == (cycle >= 5 + adjacent ? continuation : 0x8888) &&
-			m_cpu->state_int(tms320c54x_device::STATE_A) == (delayed && !t_delay && cycle >= 8 + adjacent ? 0x11 : 0) &&
-			m_cpu->state_int(tms320c54x_device::STATE_T) == (t_delay && cycle >= 7 + adjacent ? parameter : 0xbeef) &&
-			m_pipeline_register_writes == unsigned(t_delay && cycle >= 7 + adjacent) &&
-			m_cpu->state_int(tms320c54x_device::STATE_B) == expected_b,
-			"CALL owns its stack/RTN phases, executes only delay slots and returns to the correct continuation");
-		if (cycle == checkpoint && !m_pipeline_replay)
-		{
-			expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save CALL after allocation/RTN/write ownership");
-		}
-		if (cycle == 22)
-		{
-			if (!m_pipeline_replay)
-			{
-				m_pipeline_replay = true;
-				m_pipeline_store_writes = m_pipeline_extensions_reads = unsigned(checkpoint >= 6 + adjacent);
-				m_pipeline_drained_fetches = unsigned(adjacent && checkpoint >= 6); m_pipeline_operand_reads = 0;
-				m_pipeline_register_writes = 0;
-				expect(restore_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Restore retained CALL target and return word without duplicate stack writes");
-				return restart_pipeline_observer(251660, checkpoint + 1);
-			}
-			m_pipeline_write_tap.remove(); m_pipeline_operand_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (m_pipeline_peripheral_case < 131) { start_pipeline_call(m_pipeline_peripheral_case + 1); return true; }
-			osd_printf_info("TMS320C54x staged calls: PASS cases=132 forms=CALL,CALLD pages=2 adjacent_push=66 stm_t_delay=108 parameters=9 restore=132 duplicate_stack_writes=0\n");
-		}
-		++m_pipeline_expected_cycle;
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 251660)
-	{
-		m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 251650;
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
 	if (m_phase == 251690)
 	{
 		u64 const cycle = m_cpu->pipeline_cycles();
