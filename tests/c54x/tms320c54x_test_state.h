@@ -196,7 +196,6 @@ private:
 	void start_block_xc(unsigned variant = 0);
 	void start_move_repeat_owner(unsigned variant = 0);
 	void start_long_mapped_original(unsigned variant = 0);
-	void check_mmr_bus();
 
 
 

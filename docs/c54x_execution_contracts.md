@@ -267,6 +267,14 @@ after deliberate corruption. Logical IRQ acknowledgement remains active with
 physical IACK disabled. Every retained case checkpoints/replays; arbitrary
 higher-order combinations from the former exhaustive raw sweeps are not retained.
 
+`mmr_bus` isolates the CPU's shared register/MMIO view: AR3 full and masked
+writes agree with debugger state; low/high IFR masks clear only selected flags;
+the reserved address3 remains board RAM. A passive tap observes each write even
+though the stimulus uses the MMIO API rather than guest instructions. Snapshot
+replay begins before those writes and restores the observation counter; leaving
+that counter unsaved fails on repeated observations. No inherited handset state
+or physical external-bus claim belongs to this contract.
+
 The independent `status_bitfield` section owns ST0/ST1 BITF sampling: 128
 register/pattern/mask/initial-TC/addressing combinations, with pages and three
 checkpoint positions distributed rather than multiplied into 768 executions.

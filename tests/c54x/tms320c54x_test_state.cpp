@@ -292,7 +292,6 @@ void tms320c54x_test_state::machine_reset()
 	auto &program = m_cpu->space(AS_PROGRAM);
 	auto &data = m_cpu->space(AS_DATA);
 	// CALL/RET, then a three-word RPT copy.
-	check_mmr_bus();
 	write_words(program, {
 		{0x0100, 0xf074}, {0x0101, 0x0200}, {0x0102, 0xec02}, {0x0103, 0xe598},
 	});

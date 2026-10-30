@@ -120,6 +120,11 @@ protected:
 	void machine_start() override
 	{
 		m_timer = timer_alloc(FUNC(section_state::tick), this);
+#ifdef C54X_SECTION_MMR_BUS
+		save_item(NAME(m_mmr_writes));
+		m_mmr_tap=m_cpu->space(AS_DATA).install_write_tap(0x13,0x13,"MMR_passive_writes",
+			[this](offs_t,u16 &,u16) { ++m_mmr_writes; });
+#endif
 #ifdef C54X_SECTION_STAGED_IDLE
 		save_item(NAME(m_staged_idle_tim));
 #endif
@@ -386,6 +391,10 @@ private:
 #endif
 	TIMER_CALLBACK_MEMBER(tick)
 	{
+#ifdef C54X_SECTION_MMR_BUS
+		if (m_fixture->tick_count()>=2 && m_mmr_writes!=3)
+			throw emu_fatalerror("Passive MMR tap must see exactly the word and two masked writes");
+#endif
 #ifdef C54X_SECTION_BUS_REGISTERS
 		unsigned const bus_now=m_fixture->tick_count();
 		auto const &bus_input=m_cases.at(m_fixture->count());
@@ -537,6 +546,10 @@ private:
 		throw emu_fatalerror(0, "C54x section complete");
 	}
 	required_device<tms320c54x_device> m_cpu;
+#ifdef C54X_SECTION_MMR_BUS
+	u32 m_mmr_writes=0;
+	memory_passthrough_handler m_mmr_tap;
+#endif
 #ifdef C54X_SECTION_BUS_REGISTERS
 	u8 m_bus_divisor=0;
 	bool m_bus_iack=false;
