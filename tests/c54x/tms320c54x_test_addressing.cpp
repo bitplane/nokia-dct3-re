@@ -1766,20 +1766,6 @@ void tms320c54x_test_state::start_reverse_carry_sequence(bool subtract)
 	m_check_timer->adjust(attotime::from_usec(100));
 }
 
-void tms320c54x_test_state::start_asm_store_case(unsigned index)
-{
-	auto &program = m_cpu->space(AS_PROGRAM);
-	program.write_word(0x0109d0, 0x8493 | ((index / 32) << 8));
-	program.write_word(0x0109d1, 0xf4e1);
-	m_cpu->space(AS_DATA).write_word(0x0507, 0xbeef);
-	set_registers(*m_cpu, {
-		{STATE_GENPC, 0x0109d0}, {cpu_regs::STATE_PMST, 0}, {cpu_regs::STATE_ST0, 0x0aa5},
-		{cpu_regs::STATE_ST1, 0x0900 | (index & 31)}, {cpu_regs::STATE_A, 0x12345678},
-		{cpu_regs::STATE_B, 0xff87654321ULL}, {cpu_regs::STATE_AR3, 0x0507}, {cpu_regs::STATE_IDLE, 0},
-	});
-	m_phase = 3346 + index;
-	m_check_timer->adjust(attotime::from_usec(100));
-}
 
 
 
@@ -4483,31 +4469,6 @@ bool tms320c54x_test_state::check_banz_offset_results()
 
 
 
-bool tms320c54x_test_state::check_asm_store_results()
-{
-	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
-	if (m_phase >= 3346 && m_phase < 3474)
-	{
-		unsigned const index = m_phase - 3346;
-		unsigned const kind = index / 32;
-		int const shift = (index & 31) >= 16 ? int(index & 31) - 32 : int(index & 31);
-		s64 const value = kind & 1 ? -2023406815LL : 0x12345678;
-		u64 const shifted = shift < 0 ? u64(value >> -shift) : u64(value) << shift;
-		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) &&
-			m_cpu->state_int(tms320c54x_device::STATE_IDLE) &&
-			data.read_word(0x0507) == u16(shifted >> (kind & 2 ? 16 : 0)) &&
-			m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x0508 &&
-			m_cpu->state_int(tms320c54x_device::STATE_A) == 0x12345678 &&
-			m_cpu->state_int(tms320c54x_device::STATE_B) == 0xff87654321ULL &&
-			m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0x0aa5 &&
-			m_cpu->state_int(tms320c54x_device::STATE_ST1) == (0x0900 | (index & 31)),
-			"SPRU172C ASM STL/STH stores shifted low/high words without modifying either accumulator or status");
-		if (index < 127) { start_asm_store_case(index + 1); return true; }
-		osd_printf_info("TMS320C54x ASM store conformance: PASS variants=128\n");
-		return true;
-	}
-	return false;
-}
 
 bool tms320c54x_test_state::check_reverse_carry_reference_results()
 {

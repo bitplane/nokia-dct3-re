@@ -21,6 +21,23 @@ inline std::vector<clocked_register_case> section_cases()
 		c.data_events = std::vector<clocked_data_event>{{true,0x507,word,0,false}};
 		cases.push_back(std::move(c));
 	}
+	for (unsigned index = 0; index < 128; ++index) {
+		unsigned const kind = index / 32;
+		int const shift = int(index & 31) - (index & 16 ? 32 : 0);
+		s64 const source = kind & 1 ? -2023406815LL : 0x12345678;
+		u64 const shifted = shift < 0 ? u64(source >> -shift) : u64(source) << shift;
+		u16 const word = u16(shifted >> (kind & 2 ? 16 : 0)), st1 = 0x900 | (index & 31);
+		auto initial = initial_case("ASM-low-high-store", {u16(0x8493 | (kind << 8)),0xf4e1});
+		initial.data = {{0x507,0xbeef}};
+		initial.initial.insert(initial.initial.end(), {{r::STATE_A,0x12345678},{r::STATE_B,0xff87654321ULL},
+			{r::STATE_AR3,0x507},{r::STATE_ST0,0xaa5},{r::STATE_ST1,st1}});
+		clocked_register_case c{{{0,std::move(initial)}},index & 1 ? 3U : 1U,24};
+		c.pipeline_frontend = false;
+		c.states.push_back({24,observation("signed-ASM-shift-preserves-source", {{r::STATE_A,0x12345678},{r::STATE_B,0xff87654321ULL},
+			{r::STATE_AR3,0x508},{r::STATE_ST0,0xaa5},{r::STATE_ST1,st1},{STATE_GENPC,0x602}},{{0x507,word}})});
+		c.data_events = std::vector<clocked_data_event>{{true,0x507,word,0,false}};
+		cases.push_back(std::move(c));
+	}
 	return cases;
 }
 }

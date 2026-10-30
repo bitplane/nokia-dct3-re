@@ -621,7 +621,6 @@ private:
 	static u16 reverse_carry_reference(u16 address, u16 offset, bool subtract);
 	void start_reverse_carry_case(unsigned index);
 	void start_reverse_carry_sequence(bool subtract);
-	void start_asm_store_case(unsigned index);
 	void start_banz_offset_case(unsigned index);
 	static constexpr u16 bio_opcodes[] = {
 		0xf802, 0xf803, 0xfa02, 0xfa03, 0xf902, 0xf903,
@@ -1584,7 +1583,6 @@ private:
 	bool check_bio_results();
 	bool check_bit_results();
 	bool check_banz_offset_results();
-	bool check_asm_store_results();
 	bool check_reverse_carry_reference_results();
 	bool check_intm_protection_results();
 	bool check_bsp_interrupt_results();
