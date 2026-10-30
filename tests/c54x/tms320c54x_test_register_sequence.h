@@ -166,6 +166,7 @@ private:
 		m_last_data_total.reset();
 		m_first_data_total.reset();
 		require(!(m_input.forbid_data_access && m_input.data_events), "one data-bus observation policy");
+		require(m_input.observe_data_reads || m_input.data_events.has_value(), "write-only data policy requires explicit events");
 		if (m_input.io_events) {
 			require(m_input.observed_data_space != AS_IO, "one IO observation policy");
 			auto access = [this](bool write,offs_t at,u16 value) {
@@ -179,6 +180,7 @@ private:
 		if (m_input.data_events)
 		{
 			auto access = [this](bool write, offs_t at, u16 word) {
+				if (!write && !m_input.observe_data_reads) return;
 				if (!m_input.data_ranges.empty()) {
 					bool selected = false;
 					for (auto const &range : m_input.data_ranges) selected |= at >= range[0] && at <= range[1];

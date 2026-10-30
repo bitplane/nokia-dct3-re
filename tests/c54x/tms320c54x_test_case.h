@@ -101,6 +101,7 @@ struct clocked_register_case
 	std::optional<std::vector<clocked_data_event>> io_events{}; // Additional IO observation when data_events covers RAM/MMRs.
 	bool initial_bio = true;
 	std::optional<std::vector<clocked_line_sample>> bio_samples{};
+	bool observe_data_reads = true; // Write-only contracts can leave variable polling reads unconstrained.
 };
 
 // No implicit reset: the standalone runner owns reset_* metadata.

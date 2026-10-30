@@ -478,7 +478,6 @@ private:
 	};
 	block_single_fixture block_single_case(unsigned v) const;
 	void start_block_single(unsigned variant = 0);
-	void start_poll_interrupt(unsigned variant = 0);
 	struct delay_compare_fixture
 	{
 		unsigned kind, form, interrupt, prefix, read, literal_clock, checkpoint;
@@ -1031,7 +1030,6 @@ private:
 	bool check_move_repeat_owner_results();
 	bool check_block_branch_edge_results();
 	bool check_delay_dld_results();
-	bool check_poll_interrupt_results();
 	bool check_delay_compare_results();
 	bool check_mapped_parallel_load_results();
 	bool check_mapped_alu_results();

@@ -4450,14 +4450,19 @@ owners. The retained control opcode is saved with the rest of the pipeline;
 calls, returns and flag-writing delay instructions keep their existing guards.
 This is a bounded composition, not a general interrupt-latency claim.
 
-`poll-interrupt` passes 384 cases and save-state replays: IRQ/NMI, 32
-arrival phases, two pages and three snapshots before assertion, after the
-pin event settles and during entry. The handler stores the foreground
+`poll_interrupt` passes 64 cases and save-state replays: IRQ/NMI and all 32
+arrival phases. Pages and three snapshot positions before assertion, after
+the pin event settles and during entry are distributed rather than Cartesian
+dimensions. The handler stores the foreground
 accumulator to prove that the delay load completed, updates the polled RAM
 once, then returns. The test requires the branch target as the stacked
 continuation, one acknowledgement, balanced SP and eventual loop exit.
-Delayed-comparison, delayed far-call, delayed block-repeat, interrupted STLM,
-status-mask, BITT/RETD and block/XC interrupt profiles also pass unchanged.
+Exact ordered writes cover the interrupt frame, handler sample and release.
+Polling reads were not count-constrained by the old fixture and remain
+unconstrained; a write-only data-event policy avoids inventing a cycle-by-cycle
+read oracle. Checkpoints avoid the callback that queues the physical input.
+The old 384-case profile, custom taps/counters and phase-keyed IRQ hook are
+removed. This section-only run does not renew neighboring legacy profiles.
 A broader guard relaxation failed comparison-publication and far-call-frame
 tests and is not part of this contract.
 

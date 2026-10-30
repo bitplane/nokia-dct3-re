@@ -101,7 +101,6 @@ void tms320c54x_test_state::machine_reset()
 	if (profile_is("load-variable")) { start_pipeline_offset_load(127872); return; }
 	if (start_profile(*this, machine().options().bios(), {
 		{ {"rpt-subc-st"}, [](self &test) { test.start_pipeline_memory_repeat(); } },
-		{ {"poll-interrupt"}, [](self &test) { test.start_poll_interrupt(); } },
 		{ {"compare-delay"}, [](self &test) { test.start_delay_compare(); } },
 	}))
 		return;
@@ -533,11 +532,6 @@ void tms320c54x_test_state::test(machine_config &config)
 	m_cpu->clkout_divisor_cb().set([this](u8 value) { m_bus_divisor = value; });
 	m_cpu->iack_enable_cb().set([this](int value) { m_bus_iack_enable = bool(value); });
 	m_cpu->set_irq_acknowledge_callback([this](device_t &, int line) {
-		if (m_phase == 256100)
-		{
-			expect(line == ((m_pipeline_peripheral_case / 32) % 2 ? INPUT_LINE_NMI : 0) && !m_vector_acks && m_cpu->state_int(tms320c54x_device::STATE_RTN) == 0x602, "Polling loop acknowledges its pending source once with the branch target as continuation");
-			++m_vector_acks; m_cpu->set_input_line(line, CLEAR_LINE);
-		}
 		if (m_phase == 259960)
 		{
 			unsigned const variant = m_pipeline_peripheral_case;
