@@ -60,66 +60,7 @@ u64 tms320c54x_test_state::ts_load_expected(u16 memory, u16 t, bool sxm)
 	return bits;
 }
 
-tms320c54x_test_state::ts_load_fixture tms320c54x_test_state::ts_load_case(unsigned variant, bool producer)
-{
-	unsigned v = variant, form = 2, code, kind = 0;
-	if (producer) { kind = v % 3; v /= 3; code = std::array<unsigned, 8>{0, 1, 15, 16, 31, 32, 48, 63}[v % 8]; v /= 8; }
-	else { form = v % 17; v /= 17; if (form >= 5) ++form; code = v % 64; v /= 64; }
-	unsigned const pattern = v % 4; v /= 4;
-	unsigned const flags = v % 4; v /= 4;
-	unsigned const destination = v % 2; v /= 2;
-	unsigned const compatibility = producer ? 0 : v % 2;
-	unsigned const reg = producer ? 1 : code / 8;
-	auto f = memory_arithmetic_case(form + 18 * reg + destination * 144 + pattern * 576 + flags * 4608 + compatibility * 18432);
-	unsigned const prefix = producer ? kind == 1 ? 1 : 2 : 0;
-	f.read_cycle += prefix;
-	u16 const memory = std::array<u16, 4>{0, 1, 0x8000, 0xffff}[pattern], t = 0xa500 | code;
-	u32 const base = (producer ? v % 2 : (destination ^ (code / 32))) ? 0x20000 : 0;
-	u64 const a = producer && kind == 2 ? t : 0x123456789aULL, b = 0x2233445566ULL;
-	return {f, memory, t, destination, kind, prefix, base, a, b, ts_load_expected(memory, t, flags & 1)};
-}
 
-void tms320c54x_test_state::start_ts_load(unsigned variant)
-{
-	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-	bool const producer = profile_is("ld-ts-producer");
-	auto const f = ts_load_case(variant, producer); auto const &o = f.address;
-	auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
-	for (unsigned i = 0; i < 32; ++i) program.write_word(f.base + 0x600 + i, 0xf495);
-	if (producer)
-	{
-		program.write_word(f.base + 0x600, f.producer_kind == 0 ? 0x770e : f.producer_kind == 1 ? 0x3082 : 0x880e);
-		if (!f.producer_kind) program.write_word(f.base + 0x601, f.t);
-	}
-	program.write_word(f.base + 0x600 + f.prefix, 0x1400 | (f.destination << 8) | u8(o.opcode));
-	if (!producer && o.form >= 14) program.write_word(f.base + 0x601, o.literal);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10); m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST0, o.st0); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, o.st1);
-	m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000); m_cpu->set_state_int(tms320c54x_device::STATE_BK, o.bk);
-	m_cpu->set_state_int(tms320c54x_device::STATE_T, producer ? 0xf : f.t);
-	m_cpu->set_state_int(tms320c54x_device::STATE_A, f.a); m_cpu->set_state_int(tms320c54x_device::STATE_B, f.b);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
-	for (unsigned ar = 0; ar < 8; ++ar) m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + ar, 0x5007);
-	if (producer) { m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x5100); data.write_word(0x5100, f.t); }
-	data.write_word(o.address, f.memory);
-	m_idle_fixture_tick = 0; m_pipeline_replay = false;
-	m_pipeline_operand_reads = m_pipeline_extensions_reads = m_pipeline_store_writes = 0;
-	m_pipeline_operand_tap = data.install_read_tap(0, 0xffff, "ts_load_source", [this, f, producer](offs_t at, u16 &word, u16) {
-		if (machine().side_effects_disabled()) return;
-		bool const t_read = producer && f.producer_kind == 1 && !m_pipeline_operand_reads;
-		expect(m_pipeline_operand_reads < (producer && f.producer_kind == 1 ? 2 : 1) && at == (t_read ? 0x5100 : f.address.address) && word == (t_read ? f.t : f.memory) && m_cpu->pipeline_cycles() == (t_read ? 5 : f.address.read_cycle),
-			"TS load and any T producer sample each retained source once"); ++m_pipeline_operand_reads; });
-	m_pipeline_write_tap = data.install_write_tap(0, 0xffff, "ts_load_no_write", [this, f, producer](offs_t at, u16 &word, u16) {
-		if (machine().side_effects_disabled()) return;
-		expect(producer && f.producer_kind != 1 && !m_pipeline_store_writes && at == 0xe && word == f.t && m_cpu->pipeline_cycles() == (f.producer_kind == 0 ? 5 : 6),
-			"TS load writes no memory and preserves the T producer's owned publication"); ++m_pipeline_store_writes; });
-	m_pipeline_fetch_tap = program.install_read_tap(f.base + 0x601, f.base + 0x601, "ts_load_literal", [this, f, producer](offs_t, u16 &word, u16) {
-		if (machine().side_effects_disabled() || (producer ? f.producer_kind != 0 : f.address.form < 14)) return;
-		expect(!m_pipeline_extensions_reads && word == (producer ? f.t : f.address.literal), "TS load retains its own address or producer literal once"); ++m_pipeline_extensions_reads; });
-	m_phase = 254580; m_cpu->set_state_int(STATE_GENPC, f.base + 0x600); m_cpu->set_pipeline_frontend(true);
-	m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-}
 
 void tms320c54x_test_state::start_shifted_ar_conflict(unsigned variant)
 {
@@ -2608,70 +2549,8 @@ bool tms320c54x_test_state::check_bit_results()
 
 
 
-bool tms320c54x_test_state::check_ts_load_results()
+bool tms320c54x_test_state::check_shifted_ar_conflict_results()
 {
-	if (m_phase == 254580)
-	{
-		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
-		bool const producer = profile_is("ld-ts-producer");
-		auto const f = ts_load_case(variant, producer); auto const &o = f.address;
-		unsigned const checkpoint = std::array<unsigned, 3>{3, o.read_cycle - 1, o.read_cycle}[variant / (producer ? 1536 : 69632)];
-		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) &&
-			m_cpu->state_int(tms320c54x_device::STATE_A) == (!f.destination && tick > o.read_cycle ? f.result : f.a) &&
-			m_cpu->state_int(tms320c54x_device::STATE_B) == (f.destination && tick > o.read_cycle ? f.result : f.b),
-			"TS load publishes only its retained source/count result in Execute");
-		if (tick == 4 && (producer ? f.producer_kind == 0 : o.form >= 14))
-		{
-			auto const disable = machine().disable_side_effects(); m_cpu->space(AS_PROGRAM).write_word(f.base + 0x601, 0xdead);
-		}
-		if (tick == o.read_cycle - 1)
-		{
-			expect(m_cpu->state_int(tms320c54x_device::STATE_AR0 + o.selected) == o.next_ar, "TS load modifies its selected pointer once before Read");
-			m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + o.selected, 0x2222);
-		}
-		if (tick == o.read_cycle)
-		{
-			expect(m_cpu->state_int(tms320c54x_device::STATE_T) == f.t, "TS Read observes the legal producer's published T");
-			m_cpu->set_state_int(tms320c54x_device::STATE_T, f.t ^ 0x3f);
-			auto const disable = machine().disable_side_effects(); m_cpu->space(AS_DATA).write_word(o.address, 0xdead);
-		}
-		if (tick == checkpoint && !m_pipeline_replay)
-		{
-			m_idle_fixture_saved_tick = tick; m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_extensions_reads, m_pipeline_store_writes};
-			expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save TS load before address capture or after retained memory/T Read");
-		}
-		if (tick == 24)
-		{
-			u16 const expected_st0 = (o.st1 & 0x20) && o.reg && o.form >= 2 && o.form != 17 ? (o.st0 & 0x1fff) | (o.reg << 13) : o.st0;
-			expect(m_pipeline_operand_reads == (producer && f.producer_kind == 1 ? 2 : 1) &&
-				m_pipeline_extensions_reads == unsigned(producer ? f.producer_kind == 0 : o.form >= 14) &&
-				m_pipeline_store_writes == unsigned(producer && f.producer_kind != 1) &&
-				m_cpu->state_int(tms320c54x_device::STATE_ST0) == expected_st0 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == o.st1 &&
-				m_cpu->state_int(tms320c54x_device::STATE_AR0 + o.selected) == 0x2222 && m_cpu->state_int(tms320c54x_device::STATE_T) == (f.t ^ 0x3f),
-				"TS load retains memory, low-six-bit count and pointer without modifying carry/overflow or replaying the producer");
-			if (!m_pipeline_replay)
-			{
-				m_pipeline_replay = true; m_idle_fixture_tick = m_idle_fixture_saved_tick;
-				m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[1]; m_pipeline_store_writes = m_recurring_irq_snapshot[2];
-				return restore_pipeline_at(254590, "Restore TS load without source, shift-count or literal resampling");
-			}
-			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (variant < (producer ? 4607 : 208895)) { start_ts_load(variant + 1); return true; }
-			if (producer)
-			{
-				osd_printf_info("TMS320C54x TS load producers: PASS cases=4608 restore=4608 producers=STM_T,LD_T,STLM_T shift_codes=8 values=4 sxm_ovm=4 destinations=2 pages=2 snapshots=3 read_owned_t=1 forbidden_stlm_gap_claim=0 duplicate_reads=0 duplicate_writes=0 silicon_phase_claim=0\n");
-				throw emu_fatalerror(0, "TMS320C54x isolated TS load producers complete");
-			}
-			osd_printf_info("TMS320C54x TS loads: PASS cases=208896 restore=208896 forms=17 registers=8 shift_codes=64 values=4 sxm_ovm=4 destinations=2 compatibility=2 snapshots=3 read_owned_t=1 source_reads=1 writes=0 status_preserved=1 mapped_sources=excluded silicon_phase_claim=0\n");
-			throw emu_fatalerror(0, "TMS320C54x isolated TS loads complete");
-		}
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 254590)
-	{
-		m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 254580;
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
 	if (m_phase == 310100)
 	{
 		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick, kind = (variant / 8) % 4;

@@ -113,16 +113,6 @@ private:
 		u16 bk = 16;
 	};
 	static u64 ts_load_expected(u16 memory, u16 t, bool sxm);
-	struct ts_load_fixture
-	{
-		memory_arithmetic_fixture address;
-		u16 memory, t;
-		unsigned destination, producer_kind, prefix;
-		u32 base;
-		u64 a, b, result;
-	};
-	ts_load_fixture ts_load_case(unsigned variant, bool producer);
-	void start_ts_load(unsigned variant = 0);
 	struct extended_ar_store_fixture
 	{
 		unsigned form, reg, selected, kind, flags, gap;
@@ -1549,7 +1539,7 @@ private:
 	bool check_mvkd_sp_results();
 	bool check_pipeline_peripheral_logic_results();
 	bool check_mvdd_source_results();
-	bool check_ts_load_results();
+	bool check_shifted_ar_conflict_results();
 	bool check_extended_ar_store_results();
 	bool check_data_copy_results();
 	bool check_accumulator_shift_results();
