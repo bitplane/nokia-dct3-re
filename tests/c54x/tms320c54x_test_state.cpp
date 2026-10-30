@@ -81,7 +81,6 @@ void tms320c54x_test_state::machine_reset()
 		{ {"squr-delay"}, [](self &test) { test.start_delay_multiply(); } },
 		{ {"add-bk", "add-absolute", "add-sp"}, [](self &test) { test.start_pipeline_absolute_add(); } },
 		{ {"instr-observer"}, [](self &test) { test.start_instruction_observer(); } },
-		{ {"software-intr"}, [](self &test) { test.start_software_intr(); } },
 		{ {"rptb-br-edges"}, [](self &test) { test.start_block_branch_edge(); } },
 		{ {"rptb-branch"}, [](self &test) { test.start_block_branch(); } },
 		{ {"mpy-mem-imm"}, [](self &test) { test.start_memory_immediate_multiply(); } },

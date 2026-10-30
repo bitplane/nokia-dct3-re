@@ -361,7 +361,6 @@ private:
 	static block_xc_fixture block_xc_case(unsigned v);
 	void start_block_xc(unsigned variant = 0);
 	void start_move_repeat_owner(unsigned variant = 0);
-	void start_software_intr(unsigned variant = 0);
 	void start_long_mapped_original(unsigned variant = 0);
 	struct dst_bypass_fixture
 	{
@@ -378,7 +377,6 @@ private:
 	void start_idle3_pll_relock_case();
 	void check_mmr_bus();
 	void start_timer_boundary_probe(unsigned index, bool staged = false);
-	void start_intm_protection_case(unsigned index);
 
 
 
@@ -990,7 +988,6 @@ private:
 		m_check_timer->enable(true);
 		return true;
 	}
-	bool check_intm_protection_results();
 	bool check_bsp_interrupt_results();
 	bool check_idle_pll_results();
 	bool check_xc_interrupt_results();
@@ -1036,7 +1033,6 @@ private:
 	bool check_block_xc_results();
 	bool check_block_xc_irq_results();
 	bool check_move_repeat_owner_results();
-	bool check_software_intr_results();
 	bool check_block_branch_edge_results();
 	bool check_delay_dld_results();
 	bool check_poll_interrupt_results();

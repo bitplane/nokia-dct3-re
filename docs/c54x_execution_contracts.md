@@ -1904,6 +1904,25 @@ family includes cross-accumulator MAC, rounded MACR and MAS/MASR; physical
 bank timing and interrupt/repeat composition remain unvalidated. Execution
 of the original MAC is not proof of valid recording or audio.
 
+### Software INTR and INTM followers
+
+`software_intr_pipeline` checks all 32 software vectors with both initial INTM
+states in 64 cases/replays. Decode-owned RTN, retained opcode/vector words,
+exact frame Write/RET Read/handler and continuation Write clocks, frame poison,
+selective IFR clearance and preserved arithmetic/configuration state are checked.
+Pages and two checkpoints are distributed rather than producing 256 executions.
+RET's Read precedes the handler STLM's Execute in their shared model clock.
+The separate atomic `software_interrupt` section also covers TRAP/RETF behavior;
+it does not substitute for this staged publication contract.
+
+`atomic_intm_follower` retains all three complete-follower cases after INTM
+clear: one-word LD, three-word ST and RET. Exact ordered data events, logical
+continuation, stack effects and vector entry establish that the pending latch
+is not accepted before the full follower completes. This atomic contract is
+separate from the pipeline `interrupt_mask` section. Neither measures silicon
+interrupt timing. Both sections have explicit reset/setup and save/replay;
+their old phase-chain setup/result owners are removed.
+
 ### Active repeat context and stack bypass
 
 The original wrapper uses `POPD *AR7` at logical `03:1f02`, with AR7

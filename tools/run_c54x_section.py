@@ -308,6 +308,8 @@ def main():
     counts['atomic_operand_order'] = 46
     counts['xc_return'] = 16
     counts['delayed_far_call'] = 81
+    counts['software_intr_pipeline'] = 64
+    counts['atomic_intm_follower'] = 3
     counts['accumulator_call_frames'] = 216
     parser.add_argument('section', choices=[*counts, 'all'])
     parser.add_argument('--jobs', type=int, default=8)

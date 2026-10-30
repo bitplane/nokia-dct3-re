@@ -126,60 +126,7 @@ void tms320c54x_test_state::start_block_xc_irq(unsigned variant)
 	m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 }
 
-void tms320c54x_test_state::start_software_intr(unsigned variant)
-{
-	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-	u32 const base = variant & 64 ? 0x20000 : 0;
-	unsigned const vector = variant % 32;
-	auto &program = m_cpu->space(AS_PROGRAM);
-	for (unsigned i = 0; i < 16; ++i) program.write_word(base + 0x600 + i, 0xf495);
-	write_words(program, {
-		{base + 0x600, 0xf7c0 | vector}, {base + 0x601, 0x890f}, {base + 0x602, 0xf4e1},
-		{base + 0x100 + vector * 4, 0x880e}, {base + 0x101 + vector * 4, 0xfc00},
-	});
-	set_registers(*m_cpu, {
-		{cpu_regs::STATE_IDLE, 0}, {cpu_regs::STATE_TCR, 0x10}, {cpu_regs::STATE_PMST, 0x100},
-		{cpu_regs::STATE_ILLEGAL, 0}, {cpu_regs::STATE_ST0, 0xa608},
-		{cpu_regs::STATE_ST1, variant & 32 ? 0x900 : 0x100}, {cpu_regs::STATE_IFR, 0xffff}, {cpu_regs::STATE_IMR, 0},
-		{cpu_regs::STATE_SP, 0x3000}, {cpu_regs::STATE_A, 0x123456789aULL}, {cpu_regs::STATE_B, 0xfedcba9876ULL},
-		{cpu_regs::STATE_T, 0x1111}, {cpu_regs::STATE_TRN, 0x2222},
-	});
-	m_pipeline_operand_reads = m_pipeline_store_writes = 0;
-	m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0, 0xffff, "software_intr_read", [this](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return; expect(at == 0x2fff && word == 0x601 && !m_pipeline_operand_reads++ && m_cpu->pipeline_cycles() == 9, "Software INTR return reads exactly its own continuation at Read"); });
-	// SPRU172C RET[D]: nondelayed RET takes five cycles, so the continuation executes at 15.
-	m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0, 0xffff, "software_intr_write", [this](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return; unsigned const i = m_pipeline_store_writes++; bool const valid = i < 3 && at == std::array<unsigned, 3>{0x2fff, 0x0e, 0x0f}[i] && word == std::array<u16, 3>{0x601, 0x789a, 0x9876}[i] && m_cpu->pipeline_cycles() == std::array<unsigned, 3>{6, 9, 15}[i]; if (!valid) osd_printf_info("software_intr_write: case=%u replay=%u index=%u address=%04x word=%04x cycle=%llu\n", m_pipeline_peripheral_case, unsigned(m_pipeline_replay), i, unsigned(at), word, (unsigned long long)m_cpu->pipeline_cycles()); expect(valid, "Software INTR publishes one frame, handler result and return result at their Execute clocks"); });
-	m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 254400;
-	m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_cpu->set_pipeline_frontend(true);
-	m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-}
 
-void tms320c54x_test_state::start_intm_protection_case(unsigned index)
-{
-	auto &program = m_cpu->space(AS_PROGRAM);
-	auto &data = m_cpu->space(AS_DATA);
-	program.write_word(0x0109d0, 0xf6bb); // RSBX ST1, INTM
-	if (index == 0)
-		program.write_word(0x0109d1, 0xe807); // One-word LD #7,A
-	else if (index == 1)
-	{
-		program.write_word(0x0109d1, 0x76f8); // Three-word ST #7,*(0501)
-		program.write_word(0x0109d2, 0x0501);
-		program.write_word(0x0109d3, 7);
-	}
-	else
-	{
-		program.write_word(0x0109d1, 0xfc00); // RET must precede the pending interrupt.
-		data.write_word(0x1000, 0x09e0);
-	}
-	program.write_word(0x010040, 0xf4e1); // Observe interrupt entry without returning.
-	data.write_word(0x0501, 0);
-	set_registers(*m_cpu, {
-		{STATE_GENPC, 0x0109d0}, {cpu_regs::STATE_PMST, 0}, {cpu_regs::STATE_SP, 0x1000}, {cpu_regs::STATE_ST1, 0x0800},
-		{cpu_regs::STATE_A, 0}, {cpu_regs::STATE_IMR, 1}, {cpu_regs::STATE_IFR, 1}, {cpu_regs::STATE_IDLE, 0},
-	});
-	m_phase = 6164 + index;
-	m_check_timer->adjust(attotime::from_usec(100));
-}
 
 void tms320c54x_test_state::start_poll_interrupt(unsigned variant)
 {
@@ -345,29 +292,6 @@ u16 tms320c54x_test_state::repeat_irq_r(offs_t offset)
 	return 1;
 }
 
-bool tms320c54x_test_state::check_intm_protection_results()
-{
-	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
-	if (m_phase >= 6164 && m_phase <= 6166)
-	{
-		unsigned const index = m_phase - 6164;
-		u16 const expected_sp = index == 2 ? 0x1000 : 0x0fff;
-		u16 const expected_pc = index == 0 ? 0x09d2 : index == 1 ? 0x09d4 : 0x09e0;
-		expect(m_cpu->state_int(STATE_GENPC) == 0x010041 &&
-			m_cpu->state_int(tms320c54x_device::STATE_IDLE) &&
-			!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) &&
-			m_cpu->state_int(tms320c54x_device::STATE_SP) == expected_sp &&
-			data.read_word(expected_sp) == expected_pc &&
-			(index != 0 || m_cpu->state_int(tms320c54x_device::STATE_A) == 7) &&
-			(index != 1 || data.read_word(0x0501) == 7),
-			"SPRU131G INTM change protects the complete following instruction, including RET");
-		if (index < 2) { start_intm_protection_case(index + 1); return true; }
-		osd_printf_info("TMS320C54x INTM protection: PASS one_word=1 three_words=1 return=1\n");
-		start_idle_wake_case(0);
-		return true;
-	}
-	return false;
-}
 
 bool tms320c54x_test_state::check_idle_pll_results()
 {
@@ -655,35 +579,6 @@ bool tms320c54x_test_state::check_block_xc_irq_results()
 	return false;
 }
 
-bool tms320c54x_test_state::check_software_intr_results()
-{
-	if (m_phase == 254400)
-	{
-		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick, checkpoint = variant & 128 ? 5 : 3;
-		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Software INTR executes without atomic fallback");
-		u32 const base = variant & 64 ? 0x20000 : 0;
-		if (tick == 3) { expect(m_cpu->state_int(tms320c54x_device::STATE_RTN) == 0x601, "Software INTR captures RTN at Decode"); m_cpu->space(AS_PROGRAM).write_word(base + 0x600, 0xf495); }
-		if (tick == 5) m_cpu->space(AS_PROGRAM).write_word(base + 0x100 + (variant % 32) * 4, 0xf495);
-		if (tick == 9) { auto const disabled = machine().disable_side_effects(); m_cpu->space(AS_DATA).write_word(0x2fff, 0xdead); }
-		capture_pipeline_at(checkpoint, {&m_pipeline_operand_reads, &m_pipeline_store_writes},
-			"Save retained software interrupt entry");
-		if (tick == 32)
-		{
-			unsigned const vector = variant % 32;
-			expect(m_cpu->state_int(STATE_GENPC) == base + 0x603 && m_cpu->state_int(tms320c54x_device::STATE_PMST) == 0x100 && m_cpu->state_int(tms320c54x_device::STATE_IMR) == 0 && m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0xa608 && m_cpu->state_int(tms320c54x_device::STATE_A) == 0x123456789aULL && m_cpu->state_int(tms320c54x_device::STATE_B) == 0xfedcba9876ULL, "Software INTR preserves program page, configuration and arithmetic state");
-			expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_pipeline_operand_reads == 1 && m_pipeline_store_writes == 3 && m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x3000 && m_cpu->state_int(tms320c54x_device::STATE_T) == 0x789a && m_cpu->state_int(tms320c54x_device::STATE_TRN) == 0x9876 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == 0x900 && m_cpu->state_int(tms320c54x_device::STATE_IFR) == (vector < 16 ? 0xffff : 0xffff ^ (1U << (vector - 16))), "Software INTR masks interrupts, clears only its IFR bit and returns to the preserved page");
-			if (replay_pipeline_at(254410, checkpoint,
-				"Replay software interrupt without duplicate frame or handler writes")) return true;
-			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (variant < 255) { start_software_intr(variant + 1); return true; }
-			osd_printf_info("TMS320C54x staged software INTR: PASS cases=256 restore=256 vectors=32 masks=2 pages=2 snapshots=2 frame_writes=1 return_reads=1 silicon_phase_claim=0\n");
-			throw emu_fatalerror(0, "TMS320C54x isolated software INTR complete");
-		}
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 254410) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 254400; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true; }
-	return false;
-}
 
 bool tms320c54x_test_state::check_poll_interrupt_results()
 {
