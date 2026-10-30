@@ -2795,20 +2795,20 @@ SFTA -16 for larger shifts. Atomic and staged NORM share this decode; see
 Pow2 `d54e`/T=`ffe5` witness, independent reference result and limits.
 The shared shift helper supplies SXM right shifts, sticky destination overflow
 and OVM saturation while preserving carry and the unselected accumulator.
-`norm` retains 24,576 cases/restores over all selectors, 48 supported shifts,
-eight 40-bit patterns, eight status combinations and two pages. Each unique
-input has one replay checkpoint, balanced two patterns per checkpoint within
-each fixed selector/count/status/page group, rather than four copies.
-Later T mutation cannot change the captured count. The compatibility profile
-name `norm-edge` covers 8,192 alias cases/restores across all selectors,
-eight source patterns, eight status combinations and two pages, balanced four
-patterns at each of its two checkpoints. This is an inferred-model regression,
-not a documented-ISA or illegal-operand test.
+`normalization` owns 12,288 cases/restores over all selectors, 48 supported
+shifts, eight 40-bit patterns and eight status combinations. Pages and four
+checkpoints are distributed instead of crossed. Later T mutation cannot
+change the captured count. `normalization_aliases` owns 4,096 cases/restores
+over all selectors, 16 alias codes, eight patterns and eight status combinations,
+with pages and two checkpoints distributed. Aliases are an inferred-model
+regression, not a documented-ISA or illegal-operand test. Both use the common
+clocked runner and a fixture-owned bit-position oracle, with no data traffic,
+one NORM opcode fetch and Execute-only accumulator/status publication.
 
 SPRU131G table 7-13 and example 7-40 require one separating word after EXP.
-`exp-norm` retains 1,536 unique inputs/restores over all selectors, 16 patterns,
-gaps 0/1/2, SXM/OVM and two pages. Its four checkpoints are balanced separately
-for each sticky-overflow seed parity. Gap zero checks the
+`exponent_normalization` owns 768 inputs/restores over all selectors, 16
+patterns, gaps 0/1/2 and SXM/OVM. Pages and four checkpoints are distributed;
+sticky-overflow seed parity remains pattern-owned. Gap zero checks the
 prototype's stale-T projection, not a guaranteed hardware result for an
 invalid-latency sequence. The original ABS/EXP/two-word move/NORM prefix at
 `03:de97..de9b` has the required separation and now executes.
@@ -2821,8 +2821,9 @@ reads, preserved source/flags and a separately retained LDM sample after T
 mutation. Adjacent LDM reads old T; separated LDM reads the new exponent.
 The leading-bit expectation is fixture-owned, with no CPU arithmetic helper
 or Nokia/private-ROM dependency. This is not NORM acceptance or measured
-silicon timing. NORM's remaining custom fixture is separate and still due
-for migration; its legacy descriptor census is not acceptance for this section.
+silicon timing. The custom EXP/NORM snapshot/tap harness and its descriptor-only
+schedule census are removed; execution and restore checks now live in the
+independently compiled sections.
 
 Staged XC accepts the twelve single signed accumulator predicates GE/LT/NE/EQ/
 GT/LE for A/B with XC1/XC2 protected spans. XC itself is a one-word opcode.

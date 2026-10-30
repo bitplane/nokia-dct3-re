@@ -352,6 +352,9 @@ def main():
     counts['immediate_dp_forwarding'] = 1024
     counts['extended_t_store'] = 1152
     counts['exponent_forwarding'] = 1536
+    counts['normalization'] = 12288
+    counts['normalization_aliases'] = 4096
+    counts['exponent_normalization'] = 768
     counts['accumulator_call_frames'] = 216
     parser.add_argument('section', choices=[*counts, 'all'])
     parser.add_argument('--jobs', type=int, default=8)

@@ -7,7 +7,6 @@
 #include "tms320c54x_test_word_examples.h"
 #include "tms320c54x_test_disassembly.h"
 #include "tms320c54x_test_dual.h"
-#include "tms320c54x_test_normalization.h"
 #include "tms320c54x_test_register_sequence.h"
 #include "tms320c54x_test_composition_limits.h"
 #include <cstring>
@@ -23,10 +22,9 @@ public:
 	{
 		m_domain = !std::strcmp(config.options().bios(), "source-domain");
 		m_dual_mode = c54x_test::dual_multiply_mode::select(config.options().bios());
-		m_normalization_kind = c54x_test::select_normalization(config.options().bios());
 		m_composition_limit = c54x_test::select_composition_limit(config.options().bios());
 		m_extended_program = !std::strcmp(config.options().bios(), "isa-disasm") || m_domain || bool(m_dual_mode) ||
-			m_normalization_kind != c54x_test::normalization_kind::none || m_composition_limit != c54x_test::composition_limit::none;
+			m_composition_limit != c54x_test::composition_limit::none;
 		TMS320C54X(config, m_cpu, 13'000'000);
 		m_cpu->set_extended_program(m_extended_program);
 		m_cpu->set_addrmap(AS_PROGRAM, &c54x_isa_test_state::program_map);
@@ -41,8 +39,6 @@ protected:
 		if (m_composition_limit != c54x_test::composition_limit::none)
 			m_register_sequence = std::make_unique<c54x_test::register_sequence_fixture>(machine(), *m_cpu, *m_timer,
 				c54x_test::composition_limit_count(m_composition_limit), [this](unsigned raw) { return c54x_test::composition_limit_case<tms320c54x_device>(raw, m_composition_limit); });
-		else if (m_normalization_kind != c54x_test::normalization_kind::none)
-			m_normalization = std::make_unique<c54x_test::exponent_normalization_fixture>(machine(), *m_cpu, *m_timer, m_normalization_kind);
 		else if (m_dual_mode) m_dual = std::make_unique<c54x_test::dual_multiply_fixture_runner>(machine(), *m_cpu, *m_timer, m_dual_mode);
 		else if (m_domain) m_domains = std::make_unique<c54x_test::source_domain_fixture>(machine(), *m_cpu, *m_timer);
 		else
@@ -75,7 +71,6 @@ protected:
 		}
 		m_case = m_resets = 0;
 		if (m_register_sequence) m_register_sequence->start();
-		else if (m_normalization) m_normalization->start();
 		else if (m_dual) m_dual->start();
 		else if (m_domains) m_domains->start();
 		else start();
@@ -92,24 +87,6 @@ private:
 			throw emu_fatalerror(3, "%s", contract.completion);
 		}
 		throw emu_fatalerror("No active legacy register sequence");
-	}
-	[[noreturn]] void normalization_result() const
-	{
-		using k = c54x_test::normalization_kind;
-		unsigned const count = m_normalization->count(), restores = m_normalization->restores();
-		auto const digest = (unsigned long long)m_normalization->digest();
-		if (m_normalization_kind == k::aliases)
-		{
-			osd_printf_info("TMS320C54x staged NORM aliases: PASS cases=%u restore=%u selectors=4 ts_codes=32..47 shifts=-16..-1 patterns=8 status_states=8 pages=2 snapshots=2 checkpoint_policy=balanced data_accesses=0 silicon_phase_claim=0 coverage_fnv64=%016llx\n", count, restores, digest);
-			throw emu_fatalerror(3, "TMS320C54x isolated NORM aliases complete");
-		}
-		if (m_normalization_kind == k::producer)
-		{
-			osd_printf_info("TMS320C54x staged EXP NORM: PASS cases=%u restore=%u selectors=4 patterns=16 gaps=0,1,2 sxm_ovm=4 pages=2 snapshots=4 checkpoint_policy=balanced ts=Read zero_gap=projection_only data_accesses=0 silicon_phase_claim=0 coverage_fnv64=%016llx\n", count, restores, digest);
-			throw emu_fatalerror(3, "TMS320C54x isolated EXP NORM complete");
-		}
-		osd_printf_info("TMS320C54x staged NORM: PASS cases=%u restore=%u selectors=4 shifts=-16..31 patterns=8 status_states=8 pages=2 snapshots=4 checkpoint_policy=balanced ts=Read result=Execute carry_preserved=1 data_accesses=0 silicon_phase_claim=0 coverage_fnv64=%016llx\n", count, restores, digest);
-		throw emu_fatalerror(3, "TMS320C54x isolated NORM complete");
 	}
 	[[noreturn]] void dual_result() const
 	{
@@ -199,7 +176,6 @@ private:
 	TIMER_CALLBACK_MEMBER(check)
 	{
 		if (m_register_sequence) { if (m_register_sequence->step()) register_sequence_result(); return; }
-		if (m_normalization) { if (m_normalization->step()) normalization_result(); return; }
 		if (m_dual) { if (m_dual->step()) dual_result(); return; }
 		if (m_domains)
 		{
@@ -253,10 +229,8 @@ private:
 	bool m_domain = false;
 	bool m_extended_program = false;
 	c54x_test::dual_multiply_mode m_dual_mode;
-	c54x_test::normalization_kind m_normalization_kind = c54x_test::normalization_kind::none;
 	std::unique_ptr<c54x_test::register_sequence_fixture> m_register_sequence;
 	c54x_test::composition_limit m_composition_limit = c54x_test::composition_limit::none;
-	std::unique_ptr<c54x_test::exponent_normalization_fixture> m_normalization;
 	std::unique_ptr<c54x_test::dual_multiply_fixture_runner> m_dual;
 	std::unique_ptr<c54x_test::source_domain_fixture> m_domains;
 	std::vector<c54x_test::instruction_case> m_cases;
@@ -278,9 +252,6 @@ ROM_START(tms54isa)
 	ROM_SYSTEM_BIOS(14, "mac-family", "Dual MAC MACR MAS MASR with independent source and destination")
 	ROM_SYSTEM_BIOS(15, "stmac", "Parallel MAC stores with retained T X and ASM")
 	ROM_SYSTEM_BIOS(16, "stmac-edge", "Parallel MAC mapped operand exclusions")
-	ROM_SYSTEM_BIOS(17, "norm", "Retained normalization shift sampling and replay")
-	ROM_SYSTEM_BIOS(18, "norm-edge", "Recovered negative normalization-count aliases")
-	ROM_SYSTEM_BIOS(19, "exp-norm", "EXP producer and normalization T latency")
 	ROM_SYSTEM_BIOS(29, "isa-words", "Atomic instruction-word arithmetic and addressing examples")
 	ROM_SYSTEM_BIOS(30, "isa-disasm", "Debugger syntax length page wrapping and stepping contracts")
 	ROM_SYSTEM_BIOS(35, "pop-irq-edge", "Interrupt-register POPM composition admission limits")

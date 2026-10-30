@@ -17,7 +17,6 @@
 #include "tms320c54x_test_repeat_state.h"
 #include "tms320c54x_test_snapshot.h"
 #include "tms320c54x_test_dual_input.h"
-#include "tms320c54x_test_normalization_input.h"
 #include "tms320c54x_test_pipeline_state.h"
 #include <sstream>
 #include <bitset>
