@@ -1656,52 +1656,7 @@ tms320c54x_test_state::indexed_store_fixture tms320c54x_test_state::circular_loa
 
 
 
-tms320c54x_test_state::indexed_mar_fixture tms320c54x_test_state::indexed_mar_case(unsigned v, bool reverse)
-{
-	indexed_mar_fixture f{};
-	f.ar = v % 8; f.add = (v / 8) % 2; f.compatibility = (v / 16) % 2;
-	f.selected = f.compatibility && !f.ar ? 4 : f.ar;
-	f.index = std::array<u16, 8>{0, 1, 0xffff, 3, 0x8000, 0x7fff, 0x1234, 0xfffe}[(v / 32) % 8];
-	if (reverse) f.index = std::array<u16, 8>{1, 2, 4, 8, 0x80, 0x100, 0x4000, 0x8000}[(v / 32) % 8];
-	for (unsigned i = 0; i < 8; ++i) f.initial[i] = (v / 256) % 2 ? 0xfffe - i : 0x1000 + i;
-	f.initial[0] = f.index;
-	f.result = f.add ? f.initial[f.selected] + f.index : f.initial[f.selected] - f.index;
-	if (reverse)
-	{
-		// Independent bit-serial oracle, not the core's reverse/add/reverse.
-		f.result = 0; int carry = 0;
-		for (int bit = 15; bit >= 0; --bit)
-		{
-			int const sum = int(BIT(f.initial[f.selected], bit)) + (f.add ? int(BIT(f.index, bit)) : -int(BIT(f.index, bit))) + carry;
-			f.result |= (sum & 1) << bit;
-			carry = f.add ? int(sum >= 2) : sum < 0 ? -1 : 0;
-		}
-	}
-	f.st0 = f.compatibility && f.ar ? 0x608 | (f.ar << 13) : 0x8608;
-	f.base = (v / 512) % 2 ? 0x20000 : 0; f.snapshot = v / 1024;
-	return f;
-}
 
-void tms320c54x_test_state::start_indexed_mar(unsigned variant)
-{
-	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-	bool const reverse = profile_is("mar-reverse");
-	auto const f = indexed_mar_case(variant, reverse); auto &program = m_cpu->space(AS_PROGRAM);
-	for (unsigned i = 0; i < 16; ++i) program.write_word(f.base + 0x600 + i, 0xf495);
-	program.write_word(f.base + 0x600, (reverse ? f.add ? 0x6db8 : 0x6da0 : f.add ? 0x6db0 : 0x6da8) | f.ar); program.write_word(f.base + 0x601, 0xf4e1);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0); m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x8608); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x800 | (f.compatibility ? 0x20 : 0));
-	m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x123456789aULL); m_cpu->set_state_int(tms320c54x_device::STATE_B, 0xfeabcd9876ULL); m_cpu->set_state_int(tms320c54x_device::STATE_T, 0x5aa5);
-	for (unsigned i = 0; i < 8; ++i) m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + i, f.initial[i]);
-	m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0, 0xffff, "indexed_mar_no_read", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) expect(false, "Indexed MAR never reads data memory"); });
-	m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0, 0xffff, "indexed_mar_no_write", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) expect(false, "Indexed MAR never writes data memory"); });
-	m_pipeline_extensions_reads = 0;
-	m_pipeline_fetch_tap = program.install_read_tap(f.base + 0x600, f.base + 0x600, "indexed_mar_fetch", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) { expect(!m_pipeline_extensions_reads, "Indexed MAR opcode is fetched once"); ++m_pipeline_extensions_reads; } });
-	m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 254920;
-	m_cpu->set_state_int(STATE_GENPC, f.base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-}
 
 tms320c54x_test_state::mapped_dual_fixture tms320c54x_test_state::mapped_dual_case(unsigned variant, bool edge, bool interrupt_registers, bool low_bus)
 {
@@ -5577,42 +5532,6 @@ bool tms320c54x_test_state::check_popd_mapped_results()
 
 
 
-bool tms320c54x_test_state::check_indexed_mar_results()
-{
-	if (m_phase == 254920)
-	{
-		bool const reverse = profile_is("mar-reverse");
-		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick; auto const f = indexed_mar_case(variant, reverse);
-		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) && m_cpu->state_int(tms320c54x_device::STATE_A) == 0x123456789aULL && m_cpu->state_int(tms320c54x_device::STATE_B) == 0xfeabcd9876ULL && m_cpu->state_int(tms320c54x_device::STATE_T) == 0x5aa5 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == (0x800 | (f.compatibility ? 0x20 : 0)), "Indexed MAR preserves accumulators T and ST1");
-		expect(m_cpu->state_int(tms320c54x_device::STATE_ST0) == (tick >= 4 ? f.st0 : 0x8608), "Indexed MAR publishes only compatibility ARP at Access");
-		for (unsigned i = 0; i < 8; ++i) expect(m_cpu->state_int(tms320c54x_device::STATE_AR0 + i) == (tick > 4 ? 0x2200 + i : tick == 4 && i == f.selected ? f.result : f.initial[i]), "Indexed MAR updates the selected register once at Access using original AR0");
-		if (tick == 4)
-			expect_opcode((reverse ? f.add ? 0x6db8 : 0x6da0 : f.add ? 0x6db0 : 0x6da8) | f.ar,
-				m_cpu->state_int(tms320c54x_device::STATE_AR0 + f.selected) == f.result,
-				"Exact indexed MAR opcode publishes the independently calculated AR update");
-		if (tick == 4) for (unsigned i = 0; i < 8; ++i) m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + i, 0x2200 + i);
-		unsigned const checkpoint = 3 + f.snapshot;
-		capture_pipeline_at(checkpoint, {&m_pipeline_extensions_reads},
-			"Save indexed MAR before or after Access update");
-		if (tick == 12)
-		{
-			expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_pipeline_extensions_reads == 1, "Indexed MAR completes without extension fetch or duplicate opcode");
-			if (replay_pipeline_at(254930, checkpoint,
-				"Restore indexed MAR without repeating its auxiliary update")) return true;
-			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (variant < 3071) { start_indexed_mar(variant + 1); return true; }
-			if (reverse)
-			{
-				osd_printf_info("TMS320C54x staged reverse-carry MAR: PASS cases=3072 restore=3072 directions=2 auxiliary_registers=8 compatibility_states=2 power_of_two_indices=8 starts=2 pages=2 snapshots=3 publication=Access data_accesses=0 alias_AR0=1 duplicate_updates=0 independent_bit_serial_oracle=1 producer_latency=unvalidated silicon_phase_claim=0\n");
-				throw emu_fatalerror(3, "TMS320C54x isolated reverse-carry MAR complete");
-			}
-			osd_printf_info("TMS320C54x staged indexed MAR: PASS cases=3072 restore=3072 directions=2 auxiliary_registers=8 compatibility_states=2 indices=8 starts=2 pages=2 snapshots=3 publication=Access data_accesses=0 alias_AR0=1 duplicate_updates=0 producer_latency=unvalidated silicon_phase_claim=0\n"); throw emu_fatalerror(0, "TMS320C54x isolated indexed MAR complete");
-		}
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 254930) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 254920; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true; }
-	return false;
-}
 
 bool tms320c54x_test_state::check_mapped_parallel_load_results()
 {

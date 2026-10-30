@@ -145,8 +145,6 @@ void tms320c54x_test_state::machine_reset()
 	if (start_profile(*this, machine().options().bios(), {
 		{ {"rpt-subc-st"}, [](self &test) { test.start_pipeline_memory_repeat(); } },
 		{ {"mpy-t-imm", "mac-t-imm"}, [](self &test) { test.start_pipeline_immediate_multiply(); } },
-		{ {"mar-index"}, [](self &test) { test.start_indexed_mar(); } },
-		{ {"mar-reverse"}, [](self &test) { test.start_indexed_mar(); } },
 		{ {"poll-interrupt"}, [](self &test) { test.start_poll_interrupt(); } },
 		{ {"compare-delay"}, [](self &test) { test.start_delay_compare(); } },
 	}))

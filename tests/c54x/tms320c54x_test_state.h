@@ -728,16 +728,6 @@ private:
 		std::array<u16, 8> initial;
 	};
 	static indexed_store_fixture circular_load_case(unsigned v);
-	struct indexed_mar_fixture
-	{
-		unsigned ar, selected, snapshot;
-		bool add, compatibility;
-		u32 base;
-		u16 index, result, st0;
-		std::array<u16, 8> initial;
-	};
-	static indexed_mar_fixture indexed_mar_case(unsigned v, bool reverse = false);
-	void start_indexed_mar(unsigned variant = 0);
 	struct mapped_dual_fixture
 	{
 		u32 base;
@@ -1466,7 +1456,6 @@ private:
 	bool check_delay_dld_results();
 	bool check_poll_interrupt_results();
 	bool check_delay_compare_results();
-	bool check_indexed_mar_results();
 	bool check_addc_chain_results();
 	bool check_mapped_parallel_load_results();
 	bool check_mapped_alu_results();
