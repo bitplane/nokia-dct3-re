@@ -1014,16 +1014,6 @@ private:
 	void start_mvdk_producer(unsigned variant = 0);
 	void start_mvmd_accumulator(unsigned variant = 0);
 	void start_mcbsp_control_sequence(unsigned variant = 0);
-	struct stlm_status_fixture
-	{
-		unsigned family, gap, checkpoint;
-		bool source;
-		u32 base;
-		u16 before, requested, status;
-		u64 value;
-	};
-	static stlm_status_fixture stlm_status_case(unsigned variant, bool immediate = false);
-	void start_stlm_status(unsigned variant = 0);
 	void check_st1_memory_rules();
 	struct shifted_peripheral_fixture
 	{

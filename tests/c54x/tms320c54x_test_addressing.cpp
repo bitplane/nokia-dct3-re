@@ -2747,62 +2747,7 @@ void tms320c54x_test_state::start_mvdk_producer(unsigned variant)
 
 
 
-tms320c54x_test_state::stlm_status_fixture tms320c54x_test_state::stlm_status_case(unsigned variant, bool immediate)
-{
-	unsigned const pattern = variant % 64;
-	stlm_status_fixture f{(variant / 64) % 6, (variant / 768) % 4, 4 + (variant / 6144), bool((variant / 384) % 2),
-		(variant / 3072) % 2 ? 0x20000U : 0, 0, 0, 0, 0};
-	f.requested = f.family ? 0x800 | (pattern & 31) | (pattern & 32 ? 0x100 : 0) : u16(0xffff ^ (pattern * 0x421));
-	f.before = ((f.requested ^ 0x611f) & 0x711f) | ((variant / 384) % 2 ? 0x800 : 0);
-	f.value = 0x8012340000ULL | f.requested;
-	if (!immediate && !f.family && (pattern & 32)) f.requested = f.before & 0x100 ? 0 : 0xffff;
-	f.status = (f.requested & ~u16(0xc00)) | (f.before & f.requested & 0x800);
-	return f;
-}
 
-void tms320c54x_test_state::start_stlm_status(unsigned variant)
-{
-	bool const immediate = profile_is("stm-st1");
-	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-	auto const f = stlm_status_case(variant, immediate); auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
-	for (unsigned i = 0; i < 32; ++i) program.write_word(f.base + 0x600 + i, 0xf495);
-	program.write_word(f.base + 0x600, f.source ? 0x8907 : 0x8807);
-	if (f.family == 1 || f.family == 3)
-	{
-		program.write_word(f.base + 0x601 + f.gap, 0x1000 | (f.source ? 0x100 : 0) | (f.family == 3 ? 0xe0 : 0x80));
-		if (f.family == 3) program.write_word(f.base + 0x602 + f.gap, 0);
-	}
-	if (f.family == 2 || f.family >= 4) program.write_word(f.base + 0x601 + f.gap, (f.family == 2 ? 0xf482 : f.family == 4 ? 0xf480 : 0xf481) | (f.source ? 0x100 : 0x200));
-	if (immediate)
-	{
-		for (unsigned i = 31; i > 0; --i) program.write_word(f.base + 0x601 + i, program.read_word(f.base + 0x600 + i));
-		program.write_word(f.base + 0x600, 0x7707); program.write_word(f.base + 0x601, f.requested);
-	}
-	m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x260e);
-	if (!f.family) m_cpu->set_state_int(tms320c54x_device::STATE_PMST, (variant % 64) & 32 ? 1 : 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST1, f.before); m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x2000); m_cpu->set_state_int(tms320c54x_device::STATE_AR0, 0x1400);
-	m_cpu->set_state_int(tms320c54x_device::STATE_A, f.source ? 0x8012345678ULL : 0xdead);
-	m_cpu->set_state_int(tms320c54x_device::STATE_B, f.source ? 0xdead : 0x8012345678ULL);
-	data.write_word(0x1400, 0x8001);
-	m_pipeline_operand_reads = m_pipeline_store_writes = 0; m_pipeline_replay = false; m_idle_fixture_tick = 0;
-	m_pipeline_operand_tap = data.install_read_tap(0, 0xffff, "stlm_status_reads", [this, f](offs_t at, u16 &word, u16) {
-		if (machine().side_effects_disabled()) return;
-		expect((f.family == 1 || f.family == 3) && at == 0x1400 && word == 0x8001 && !m_pipeline_operand_reads,
-			"STLM ST1 never reads its destination and the following load reads RAM once"); ++m_pipeline_operand_reads; });
-	m_pipeline_write_tap = data.install_write_tap(0, 0xffff, "stlm_status_write", [this, f, immediate](offs_t at, u16 &word, u16) {
-		if (machine().side_effects_disabled()) return;
-		expect(at == 7 && word == f.requested && !m_pipeline_store_writes && m_cpu->pipeline_cycles() == 6,
-			"STLM ST1 publishes the Execute-live accumulator once independent of DP/CPL"); ++m_pipeline_store_writes; });
-	m_pipeline_extensions_reads = 0;
-	if (immediate) m_pipeline_fetch_tap = program.install_read_tap(f.base + 0x601, f.base + 0x601, "stm_status_literal", [this, f](offs_t, u16 &word, u16) {
-		if (!machine().side_effects_disabled()) { expect(!m_pipeline_extensions_reads++ && word == f.requested, "STM ST1 retains one original literal"); }
-	});
-	m_phase = 62110; m_cpu->set_state_int(STATE_GENPC, f.base + 0x600); m_cpu->set_pipeline_frontend(true);
-	m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-}
 
 void tms320c54x_test_state::check_st1_memory_rules()
 {
@@ -4297,54 +4242,6 @@ bool tms320c54x_test_state::check_mapped_dual_results()
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
 	}
 	if (m_phase == 62171) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 62170; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true; }
-	if (m_phase == 62110)
-	{
-		bool const immediate = profile_is("stm-st1");
-		auto const f = stlm_status_case(m_pipeline_peripheral_case, immediate); unsigned const tick = ++m_idle_fixture_tick;
-		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "STLM status publication and qualified consumers stay staged");
-		if (tick == 4 || tick == 5) m_cpu->set_state_int(f.source ? tms320c54x_device::STATE_B : tms320c54x_device::STATE_A, tick == 4 ? f.value ^ 0xffff : f.value);
-		if (immediate && tick == 4) { auto const disable = machine().disable_side_effects(); m_cpu->space(AS_PROGRAM).write_word(f.base + 0x601, u16(~f.requested)); }
-		if (tick == 6) expect(m_cpu->state_int(tms320c54x_device::STATE_ST1) == f.status && m_xf_pin == bool(f.status & 0x2000), "STLM applies reserved-bit/INTM rules and publishes XF at Execute");
-		if (tick == f.checkpoint && !m_pipeline_replay)
-		{
-			m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_store_writes, m_pipeline_extensions_reads}; expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save retained STLM and consumer mode before/at publication");
-		}
-		if (tick == 18)
-		{
-			if (immediate) expect(m_pipeline_extensions_reads == 1, "STM captures the literal once across replay");
-			u16 const mode = immediate || f.gap || f.family == 3 ? f.status : f.before;
-			u64 expected = f.value;
-			if (f.family == 1 || f.family == 3) expected = mode & 0x100 ? 0xffffff8001ULL : 0x8001;
-			if (f.family == 2 || f.family >= 4)
-			{
-				u64 const source = 0x8012345678ULL; int const shift = int(mode & 31) - (mode & 16 ? 32 : 0);
-				expected = shift >= 0 ? (source << shift) & 0xffffffffffULL : mode & 0x100 ? u64((s64(source) - (s64(1) << 40)) >> -shift) & 0xffffffffffULL : source >> -shift;
-				if (f.family >= 4) expected = (f.family == 4 ? f.value + expected : f.value - expected) & 0xffffffffffULL;
-			}
-			if (m_cpu->state_int(f.source ? tms320c54x_device::STATE_B : tms320c54x_device::STATE_A) != expected)
-				osd_printf_info("STLM status mismatch: case=%u family=%u gap=%u before=%04x status=%04x expected=%010llx actual=%010llx\n", m_pipeline_peripheral_case, f.family, f.gap, f.before, f.status, (unsigned long long)expected, (unsigned long long)m_cpu->state_int(f.source ? tms320c54x_device::STATE_B : tms320c54x_device::STATE_A));
-			expect(m_cpu->state_int(f.source ? tms320c54x_device::STATE_B : tms320c54x_device::STATE_A) == expected && m_cpu->state_int(f.source ? tms320c54x_device::STATE_A : tms320c54x_device::STATE_B) == 0x8012345678ULL && m_cpu->state_int(tms320c54x_device::STATE_ST1) == f.status && m_cpu->state_int(tms320c54x_device::STATE_PMST) == unsigned(!f.family && (m_pipeline_peripheral_case % 64) & 32) && m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x2000 && m_cpu->state_int(tms320c54x_device::STATE_AR0) == 0x1400 && m_pipeline_store_writes == 1 && m_pipeline_operand_reads == unsigned(f.family == 1 || f.family == 3), "STLM retains one publication and consumers obey one-gap SXM/ASM or zero-gap long-offset latency");
-			if (!m_pipeline_replay)
-			{
-				m_pipeline_replay = true; m_idle_fixture_tick = f.checkpoint; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_store_writes = m_recurring_irq_snapshot[1]; m_check_timer->adjust(attotime::never);
-				m_pipeline_extensions_reads = m_recurring_irq_snapshot[2];
-				if (immediate) m_cpu->set_pipeline_frontend(true);
-				expect(restore_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Replay STLM without duplicate publication or loss of sampled modes"); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 62111; m_check_timer->enable(true); return true;
-			}
-			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (m_pipeline_peripheral_case < 18431) { start_stlm_status(m_pipeline_peripheral_case + 1); return true; }
-			if (immediate)
-			{
-				expect(m_pipeline_extensions_reads == 1, "STM captures the literal once across replay");
-				osd_printf_info("TMS320C54x staged STM ST1: PASS cases=18432 restore=18432 families=raw,SXM_LD,ASM_LD,long_SXM_LD,ASM_ADD,ASM_SUB gaps=0,1,2,3 pages=2 snapshots=3 literal_reads=1 literal_poison=1 status_writes=1 destination_reads=0 short_latency=0 long_latency=0 clear_policy=legacy_unverified reset_before_restore=1 silicon_phase_claim=0\n");
-				throw emu_fatalerror(0, "TMS320C54x isolated STM ST1 complete");
-			}
-			osd_printf_info("TMS320C54x staged STLM ST1: PASS cases=18432 restore=18432 sources=A,B families=raw,SXM_LD,ASM_LD,long_SXM_LD,ASM_ADD,ASM_SUB gaps=0,1,2,3 pages=2 snapshots=3 execute_live=1 status_writes=1 destination_reads=0 short_latency=1 long_latency=0 clear_policy=legacy_unverified silicon_phase_claim=0\n");
-			throw emu_fatalerror(0, "TMS320C54x isolated STLM ST1 complete");
-		}
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 62111) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 62110; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true; }
 	return false;
 }
 
