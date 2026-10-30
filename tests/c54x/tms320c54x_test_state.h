@@ -196,7 +196,6 @@ private:
 	static std::array<u16, 2> addm_expected(unsigned variant);
 	void start_pipeline_addm(unsigned variant = 0);
 	void start_pipeline_retd_data_order(unsigned variant = 0);
-	void start_pipeline_cmpr(unsigned variant = 0);
 	void start_pipeline_mar(unsigned variant = 0);
 	void start_pipeline_memory_logic(unsigned variant = 0);
 	void start_pipeline_mu4_logic_tail(unsigned variant = 0);
@@ -1930,7 +1929,7 @@ private:
 	bool check_pipeline_delayed_return_results();
 	bool check_addm_expected_results();
 	bool check_pipeline_retd_data_order_results();
-	bool check_pipeline_cmpr_results();
+	bool check_pipeline_mar_results();
 	bool check_pipeline_memory_logic_results();
 	bool check_pipeline_far_branch_results();
 	bool check_pipeline_far_call_results();
