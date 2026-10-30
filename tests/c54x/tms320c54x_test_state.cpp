@@ -262,7 +262,6 @@ void tms320c54x_test_state::machine_reset()
 	if (start_profile(*this, machine().options().bios(), {
 		{ {"bus-stm"}, [](self &test) { test.start_staged_bus_stm(); } },
 		{ {"timer-stm"}, [](self &test) { test.start_staged_bus_stm(); } },
-		{ {"pshd-mapped"}, [](self &test) { test.start_mapped_pshd(); } },
 		{ {"pshd-repeat"}, [](self &test) { test.start_repeat_push(); } },
 		{ {"bus-io-compose"}, [](self &test) { test.start_atomic_io_composition(); } },
 	}))

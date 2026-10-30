@@ -201,6 +201,7 @@ def main():
     counts['atomic_double_stores'] = 8
     counts['atomic_address_literals'] = 4
     counts['atomic_shifted_loads'] = 7
+    counts['mapped_pshd'] = 48
     parser.add_argument('section', choices=[*counts, 'all'])
     parser.add_argument('--jobs', type=int, default=8)
     parser.add_argument('--negative-control', action='store_true', help='require failure of an intentionally wrong expectation')

@@ -2400,31 +2400,6 @@ void tms320c54x_test_state::start_push_exclusion(bool self_ar)
 	m_idle_fixture_tick = 0; m_phase = 254090; m_cpu->set_state_int(STATE_GENPC, 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 }
 
-void tms320c54x_test_state::start_mapped_pshd(unsigned variant)
-{
-	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-	u16 const source = std::array<u16, 12>{0, 1, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15}[variant % 12];
-	u16 const value = std::array<u16, 4>{0, 1, 0x8000, 0xffff}[(variant / 12) % 4];
-	u16 const expected = source <= 1 ? 0 : source == 6 ? 0xa600 : source == 7 ? 0x800 : (source == 10 || source == 13) ? value & 0xff : value;
-	u32 const base = (variant / 48) % 2 ? 0x20000 : 0;
-	auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
-	for (unsigned i = 0; i < 16; ++i) program.write_word(base + 0x600 + i, 0xf495);
-	program.write_word(base + 0x600, 0x4b80); program.write_word(base + 0x601, 0xf4e1);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xa600); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x800);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10); m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000);
-	m_cpu->set_input_line(0, CLEAR_LINE); m_cpu->set_input_line(INPUT_LINE_NMI, CLEAR_LINE);
-	for (unsigned i = 0; i < 8; ++i) data.write_word(0x10 + i, source);
-	if (source >= 8) data.write_word(source, value);
-	data.write_word(0xfff, 0xbeef);
-	m_pipeline_operand_reads = m_pipeline_store_writes = 0;
-	m_pipeline_operand_tap = data.install_read_tap(0, 0xffff, "mapped_pshd_source",
-		[this, source, expected](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return; expect(!m_pipeline_operand_reads && at == source && word == expected && m_cpu->pipeline_cycles() == 5, "Mapped PSHD samples the actual register once in Read"); ++m_pipeline_operand_reads; });
-	m_pipeline_write_tap = data.install_write_tap(0, 0xffff, "mapped_pshd_stack",
-		[this, expected](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return; expect(!m_pipeline_store_writes && at == 0xfff && word == expected && m_cpu->pipeline_cycles() == 6, "Mapped PSHD publishes its retained source once in Execute"); ++m_pipeline_store_writes; });
-	m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 254050;
-	m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-}
 
 bool tms320c54x_test_state::standard_reada_brc() const
 { return profile_is("reada-brc16"); }
@@ -5277,47 +5252,6 @@ bool tms320c54x_test_state::check_repeat_push_results()
 		}
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
 	}
-	if (m_phase == 254050)
-	{
-		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
-		u16 const source = std::array<u16, 12>{0, 1, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15}[variant % 12];
-		u16 const value = std::array<u16, 4>{0, 1, 0x8000, 0xffff}[(variant / 12) % 4];
-		u16 const expected = source <= 1 ? 0 : source == 6 ? 0xa600 : source == 7 ? 0x800 : (source == 10 || source == 13) ? value & 0xff : value;
-		unsigned const checkpoint = std::array<unsigned, 3>{4, 5, 6}[variant / 96];
-		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Mapped PSHD executes without atomic fallback");
-		if (tick == 4) expect(m_cpu->state_int(tms320c54x_device::STATE_SP) == 0xfff, "PSHD allocates the retained stack address in Access");
-		if (tick == 5)
-		{
-			auto const disable = machine().disable_side_effects();
-			// Change control registers safely: INTM stays set and no enabled IFR is introduced.
-			if (source == 1) m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0xffff);
-			else if (source == 6) m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xa601);
-			else if (source == 7) m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x900);
-			else m_cpu->space(AS_DATA).write_word(source, expected ^ 0xffff);
-			m_cpu->set_state_int(tms320c54x_device::STATE_AR0, 0x2222);
-		}
-		if (tick == checkpoint && !m_pipeline_replay)
-		{
-			m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_store_writes, 0, 0};
-			expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save mapped PSHD around Access, Read and Execute");
-		}
-		if (tick == 12)
-		{
-			{ auto const disable = machine().disable_side_effects(); expect(m_cpu->space(AS_DATA).read_word(0xfff) == expected, "Mapped PSHD retains the register word after source and pointer mutation"); }
-			expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_cpu->state_int(tms320c54x_device::STATE_SP) == 0xfff && m_pipeline_operand_reads == 1 && m_pipeline_store_writes == 1, "Mapped PSHD completes one allocation, read and write");
-			if (!m_pipeline_replay)
-			{
-				m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_store_writes = m_recurring_irq_snapshot[1];
-				return restore_pipeline_at(254060, "Restore mapped PSHD without rereading its source or duplicating its push");
-			}
-			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (variant < 287) { start_mapped_pshd(variant + 1); return true; }
-			osd_printf_info("TMS320C54x mapped PSHD: PASS cases=288 restore=288 registers=12 patterns=4 pages=2 snapshots=3 address_access=4 source_read=5 stack_write=6 reads=1 writes=1 source_retained=1 repeat_coverage=0 dagen_source_coverage=0 silicon_phase_claim=0\n");
-			throw emu_fatalerror(0, "TMS320C54x isolated mapped PSHD complete");
-		}
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 254060) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 254050; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true; }
 	if (m_phase == 62066)
 	{
 		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick; auto const f = reada_brc_case(variant);

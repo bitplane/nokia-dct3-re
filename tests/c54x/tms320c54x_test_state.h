@@ -859,7 +859,6 @@ private:
 	static repeat_push_fixture repeat_push_case(unsigned v);
 	void start_repeat_push(unsigned variant = 0);
 	void start_push_exclusion(bool self_ar = false);
-	void start_mapped_pshd(unsigned variant = 0);
 	void start_staged_bus_stm(unsigned variant = 0);
 	struct reada_brc_fixture
 	{
