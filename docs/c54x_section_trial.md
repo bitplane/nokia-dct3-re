@@ -301,6 +301,8 @@ Subsequent replacements use the same section-only workflow:
 
 | `atomic_logic_pointer_literals.h` | Retain16 logical/shift/MVMM/load/memory-modify literals and XC NTC taken/annulled two-MAR slots. Explicit flags/SXM/BK, source registers and RAM replace ordered inheritance, including prior ANDM result and ORM neighbor. Fixed expected results, exact ordered MMR/RAM accesses, pointer/flag/source preservation and pre-instruction replay. Drop port-marker timing; atomic semantic/access scope. | Native18 cases/restores, unchanged count; build5.553s/run0.022s. Delete circular_marker_examples, ISA bank reference, phase6553 entry and450..467 dispatch/setup/assertions. Supersedes atomic_move_modify_literals' pending circular-marker entry. |
 
+| `atomic_logic_program_literals.h` | Retain AR5 ANDM/ORM with neighbors/unrelated word, signed shifted circular LD, and decrement/increment READA. Explicit prior logical result, flags/BK/pointers and distinct program/data contents at A replace inheritance. Exact RAM read/write and program-read events, memory-space discrimination, fixed results/state and pre-instruction replay. Drop port-marker cycle deltas; atomic semantic/access scope. | Native5 cases/restores, unchanged count; build5.343s/run0.016s. Delete phase9220..9222,468/469/6539 setup/checks. |
+
 `python3 tools/run_c54x_section.py all` rebuilds/runs each replacement in
 sequence. Final measurements: immediate-store5.214/0.019s,
 basic-memory5.423/0.020s, stack5.262/0.069s, DAGEN5.406/0.126s (build/run).
