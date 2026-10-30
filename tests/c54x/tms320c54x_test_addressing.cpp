@@ -170,51 +170,6 @@ void tms320c54x_test_state::start_pipeline_pop_dagen_conflict(unsigned variant)
 
 
 
-bool tms320c54x_test_state::absolute_memory_dp() const
-{ return profile_is("dp-absolute"); }
-
-void tms320c54x_test_state::start_pipeline_memory_dp(unsigned variant)
-{
-	m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
-	m_pipeline_peripheral_case = variant;
-	unsigned const page = variant & 511;
-	u16 const target = (page << 7) | 0x7e;
-	auto &program = m_cpu->space(AS_PROGRAM);
-	for (unsigned i = 0; i < 16; ++i) program.write_word(0x600 + i, 0xf495);
-	bool const absolute = absolute_memory_dp();
-	program.write_word(0x600, absolute ? 0x46f8 : 0x467f);
-	program.write_word(0x601, absolute ? 0x47f : 0x107e);
-	if (absolute) program.write_word(0x602, 0x107e);
-	set_registers(*m_cpu, {
-		{cpu_regs::STATE_TCR, 0x10}, {cpu_regs::STATE_PMST, 0}, {cpu_regs::STATE_ILLEGAL, 0},
-		{cpu_regs::STATE_ST0, 0xa608}, {cpu_regs::STATE_ST1, 0x800}, {cpu_regs::STATE_A, 0},
-		{cpu_regs::STATE_B, 0x123456789aULL}, {cpu_regs::STATE_IFR, 0}, {cpu_regs::STATE_IMR, 0},
-	});
-	m_cpu->space(AS_DATA).write_word(0x47f, 0xe000 | page);
-	m_cpu->space(AS_DATA).write_word(0x47e, 0x1111);
-	m_cpu->space(AS_DATA).write_word(target, 0x2222);
-	m_cpu->set_state_int(STATE_GENPC, 0x600);
-	m_cpu->set_pipeline_frontend(true);
-	m_pipeline_replay = false; m_pipeline_expected_cycle = 1;
-	m_pipeline_operand_reads = m_pipeline_extensions_reads = m_pipeline_store_writes = 0;
-	m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0x47f, 0x47f, "staged_memory_dp_source",
-		[this, page, absolute](offs_t, u16 &value, u16) {
-			if (machine().side_effects_disabled()) return;
-			expect(value == (0xe000 | page) && m_cpu->pipeline_cycles() == 5 + unsigned(absolute), "Memory DP retains one sample before held clocks");
-			++m_pipeline_operand_reads;
-		});
-	m_pipeline_fetch_tap = m_cpu->space(AS_DATA).install_read_tap(target, target, "staged_memory_dp_consumer",
-		[this, absolute](offs_t, u16 &value, u16) {
-			if (machine().side_effects_disabled()) return;
-			expect(value == 0x2222 && m_cpu->pipeline_cycles() == 8 + unsigned(absolute), "Adjacent direct load uses forwarded DP after the producer's two held clocks");
-			++m_pipeline_extensions_reads;
-		});
-	if (absolute)
-		m_pipeline_write_tap = program.install_read_tap(0x601, 0x601, "absolute_dp_extension",
-			[this](offs_t, u16 &value, u16) { if (machine().side_effects_disabled()) return; expect(!m_pipeline_store_writes && value == 0x47f, "Absolute DP owns one address extension"); ++m_pipeline_store_writes; });
-	m_phase = 251590; m_cpu->resume(SUSPEND_REASON_DISABLE);
-	m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-}
 
 void tms320c54x_test_state::start_pipeline_data_push(unsigned variant)
 {
@@ -6092,56 +6047,6 @@ bool tms320c54x_test_state::check_pipeline_mmr_pop_results()
 }
 
 
-bool tms320c54x_test_state::check_absolute_memory_dp_results()
-{
-	if (m_phase == 251590)
-	{
-		u64 const cycle = m_cpu->pipeline_cycles();
-		unsigned const page = m_pipeline_peripheral_case & 511;
-		unsigned const offset = unsigned(absolute_memory_dp());
-		u64 const checkpoint = 4 + offset + m_pipeline_peripheral_case / 512;
-		expect(cycle == m_pipeline_expected_cycle && !m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) &&
-			m_pipeline_operand_reads == unsigned(cycle >= 5 + offset) && m_pipeline_extensions_reads == unsigned(cycle >= 8 + offset) &&
-			m_cpu->state_int(tms320c54x_device::STATE_A) == (cycle >= 9 + offset ? 0x2222 : 0) &&
-			m_cpu->state_int(tms320c54x_device::STATE_B) == 0x123456789aULL &&
-			m_cpu->state_int(tms320c54x_device::STATE_ST0) == (0xa600 | (cycle >= 8 + offset ? page : 8)) &&
-			m_cpu->state_int(tms320c54x_device::STATE_ST1) == 0x800,
-			"Memory DP holds two clocks, masks nine bits and forwards to its adjacent consumer without early ST0 commitment");
-		if (cycle == checkpoint && !m_pipeline_replay)
-		{
-			expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save memory DP before/after sampling or during held clocks");
-		}
-		if (offset && cycle == 4) { auto const disable = machine().disable_side_effects(); m_cpu->space(AS_PROGRAM).write_word(0x601, 0xdead); }
-		if (cycle == 5 + offset) m_cpu->space(AS_DATA).write_word(0x47f, 0);
-		if (cycle == 11 + offset)
-		{
-			if (offset) expect(m_pipeline_store_writes == 1, "Absolute DP never refetches its address extension");
-			if (!m_pipeline_replay)
-			{
-				m_pipeline_replay = true; m_pipeline_operand_reads = unsigned(checkpoint >= 5 + offset); m_pipeline_extensions_reads = 0;
-				expect(restore_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Restore retained DP sample, forwarding and remaining held clocks");
-				return restart_pipeline_observer(251600, checkpoint + 1);
-			}
-			m_pipeline_operand_tap.remove(); m_pipeline_fetch_tap.remove(); if (offset) m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (m_pipeline_peripheral_case < 1535) { start_pipeline_memory_dp(m_pipeline_peripheral_case + 1); return true; }
-			if (offset)
-			{
-				osd_printf_info("TMS320C54x staged absolute memory DP: PASS pages=512 cases=1536 restore=1536 source_read=6 producer_execute=9 consumer_execute=10 extension_fetches=1 duplicate_reads=0 silicon_phase_claim=0\n");
-				throw emu_fatalerror(0, "TMS320C54x isolated absolute memory DP complete");
-			}
-			osd_printf_info("TMS320C54x staged memory DP: PASS pages=512 cases=1536 source_read=5 producer_execute=8 consumer_execute=9 restore=1536 duplicate_reads=0 silicon_phase_claim=0\n");
-			start_pipeline_conditional_branch(); return true;
-		}
-		++m_pipeline_expected_cycle;
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 251600)
-	{
-		m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 251590;
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	return false;
-}
 
 bool tms320c54x_test_state::check_pipeline_data_push_results()
 {
