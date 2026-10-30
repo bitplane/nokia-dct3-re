@@ -21,7 +21,7 @@ def copy_changed(source, target):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    counts = dict(immediate_store=8, basic_memory=18, stack=141, dagen=292, paired_store=64, register_load=80, memory_dp=48)
+    counts = dict(immediate_store=8, basic_memory=18, stack=141, dagen=292, paired_store=64, register_load=80, memory_dp=48, data_stack=76, descriptor_copy=12)
     parser.add_argument('section', choices=[*counts, 'all'])
     parser.add_argument('--jobs', type=int, default=8)
     parser.add_argument('--negative-control', action='store_true', help='require failure of an intentionally wrong expectation')
@@ -40,7 +40,8 @@ def main():
         copy_changed(source, overlay / source.name)
     copy_changed(sections / 'runner.cpp', overlay / 'tms320c54x_test_isa.cpp')
     copy_changed(sections / 'common.h', overlay / 'c54x_section_common.h')
-    copy_changed(sections / (args.section + '.h'), overlay / 'c54x_section_selected.h')
+    selected_source = ROOT / 'tests/firmware/c54x_descriptor_copy.h' if args.section == 'descriptor_copy' else sections / (args.section + '.h')
+    copy_changed(selected_source, overlay / 'c54x_section_selected.h')
     if args.negative_control:
         selected = overlay / 'c54x_section_selected.h'
         text = selected.read_text()

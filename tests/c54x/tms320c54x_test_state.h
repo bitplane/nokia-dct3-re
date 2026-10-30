@@ -217,9 +217,7 @@ private:
 	static std::array<u16, 2> addm_inputs(unsigned variant);
 	static std::array<u16, 2> addm_expected(unsigned variant);
 	void start_pipeline_addm(unsigned variant = 0);
-	void start_pipeline_data_push(unsigned variant = 0);
 	void start_pipeline_retd_data_order(unsigned variant = 0);
-	void start_pipeline_data_pop(unsigned variant = 0);
 	void start_pipeline_register_store(unsigned variant = 0);
 	void start_pipeline_cmpr(unsigned variant = 0);
 	void start_pipeline_mar(unsigned variant = 0);
@@ -2041,9 +2039,8 @@ private:
 	bool check_pipeline_xc_tc_results();
 	bool check_pipeline_delayed_return_results();
 	bool check_addm_expected_results();
-	bool check_pipeline_data_push_results();
 	bool check_pipeline_retd_data_order_results();
-	bool check_pipeline_data_pop_results();
+	bool check_pipeline_register_store_results();
 	bool check_pipeline_cmpr_results();
 	bool check_pipeline_memory_logic_results();
 	bool check_pipeline_far_branch_results();
