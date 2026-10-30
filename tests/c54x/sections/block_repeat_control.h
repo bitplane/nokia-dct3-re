@@ -26,6 +26,21 @@ inline std::vector<clocked_register_case> section_cases()
 			{r::STATE_ST1,0,0x8000}})});
 		cases.push_back(std::move(c));
 	}
+	for (unsigned extended = 0; extended < 2; ++extended)
+	for (unsigned count : {0U,2U}) {
+		unsigned const body = 0x603 + extended;
+		auto initial = initial_case("nested-repeat", {0xf072,u16(body),u16(extended ? 0xf070 : 0xec00 | count)});
+		if (extended) initial.program[3].value = count;
+		initial.program[body - 0x600].value = 0x6d91;
+		initial.program[body - 0x600 + 1].value = 0xf4e1;
+		initial.initial.insert(initial.initial.end(), {{r::STATE_BRC,3},{r::STATE_AR1,0},{r::STATE_ST1,0}});
+		clocked_register_case c{{{0,std::move(initial)}},extended ? 6U : 1U,96};
+		c.pipeline_frontend = false;
+		c.states.push_back({96,observation("nested-loop-counts", {{r::STATE_AR1,4 * (count + 1)},
+			{r::STATE_BRC,0},{r::STATE_ST1,0,0x8000}})});
+		c.data_events = std::vector<clocked_data_event>{};
+		cases.push_back(std::move(c));
+	}
 	return cases;
 }
 }

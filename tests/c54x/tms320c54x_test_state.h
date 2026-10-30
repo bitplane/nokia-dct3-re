@@ -95,7 +95,6 @@ private:
 	void start_cala_rtn_case(unsigned index);
 	void start_operand_fetch_case(unsigned index);
 	void start_loop_xc_case(unsigned index);
-	void start_nested_repeat_case(unsigned index);
 	void start_xc_irq_case(unsigned index);
 	void check_control_disassembler();
 	void start_idle_nmi_case(unsigned index);
