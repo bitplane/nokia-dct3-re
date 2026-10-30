@@ -291,6 +291,8 @@ Subsequent replacements use the same section-only workflow:
 
 | `xmem_load_alu.h` | Retain LD/ADD/SUB, all16 Xmem modes ×16 shifts ×eight original operand/source pairs ×SXM ×A/B; arithmetic also crosses OVM. Explicit signed40-bit addition/subtraction, low32 carry/no-borrow, signed32 saturation and sticky accumulator overflow expectations. Exact Access4 pointer update, Read5 capture, Execute6 publication, pointer/source poison, one opcode fetch/no writes, final flags/other accumulator and replay. Distribute status backgrounds/pages/three snapshots; preserve original pattern-linked BK0/wrap, not a new operand Cartesian product. | Native8192 LD +32768 arithmetic cases/restores versus196608 +393216; build5.609s/run15.417s. Delete shared legacy Xmem domain, arithmetic oracle, setup/checker/replay/declarations/dispatch/selectors/BIOS. |
 
+| `atomic_alu_store_literals.h` | Retain eight signed LD, saturating ADD/SUB, full40-bit OR/XOR, decrement/circular STL and SST signed STH literals. Explicit initial flags/accumulators/pointers replace predecessor inheritance; fixed expected results, exact RAM reads/writes, sibling/status/pointer preservation and pre-instruction replay. Drop port-marker cycle deltas; atomic semantics/access contract only. | Native8 cases/restores, unchanged count; build5.392s/run0.019s. Delete phase426 successor setup and phase427..434 assertions/setups; phase434's following circular-STH preparation remains reference material pending that bank. |
+
 `python3 tools/run_c54x_section.py all` rebuilds/runs each replacement in
 sequence. Final measurements: immediate-store5.214/0.019s,
 basic-memory5.423/0.020s, stack5.262/0.069s, DAGEN5.406/0.126s (build/run).
