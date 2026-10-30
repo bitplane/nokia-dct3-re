@@ -68,6 +68,7 @@ struct clocked_irq_expectation
 	std::vector<register_check> registers{};
 	std::optional<unsigned> io_events_before{};
 };
+struct retired_instruction_check { u32 address; u16 opcode; unsigned count; };
 
 inline bool accept_data_event(std::vector<clocked_data_event> const &events, unsigned &cursor, clocked_data_event actual)
 {
@@ -115,6 +116,7 @@ struct clocked_register_case
 	std::vector<memory_word> volatile_data_reads{}; // Synthetic endpoints toggle after each side-effecting read.
 	int volatile_data_space = AS_DATA;
 	std::optional<u16> volatile_read_increment{}; // Otherwise invert after each read; explicit test stimulus, not peripheral behavior.
+	std::optional<retired_instruction_check> retired_instruction{};
 };
 
 // No implicit reset: the standalone runner owns reset_* metadata.

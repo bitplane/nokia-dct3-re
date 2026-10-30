@@ -34,7 +34,6 @@ TIMER_CALLBACK_MEMBER(tms320c54x_test_state::check_results)
 	if (check_delayed_call_replay_results()) return;
 	if (check_mvdk_producer_results()) return;
 	if (check_mvdk_mapped_results()) return;
-	if (check_basic_repeat_results()) return;
 	if (check_rptbd_shift_store_results()) return;
 	if (check_long_mapped_original_results()) return;
 	if (check_staged_conditional_store_results()) return;

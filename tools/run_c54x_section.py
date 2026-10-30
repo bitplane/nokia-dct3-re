@@ -402,6 +402,7 @@ def main():
     counts['mcbsp_control'] = 16
     counts['repeated_write_a'] = 4800
     counts['repeated_write_a16'] = 4800
+    counts['memory_count_repeat'] = 1730
     counts['shifted_unowned'] = 20480
     counts['shifted_bsp'] = 5120
     counts['accumulator_call_frames'] = 216

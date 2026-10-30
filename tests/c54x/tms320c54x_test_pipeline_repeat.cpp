@@ -39,64 +39,6 @@ void tms320c54x_test_state::start_repeat_endpoint_case(unsigned index)
 
 
 
-tms320c54x_test_state::basic_repeat_fixture tms320c54x_test_state::basic_repeat_case(unsigned v)
-{
-	unsigned const edge = v >= 10368 ? v - 10368 : 8;
-	if (edge < 8) v = ((edge / 2) % 2) * 576 + (edge / 4) * 3456;
-	basic_repeat_fixture f{};
-	f.form = v % 36; v /= 36; f.count = std::array<unsigned, 4>{0, 1, 7, 255}[v % 4]; v /= 4;
-	if (edge < 8) f.count = edge % 2 ? 0xffff : 0x8000;
-	f.compiler = v % 2; v /= 2; f.compatibility = v % 2; v /= 2;
-	f.base = v % 2 ? 0x20000 : 0; v /= 2; f.irq = v % 3; v /= 3;
-	f.checkpoint = std::array<unsigned, 3>{3, 6, 12}[v];
-	f.absolute = f.form >= 34;
-	f.mode = f.form < 2 ? (f.form ? 0x7f : 0) : f.form < 26 ? 0x80 + f.form - 2 : f.form < 34 ? 0x10 + f.form - 26 : 0xf8;
-	f.selected = f.mode & 7;
-	if (f.compatibility && !f.selected) f.selected = 5;
-	f.modification = f.form >= 2 && f.form < 26 ? (f.mode & 0x78) >> 3 : 0;
-	f.st0 = 0xa600 | (f.form >= 26 && f.form < 34 ? 0 : 8);
-	f.st1 = (f.compiler ? 0x4000 : 0) | (f.compatibility ? 0x20 : 0) | (f.irq ? 0 : 0x800);
-	f.address = f.absolute ? (f.form == 35 ? 0x15 : 0x5000) : f.form >= 2 && f.form < 26 ? 0x5000 :
-		f.compiler ? 0x3000 + f.mode : ((f.st0 & 0x1ff) << 7) | f.mode;
-	f.body = f.base + (f.absolute ? 0x602 : 0x601);
-	return f;
-}
-
-void tms320c54x_test_state::start_basic_repeat(unsigned variant)
-{
-	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-	auto const f = basic_repeat_case(variant); auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
-	for (unsigned i = 0; i < 24; ++i) program.write_word(f.base + 0x600 + i, 0xf495);
-	program.write_word(f.base + 0x600, 0x4700 | f.mode);
-	if (f.absolute) program.write_word(f.base + 0x601, f.address);
-	program.write_word(f.base + 0x60f, 0xf4e1);
-	u32 const vector = f.base + (f.irq == 2 ? 4 : 0x48);
-	program.write_word(vector, 0xf495); program.write_word(vector + 1, 0xf4eb);
-	m_cpu->set_pipeline_frontend(false); m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
-	set_registers(*m_cpu, {
-		{cpu_regs::STATE_TCR, 0x10}, {cpu_regs::STATE_PMST, 0}, {cpu_regs::STATE_ST0, f.st0},
-		{cpu_regs::STATE_ST1, f.st1}, {cpu_regs::STATE_SP, 0x3000}, {cpu_regs::STATE_A, 0x123456789aULL},
-		{cpu_regs::STATE_B, 0xfedcba9876ULL}, {cpu_regs::STATE_RC, 0}, {cpu_regs::STATE_BRC, 13},
-		{cpu_regs::STATE_IFR, 0}, {cpu_regs::STATE_IMR, f.irq == 1 ? 4 : 0},
-	});
-	for (unsigned i = 0; i < 8; ++i) m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + i, f.address == 0x10 + i ? f.count : 0x5000);
-	if (f.address >= 0x60) data.write_word(f.address, f.count);
-	m_cpu->set_input_line(2, CLEAR_LINE); m_cpu->set_input_line(INPUT_LINE_NMI, CLEAR_LINE);
-	m_observed_instructions.clear(); m_saved_observed_instructions.clear(); m_rptbd_counts = {}; m_rptbd_return = 0; m_pipeline_replay = false; m_idle_fixture_tick = 0;
-	m_pipeline_fetch_tap = program.install_read_tap(f.body, f.body, "basic_repeat_body", [this](offs_t, u16 &word, u16) { if (machine().side_effects_disabled()) return; expect(word == 0xf495 && !m_rptbd_counts.fetches++, "Memory-count repeat fetches its body once"); });
-	m_pipeline_operand_tap = data.install_read_tap(0, 0xffff, "basic_repeat_reads", [this, f](offs_t at, u16 &word, u16) {
-		if (machine().side_effects_disabled()) return;
-		if (at == 0x2fff) { expect(f.irq && !m_rptbd_counts.stack_reads++ && word == m_rptbd_return, "Memory repeat interrupt consumes its retained continuation"); return; }
-		expect(at == f.address && word == f.count && !m_rptbd_counts.reads++ && m_cpu->pipeline_cycles() == (f.absolute ? 6 : 5), "Memory repeat samples the count exactly once through the decoded address"); });
-	m_pipeline_write_tap = data.install_write_tap(0, 0xffff, "basic_repeat_writes", [this, f](offs_t at, u16 &word, u16) {
-		if (machine().side_effects_disabled()) return;
-		expect(f.irq && at == 0x2fff && !m_rptbd_counts.stack_writes++ && word >= u16(f.body + 1) && word <= 0x60f, "Memory repeat writes only its optional post-body interrupt frame"); m_rptbd_return = word; });
-	m_phase = 310440; m_cpu->set_state_int(STATE_GENPC, f.base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE);
-	m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-}
-
-
-
 unsigned tms320c54x_test_state::block_branch_count(unsigned variant)
 { return std::array<unsigned, 4>{0, 1, 2, 7}[variant % 4]; }
 
@@ -1217,62 +1159,6 @@ bool tms320c54x_test_state::check_delayed_call_replay_results()
 	if (m_phase == 255430) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 255420; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true; }
 	return false;
 }
-
-bool tms320c54x_test_state::check_basic_repeat_results()
-{
-	if (m_phase == 310440)
-	{
-		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
-		auto const f = basic_repeat_case(variant);
-		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Basic memory repeat retains an admitted count and body");
-		if (tick == (f.absolute ? 5U : 4U)) { auto const disable = machine().disable_side_effects(); m_cpu->space(AS_PROGRAM).write_word(f.body, 0xe8ff); }
-		if (tick == (f.absolute ? 6U : 5U) && f.address >= 0x60) { auto const disable = machine().disable_side_effects(); m_cpu->space(AS_DATA).write_word(f.address, 0xdead); }
-		if (f.irq && tick == 3) m_cpu->set_input_line(f.irq == 2 ? INPUT_LINE_NMI : 2, ASSERT_LINE);
-		if (tick == f.checkpoint && !m_pipeline_replay)
-		{
-			m_rptbd_saved_counts = m_rptbd_counts; m_rptbd_saved_return = m_rptbd_return; m_saved_observed_instructions = m_observed_instructions;
-			expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save memory repeat before count capture, during hold or body");
-		}
-		if (tick == f.count + 80)
-		{
-			unsigned iterations = 0; for (auto const &[address, word] : m_observed_instructions) if (address == f.body) { expect(word == 0xf495, "Memory repeat executes the retained body word"); ++iterations; }
-			if (iterations != f.count + 1 || m_rptbd_counts.reads != 1 || m_rptbd_counts.fetches != 1 || m_rptbd_counts.acks != unsigned(bool(f.irq)))
-				osd_printf_info("Memory repeat mismatch case=%u replay=%u count=%u iterations=%u reads=%u fetches=%u acks=%u stack=%u/%u pc=%06x rc=%04x\n", variant, unsigned(m_pipeline_replay), f.count, iterations, m_rptbd_counts.reads, m_rptbd_counts.fetches, m_rptbd_counts.acks, m_rptbd_counts.stack_reads, m_rptbd_counts.stack_writes, unsigned(m_cpu->state_int(STATE_GENPC)), unsigned(m_cpu->state_int(tms320c54x_device::STATE_RC)));
-			expect(iterations == f.count + 1 && m_rptbd_counts.reads == 1 && m_rptbd_counts.fetches == 1 &&
-				m_rptbd_counts.acks == unsigned(bool(f.irq)) && m_rptbd_counts.stack_reads == unsigned(bool(f.irq)) && m_rptbd_counts.stack_writes == unsigned(bool(f.irq)), "Memory repeat executes count+1 bodies with one count read and a balanced deferred interrupt");
-			u16 const st0 = f.compatibility && f.form >= 2 && f.form < 26 && (f.mode & 7) ? (f.st0 & ~0xe000) | ((f.mode & 7) << 13) : f.st0;
-			for (unsigned i = 0; i < 8; ++i)
-			{
-				u16 const ar = f.address == 0x10 + i ? f.count : 0x5000 + (f.form >= 2 && f.form < 26 && i == f.selected ? f.modification == 1 ? -1 : f.modification == 2 ? 1 : 0 : 0);
-				expect(m_cpu->state_int(tms320c54x_device::STATE_AR0 + i) == ar, "Count addressing modifies its selected pointer once, never once per body");
-			}
-			expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_cpu->state_int(STATE_GENPC) == f.base + 0x610 && m_cpu->state_int(tms320c54x_device::STATE_RC) == 0 &&
-				m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x3000 && m_cpu->state_int(tms320c54x_device::STATE_BRC) == 13 && m_cpu->state_int(tms320c54x_device::STATE_ST0) == st0 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == f.st1 &&
-				m_cpu->state_int(tms320c54x_device::STATE_A) == 0x123456789aULL && m_cpu->state_int(tms320c54x_device::STATE_B) == 0xfedcba9876ULL, "Memory repeat preserves flags and unrelated state through its fresh continuation");
-			if (!m_pipeline_replay)
-			{
-				m_pipeline_replay = true; m_idle_fixture_tick = f.checkpoint; m_rptbd_counts = m_rptbd_saved_counts; m_rptbd_return = m_rptbd_saved_return; m_observed_instructions = m_saved_observed_instructions;
-				return restore_pipeline_at(310450, "Restore sampled count and pointer without resampling or duplicated effects");
-			}
-			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (variant < 10375) { start_basic_repeat(variant + 1); return true; }
-			osd_printf_info("TMS320C54x basic memory repeat: PASS cases=10376 restore=10376 forms=36 counts=0,1,7,255,32768,65535 pages=2 cpl=2 cmpt=2 sources=none,IRQ,NMI snapshots=3 count_reads=1 body_fetches=1 body_count=rc+1 pointer_effect=once retained_count=1 balanced_frames=1 physical_phase_claim=0\n"); throw emu_fatalerror(0, "TMS320C54x isolated basic memory repeat complete");
-		}
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 310450) { m_cpu->set_input_line(2, CLEAR_LINE); m_cpu->set_input_line(INPUT_LINE_NMI, CLEAR_LINE); m_phase = 310451; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true; }
-	if (m_phase == 310451)
-	{
-		auto const f = basic_repeat_case(m_pipeline_peripheral_case);
-		// Restore the fixture's external asserted-until-ack input too:
-		// the earliest snapshot can precede queued line synchronization.
-		if (f.irq && f.checkpoint == 3) m_cpu->set_input_line(f.irq == 2 ? INPUT_LINE_NMI : 2, ASSERT_LINE);
-		m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 310440; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	return false;
-}
-
-
 
 bool tms320c54x_test_state::check_block_branch_count_results()
 {

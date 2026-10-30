@@ -95,7 +95,6 @@ void tms320c54x_test_state::machine_reset()
 		{ {"shift-delay"}, [](self &test) { test.start_delay_load(); } },
 		{ {"shift-alu-delay"}, [](self &test) { test.start_delay_load(); } },
 		{ {"rptbd-shift-st"}, [](self &test) { test.start_rptbd_shift_store(); } },
-		{ {"rpt-smem"}, [](self &test) { test.start_basic_repeat(); } },
 		{ {"rpt-ld"}, [](self &test) { test.start_repeat_load(); } },
 		{ {"rpt-sfta"}, [](self &test) { test.start_repeat_load(); } },
 	}))
@@ -481,14 +480,6 @@ void tms320c54x_test_state::test(machine_config &config)
 			for (auto const &[address, word] : m_observed_instructions) if (address == f.body) ++iterations;
 			expect(f.irq && line == (f.irq == 2 ? INPUT_LINE_NMI : 2) && !m_rptbd_counts.acks++ && iterations == f.count + 1, "Repeated accumulator load acknowledges its pending source only after every arithmetic iteration");
 			m_cpu->set_input_line(line, CLEAR_LINE);
-		}
-		if (m_phase == 310440)
-		{
-			auto const f = basic_repeat_case(m_pipeline_peripheral_case); unsigned iterations = 0;
-			for (auto const &[address, word] : m_observed_instructions) if (address == f.body) ++iterations;
-			if (!f.irq || line != (f.irq == 2 ? INPUT_LINE_NMI : 2) || m_rptbd_counts.acks || iterations != f.count + 1)
-				osd_printf_info("Memory repeat interrupt mismatch case=%u replay=%u line=%d acks=%u iterations=%u count=%u cycle=%llu\n", m_pipeline_peripheral_case, unsigned(m_pipeline_replay), line, m_rptbd_counts.acks, iterations, f.count, (unsigned long long)m_cpu->pipeline_cycles());
-			expect(f.irq && line == (f.irq == 2 ? INPUT_LINE_NMI : 2) && !m_rptbd_counts.acks++ && iterations == f.count + 1, "Memory repeat defers IRQ/NMI until its complete body count"); m_cpu->set_input_line(line, CLEAR_LINE);
 		}
 		if (m_phase == 310400)
 		{

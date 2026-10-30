@@ -4999,6 +4999,23 @@ count, including non-pipelined bodies such as NOP. Otherwise a following
 NOP repeat can issue stale copies and update their auxiliary registers.
 The count-owner address comparison wraps the low 16-bit PC within XPC.
 
+`memory_count_repeat` owns 1,730 independent cases/restores: all36 count
+address forms, counts0/1/7/255, CPL/compatibility states and none/IRQ/NMI,
+plus one case each for counts8000/ffff. Pages and three checkpoints are
+distributed; duplicate high-count page/checkpoint copies are removed.
+Every case seeds its own CPU/RAM. The header reads the count once and
+modifies its pointer once; the NOP body is fetched once and must retire
+count+1 times despite poisoning its backing opcode. RAM count sources are
+poisoned after Read. Mapped count-register values remain intact.
+
+A saved scalar retirement counter replaces the legacy instruction-history
+vector. It must reach the expected total before IRQ/NMI acknowledgement and
+again at case completion. A pre-count input pulse is latched before the
+earliest checkpoint, avoiding queued-line ambiguity on restore. The optional
+interrupt owns one bounded continuation write/read pair, both equal to RTN;
+RETE restores SP/status. Omitting the retirement counter from the snapshot
+fails during replay. Exact physical interrupt latency remains unclaimed.
+
 `rpt-mem-copy` passes 27,648 cases and replays: 24 addressing/source forms,
 18 owned mapped sources, counts 0/1/7/31, MVDD/MVKD/MVDK bodies, two flag
 states, two pages, IRQ/NMI controls, four snapshots and two raw-word

@@ -24,6 +24,13 @@ public:
 	{
 		TMS320C54X(c, m_cpu, 13'000'000);
 		m_cpu->set_extended_program(true);
+#ifdef C54X_SECTION_COUNT_RETIREMENTS
+		m_cpu->instruction_observer_cb().set([this](offs_t pc,u16 opcode) {
+			auto const &expected=*m_cases.at(m_fixture->count()).retired_instruction;
+			if (pc==expected.address && (opcode!=expected.opcode || ++m_retired_count>expected.count))
+				throw emu_fatalerror("Repeated instruction retirement identity/count mismatch");
+		});
+#endif
 #ifdef C54X_SECTION_OBSERVE_MEMORY_MULTIPLY
 		m_cpu->instruction_observer_cb().set([this](offs_t pc,u16 opcode) {
 			auto const &input=m_cases.at(m_fixture->count());
@@ -63,6 +70,9 @@ protected:
 	void machine_start() override
 	{
 		m_timer = timer_alloc(FUNC(section_state::tick), this);
+#ifdef C54X_SECTION_COUNT_RETIREMENTS
+		save_item(NAME(m_retired_count));
+#endif
 #ifdef C54X_SECTION_BSP_WORD_SOURCE
 		// Completed-word RX only; no serial-pin state changes in this attachment.
 		save_item(NAME(m_bsp.control)); save_item(NAME(m_bsp.receive));
@@ -73,6 +83,9 @@ protected:
 		save_item(NAME(m_case_irq_cursor));
 		m_cpu->set_irq_acknowledge_callback([this](device_t &, int line) {
 			unsigned const index = m_fixture->count();
+#ifdef C54X_SECTION_COUNT_RETIREMENTS
+			check_retirements(index);
+#endif
 			if (m_last_irq_case != index) { m_last_irq_case = index; m_case_irq_cursor = 0; }
 			auto const &sequence = m_cases.at(index).irqs;
 			if (m_case_irq_cursor >= sequence.size()) throw emu_fatalerror("Unexpected section IRQ case=%u ordinal=%u",index,m_case_irq_cursor);
@@ -94,6 +107,10 @@ protected:
 		m_cases = c54x_test::section_cases();
 		m_fixture = std::make_unique<c54x_test::register_sequence_fixture>(machine(), *m_cpu, *m_timer,
 			m_cases.size(), [this](unsigned i) {
+#ifdef C54X_SECTION_COUNT_RETIREMENTS
+				if (i) check_retirements(i-1);
+				m_retired_count=0;
+#endif
 #ifdef C54X_SECTION_MCBSP_CONTROL
 				m_mcbsp->reset();
 				m_mcbsp->control_w(0,1); m_mcbsp->control_w(1,1); m_mcbsp->control_w(0,5);
@@ -149,6 +166,13 @@ protected:
 	}
 	void machine_reset() override { m_fixture->start(); }
 private:
+#ifdef C54X_SECTION_COUNT_RETIREMENTS
+	void check_retirements(unsigned index) {
+		if (m_retired_count!=m_cases.at(index).retired_instruction->count)
+			throw emu_fatalerror("Repeated instruction count case=%u actual=%u expected=%u",index,m_retired_count,
+				m_cases.at(index).retired_instruction->count);
+	}
+#endif
 	void program(address_map &map) {
 		map(0, 0x3ffff).ram();
 #ifdef C54X_SECTION_HIGH_PROGRAM
@@ -190,6 +214,9 @@ private:
 			throw emu_fatalerror("Section XF output mismatch");
 #endif
 		if (!complete) return;
+#ifdef C54X_SECTION_COUNT_RETIREMENTS
+		check_retirements(m_cases.size()-1);
+#endif
 #ifdef C54X_SECTION_BSP_WORD_SOURCE
 		check_bsp_frame(m_cases.size()-1);
 #endif
@@ -219,6 +246,9 @@ private:
 	u32 m_irq_acks = 0;
 	u32 m_last_irq_case = ~u32(0);
 	u32 m_case_irq_cursor = 0;
+#ifdef C54X_SECTION_COUNT_RETIREMENTS
+	u32 m_retired_count = 0;
+#endif
 	bool m_xf = false;
 #ifdef C54X_SECTION_BSP_WORD_SOURCE
 	tms320c54x_bsp_state m_bsp;

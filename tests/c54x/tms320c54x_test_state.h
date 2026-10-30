@@ -107,15 +107,6 @@ private:
 	static std::array<u64, 3> repeat_load_initial(repeat_load_fixture const &f);
 	static std::array<u64, 3> repeat_load_step(repeat_load_fixture const &f, std::array<u64, 3> state);
 	void start_repeat_load(unsigned variant = 0);
-	struct basic_repeat_fixture
-	{
-		unsigned form, count, irq, checkpoint, selected, modification;
-		bool compiler, compatibility, absolute;
-		u32 base, body;
-		u16 mode, address, st0, st1;
-	};
-	static basic_repeat_fixture basic_repeat_case(unsigned v);
-	void start_basic_repeat(unsigned variant = 0);
 	struct rptbd_shift_store_fixture
 	{
 		unsigned count, form, kind, flags, irq, checkpoint;
@@ -765,7 +756,6 @@ private:
 	bool check_delayed_call_replay_results();
 	bool check_mvdk_producer_results();
 	bool check_mvdk_mapped_results();
-	bool check_basic_repeat_results();
 	bool check_rptbd_shift_store_results();
 	bool check_long_mapped_original_results();
 	bool check_staged_conditional_store_results();
