@@ -243,14 +243,6 @@ private:
 	};
 	static block_back_fixture block_back_case(unsigned v);
 	void start_block_back(unsigned variant = 0);
-	struct block_page_fixture
-	{
-		unsigned count, checkpoint;
-		u32 caller, callee;
-		bool staged, hazard, delayed;
-	};
-	static block_page_fixture block_page_case(unsigned variant);
-	void start_block_page(unsigned variant = 0);
 	struct block_far_call_fixture
 	{
 		unsigned count, layout, depth, interrupt, checkpoint, delay_form;
@@ -642,7 +634,6 @@ private:
 		return true;
 	}
 	bool check_instruction_observer_results();
-	bool check_block_page_results();
 	bool check_mvdd_source_results();
 	bool check_branch_repeat_results();
 	bool check_rptbd_t_load_results();
