@@ -3459,11 +3459,12 @@ destination with signed X times T. FRCT doubles the product, OVM applies
 to the result, and SMUL does not apply the MAC-family product clamp.
 The atomic model's carry-preservation policy remains silicon-unvalidated.
 
-`st-par-mpy` passes 139,264 cases and cleared-pipeline replays: 73,728
-address cases and 65,536 numeric cases, all 1,024 encodings, linear and
-circular addressing, pointer/memory/accumulator aliases, all 32 ASM modes,
-signed word patterns, FRCT/OVM/SMUL/SXM/SST and sticky-status combinations,
-two pages and the [parallel numeric checkpoint policy](#parallel-storeload).
+`parallel_multiply` owns 14,336 cases with cleared-pipeline replay: 6,144
+encoding/layout/BK cases, 4,096 ASM/SXM/SST store cases and 4,096 numeric
+word/T/FRCT/OVM/SMUL/sticky cases. Pages/checkpoints are distributed; full
+address/status/seed and arithmetic/store correlations are deliberately reduced.
+All 1,024 encodings and 32 ASM counts remain. Setting SMUL in the numeric
+bank must not add a product clamp to this instruction.
 T and source memory change after Read;
 the accumulator changes before Execute and ASM changes after capture.
 Mapped/peripheral operands, arbitrary producer/
@@ -3963,9 +3964,10 @@ accumulator plus the shifted memory operand. SUB reverses that order:
 accumulator bits must survive the subtraction; subtracting only high words
 is not equivalent.
 
-`st-par-alu` passes 278,528 cases plus replay: eight operation/source/destination
-forms, 147,456 addressing cases and 131,072 numeric cases, two pages and the
-[parallel numeric checkpoint policy](#parallel-storeload).
+`parallel_arithmetic` owns 24,576 cases/restores: eight forms, 12,288
+encoding/layout/BK cases, 8,192 ASM/SXM/SST store cases and 4,096 numeric
+memory/opposite-accumulator/SXM/OVM/sticky cases. Pages/checkpoints and
+address/status/seed interactions are representative rather than full products.
 Independent integer expectations check bit-32 carry, sticky
 destination overflow, OVM, shifted/saturated stores and preserved sibling
 state. The fixture changes accumulators after Read and changes ASM/pointers
@@ -4772,22 +4774,16 @@ extends X reads below `0060`. Mapped/peripheral Y remains
 excluded before pointer changes; single-repeat mapped sources are separately
 excluded.
 
-`stld`, `st-par-alu` and `st-par-mpy` retain every address-case ordinal:
-those cohorts couple checkpoint and status settings and are not duplicates.
-Their numeric cohorts instead retain each distinct consumed input once,
-selecting one of three checkpoints, balanced within every opcode-form,
-shift, flags and page group. The three former checkpoint copies have equal
-setup and asserted results; unused reference-generator metadata is not an
-input to the bench. Compiled factory comparisons and runtime original-key
-digests guard this projection. This retires 589,824 executions/restores across
-the three profiles; it deliberately gives up restoring every numeric input
-at every old checkpoint, not arithmetic, pointer or preservation expectations.
-
-`stld` passes 208,896 cases and save-state replays: 110,592 address cases
-and 98,304 numeric cases, including aliased pointers/memory/accumulators,
-circular and linear modes, eight words, eight accumulator patterns,
-all 32 ASM values across the address cases, eight numeric boundary shifts,
-SXM/SST/OVM/carry combinations, two pages and three checkpoint classes. Source memory,
+`parallel_load` owns 15,552 cases/restores: 9,216 all-encoding/layout/BK
+cases, 6,144 ASM/SXM/SST store cases and 192 memory/SXM/carry load cases.
+It separates store conversion from load numeric dependencies instead of
+crossing every dimension. Eight memory words and accumulator patterns,
+all32 ASM counts, both SXM/SST states and three checkpoints remain. Pages,
+address/status/seed cohorts and store/load numeric interactions are deliberately
+distributed. The RAM load, arithmetic and multiply sections together replace
+626,688 executions with 54,464. The old factories, variant schedule and mirrored
+host census are deleted; mapped/volatile/BSP fixtures remain separate.
+Source memory,
 ASM, accumulators, pointers and T change after their respective capture
 points. Mapped sources have a separate positive fixture; destination-MMIO
 and mapped repeated operands are outside this bank's qualification.

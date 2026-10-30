@@ -565,38 +565,7 @@ tms320c54x_test_state::delay_load_fixture tms320c54x_test_state::delay_shift_alu
 
 
 
-tms320c54x_test_state::parallel_load_fixture tms320c54x_test_state::parallel_arithmetic_case(unsigned variant)
-{
-	unsigned const extent = 67584, form = variant / extent;
-	auto c = parallel_load_case(variant % extent + (form % 4) * extent);
-	c.form = form; auto &f = c.memory;
-	u64 const old_other = f.destination ? c.a : c.b;
-	s64 const other = old_other & 0x8000000000ULL ? s64(old_other) - 0x10000000000LL : s64(old_other);
-	s64 const memory = s64(f.st1 & 0x100 ? s16(f.xword) : s32(f.xword)) * 65536;
-	s64 result = form >= 4 ? memory - other : other + memory;
-	bool const carry = form >= 4 ? u32(memory) >= u32(old_other) : u64(u32(memory)) + u32(old_other) > 0xffffffffULL;
-	f.result_st0 = (f.st0 & ~0x800) | (carry ? 0x800 : 0);
-	if (result < -2147483648LL || result > 2147483647LL) { f.result_st0 |= f.destination ? 0x200 : 0x400; if (f.st1 & 0x200) result = std::clamp(result, s64(-2147483648LL), s64(2147483647LL)); }
-	c.result_a = f.destination ? c.a : u64(result) & 0xffffffffffULL;
-	c.result_b = f.destination ? u64(result) & 0xffffffffffULL : c.b;
-	return c;
-}
 
-tms320c54x_test_state::parallel_load_fixture tms320c54x_test_state::parallel_multiply_case(unsigned variant)
-{
-	auto c = parallel_load_case(variant);
-	auto &f = c.memory;
-	c.t = std::array<u16, 8>{0, 1, 0xffff, 0x8000, 0x7fff, 0x1234, 0x5555, 0xaaaa}[(variant / 8) % 8];
-	f.st1 = (f.st1 & ~0x40) | ((variant / 64) % 2 ? 0x40 : 0);
-	f.pmst = (f.pmst & ~2) | ((variant / 128) % 2 ? 2 : 0);
-	s64 const product = s64(s16(f.xword)) * s16(c.t) * (f.st1 & 0x40 ? 2 : 1);
-	bool const overflow = product < -2147483648LL || product > 2147483647LL;
-	u64 const result = u64(f.st1 & 0x200 ? std::clamp(product, s64(-2147483648LL), s64(2147483647LL)) : product) & 0xffffffffffULL;
-	c.result_a = f.destination ? c.a : result;
-	c.result_b = f.destination ? result : c.b;
-	f.result_st0 = f.st0 | (overflow ? f.destination ? 0x200 : 0x400 : 0);
-	return c;
-}
 
 
 

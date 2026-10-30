@@ -16,7 +16,7 @@
 #include "tms320c54x_test_register_sequence.h"
 #include "tms320c54x_test_repeat_state.h"
 #include "tms320c54x_test_snapshot.h"
-#include "tms320c54x_test_dual_input.h"
+#include "tms320c54x_test_parallel_transfer_input.h"
 #include "tms320c54x_test_pipeline_state.h"
 #include <sstream>
 #include <bitset>
@@ -458,17 +458,14 @@ private:
 	void start_repeated_stld(unsigned variant = 0);
 	struct parallel_load_fixture
 	{
-		dual_multiply_fixture memory;
+		parallel_transfer_fixture memory;
 		unsigned form;
 		u64 a, b, result_a, result_b;
 		u16 imr = 0, ifr = 0;
 		u16 t = 0xbeef;
 	};
 	static void finish_parallel_load_case(parallel_load_fixture &c);
-	static parallel_load_fixture parallel_load_case(unsigned variant);
 	static parallel_load_fixture mapped_parallel_load_case(unsigned v);
-	static parallel_load_fixture parallel_arithmetic_case(unsigned variant);
-	static parallel_load_fixture parallel_multiply_case(unsigned variant);
 	static parallel_load_fixture bsp_parallel_load_case(unsigned variant);
 	static parallel_load_fixture peripheral_parallel_load_case(unsigned variant);
 	void start_parallel_load(unsigned variant = 0);
@@ -922,7 +919,6 @@ private:
 	ordered_case_digest m_idle_coverage;
 	bool m_idle_mode_bank = false;
 	ordered_case_digest m_circular_move_coverage;
-	ordered_case_digest m_parallel_coverage;
 	unsigned m_circular_move_excluded = 0;
 	tms320c54x_bsp_state m_shifted_bsp;
 	util::gsm_fr_codec m_rom4_codec;
