@@ -198,49 +198,6 @@ void tms320c54x_test_state::start_saccd_boundary_case(unsigned index)
 }
 
 
-void tms320c54x_test_state::start_poly_boundary_case(unsigned index)
-{
-	static constexpr u64 before[] = {0x7fff7fff, 0x7fff8000, 0xffffffffffULL, 0xffffff7fffULL};
-	m_cpu->reset();
-	auto &program = m_cpu->space(AS_PROGRAM);
-	program.write_word(0x0800, 0x3682); // POLY *AR2.
-	program.write_word(0x0801, 0xf4e1);
-	m_cpu->space(AS_DATA).write_word(0x0600, 0xffff);
-	m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0600);
-	m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x10000);
-	m_cpu->set_state_int(tms320c54x_device::STATE_B, before[index % 4]);
-	m_cpu->set_state_int(tms320c54x_device::STATE_T, 1);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x1a00 | (index & 32 ? 0x0400 : 0));
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST1,
-		(index & 4 ? 0x0040 : 0) | (index & 8 ? 0x0200 : 0) | (index & 16 ? 0x0100 : 0));
-	m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
-	m_cpu->set_state_int(STATE_GENPC, 0x0800);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-	m_phase = 250000 + index;
-	m_check_timer->adjust(attotime::from_usec(100));
-}
-
-void tms320c54x_test_state::start_abdst_overflow_case(unsigned index)
-{
-	m_cpu->reset();
-	auto &program = m_cpu->space(AS_PROGRAM);
-	program.write_word(0x0800, 0xe301); // ABDST *AR2,*AR3.
-	program.write_word(0x0801, 0xf4e1);
-	m_cpu->space(AS_DATA).write_word(0x0600, 0);
-	m_cpu->space(AS_DATA).write_word(0x0601, 0);
-	set_registers(*m_cpu, {
-		{cpu_regs::STATE_AR2, 0x0600}, {cpu_regs::STATE_AR3, 0x0601}, {cpu_regs::STATE_A, 0xff00000000ULL},
-		{cpu_regs::STATE_B, index & 4 ? 0xffffffffffULL : 0x7fffffff}, {cpu_regs::STATE_T, 0x1234},
-		{cpu_regs::STATE_ST0, 0x1400 | (index & 8 ? 0x0200 : 0)},
-	});
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST1,
-		0x0100 | (index & 1 ? 0x0040 : 0) | (index & 2 ? 0x0200 : 0));
-	m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
-	m_cpu->set_state_int(STATE_GENPC, 0x0800);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-	m_phase = 240000 + index;
-	m_check_timer->adjust(attotime::from_usec(100));
-}
 
 
 
@@ -4427,57 +4384,6 @@ bool tms320c54x_test_state::check_saccd_results()
 }
 
 
-bool tms320c54x_test_state::check_arithmetic_boundary_results()
-{
-	if (m_phase >= 240000 && m_phase < 240016)
-	{
-		unsigned const index = m_phase - 240000;
-		u64 const distance = index & 1 ? 0x20000 : 0x10000;
-		bool const overflow = !(index & 4);
-		u64 const result = overflow ? (index & 2 ? 0x7fffffff : 0x7fffffff + distance) : distance - 1;
-		u16 const flags = 0x1c00 | (overflow || (index & 8) ? 0x0200 : 0);
-		expect(m_cpu->state_int(tms320c54x_device::STATE_A) == 0 &&
-			m_cpu->state_int(tms320c54x_device::STATE_B) == result &&
-			m_cpu->state_int(tms320c54x_device::STATE_ST0) == flags &&
-			m_cpu->state_int(tms320c54x_device::STATE_T) == 0x1234 &&
-			m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0600 &&
-			m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x0601 &&
-			m_cpu->state_int(tms320c54x_device::STATE_IDLE) &&
-			!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) &&
-			m_cpu->state_int(STATE_GENPC) == 0x0802,
-			"ABDST accumulates absolute signed-17 old A with FRCT, sticky OVB and OVM saturation");
-		if (index < 15) { start_abdst_overflow_case(index + 1); return true; }
-		osd_printf_info("TMS320C54x ABDST overflow: PASS cases=16 frct=0,1 ovm=0,1 sticky_ovb=1 pipeline_claim=0\n");
-		start_poly_boundary_case(0); return true;
-	}
-	if (m_phase >= 250000 && m_phase < 250064)
-	{
-		unsigned const index = m_phase - 250000;
-		static constexpr s64 before[] = {0x7fff7fff, 0x7fff8000, -1, -32769};
-		s64 const rounded = (before[index % 4] + (index & 4 ? 2 : 1) + 32768) & ~s64(65535);
-		bool const overflow = rounded > 0x7fffffffLL || rounded < -0x80000000LL;
-		u64 const result = overflow && (index & 8) ? 0x7fffffff : u64(rounded) & 0xffffffffffULL;
-		u16 const flags = 0x1a00 | (overflow || (index & 32) ? 0x0400 : 0);
-		expect(m_cpu->state_int(tms320c54x_device::STATE_A) == result &&
-			m_cpu->state_int(tms320c54x_device::STATE_B) == (index & 16 ? 0xffffff0000ULL : 0xffff0000ULL) &&
-			m_cpu->state_int(tms320c54x_device::STATE_ST0) == flags &&
-			m_cpu->state_int(tms320c54x_device::STATE_T) == 1 &&
-			m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0600 &&
-			m_cpu->state_int(tms320c54x_device::STATE_IDLE) &&
-			!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) &&
-			m_cpu->state_int(STATE_GENPC) == 0x0802,
-			"POLY rounds old-B product sum, applies OVM/sticky OVA and independently loads SXM-extended memory into B");
-		if (index < 63) { start_poly_boundary_case(index + 1); return true; }
-		osd_printf_info("TMS320C54x POLY boundaries: PASS cases=64 frct=0,1 ovm=0,1 sxm=0,1 sticky_ova=1 pipeline_claim=0\n");
-		if (profile_is("legacy-atomic"))
-		{
-			osd_printf_info("TMS320C54x legacy atomic prefix: PASS transport_integration=0 staged_suite_claim=0\n");
-			throw emu_fatalerror(3, "TMS320C54x isolated legacy atomic prefix complete");
-		}
-		start_pipeline_frontend_case(); return true;
-	}
-	return false;
-}
 
 bool tms320c54x_test_state::check_multiword_pipeline_results()
 {

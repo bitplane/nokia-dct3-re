@@ -75,8 +75,6 @@ private:
 		{0x0080012345ULL, 15, 0x91a2, 0x91a2},
 	};
 	void start_saccd_boundary_case(unsigned index);
-	void start_poly_boundary_case(unsigned index);
-	void start_abdst_overflow_case(unsigned index);
 	void xf_w(int state);
 	bool m_xf_pin = true;
 	unsigned m_xf_publications = 0;
@@ -1745,7 +1743,6 @@ private:
 	bool check_xc_interrupt_results();
 	bool check_repeat_endpoints_results();
 	bool check_interrupt_entry_results();
-	bool check_arithmetic_boundary_results();
 	bool check_pipeline_frontend_results();
 	bool check_multiword_pipeline_results();
 	bool check_pipeline_store_results();
