@@ -198,6 +198,8 @@ Subsequent replacements use the same section-only workflow:
 
 | `mvdm_accumulator.h` | Keep six accumulator slice destinations ×RAM/AR/BK source kinds ×eight source words ×eight accumulator patterns. Preserve eight-bit guard masking, neighboring slices, exact Read/Write6, literal/source poison, publication before an immediate OR-zero consumer, T/SP/status/PC and replay. Distribute16 ignored SXM/OVM/CPL/FRCT states, pages and three snapshots; deliberately lose their Cartesian pairing. | Native1152 cases/restores versus110592; build5.453s/run0.442s. Delete setup/helper/fixture, phases62160/62161, profile route/declarations. Rename the surviving checker for its mapped-ALU banks rather than the deleted MVDM bank. |
 
+| `mvdm_t_trn.h` | Keep T/TRN destinations ×RAM/AR4/AR1 sources ×eight word boundaries ×gap/no-gap unsigned LDM consumers. Preserve exact source Read6/Write6/consumer Read7..8, literal/source poison, destination/sibling/status, final A/PC/IDLE and replay from a cleared pipeline. Distribute16 ignored status modes, pages and four checkpoints instead of crossing them; deliberately lose their exhaustive pairings. | Native96 cases/restores versus12288; build5.523s/run0.050s. Delete setup/helper/fixture, named phase pair, profile route/declarations/phase constant; mixed mapped-write checker retains its other banks. |
+
 `python3 tools/run_c54x_section.py all` rebuilds/runs each replacement in
 sequence. Final measurements: immediate-store5.214/0.019s,
 basic-memory5.423/0.020s, stack5.262/0.069s, DAGEN5.406/0.126s (build/run).

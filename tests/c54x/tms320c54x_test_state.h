@@ -1029,14 +1029,6 @@ private:
 	};
 	static page_zero_stack_fixture page_zero_stack_case(unsigned v, bool edge);
 	void start_page_zero_stack(unsigned variant = 0);
-	struct mvdm_t_fixture
-	{
-		unsigned destination, gap, checkpoint;
-		u16 source, value, st1;
-		u32 base;
-	};
-	static mvdm_t_fixture mvdm_t_case(unsigned v);
-	void start_mvdm_t(unsigned variant = 0);
 	void start_mvdm_ar(unsigned variant = 0);
 	bool mvkd_delay() const;
 	void start_mvdm_delay(unsigned variant = 0);
@@ -1666,7 +1658,6 @@ private:
 	bool (tms320c54x_test_state::*m_result_owner)() = nullptr;
 	static constexpr unsigned native_store_phase = 1'000'000; // Outside legacy phase bands.
 	static constexpr unsigned push_mvmm_phase = 1'000'060;
-	static constexpr unsigned mvdm_t_phase = 1'000'070;
 	std::bitset<65536> m_asserted_opcodes;
 	std::array<u16, 3> m_native_store_context = {};
 	unsigned m_bleq_case = 0;
