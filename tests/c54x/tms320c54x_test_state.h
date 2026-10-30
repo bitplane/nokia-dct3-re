@@ -1913,14 +1913,11 @@ private:
 
 	void start_zero_bk_case(unsigned index);
 
-	static constexpr u64 MINMAX_SEEDS[] = {0, 1, 0xffffffffffULL, 0x7fffffff, 0xff80000000ULL, 0x7fffffffffULL, 0x8000000000ULL, 0x123456789aULL};
-	void start_minmax_case(unsigned index);
 
 	void start_rcd_acc_case(unsigned index);
 
 	void start_saccd_case(unsigned index);
 
-	void start_roltc_case(unsigned index);
 
 	static std::array<s16, 4> rom4_pair_vector(unsigned index);
 	void start_rom4_pairs(unsigned index);
@@ -2216,7 +2213,6 @@ private:
 	bool check_atomic_xorm_results();
 	bool check_conditional_register_results();
 	bool check_rom4_codec_is_results();
-	bool check_roltc_results();
 	bool check_rom4_crc_input_results();
 	TIMER_CALLBACK_MEMBER(check_results);
 

@@ -57,12 +57,12 @@ int main() {
         std::printf("cases=%u digest=%016llx\n",coverage.count,(unsigned long long)coverage.value);
     }
     using k=register_pair_kind;
-    literal(k::saturation,8,0x80000000,0x7fffffff,0x7fffffff,0xbc24,0xb824);
-    literal(k::saturation,12,0xff7fffffff,0xff80000000,0xff80000000,0xbc24,0xb824);
-    literal(k::saturation,14,0xff80000000,0xff80000000,0xff80000000,0xb824,0xb824);
-    literal(k::rotate,54,1,0x80000000,0xc0000000,0xa824,0xa024);
-    literal(k::rotate,112,0x80000000,1,3,0xb824,0xb024);
-    literal(k::rotate,24,0x5fb0001234,0x5800091a,0x2c00048d,0xa024,0xa024);
+    literal(k::saturation,8,0x80000000,0x7fffffff,0x7fffffff,0x1c24,0x1824);
+    literal(k::saturation,12,0xff7fffffff,0xff80000000,0xff80000000,0x1c24,0x1824);
+    literal(k::saturation,14,0xff80000000,0xff80000000,0xff80000000,0x1824,0x1824);
+    literal(k::rotate,54,1,0x80000000,0xc0000000,0x0824,0x0024);
+    literal(k::rotate,112,0x80000000,1,3,0x1824,0x1024);
+    literal(k::rotate,24,0x5fb0001234,0x5800091a,0x2c00048d,0x0024,0x0024);
 }
 ''') as binary:
             lines = subprocess.check_output([str(binary)], text=True).splitlines()

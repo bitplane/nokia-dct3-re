@@ -5504,13 +5504,13 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 		}
 		return begin_atomic_case(atomic_shift_examples().front(), 543);
 	}
-	if ((m_phase >= 543 && m_phase <= 547) || (m_phase >= 6576 && m_phase <= 6583) || (m_phase >= 9232 && m_phase <= 9246) || m_phase == 9250 || m_phase == 9251)
+	if ((m_phase >= 543 && m_phase <= 547) || (m_phase >= 6576 && m_phase <= 6583) || (m_phase >= 9232 && m_phase <= 9246) || m_phase == 9250 || m_phase == 9251 || (m_phase >= 9253 && m_phase <= 9258))
 	{
 		// Compatibility routing stays here, outside the independent case data.
 		static constexpr unsigned phases[] = {
 			543, 544, 545, 546, 547, 6576, 6577, 6578, 6579, 6580, 6581, 6582, 6583,
 			9232, 9233, 9234, 9235, 9236, 9237, 9238, 9239, 9240, 9241, 9242, 9243,
-			9244, 9245, 9246, 9250, 9251
+			9244, 9245, 9246, 9250, 9251, 9253, 9254, 9255, 9256, 9257, 9258
 		};
 		auto const &cases = atomic_shift_examples();
 		expect(cases.size() == std::size(phases), "Atomic shift case/continuation map is complete");

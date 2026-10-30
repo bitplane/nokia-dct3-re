@@ -59,6 +59,7 @@ inline constexpr atomic_phase_range atomic_phase_ranges[] = {
 	{9248, 9249, atomic_fixture::reference},
 	{9250, 9251, atomic_fixture::corpus},
 	{9252, 9252, atomic_fixture::reference},
+	{9253, 9258, atomic_fixture::corpus},
 	{9400, 9403, atomic_fixture::reference},
 	{9410, 9413, atomic_fixture::reference},
 	{40000, 40008, atomic_fixture::reference},

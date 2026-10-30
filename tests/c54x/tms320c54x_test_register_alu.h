@@ -53,7 +53,7 @@ inline minmax_fixture minmax_case(unsigned v, bool square)
 	minmax_fixture f{};
 	f.a = values[v % 16]; f.b = values[(v / 16) % 16]; f.selector = (v / 256) % 4;
 	unsigned const flags = (v / 1024) % 8;
-	f.st0 = 0xa002 | (flags & 1 ? 0x800 : 0) | (v & 1 ? 0x600 : 0);
+	f.st0 = 0x0002 | (flags & 1 ? 0x800 : 0) | (v & 1 ? 0x600 : 0);
 	f.st1 = 0x800 | (flags & 2 ? 0x200 : 0) | (flags & 4 ? 0x100 : 0);
 	s64 const a = BIT(f.a, 39) ? s64(f.a) - (s64(1) << 40) : s64(f.a);
 	s64 const b = BIT(f.b, 39) ? s64(f.b) - (s64(1) << 40) : s64(f.b);

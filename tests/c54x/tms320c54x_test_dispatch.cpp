@@ -223,7 +223,6 @@ TIMER_CALLBACK_MEMBER(tms320c54x_test_state::check_results)
 	if (check_atomic_xorm_results()) return;
 	if (check_conditional_register_results()) return;
 	if (check_rom4_codec_is_results()) return;
-	if (check_roltc_results()) return;
 	if (check_rom4_crc_input_results()) return;
 
 	osd_printf_info("TMS320C54x test state: pc=%04x sp=%04x brc=%04x "

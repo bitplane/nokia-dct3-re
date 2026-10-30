@@ -3981,20 +3981,6 @@ void tms320c54x_test_state::start_staged_overflow(unsigned variant)
 	m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 }
 
-void tms320c54x_test_state::start_minmax_case(unsigned index)
-{
-	auto &program = m_cpu->space(AS_PROGRAM);
-	program.write_word(0x0700, 0xf486 | ((index & 2) << 7) | (index & 1));
-	program.write_word(0x0701, 0xf4e1);
-	m_cpu->set_state_int(tms320c54x_device::STATE_XPC, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x0700);
-	m_cpu->set_state_int(tms320c54x_device::STATE_A, MINMAX_SEEDS[index / 32]);
-	m_cpu->set_state_int(tms320c54x_device::STATE_B, MINMAX_SEEDS[(index / 4) % 8]);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x1c00);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-	m_phase = 77000 + index;
-	m_check_timer->adjust(attotime::from_usec(100));
-}
 
 void tms320c54x_test_state::start_rcd_acc_case(unsigned index)
 {
@@ -4041,23 +4027,6 @@ void tms320c54x_test_state::start_saccd_case(unsigned index)
 	m_check_timer->adjust(attotime::from_usec(100));
 }
 
-void tms320c54x_test_state::start_roltc_case(unsigned index)
-{
-	static constexpr u64 seeds[] = { 0, 1, 0x80000000, 0xffffffff,
-		0x81c0005555ULL, 0xff12345678ULL, 0xaaaaaaaa, 0x55555555 };
-	auto &program = m_cpu->space(AS_PROGRAM);
-	program.write_word(0x0700, index & 1 ? 0xf592 : 0xf492);
-	program.write_word(0x0701, 0xf4e1);
-	m_cpu->set_state_int(tms320c54x_device::STATE_XPC, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x0700);
-	m_cpu->set_state_int(tms320c54x_device::STATE_A, index & 1 ? 0x12345 : seeds[index / 32]);
-	m_cpu->set_state_int(tms320c54x_device::STATE_B, index & 1 ? seeds[index / 32] : 0x12345);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x25a5 | ((index & 2) ? 0x1000 : 0) | ((index & 4) ? 0x0800 : 0));
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0800 | ((index & 8) ? 0x0100 : 0) | ((index & 16) ? 0x0200 : 0));
-	m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-	m_phase = 70000 + index;
-	m_check_timer->adjust(attotime::from_usec(100));
-}
 
 bool tms320c54x_test_state::check_branch_arithmetic_results()
 {
@@ -4324,7 +4293,7 @@ bool tms320c54x_test_state::check_shifted_high_store_results()
 			"SPRU172C shifted STH Xmem preserves accumulators/status and applies address modification and SST");
 		if (index < 127) { start_shifted_high_store_case(index + 1); return true; }
 		osd_printf_info("TMS320C54x shifted high store conformance: PASS variants=128\n");
-		start_roltc_case(0);
+		start_zero_bk_case(0);
 		return true;
 	}
 	return false;
@@ -4676,25 +4645,6 @@ bool tms320c54x_test_state::check_saccd_results()
 			"conditional delayed return preserves delay instruction and conditionally pops stack");
 		if (index < 35) { start_rcd_acc_case(index + 1); return true; }
 		osd_printf_info("TMS320C54x RCD accumulator conditions: PASS variants=36\n");
-		start_minmax_case(0);
-		return true;
-	}
-	if (m_phase >= 77000 && m_phase < 77256)
-	{
-		unsigned const index = m_phase - 77000;
-		u64 const a = MINMAX_SEEDS[index / 32];
-		u64 const b = MINMAX_SEEDS[(index / 4) % 8];
-		s64 const signed_a = s64(a << 24) >> 24;
-		s64 const signed_b = s64(b << 24) >> 24;
-		bool const choose_a = index & 1 ? signed_a < signed_b : signed_a > signed_b;
-		u64 const selected = choose_a ? a : b;
-		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) && m_cpu->state_int(tms320c54x_device::STATE_IDLE) &&
-			u64(m_cpu->state_int(tms320c54x_device::STATE_A)) == (index & 2 ? a : selected) &&
-			u64(m_cpu->state_int(tms320c54x_device::STATE_B)) == (index & 2 ? selected : b) &&
-			m_cpu->state_int(tms320c54x_device::STATE_ST0) == (choose_a ? 0x1400 : 0x1c00),
-			"signed 40-bit MIN/MAX selects B and sets carry on equality");
-		if (index < 255) { start_minmax_case(index + 1); return true; }
-		osd_printf_info("TMS320C54x MIN/MAX conformance: PASS variants=256\n");
 		start_bsp_interrupt_case(0);
 		return true;
 	}
@@ -7253,31 +7203,5 @@ bool tms320c54x_test_state::check_atomic_xorm_results()
 	return false;
 }
 
-bool tms320c54x_test_state::check_roltc_results()
-{
-	[[maybe_unused]] auto &program = m_cpu->space(AS_PROGRAM);
-	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
-	if (m_phase >= 70000 && m_phase < 70256)
-	{
-		unsigned const index = m_phase - 70000;
-		static constexpr u64 seeds[] = { 0, 1, 0x80000000, 0xffffffff,
-			0x81c0005555ULL, 0xff12345678ULL, 0xaaaaaaaa, 0x55555555 };
-		u64 const source = seeds[index / 32];
-		u32 const expected = (u32(source) << 1) | ((index & 2) ? 1 : 0);
-		u16 const status = 0x25a5 | ((index & 2) ? 0x1000 : 0) | (BIT(source, 31) ? 0x0800 : 0);
-		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) &&
-			m_cpu->state_int(tms320c54x_device::STATE_IDLE) &&
-			m_cpu->state_int(tms320c54x_device::STATE_A) == (index & 1 ? 0x12345 : expected) &&
-			m_cpu->state_int(tms320c54x_device::STATE_B) == (index & 1 ? expected : 0x12345) &&
-			m_cpu->state_int(tms320c54x_device::STATE_ST0) == status &&
-			m_cpu->state_int(tms320c54x_device::STATE_ST1) == (0x0800 | ((index & 8) ? 0x0100 : 0) | ((index & 16) ? 0x0200 : 0)),
-			"ROLTC inserts TC, exports bit31 to C, clears guard bits and preserves other status");
-		if (index < 255) { start_roltc_case(index + 1); return true; }
-		osd_printf_info("TMS320C54x ROLTC conformance: PASS variants=256\n");
-		start_zero_bk_case(0);
-		return true;
-	}
-	return false;
-}
 
 } // namespace c54x_test

@@ -8,6 +8,20 @@
   },
   "families": [
     {
+      "id": "atomic-minmax-roltc-matrix-retirement",
+      "classification": "architectural_interaction",
+      "decision": "rewrite",
+      "profiles": [],
+      "case_ids": [],
+      "retired_case_ids": "start_minmax_case raw0..255; start_roltc_case raw0..255",
+      "retained_profiles": ["isa-memory", "minmax", "rotate", "legacy-atomic"],
+      "basis": "SPRU172C MIN/MAX selects by signed40-bit comparison and sets C when B is selected, including equality; ROLTC shifts low32, inserts TC, exports bit31 to C and clears guards. Four literal MIN/MAX cases and two literal ROLTC cases now exercise the atomic backend through the existing port-bracketed reference harness, independently of CPU arithmetic helpers. The pre-existing MIN/MAX literal witnesses remain. Staged matrices separately retain numeric, sampling, two-operation carry/TC, status and replay contracts; atomic and staged execution are not assumed interchangeable.",
+      "changes": ["remove two dedicated atomic setup loops, result handlers, declarations and default records; retire512 old sweep executions and add six explicit reference identities", "all four MIN/MAX forms retain atomic TC/overflow preservation, signed guard comparison and tie carry witnesses; both ROLTC destinations retain opposed C/TC inputs, guard clearing and unselected accumulator/status checks", "new literal cases use existing absolute port markers and one-cycle operation-cost checks; no new fixture class, generated source or CPU change", "correct standard-mode ARP sentinels in shared MIN/MAX/SQUR and SAT/rotate data: a002->0002, b824->1824, a024->0024. All lower status bits, original keys, numeric values, checkpoints and predicates remain; digests identify keys, not unchanged input contents"],
+      "limits": ["the old atomic Cartesian coverage is intentionally retired: MIN/MAX256 pair/selector rows and ROLTC256 source/status combinations are not retained verbatim", "staged matrices use different status sentinels and some different values; literal witnesses plus staged coverage are not a proof of atomic/staged equivalence on every old tuple", "no physical instruction timing, interrupt/repeat composition or handset renewal follows from port intervals or clocked snapshots", "SAT/SQUR are neighboring controls for the corrected shared fixture seeds, not newly retired families"],
+      "measurement": {"baseline_commit": "4d669000", "cpp_bytes_deleted_net": 3562, "cpp_lines_deleted_net": 74, "sweep_cases_retired": 512, "literal_witnesses_added": 6, "scope": "Actual net CPU+firmware source deletion; no relocation or measured whole-suite runtime claim."},
+      "verification": {"baseline": "legacy-atomic passes, including both256-case sweep records; CPU-only isa-memory passes323 ordered identities", "after": "Full and CPU-only builds pass. Both executables pass isa-memory329, minmax19456, rotate4608, sat3072 and squr4096 cases; staged groups restore every case. Legacy atomic prefix passes; all166 remaining PASS records match baseline order and content exactly after removing only the two retired summaries.", "captures": "tmp/c54x-atomic-sweep-review/; legacy prefix baseline run_c54x_core_icalsh6r; standalone new reference bank run_c54x_core_7cwlxnf5", "host": "29 focused executable fixture, routing, selection and inventory tests pass in3.603 seconds. Full host, full default, all-isolated and handset runs are not renewed by this batch.", "inventory": "395 isolated profiles,273 default requirements"}
+    },
+    {
       "id": "xc-equality-subset-retirement",
       "classification": "architectural_interaction",
       "decision": "delete",
@@ -1753,6 +1767,12 @@
         "sfta-b-right2-zero-fill",
         "sftl-b-left6-carry",
         "load-b-zero-shift-to-a",
+        "max-a-guard-keeps-tc-overflow",
+        "max-b-exports-comparison-carry",
+        "min-a-equal-sets-carry",
+        "min-b-signed-guard-keeps-tc",
+        "roltc-a-uses-tc-clears-guards",
+        "roltc-b-ignores-old-carry",
         "atomic-subs-absolute-carry",
         "atomic-subs-absolute-borrow",
         "atomic-subc-ar2-success",

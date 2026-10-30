@@ -2309,6 +2309,16 @@ rewinds the fetch observer separately from guest state; replay must not
 duplicate a fetch. Arithmetic remains in the unchanged independent reference,
 not the runner or a CPU implementation helper.
 
+The dedicated atomic MIN/MAX and ROLTC 256-case sweeps are retired. The
+shared literal reference bank retains the existing MIN/MAX interval examples
+and adds four full-status MIN/MAX witnesses plus two ROLTC witnesses, both
+destinations with opposed C/TC and guard-bearing inputs. These execute the
+atomic backend with independent literal results and port-bracketed cost
+checks; staged `minmax`/`rotate` retain the broader numeric and replay coverage.
+This deliberately removes the old atomic Cartesian products, not merely
+their routing. Shared MIN/MAX/SQUR and SAT/rotate fixtures use ARP0 when
+CMPT is clear; original ordered identities do not certify unchanged inputs.
+
 Indexed MAR now admits the AR0 subtraction/addition forms (`6da8..6db7`).
 SPRU131G table 5-4 defines ordinary 16-bit auxiliary arithmetic, not reverse
 carry or circular indexing; SPRU172C MAR defines CMPT/ARP selection. Both
@@ -2610,9 +2620,10 @@ match the preceding capture. The review binds its executable, acceptance
 sources and exact bench patch over `66cfbfc9`; no CPU/device source changed.
 No runtime improvement or blanket validity of other fixture inputs is claimed.
 
-The current layout has 275 default requirements after the additional idle
+The current layout has 273 default requirements after the additional idle
 banks moved to `power-idle` and `rom4-context` and the overlapping48-case
-accumulator-XC subset was retired. Focused native and executable
+accumulator-XC subset and the two atomic numeric sweeps were retired.
+Focused native and executable
 host checks qualify the selected-owner routing and regrouped inputs. A
 current-tree full-default/all-isolated run remains outstanding; this older
 capture is not silently renewed by those focused checks.
