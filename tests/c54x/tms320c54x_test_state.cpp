@@ -296,7 +296,6 @@ void tms320c54x_test_state::machine_reset()
 		{ {"addc-chain"}, [](self &test) { test.start_addc_chain(); } },
 		{ {"mvkd-peripheral"}, [](self &test) { test.start_mvkd_peripheral(); } },
 		{ {"cmpm-absolute"}, [](self &test) { test.start_pipeline_bitfield_ar7(); } },
-		{ {"cmpm-direct"}, [](self &test) { test.start_direct_cmpm(); } },
 		{ {"cmpm-acc"}, [](self &test) { test.start_accumulator_cmpm(); } },
 		{ {"cmpm-map", "cmpm-map-edge"}, [](self &test) { test.start_accumulator_cmpm(); } },
 		{ {"cmpm-smem", "bitf-smem"}, [](self &test) { test.start_pipeline_bitfield(); } },

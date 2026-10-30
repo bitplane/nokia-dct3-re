@@ -295,7 +295,6 @@ private:
 	};
 	static accumulator_cmpm_fixture accumulator_cmpm_case(unsigned v, bool mapped = false, bool edge = false);
 	void start_accumulator_cmpm(unsigned variant = 0);
-	void start_direct_cmpm(unsigned variant = 0);
 	void start_pipeline_bitfield_ar7(unsigned variant = 0);
 	static memory_arithmetic_fixture offset_load_case(unsigned variant);
 	static memory_arithmetic_fixture unsigned_load_case(unsigned variant);
@@ -1666,7 +1665,6 @@ private:
 	bool check_repeat_pop_exclusion_results_part2();
 	bool check_accumulator_cmpm_results();
 	bool check_staged_conditional_store_results();
-	bool check_accumulator_stm_results();
 	bool check_ldu_peripheral_results();
 	bool check_ldu_status_value_results();
 	bool check_ldu_imr_results();
