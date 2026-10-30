@@ -40,7 +40,7 @@ inline std::vector<clocked_register_case> section_cases()
 			c.actions.insert(c.actions.begin(), {3,{},false,{},{{line,ASSERT_LINE},{line,CLEAR_LINE}}});
 			c.irq = clocked_irq_expectation{line,count + 10,~0U,count + 1,0x9004};
 		}
-		c.data_range = std::array<u32,2>{0x420,0x430};
+		c.data_ranges = {{0x420,0x430}};
 		c.data_events = std::vector<clocked_data_event>{};
 		for (unsigned i = 0; i <= count; ++i) {
 			c.program_events.push_back({false,source + i,u16(0x1200 + i),i ? 10 + i : 9});

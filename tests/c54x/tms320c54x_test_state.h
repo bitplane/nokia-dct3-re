@@ -329,7 +329,6 @@ private:
 	void start_pipeline_arp(unsigned variant = 0);
 	void start_pipeline_read_a(unsigned variant = 0);
 	void start_pipeline_banz(unsigned variant = 0);
-	void start_pipeline_memory_repeat_read_a(unsigned variant = 0);
 	void start_pipeline_absolute_add(unsigned variant = 0);
 	void start_instruction_observer(unsigned variant = 0);
 	void start_pipeline_add_sp_context(unsigned variant = 0);
@@ -2019,7 +2018,6 @@ private:
 	bool check_pipeline_idle_results();
 	bool check_repeat_pop_exclusion_results();
 	bool check_pipeline_sp_rmw_results();
-	bool check_pipeline_memory_repeat_read_a_results();
 	bool check_instruction_observer_results();
 	bool check_block_page_results();
 	bool check_mvkd_sp_results();

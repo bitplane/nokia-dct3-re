@@ -56,7 +56,12 @@ protected:
 	}
 	void machine_reset() override { m_fixture->start(); }
 private:
-	void program(address_map &map) { map(0, 0x3ffff).ram(); }
+	void program(address_map &map) {
+		map(0, 0x3ffff).ram();
+#ifdef C54X_SECTION_HIGH_PROGRAM
+		map(0x7f0000, 0x7fffff).ram();
+#endif
+	}
 	void data(address_map &map) { map(0, 0xffff).ram(); }
 	TIMER_CALLBACK_MEMBER(tick)
 	{

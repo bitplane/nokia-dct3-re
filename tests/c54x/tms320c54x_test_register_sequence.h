@@ -111,14 +111,18 @@ private:
 		if (m_input.data_events)
 		{
 			auto access = [this](bool write, offs_t at, u16 word) {
+				if (!m_input.data_ranges.empty()) {
+					bool selected = false;
+					for (auto const &range : m_input.data_ranges) selected |= at >= range[0] && at <= range[1];
+					if (!selected) return;
+				}
 				if (!m_machine.side_effects_disabled() && !accept_data_event(*m_input.data_events, m_data_cursor,
 					{write, u32(at), word, unsigned(m_cpu.pipeline_cycles())}))
 					throw emu_fatalerror("C54x case=%u event=%u write=%u address=%x value=%x clock=%llu",
 						m_case, m_data_cursor, unsigned(write), unsigned(at), word, (unsigned long long)m_cpu.pipeline_cycles());
 				if (!m_machine.side_effects_disabled() && m_data_observer) m_data_observer(write, u32(at), word);
 			};
-			auto const range = m_input.data_range.value_or(std::array<u32,2>{0,0xffff});
-			m_data_tap = m_cpu.space(AS_DATA).install_readwrite_tap(range[0], range[1], "register_sequence_data",
+			m_data_tap = m_cpu.space(AS_DATA).install_readwrite_tap(0, 0xffff, "register_sequence_data",
 				[access](offs_t at, u16 &word, u16) { access(false, at, word); },
 				[access](offs_t at, u16 &word, u16) { access(true, at, word); });
 		}

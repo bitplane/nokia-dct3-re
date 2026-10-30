@@ -860,13 +860,6 @@ void tms320c54x_test_state::test(machine_config &config)
 				m_cpu->state_int(tms320c54x_device::STATE_RC) == 0 && m_cpu->state_int(tms320c54x_device::STATE_RTN) == (variant % 2 ? 0x603 : 0x602) && !m_vector_acks,
 				"NOP repeat acknowledges its original pending source only after the final body and stacks the fresh continuation"); ++m_vector_acks;
 		}
-		if (m_phase == 252410 && m_pipeline_peripheral_case >= 384)
-		{
-			unsigned const count = std::array<unsigned, 4>{0, 1, 3, 15}[m_pipeline_peripheral_case % 4];
-			expect(line == (BIT(m_pipeline_peripheral_case, 2) ? INPUT_LINE_NMI : 0) && m_pipeline_store_writes == count + 1 &&
-				m_cpu->state_int(tms320c54x_device::STATE_RTN) == 0x9003 && !m_vector_acks,
-				"Memory RPT accepts its pending source only after the full copy and stacks the one-word READA continuation"); ++m_vector_acks;
-		}
 		if (m_phase == 252230)
 		{
 			unsigned const kind = pipeline_idle_kind(m_pipeline_peripheral_case);

@@ -75,7 +75,7 @@ struct clocked_register_case
 	std::optional<unsigned> final_pipeline_clock{};
 	bool clear_pipeline_before_restore = false;
 	std::vector<clocked_data_event> program_events{};
-	std::optional<std::array<u32,2>> data_range{}; // Explicitly scoped bus observations.
+	std::vector<std::array<u32,2>> data_ranges{}; // Empty means the whole data bus.
 	std::optional<clocked_irq_expectation> irq{};
 };
 
