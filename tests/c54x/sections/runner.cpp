@@ -36,8 +36,9 @@ protected:
 			if (line != expected.line || cycle < expected.earliest || cycle > expected.latest ||
 				m_fixture->data_events_seen() != expected.data_events_before ||
 				(expected.return_pc && m_cpu->state_int(tms320c54x_device::STATE_RTN) != *expected.return_pc))
-				throw emu_fatalerror("Section IRQ case=%u line=%d clock=%llu data_events=%u previous_case=%u",
-					index,line,(unsigned long long)cycle,m_fixture->data_events_seen(),m_last_irq_case);
+				throw emu_fatalerror("Section IRQ case=%u line=%d clock=%llu data_events=%u previous_case=%u return_pc=%04x",
+					index,line,(unsigned long long)cycle,m_fixture->data_events_seen(),m_last_irq_case,
+					unsigned(m_cpu->state_int(tms320c54x_device::STATE_RTN)));
 			++m_case_irq_cursor; ++m_irq_acks; m_cpu->set_input_line(line, CLEAR_LINE); return 0;
 		}, "section_irq");
 		m_cases = c54x_test::section_cases();

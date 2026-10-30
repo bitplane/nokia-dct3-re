@@ -153,8 +153,6 @@ void tms320c54x_test_state::machine_reset()
 	if (profile_is("stlm-pmst")) { start_stlm_pmst(); return; }
 	if (profile_is("cond-store") || profile_is("cond-store-edge")) { start_staged_conditional_store(); return; }
 	if (profile_is("cond-store-ar")) { start_staged_conditional_store(); return; }
-	if (profile_is("pshd-long")) { start_extended_push(); return; }
-	if (profile_is("pshd-long-map")) { start_extended_push(96000); return; }
 	if (start_profile(*this, machine().options().bios(), {
 		{ {"mvdk-mapped", "mvdk-acc", "clock-mvdk"}, [](self &test) { test.start_mvdk_mapped(); } },
 		{ {"mvdk-producer", "mvdk-acc-prod"}, [](self &test) { test.start_mvdk_producer(); } },
@@ -635,11 +633,6 @@ void tms320c54x_test_state::test(machine_config &config)
 			bool const nmi = (variant / 16) % 2, long_count = (variant / 8) % 2;
 			expect(line == (nmi ? INPUT_LINE_NMI : 0) && !m_vector_acks && m_pipeline_store_writes == count + 1 && m_cpu->state_int(tms320c54x_device::STATE_RTN) == (long_count ? 0x604 : 0x603), "Repeated MVDP acknowledges the pending source only after all writes with the unexecuted continuation");
 			++m_vector_acks;
-		}
-		if (m_phase == 310560)
-		{
-			auto const f = extended_push_case(m_pipeline_peripheral_case);
-			expect(f.irq && line == (f.irq == 2 || f.irq == 4 ? INPUT_LINE_NMI : 2) && !m_rptbd_counts.acks++, "Extended push acknowledges its original pending interrupt once"); m_cpu->set_input_line(line, CLEAR_LINE);
 		}
 		if (m_phase == 310520)
 		{

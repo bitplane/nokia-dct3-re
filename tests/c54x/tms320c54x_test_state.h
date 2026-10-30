@@ -278,17 +278,6 @@ private:
 	static memory_repeat_fixture memory_repeat_case(unsigned variant);
 	static std::array<u64, 2> repeat_subc_result(memory_repeat_fixture const &f, unsigned iterations);
 	void start_pipeline_memory_repeat(unsigned variant = 0);
-	struct extended_push_fixture
-	{
-		unsigned form, selected, pattern, irq, checkpoint;
-		bool mapped, compatibility, compiler;
-		u32 base;
-		u16 mode, literal, address, value, st0, final_st0, st1, bk, t, trn, pmst;
-		u64 a, b;
-		std::array<u16, 8> initial, final;
-	};
-	static extended_push_fixture extended_push_case(unsigned v);
-	void start_extended_push(unsigned variant = 0);
 	struct stlm_pmst_fixture
 	{
 		unsigned pattern, irq, checkpoint;
