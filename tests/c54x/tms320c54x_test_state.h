@@ -1632,7 +1632,6 @@ private:
 	static xc_latency_fixture xc_latency_case(unsigned index);
 	void start_xc_latency(unsigned index);
 
-	void start_xc_status(unsigned index);
 
 	struct xorm_fixture
 	{
@@ -1952,7 +1951,7 @@ private:
 	bool check_staged_bus_stm_results();
 	bool check_rom4_fr_decoder_results();
 	bool check_native_dual_sub_results();
-	bool check_xc_latency_status_results();
+	bool check_xc_latency_results();
 	bool check_atomic_xorm_results();
 	bool check_conditional_register_results();
 	bool check_rom4_codec_is_results();

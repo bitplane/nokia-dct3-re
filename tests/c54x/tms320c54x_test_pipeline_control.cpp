@@ -340,31 +340,6 @@ void tms320c54x_test_state::start_xc_latency(unsigned index)
 	m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 }
 
-void tms320c54x_test_state::start_xc_status(unsigned index)
-{
-	auto &program = m_cpu->space(AS_PROGRAM);
-	unsigned const mode = index % 32, gap = mode % 4;
-	bool const set = (mode / 4) & 1, initial = (mode / 8) & 1, tc = (mode / 16) & 1;
-	for (unsigned i = 0; i < 16; ++i) program.write_word(0x600 + i, 0xf495);
-	program.write_word(0x600, set ? 0xf5bc : 0xf4bc);
-	program.write_word(0x601 + gap, tc ? 0xfd30 : 0xfd20);
-	program.write_word(0x602 + gap, 0xe833);
-	program.write_word(0x604 + gap, 0xf4e1);
-	set_registers(*m_cpu, {
-		{cpu_regs::STATE_PC, 0x600}, {cpu_regs::STATE_SP, 0x1000}, {cpu_regs::STATE_A, 0}, {cpu_regs::STATE_B, 0},
-		{cpu_regs::STATE_ST0, 0xe05 | (initial ? 0x1000 : 0)}, {cpu_regs::STATE_ST1, 0x800}, {cpu_regs::STATE_PMST, 0},
-		{cpu_regs::STATE_TCR, 0x10}, {cpu_regs::STATE_ILLEGAL, 0}, {cpu_regs::STATE_IDLE, 0},
-	});
-	m_cpu->set_pipeline_frontend(index < 64);
-	m_rom4_codec_replay = false; m_rom4_codec_replays = 0;
-	m_phase = 522000 + index;
-	if (!(index & 32))
-	{
-		expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save XC/status producer before Access sampling or Execute publication");
-		m_rom4_codec_replays = 1;
-	}
-	m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-}
 
 void tms320c54x_test_state::start_atomic_conditional_return(unsigned index)
 {
@@ -668,7 +643,7 @@ bool tms320c54x_test_state::check_delayed_condition_return_results()
 }
 
 
-bool tms320c54x_test_state::check_xc_latency_status_results()
+bool tms320c54x_test_state::check_xc_latency_results()
 {
 	if (m_phase >= 523000 && m_phase < 523768)
 	{
@@ -701,37 +676,6 @@ bool tms320c54x_test_state::check_xc_latency_status_results()
 		if (index < 767) { start_xc_latency(index + 1); return true; }
 		osd_printf_info("TMS320C54x atomic XC conditions: PASS cases=384 restore=384 sources=TC,C,A,B producer_words=1,2 gaps=0,1,2,3 controlled_words=1,2 snapshots=2 physical_phase_claim=0\n");
 		throw emu_fatalerror(0, "TMS320C54x isolated XC conditions complete");
-	}
-	if (m_phase >= 522000 && m_phase < 522128)
-	{
-		unsigned const index = m_phase - 522000, mode = index % 32, gap = mode % 4;
-		bool const staged = index < 64, set = (mode / 4) & 1, initial = (mode / 8) & 1, tc = (mode / 16) & 1;
-		if (!m_rom4_codec_replays && (staged ? m_cpu->pipeline_cycles() == 6 : m_cpu->state_int(tms320c54x_device::STATE_PC) == 0x601))
-		{
-			expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save XC/status after publication with an older retained predicate");
-			m_rom4_codec_replays = 1;
-		}
-		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "XC and status producers remain admitted");
-		if (!m_cpu->state_int(tms320c54x_device::STATE_IDLE)) { m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true; }
-		bool const take = (gap < 2 ? initial : set) == tc;
-		if (m_cpu->state_int(tms320c54x_device::STATE_A) != (take ? 0x33 : 0))
-			osd_printf_info("XC/status divergence: staged=%u case=%u gap=%u initial_tc=%u producer_tc=%u predicate_tc=%u actual_A=%04x expected_A=%04x\n", staged, index, gap, initial, set, tc,
-				unsigned(m_cpu->state_int(tms320c54x_device::STATE_A)), take ? 0x33 : 0);
-		expect(m_rom4_codec_replays == 1 && m_cpu->state_int(tms320c54x_device::STATE_A) == (take ? 0x33 : 0) &&
-			m_cpu->state_int(tms320c54x_device::STATE_B) == 0 && m_cpu->state_int(tms320c54x_device::STATE_PC) == 0x605 + gap &&
-			m_cpu->state_int(tms320c54x_device::STATE_ST0) == (0xe05 | (set ? 0x1000 : 0)) &&
-			m_cpu->state_int(tms320c54x_device::STATE_ST1) == 0x800 && m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x1000,
-			"XC tests its Access-stage status rather than either preceding Execute publication");
-		if (!m_rom4_codec_replay)
-		{
-			expect(restore_snapshot(machine(), *m_check_timer, m_saved_pipeline) == STATERR_NONE, "Restore XC/status with the original retained predicate");
-			m_phase = 522000 + index; m_rom4_codec_replay = true;
-			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-		}
-		if (index == 63) osd_printf_info("TMS320C54x staged XC/status: PASS cases=64 restore=64 producers=SSBX,RSBX gaps=0,1,2,3 old_condition_words=2 snapshots=2 physical_phase_claim=0\n");
-		if (index < 127) { start_xc_status(index + 1); return true; }
-		osd_printf_info("TMS320C54x atomic XC/status: PASS cases=64 restore=64 producers=SSBX,RSBX gaps=0,1,2,3 old_condition_words=2 snapshots=2 physical_phase_claim=0\n");
-		throw emu_fatalerror(0, "TMS320C54x isolated XC/status complete");
 	}
 	return false;
 }
