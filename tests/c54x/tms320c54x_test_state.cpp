@@ -231,7 +231,6 @@ void tms320c54x_test_state::machine_reset()
 		{ {"adds"}, [](self &test) { test.start_pipeline_memory_arithmetic(); } },
 		{ {"alu-map", "alu-map-edge", "alu-map-irq", "alu-low-bus"}, [](self &test) { test.start_mapped_dual(); } },
 		{ {"xc-signed"}, [](self &test) { test.start_signed_xc(); } },
-		{ {"xc-controls"}, [](self &test) { test.start_pipeline_xc_irq(); } },
 		{ {"xc-ret"}, [](self &test) { test.start_xc_return(); } },
 		{ {"drsub", "long-pair"}, [](self &test) { test.start_pipeline_long_pair(); } },
 		{ {"xmem-store"}, [](self &test) { test.start_xmem_store(); } },

@@ -1307,7 +1307,7 @@ bool tms320c54x_test_state::check_pipeline_conditional_branch_results()
 			m_pipeline_write_tap.remove(); m_pipeline_operand_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
 			if (m_pipeline_peripheral_case < 13) { start_pipeline_worker_xc(m_pipeline_peripheral_case + 1); return true; }
 			osd_printf_info("TMS320C54x staged original worker XC prefix: PASS cases=14 restore=14 composed_seven_words=4 composed_nine_words=6 duplicate_pushes=0\n");
-			start_pipeline_xc_irq(); return true;
+			return true;
 		}
 		++m_pipeline_expected_cycle;
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;

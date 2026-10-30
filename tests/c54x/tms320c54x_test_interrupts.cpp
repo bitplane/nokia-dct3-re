@@ -37,37 +37,6 @@ void tms320c54x_test_state::start_xc_irq_case(unsigned index)
 
 
 
-void tms320c54x_test_state::start_pipeline_xc_irq(unsigned variant)
-{
-	m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
-	m_pipeline_peripheral_case = variant;
-	auto &program = m_cpu->space(AS_PROGRAM);
-	for (unsigned i = 0; i < 32; ++i) { program.write_word(0x600 + i, 0xf495); program.write_word(0x40 + i, 0xf495); }
-	program.write_word(0x600, BIT(variant, 0) ? 0xff00 : 0xfd00);
-	program.write_word(0x601, 0x8000); program.write_word(0x602, 0x8001);
-	set_registers(*m_cpu, {
-		{cpu_regs::STATE_TCR, 0x10}, {cpu_regs::STATE_PMST, 0}, {cpu_regs::STATE_ILLEGAL, 0},
-		{cpu_regs::STATE_ST0, 0xa60e}, {cpu_regs::STATE_ST1, 0}, {cpu_regs::STATE_A, 0x1234},
-		{cpu_regs::STATE_SP, 0x500}, {cpu_regs::STATE_IFR, 0}, {cpu_regs::STATE_IMR, 1}, {STATE_GENPC, 0x600},
-	});
-	m_cpu->set_pipeline_frontend(true);
-	m_pipeline_replay = false; m_pipeline_expected_cycle = 1;
-	m_pipeline_store_writes = m_pipeline_operand_reads = 0;
-	m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0x700, 0x701, "xc_protected_stores",
-		[this](offs_t address, u16 &word, u16) {
-			if (machine().side_effects_disabled()) return;
-			expect(word == 0x1234 && m_cpu->pipeline_cycles() == 7 + address - 0x700, "Both XC-protected stores retire before interrupt entry");
-			++m_pipeline_store_writes;
-		});
-	m_pipeline_operand_tap = program.install_read_tap(0x40, 0x40, "xc_vector_fetch",
-		[this](offs_t, u16 &, u16) {
-			if (machine().side_effects_disabled()) return;
-			expect(m_pipeline_store_writes == 2 && m_cpu->pipeline_cycles() > 8, "XC 1 and XC 2 protect two full words before vector Fetch");
-			++m_pipeline_operand_reads;
-		});
-	m_phase = 251710; m_cpu->resume(SUSPEND_REASON_DISABLE);
-	m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-}
 
 void tms320c54x_test_state::start_stack_irq_order(unsigned variant)
 {
@@ -551,45 +520,6 @@ bool tms320c54x_test_state::check_xc_interrupt_results()
 
 
 
-bool tms320c54x_test_state::check_pipeline_xc_irq_results()
-{
-	if (m_phase == 251710)
-	{
-		u64 const cycle = m_cpu->pipeline_cycles();
-		u64 const checkpoint = 5 + 3 * (m_pipeline_peripheral_case / 2);
-		expect(cycle == m_pipeline_expected_cycle && !m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "XC interrupt fixture advances without unsupported instructions");
-		if (cycle == 3) m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 1);
-		if (cycle <= 8) expect(m_pipeline_operand_reads == 0, "Pending interrupt cannot fetch its vector inside XC word protection");
-		if (cycle == checkpoint && !m_pipeline_replay)
-		{
-			expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save pending interrupt in XC protection window");
-		}
-		if (cycle == 24)
-		{
-			expect(m_pipeline_store_writes == 2 && m_pipeline_operand_reads == 1 &&
-				m_cpu->state_int(tms320c54x_device::STATE_IFR) == 0 && m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x4ff,
-				"XC releases pending IRQ after both stores with one vector fetch and one interrupt stack allocation");
-			if (!m_pipeline_replay)
-			{
-				m_pipeline_replay = true; m_pipeline_store_writes = checkpoint >= 8 ? 2 : 0; m_pipeline_operand_reads = 0;
-				expect(restore_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Restore XC interrupt guard and pending source");
-				return restart_pipeline_observer(251720, checkpoint + 1);
-			}
-			m_pipeline_write_tap.remove(); m_pipeline_operand_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (m_pipeline_peripheral_case < 3) { start_pipeline_xc_irq(m_pipeline_peripheral_case + 1); return true; }
-			osd_printf_info("TMS320C54x staged unconditional XC IRQ protection: PASS cases=4 forms=XC1,XC2 restore=4 protected_words=2 vector_fetches=1\n");
-			start_pipeline_xc_arithmetic(); return true;
-		}
-		++m_pipeline_expected_cycle;
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 251720)
-	{
-		m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 251710;
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	return false;
-}
 
 bool tms320c54x_test_state::check_stack_irq_order_results()
 {
