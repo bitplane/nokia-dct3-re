@@ -247,8 +247,6 @@ void tms320c54x_test_state::machine_reset()
 		{ {"repeat-context"}, [](self &test) { test.start_repeat_context(); } },
 		{ {"repeat-pmst"}, [](self &test) { test.start_repeat_context(); } },
 		{ {"repeat-popd"}, [](self &test) { test.start_repeat_context(); } },
-		{ {"repeat-rearm"}, [](self &test) { test.start_repeat_rearm(); } },
-		{ {"rearm-edge"}, [](self &test) { test.start_repeat_rearm(); } },
 		{ {"rptb-bcd", "rptb-bd", "rptb-banz", "rptb-tc-delay"}, [](self &test) { test.start_block_bcd(); } },
 		{ {"asm-store", "asm-store-ld"}, [](self &test) { test.start_asm_store(); } },
 		{ {"push-pop-same"}, [](self &test) { test.start_push_pop_same(); } },

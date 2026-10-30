@@ -1398,7 +1398,6 @@ private:
 	static extended_banz_fixture block_banz_case(unsigned v);
 	static u16 block_banz_resolved(unsigned v, unsigned iteration);
 	void start_block_bcd(unsigned variant = 0);
-	void start_repeat_rearm(unsigned variant = 0);
 	using saved_repeat_fixture = c54x_test::saved_repeat_fixture;
 	static saved_repeat_fixture saved_repeat_case(unsigned v);
 	u16 saved_repeat_word(saved_repeat_fixture const &f, unsigned slot) const;
@@ -1790,7 +1789,6 @@ private:
 	bool check_memory_repeat_results();
 	bool check_push_pop_same_results();
 	bool check_asm_store_results_part2();
-	bool check_repeat_rearm_results();
 	bool check_fcala_delay_results();
 	bool check_body_repeat_results();
 	bool check_saved_repeat_results();

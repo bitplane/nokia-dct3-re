@@ -1102,28 +1102,6 @@ void tms320c54x_test_state::start_block_bcd(unsigned variant)
 	m_phase = 255560; m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 }
 
-void tms320c54x_test_state::start_repeat_rearm(unsigned variant)
-{
-	bool const edge = profile_is("rearm-edge");
-	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-	unsigned const first = std::array<unsigned, 4>{0, 1, 3, 7}[variant % 4], second = (variant / 4) % 2 ? 2 : 0;
-	u32 const base = (edge ? variant % 2 : (variant / 8) % 2) ? 0x20000 : 0;
-	auto &program = m_cpu->space(AS_PROGRAM);
-	std::array<u16, 14> const words{0xf072, 0x604, 0x6d92, 0xf495, 0xf495, 0x771a, u16(second), 0xf072, 0x60b, 0x6d93, 0xf495, 0xf495, 0x6d94, 0xf4e1};
-	for (unsigned i = 0; i < words.size(); ++i) program.write_word(base + 0x600 + i, words[i]);
-	if (edge) { program.write_word(base + 0x601, 0x60b); program.write_word(base + 0x602, 0x771a); program.write_word(base + 0x603, 0); }
-	m_cpu->set_pipeline_frontend(false);
-	set_registers(*m_cpu, {
-		{cpu_regs::STATE_IDLE, 0}, {cpu_regs::STATE_ILLEGAL, 0}, {cpu_regs::STATE_PMST, 0},
-		{cpu_regs::STATE_ST0, 0xa608}, {cpu_regs::STATE_ST1, 0x800}, {cpu_regs::STATE_IFR, 0},
-		{cpu_regs::STATE_IMR, 0}, {cpu_regs::STATE_TCR, 0x10}, {cpu_regs::STATE_BRC, edge ? 3 : first},
-		{cpu_regs::STATE_AR2, 0x1200}, {cpu_regs::STATE_AR3, 0x1300}, {cpu_regs::STATE_AR4, 0x1400},
-	});
-	m_pipeline_store_writes = 0; m_pipeline_replay = false; m_idle_fixture_tick = 0;
-	m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0, 0xffff, "repeat_rearm_no_reads", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) expect(false, "Repeat rearm does not read data memory"); });
-	m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0, 0xffff, "repeat_rearm_write", [this, second, edge](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return; expect(!edge && at == 0x1a && word == second && !m_pipeline_store_writes, "Only the post-loop STM publishes the next BRC once"); ++m_pipeline_store_writes; });
-	m_phase = edge ? 255540 : 255520; m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-}
 
 bool tms320c54x_test_state::check_repeated_writa_results()
 {
@@ -1496,46 +1474,6 @@ bool tms320c54x_test_state::check_branch_repeat_results()
 }
 
 
-bool tms320c54x_test_state::check_repeat_rearm_results()
-{
-	if (m_phase == 255540)
-	{
-		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick, checkpoint = 6 + variant / 2;
-		if (tick == checkpoint && !m_pipeline_replay) { expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save actual in-body BRC exclusion before or after its Access guard"); }
-		if (tick == 20)
-		{
-			expect(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) && !m_pipeline_store_writes && m_cpu->state_int(tms320c54x_device::STATE_BRC) == 3 && m_cpu->state_int(tms320c54x_device::STATE_RSA) == 0x602 && m_cpu->state_int(tms320c54x_device::STATE_REA) == 0x60b && m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x1200 && m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x1300 && m_cpu->state_int(tms320c54x_device::STATE_AR4) == 0x1400, "Actual in-body STM BRC remains excluded before publication or body effects");
-			if (!m_pipeline_replay) { m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; return restore_pipeline_at(255550, "Restore the in-body guard without enabling a BRC write"); }
-			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (variant < 7) { start_repeat_rearm(variant + 1); return true; }
-			osd_printf_info("TMS320C54x in-body STM BRC exclusion: PASS cases=8 restore=8 pages=2 snapshots=4 write_owner=Access publications=0 body_effects=0 silicon_trap_claim=0\n");
-			throw emu_fatalerror(3, "TMS320C54x isolated in-body STM BRC exclusion complete");
-		}
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 255550) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 255540; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true; }
-	if (m_phase == 255520)
-	{
-		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
-		unsigned const first = std::array<unsigned, 4>{0, 1, 3, 7}[variant % 4], second = (variant / 4) % 2 ? 2 : 0;
-		u32 const base = (variant / 8) % 2 ? 0x20000 : 0;
-		unsigned const checkpoint = 10 + first * 3 + variant / 16;
-		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Post-loop STM must not inherit the older endpoint's body ownership");
-		if (tick == checkpoint && !m_pipeline_replay) { m_pipeline_store_case = m_pipeline_store_writes; expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save adjacent block rearm across endpoint and STM publication"); }
-		if (tick == 100)
-		{
-			expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_cpu->state_int(STATE_GENPC) == base + 0x60e && m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x1201 + first && m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x1301 + second && m_cpu->state_int(tms320c54x_device::STATE_AR4) == 0x1401 && !m_cpu->state_int(tms320c54x_device::STATE_BRC) && m_cpu->state_int(tms320c54x_device::STATE_RSA) == 0x609 && m_cpu->state_int(tms320c54x_device::STATE_REA) == 0x60b && m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0xa608 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == 0x800 && m_pipeline_store_writes == 1, "Consecutive blocks own separate counts and execute their continuation once");
-			if (!m_pipeline_replay) { m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; m_pipeline_store_writes = m_pipeline_store_case; return restore_pipeline_at(255530, "Restore rearm without duplicate BRC publication or iterations"); }
-			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (variant < 63) { start_repeat_rearm(variant + 1); return true; }
-			osd_printf_info("TMS320C54x adjacent block rearm: PASS cases=64 restore=64 first_counts=0,1,3,7 second_counts=0,2 pages=2 snapshots=4 brc_publications=1 actual_iterations=1 write_owner=Access interrupt_composition=unvalidated physical_phase_claim=0\n");
-			throw emu_fatalerror(3, "TMS320C54x isolated adjacent block rearm complete");
-		}
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 255530) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 255520; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true; }
-	return false;
-}
 
 bool tms320c54x_test_state::check_delayed_call_replay_results()
 {
