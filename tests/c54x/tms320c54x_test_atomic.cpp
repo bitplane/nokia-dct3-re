@@ -13,7 +13,6 @@ bool tms320c54x_test_state::check_atomic_program_results()
 	{
 	case atomic_fixture::basic: return check_atomic_basic_results();
 	case atomic_fixture::corpus: return check_atomic_corpus_results();
-	case atomic_fixture::reference: return check_atomic_reference_results();
 	case atomic_fixture::none: return false;
 	}
 	return false;

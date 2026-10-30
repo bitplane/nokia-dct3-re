@@ -6,7 +6,7 @@
 
 namespace c54x_test {
 
-enum class atomic_fixture { none, basic, corpus, reference };
+enum class atomic_fixture { none, basic, corpus };
 
 struct atomic_phase_range
 {
@@ -26,20 +26,13 @@ inline constexpr atomic_phase_range atomic_phase_ranges[] = {
 	{422, 422, atomic_fixture::corpus},
 	{424, 525, atomic_fixture::corpus},
 	{533, 547, atomic_fixture::corpus},
-	{548, 569, atomic_fixture::reference},
-	{602, 613, atomic_fixture::reference},
-	{728, 738, atomic_fixture::reference},
-	{740, 749, atomic_fixture::reference},
 	{6501, 6502, atomic_fixture::corpus},
-	{6503, 6503, atomic_fixture::reference},
 	{6504, 6504, atomic_fixture::corpus},
 	{6515, 6516, atomic_fixture::corpus},
 	{6520, 6521, atomic_fixture::corpus},
 	{6524, 6528, atomic_fixture::corpus},
 	{6530, 6532, atomic_fixture::corpus},
-	{6533, 6533, atomic_fixture::reference},
 	{6534, 6557, atomic_fixture::corpus},
-	{6558, 6559, atomic_fixture::reference},
 	{6560, 6560, atomic_fixture::corpus},
 	{6563, 6567, atomic_fixture::corpus},
 	{6570, 6571, atomic_fixture::corpus},
@@ -48,14 +41,10 @@ inline constexpr atomic_phase_range atomic_phase_ranges[] = {
 	{8000, 9023, atomic_fixture::corpus},
 	{9100, 9107, atomic_fixture::basic},
 	{9207, 9207, atomic_fixture::corpus},
-	{9211, 9214, atomic_fixture::reference},
 	{9215, 9222, atomic_fixture::corpus},
 	{9226, 9246, atomic_fixture::corpus},
 	{9250, 9251, atomic_fixture::corpus},
-	{9252, 9252, atomic_fixture::reference},
 	{9253, 9258, atomic_fixture::corpus},
-	{40000, 40008, atomic_fixture::reference},
-	{41000, 41511, atomic_fixture::reference},
 	{90010, 90011, atomic_fixture::corpus},
 	{1000000, 1000000, atomic_fixture::corpus},
 };

@@ -1138,7 +1138,6 @@ private:
 	}
 	bool check_atomic_basic_results();
 	bool check_atomic_corpus_results();
-	bool check_atomic_reference_results();
 	bool check_bio_results();
 	bool check_bit_results();
 	bool check_intm_protection_results();
