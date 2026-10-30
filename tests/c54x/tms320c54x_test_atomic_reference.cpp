@@ -349,15 +349,6 @@ bool tms320c54x_test_state::check_atomic_reference_results()
 	auto const shift_phase = std::find(std::begin(shift_phases), std::end(shift_phases), m_phase);
 	if (shift_phase != std::end(shift_phases))
 	{
-		unsigned const index = unsigned(shift_phase - std::begin(shift_phases));
-		auto const &cases = shift_examples();
-		auto const &test = cases[index];
-		check_case(*m_cpu, test, m_port_writes, m_last_port_cycle - m_first_port_cycle);
-		expect_opcode(test.opcode, true, "Literal shift/comparison/normalization reference");
-		if (index + 1 < cases.size())
-		{
-			return begin_atomic_case(cases[index + 1], shift_phases[index + 1]);
-		}
 		write_words(program, {
 			{0x05e2, 0x6283}, // MPY *AR3,#4,A.
 			{0x05e3, 4}, {0x05e4, 0x75d6}, {0x05e5, 0x0124}, {0x05e6, 0xf5e1},

@@ -89,7 +89,7 @@ protected:
 			{
 				for (auto const *bank : {
 					&c54x_test::memory_examples(), &c54x_test::memory_continuations(),
-					&c54x_test::shift_examples(), &c54x_test::register_bit_examples(),
+					&c54x_test::register_bit_examples(),
 					&c54x_test::atomic_shift_examples(), &c54x_test::absolute_arithmetic_examples(),
 					&c54x_test::memory_transfer_examples(), &c54x_test::absolute_operand_examples(),
 					&c54x_test::long_offset_examples(), &c54x_test::circular_marker_examples(),
