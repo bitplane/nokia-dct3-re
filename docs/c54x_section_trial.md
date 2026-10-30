@@ -309,6 +309,8 @@ Subsequent replacements use the same section-only workflow:
 
 | `atomic_conditional_slot_literals.h` | Retain BC ALT taken/untaken, XC TC/AEQ/BGT accepted/annulled two-MAR slots, LD→circular MAR→two-store sequence and direct STM PMST. Explicit sign/TC/accumulators/flags/BK/pointers; target fetch, fixed pointer/memory/control results, exact data bus, sibling preservation and pre-operation replay. Drop port-marker timing; atomic semantic/access scope. | Native10 cases/restores, unchanged count; build5.464s/run0.017s. Delete phase480..489 and490 assertions/iteration logic; only490's following mapped-load sequence preparation remains reference material. |
 
+| `atomic_mapped_load_sequences.h` | Retain five-LDM/four-STL zero-extension sequence, signed immediate ADD B→A, full40-bit LD A→B with destination overflow and indexed LD→MAR→two MVMD→ST sequence. Explicit SXM/flags/accumulators/pointers/BK and memory replace inheritance. Fixed results, complete ordered MMR/RAM transactions, source/sibling/status preservation and pre-sequence replay. Drop port-marker timing; atomic semantic/access scope. | Native4 cases/restores, unchanged count; build5.443s/run0.017s. Delete phase490 preparation,491/492/494 and495 assertions/preparations plus493 successor setup. Following STM/CLKMD setup remains reference material. Supersedes atomic_conditional_slot_literals' pending mapped-load preparation. |
+
 `python3 tools/run_c54x_section.py all` rebuilds/runs each replacement in
 sequence. Final measurements: immediate-store5.214/0.019s,
 basic-memory5.423/0.020s, stack5.262/0.069s, DAGEN5.406/0.126s (build/run).

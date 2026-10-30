@@ -2345,129 +2345,12 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 	{
 		verify_atomic_case(register_bit_examples()[18]);
 	}
-	if (m_phase == 490)
-	{
-		program.write_word(0x05e2, 0x4812); // LDM AR2,A
-		program.write_word(0x05e3, 0x8095); // STL A,*AR5+
-		program.write_word(0x05e4, 0x4813); // LDM AR3,A
-		program.write_word(0x05e5, 0x8095);
-		program.write_word(0x05e6, 0x4814); // LDM AR4,A
-		program.write_word(0x05e7, 0x8095);
-		program.write_word(0x05e8, 0x4817); // LDM AR7,A
-		program.write_word(0x05e9, 0x8095);
-		program.write_word(0x05ea, 0x4910); // LDM AR0,B
-		program.write_word(0x05eb, 0x75d6);
-		program.write_word(0x05ec, 0x0124);
-		program.write_word(0x05ed, 0xf5e1);
-		for (u16 address = 0x0f40; address != 0x0f44; ++address)
-			data.write_word(address, 0);
-		m_port_writes = 0;
-		set_registers(*m_cpu, {
-			{cpu_regs::STATE_A, 0}, {cpu_regs::STATE_B, 0}, {cpu_regs::STATE_AR0, 0x8000},
-			{cpu_regs::STATE_AR2, 0x8002}, {cpu_regs::STATE_AR3, 0x8003}, {cpu_regs::STATE_AR4, 0x8004},
-			{cpu_regs::STATE_AR5, 0x0f40}, {cpu_regs::STATE_AR7, 0x8007}, {cpu_regs::STATE_ST0, 0x0800},
-		});
-		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100); // SXM.
-		return resume_atomic_at(0x05e0, 491);
-	}
-	if (m_phase == 491)
-	{
-		expect_opcode(0x4812, data.read_word(0x0f40) == 0x8002,
-				"ROM4 LDM AR2,A preserves the zero-extended load via STL");
-		expect_opcode(0x4813, data.read_word(0x0f41) == 0x8003,
-				"ROM4 LDM AR3,A preserves the zero-extended load via STL");
-		expect_opcode(0x4814, data.read_word(0x0f42) == 0x8004,
-				"ROM4 LDM AR4,A preserves the zero-extended load via STL");
-		expect_opcode(0x4817, data.read_word(0x0f43) == 0x8007 &&
-				m_cpu->state_int(tms320c54x_device::STATE_A) == 0x8007,
-				"ROM4 LDM AR7,A zero-extends despite SXM");
-		expect_opcode(0x4910,
-				m_cpu->state_int(tms320c54x_device::STATE_B) == 0x8000 &&
-				m_cpu->state_int(tms320c54x_device::STATE_AR5) == 0x0f44 &&
-				m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0x0800 &&
-				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 11,
-				"five ROM4 LDM words and four STL stores cost one cycle each");
-		write_words(program, {
-			{0x05e2, 0xf200}, // ADD #lk,B,A
-			{0x05e3, 0xfffe}, {0x05e4, 0x75d6}, {0x05e5, 0x0124}, {0x05e6, 0xf5e1},
-		});
-		m_port_writes = 0;
-		set_registers(*m_cpu, {
-			{cpu_regs::STATE_A, 0x1234}, {cpu_regs::STATE_B, 0x0100}, {cpu_regs::STATE_ST0, 0},
-			{cpu_regs::STATE_ST1, 0x0100}, // SXM.
-			{cpu_regs::STATE_PC, 0x05e0}, {cpu_regs::STATE_IDLE, 0},
-		});
-		return next_atomic_phase(492);
-	}
-	if (m_phase == 492)
-	{
-		expect_opcode(0xf200,
-				m_cpu->state_int(tms320c54x_device::STATE_A) == 0x00fe &&
-				m_cpu->state_int(tms320c54x_device::STATE_B) == 0x0100 &&
-				m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0x0800 &&
-				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
-				"ROM4 ADD #lk,B,A sign-extends under SXM and costs two cycles");
-	}
 	if (m_phase == 493)
 	{
 		verify_atomic_case(register_bit_examples()[19]);
-		program.write_word(0x05e2, 0xf540); // LD A,0,B
-		m_port_writes = 0;
-		set_registers(*m_cpu, {
-			{cpu_regs::STATE_A, 0xff000000f0ULL}, {cpu_regs::STATE_B, 0x1234}, {cpu_regs::STATE_PC, 0x05e0},
-			{cpu_regs::STATE_IDLE, 0},
-		});
-		return next_atomic_phase(494);
-	}
-	if (m_phase == 494)
-	{
-		expect_opcode(0xf540,
-				m_cpu->state_int(tms320c54x_device::STATE_A) == 0xff000000f0ULL &&
-				m_cpu->state_int(tms320c54x_device::STATE_B) == 0xff000000f0ULL &&
-				m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0x0a00 &&
-				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
-				"ROM4 LD A,0,B preserves all 40 bits and sets OVB in one cycle");
-		write_words(program, {
-			{0x05e2, 0x10da}, // LD *AR2+0%,A
-			{0x05e3, 0x6d93}, // MAR *AR3+
-			{0x05e4, 0x7308}, // MVMD AL,dmad
-			{0x05e5, 0x0f50},
-			{0x05e6, 0x7313}, // MVMD AR3,dmad
-			{0x05e7, 0x0f51},
-			{0x05e8, 0x7681}, // ST #lk,*AR1
-			{0x05e9, 0x5a5a}, {0x05ea, 0x75d6}, {0x05eb, 0x0124}, {0x05ec, 0xf5e1},
-		});
-		write_words(data, {
-			{0x0f22, 0x8001}, {0x0f50, 0}, {0x0f51, 0}, {0x0f52, 0},
-		});
-		m_port_writes = 0;
-		set_registers(*m_cpu, {
-			{cpu_regs::STATE_A, 0}, {cpu_regs::STATE_B, 0x1234}, {cpu_regs::STATE_AR0, 2},
-			{cpu_regs::STATE_AR1, 0x0f52}, {cpu_regs::STATE_AR2, 0x0f22}, {cpu_regs::STATE_AR3, 0x0f30},
-			{cpu_regs::STATE_BK, 4}, {cpu_regs::STATE_ST0, 0x0800},
-		});
-		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100); // SXM.
-		return resume_atomic_at(0x05e0, 495);
 	}
 	if (m_phase == 495)
 	{
-		expect_opcode(0x10da,
-				m_cpu->state_int(tms320c54x_device::STATE_A) == 0xffffff8001ULL &&
-				m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0f20,
-				"ROM4 LD *AR2+0%,A sign-extends before circular advance");
-		expect_opcode(0x6d93,
-				m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x0f31,
-				"ROM4 MAR *AR3+ updates the register in one cycle");
-		expect_opcode(0x7308, data.read_word(0x0f50) == 0x8001,
-				"ROM4 MVMD AL,dmad captures A's low word");
-		expect_opcode(0x7313, data.read_word(0x0f51) == 0x0f31,
-				"ROM4 MVMD AR3,dmad captures the modified register");
-		expect_opcode(0x7681, data.read_word(0x0f52) == 0x5a5a &&
-				m_cpu->state_int(tms320c54x_device::STATE_AR1) == 0x0f52 &&
-				m_cpu->state_int(tms320c54x_device::STATE_B) == 0x1234 &&
-				m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0x0800 &&
-				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 10,
-				"ROM4 load/MAR/two MVMDs/ST cost 1+1+2+2+2 cycles");
 		program.write_word(0x05e2, 0x7718); // STM #lk,SP
 		program.write_word(0x05e3, 0x0320);
 		program.write_word(0x05e4, 0x7728); // STM #lk,028h

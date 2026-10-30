@@ -241,6 +241,7 @@ def main():
     counts['atomic_accumulator_add_literals'] = 7
     counts['atomic_multiply_move_literals'] = 7
     counts['atomic_conditional_slot_literals'] = 10
+    counts['atomic_mapped_load_sequences'] = 4
     parser.add_argument('section', choices=[*counts, 'all'])
     parser.add_argument('--jobs', type=int, default=8)
     parser.add_argument('--negative-control', action='store_true', help='require failure of an intentionally wrong expectation')
