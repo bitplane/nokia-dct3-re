@@ -14,35 +14,24 @@ namespace c54x_test {
 
 struct dual_multiply_mode
 {
-	enum class operation { none, multiply, arithmetic, unsigned_mac, mac, parallel_mac };
+	enum class operation { none, unsigned_mac, mac, parallel_mac };
 	operation op = operation::none;
-	bool edge = false;
 	explicit operator bool() const { return op != operation::none; }
-	bool alu() const { return op == operation::arithmetic; }
 	bool parallel() const { return op == operation::parallel_mac; }
 	bool family() const { return op == operation::mac || parallel(); }
-	bool macsu() const { return family() || op == operation::unsigned_mac; }
 	unsigned count() const
 	{
-		if (edge) return alu() ? 32 : 16;
-		return family() ? dual_mac_schedule::cases : macsu() ? dual_macsu_schedule::cases :
-			alu() ? dual_alu_schedule::cases : dual_mpy_schedule::cases;
+		return family() ? dual_mac_schedule::cases : dual_macsu_schedule::cases;
 	}
 	unsigned key(unsigned ordinal) const
 	{
-		if (edge) return ordinal;
-		return family() ? dual_mac_schedule::key(ordinal) : macsu() ? dual_macsu_schedule::key(ordinal) :
-			alu() ? dual_alu_schedule::key(ordinal) : dual_mpy_schedule::key(ordinal);
+		return family() ? dual_mac_schedule::key(ordinal) : dual_macsu_schedule::key(ordinal);
 	}
 	static dual_multiply_mode select(std::string_view name)
 	{
-		bool const edge = name.size() >= 5 && name.substr(name.size() - 5) == "-edge";
-		if (edge) name.remove_suffix(5);
-		operation const op = name == "mpy-dual" ? operation::multiply : name == "alu-dual" ? operation::arithmetic :
-			name == "macsu-dual" ? operation::unsigned_mac : name == "mac-family" ? operation::mac :
+		operation const op = name == "macsu-dual" ? operation::unsigned_mac : name == "mac-family" ? operation::mac :
 			name == "stmac" ? operation::parallel_mac : operation::none;
-		if (edge && op != operation::multiply && op != operation::arithmetic && op != operation::parallel_mac) return {};
-		return {op, edge};
+		return {op};
 	}
 };
 
@@ -57,24 +46,24 @@ public:
 	bool step()
 	{
 		if (m_resume) { m_resume = false; m_cpu.resume(SUSPEND_REASON_DISABLE); schedule(); return false; }
-		bool const alu = m_mode.alu(), parallel = m_mode.parallel(), family = m_mode.family(), macsu = m_mode.macsu(), edge = m_mode.edge;
+		bool const parallel = m_mode.parallel(), family = m_mode.family();
 		auto const &f = m_input;
 		unsigned const variant = m_raw, tick = ++m_tick;
 		unsigned const feedback = parallel ? f.destination : f.source;
 		unsigned const checkpoint = 3 + f.snapshot;
-		require(bool(state(r::STATE_ILLEGAL)) == (edge && tick >= 4), "Dual MPY admits RAM pairs and rejects low-page operands before effects");
-		u64 const before = dual_macsu_seed(family ? variant % (edge ? 16U : 215040U) : variant, edge) ^ (!edge && tick <= 5 ? 0xffffffffffULL : 0);
-		require(state(r::STATE_A) == (!edge && tick >= 6 && !f.destination ? f.result : macsu && !feedback ? before : 0x123456789aULL) && state(r::STATE_B) == (!edge && tick >= 6 && f.destination ? f.result : macsu && feedback ? before : 0xfeabcd9876ULL) && state(r::STATE_ST0) == (!edge && tick >= 6 ? f.result_st0 : f.st0), "Dual multiply publishes its Execute-owned result and sticky destination overflow");
+		require(!state(r::STATE_ILLEGAL), "Dual MPY admits RAM pairs and rejects low-page operands before effects");
+		u64 const before = dual_macsu_seed(family ? variant % 215040U : variant, false) ^ (tick <= 5 ? 0xffffffffffULL : 0);
+		require(state(r::STATE_A) == (tick >= 6 && !f.destination ? f.result : !feedback ? before : 0x123456789aULL) && state(r::STATE_B) == (tick >= 6 && f.destination ? f.result : feedback ? before : 0xfeabcd9876ULL) && state(r::STATE_ST0) == (tick >= 6 ? f.result_st0 : f.st0), "Dual multiply publishes its Execute-owned result and sticky destination overflow");
 		if (tick == 4)
 		{
-			for (unsigned i = 0; i < 4; ++i) { require(state(r::STATE_AR2 + i) == f.final[i], "Dual MPY captures both addresses before one X-priority alias update"); if (!edge) m_cpu.set_state_int(r::STATE_AR2 + i, 0x2200 + i); }
-			if (!edge) m_cpu.set_state_int(r::STATE_BK, 32);
+			for (unsigned i = 0; i < 4; ++i) { require(state(r::STATE_AR2 + i) == f.final[i], "Dual MPY captures both addresses before one X-priority alias update"); m_cpu.set_state_int(r::STATE_AR2 + i, 0x2200 + i); }
+			m_cpu.set_state_int(r::STATE_BK, 32);
 		}
-		if (!edge && tick == 5)
+		if (tick == 5)
 		{
-			require(state(r::STATE_T) == (parallel ? f.yword : alu ? 0xabcd : f.xword), "Dual memory Read publishes T only for dual-read multiply");
+			require(state(r::STATE_T) == (parallel ? f.yword : f.xword), "Dual memory Read publishes T only for dual-read multiply");
 			m_cpu.set_state_int(r::STATE_T, 0xdead);
-			if (macsu) m_cpu.set_state_int(feedback ? r::STATE_B : r::STATE_A, dual_macsu_seed(family ? variant % (edge ? 16U : 215040U) : variant, edge));
+			m_cpu.set_state_int(feedback ? r::STATE_B : r::STATE_A, dual_macsu_seed(family ? variant % 215040U : variant, false));
 			if (parallel) m_cpu.set_state_int(r::STATE_ST1, f.st1 ^ 31);
 			auto const disable = m_machine.disable_side_effects();
 			m_cpu.space(AS_DATA).write_word(f.xaddress, 0xdead); m_cpu.space(AS_DATA).write_word(f.yaddress, 0xbeef);
@@ -85,8 +74,8 @@ public:
 		}
 		if (tick == 12)
 		{
-			require(m_reads == (edge ? 0U : parallel ? 1U : 2U) && m_writes == unsigned(parallel && !edge) && m_fetches == 1 && bool(state(r::STATE_IDLE)) == !edge && state(r::STATE_T) == (edge ? parallel ? f.yword : 0xabcd : 0xdead) && state(r::STATE_ST1) == (parallel && !edge ? f.st1 ^ 31 : f.st1) && state(r::STATE_PMST) == f.pmst, "Dual multiply retains operands and ASM without duplicate publications");
-			for (unsigned i = 0; i < 4; ++i) require(state(r::STATE_AR2 + i) == (edge ? f.initial[i] : 0x2200 + i), "Dual MPY never reapplies its address modification");
+			require(m_reads == (parallel ? 1U : 2U) && m_writes == unsigned(parallel) && m_fetches == 1 && bool(state(r::STATE_IDLE)) && state(r::STATE_T) == 0xdead && state(r::STATE_ST1) == (parallel ? f.st1 ^ 31 : f.st1) && state(r::STATE_PMST) == f.pmst, "Dual multiply retains operands and ASM without duplicate publications");
+			for (unsigned i = 0; i < 4; ++i) require(state(r::STATE_AR2 + i) == (0x2200 + i), "Dual MPY never reapplies its address modification");
 			if (!m_replay)
 			{
 				m_replay = true; m_tick = checkpoint; m_reads = m_saved_counts[0]; m_fetches = m_saved_counts[1]; m_writes = m_saved_counts[2];
@@ -114,15 +103,15 @@ private:
 	void begin()
 	{
 		m_cpu.suspend(SUSPEND_REASON_DISABLE, true);
-		bool const alu = m_mode.alu(), parallel = m_mode.parallel(), family = m_mode.family(), macsu = m_mode.macsu(), edge = m_mode.edge;
+		bool const parallel = m_mode.parallel(), family = m_mode.family();
 		m_raw = m_mode.key(m_ordinal);
-		m_input = dual_multiply_case(m_raw, edge, alu, macsu, family, family, parallel);
+		m_input = dual_multiply_case(m_raw, false, false, true, family, family, parallel);
 		auto const &f = m_input;
 		m_coverage.add(m_raw);
 		unsigned const feedback = parallel ? f.destination : f.source;
 		auto &program = m_cpu.space(AS_PROGRAM); auto &data = m_cpu.space(AS_DATA);
 		for (unsigned i = 0; i < 16; ++i) program.write_word(f.base + 0x600 + i, 0xf495);
-		program.write_word(f.base + 0x600, (alu ? 0xa000 | (m_raw >= (edge ? 16U : 43008U) ? 0x200 : 0) : family ? (parallel ? 0xd000 : 0xb000) | (f.operation << 10) : macsu ? 0xa600 : 0xa400) | (family ? f.source << 9 : 0) | (f.destination << 8) | (f.x << 4) | f.y); program.write_word(f.base + 0x601, 0xf4e1);
+		program.write_word(f.base + 0x600, (family ? (parallel ? 0xd000 : 0xb000) | (f.operation << 10) : 0xa600) | (family ? f.source << 9 : 0) | (f.destination << 8) | (f.x << 4) | f.y); program.write_word(f.base + 0x601, 0xf4e1);
 		if (f.xaddress >= 0x60) data.write_word(f.xaddress, f.xword);
 		if (f.yaddress >= 0x60) data.write_word(f.yaddress, f.yword);
 		m_cpu.set_state_int(r::STATE_IDLE, 0); m_cpu.set_state_int(r::STATE_ILLEGAL, 0);
@@ -130,13 +119,13 @@ private:
 		m_cpu.set_state_int(r::STATE_TCR, 0x10); m_cpu.set_state_int(r::STATE_IFR, 0); m_cpu.set_state_int(r::STATE_IMR, 0);
 		m_cpu.set_state_int(r::STATE_A, 0x123456789aULL); m_cpu.set_state_int(r::STATE_B, 0xfeabcd9876ULL); m_cpu.set_state_int(r::STATE_T, 0xabcd);
 		if (parallel) m_cpu.set_state_int(r::STATE_T, f.yword);
-		if (macsu) m_cpu.set_state_int(feedback ? r::STATE_B : r::STATE_A, dual_macsu_seed(family ? m_raw % (edge ? 16U : 215040U) : m_raw, edge) ^ (edge ? 0 : 0xffffffffffULL));
+		m_cpu.set_state_int(feedback ? r::STATE_B : r::STATE_A, dual_macsu_seed(family ? m_raw % 215040U : m_raw, false) ^ 0xffffffffffULL);
 		for (unsigned i = 0; i < 4; ++i) m_cpu.set_state_int(r::STATE_AR2 + i, f.initial[i]);
 		m_cpu.set_state_int(r::STATE_AR0, 3); m_cpu.set_state_int(r::STATE_BK, f.linear ? 0 : 16);
 		m_cpu.set_input_line(0, CLEAR_LINE); m_cpu.set_input_line(INPUT_LINE_NMI, CLEAR_LINE);
 		m_reads = m_fetches = m_writes = 0;
-		m_read_tap = data.install_read_tap(0, 0xffff, "dual_multiply_reads", [this, f, edge, parallel](offs_t at, u16 &word, u16) { if (m_machine.side_effects_disabled()) return; require(!edge && m_reads < (parallel ? 1U : 2U) && at == (m_reads ? f.yaddress : f.xaddress) && word == (m_reads ? f.yword : f.xword) && m_cpu.pipeline_cycles() == 5, "Dual multiply retains its captured logical operands in Read"); ++m_reads; });
-		m_write_tap = data.install_write_tap(0, 0xffff, "dual_multiply_write", [this, f, edge, parallel](offs_t at, u16 &word, u16) { if (m_machine.side_effects_disabled()) return; require(parallel && !edge && !m_writes && at == f.yaddress && word == f.stored && m_cpu.pipeline_cycles() == 6, "Parallel MAC writes the old shifted source once at Execute"); ++m_writes; });
+		m_read_tap = data.install_read_tap(0, 0xffff, "dual_multiply_reads", [this, f, parallel](offs_t at, u16 &word, u16) { if (m_machine.side_effects_disabled()) return; require(m_reads < (parallel ? 1U : 2U) && at == (m_reads ? f.yaddress : f.xaddress) && word == (m_reads ? f.yword : f.xword) && m_cpu.pipeline_cycles() == 5, "Dual multiply retains its captured logical operands in Read"); ++m_reads; });
+		m_write_tap = data.install_write_tap(0, 0xffff, "dual_multiply_write", [this, f, parallel](offs_t at, u16 &word, u16) { if (m_machine.side_effects_disabled()) return; require(parallel && !m_writes && at == f.yaddress && word == f.stored && m_cpu.pipeline_cycles() == 6, "Parallel MAC writes the old shifted source once at Execute"); ++m_writes; });
 		m_fetch_tap = program.install_read_tap(f.base + 0x600, f.base + 0x600, "dual_multiply_fetch", [this](offs_t, u16 &, u16) { if (!m_machine.side_effects_disabled()) { require(!m_fetches, "Dual MPY opcode is fetched once"); ++m_fetches; } });
 		m_replay = m_resume = false; m_tick = 0;
 		m_cpu.set_state_int(STATE_GENPC, f.base + 0x600); m_cpu.set_pipeline_frontend(true); m_cpu.resume(SUSPEND_REASON_DISABLE);

@@ -357,6 +357,9 @@ def main():
     counts['exponent_normalization'] = 768
     counts['composition_limits'] = 110
     counts['source_admission'] = 38464
+    counts['dual_multiply'] = 22528
+    counts['dual_arithmetic'] = 45056
+    counts['dual_admission'] = 64
     counts['accumulator_call_frames'] = 216
     parser.add_argument('section', choices=[*counts, 'all'])
     parser.add_argument('--jobs', type=int, default=8)

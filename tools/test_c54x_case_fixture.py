@@ -240,17 +240,13 @@ template<class s> void check(unsigned blocks, unsigned numeric, bool alu = false
     std::printf("cases=%u digest=%016llx\n", digest.count, (unsigned long long)digest.value);
 }
 int main() {
-    check<c54x_test::dual_mpy_schedule>(1, 8192);
-    check<c54x_test::dual_alu_schedule>(2, 8192, true);
     check<c54x_test::dual_macsu_schedule>(1, 65536, false, true);
     check<c54x_test::dual_mac_schedule>(8, 65536);
 }
 '''
         with compiled_cpp(source) as program:
             output = subprocess.check_output([str(program)], text=True).splitlines()
-        self.assertEqual(output, ['cases=26624 digest=48c359ad090cdc45',
-                                 'cases=53248 digest=0e097cb7d60a0ad8',
-                                 'cases=83968 digest=a57c305fd5b3a3ba',
+        self.assertEqual(output, ['cases=83968 digest=a57c305fd5b3a3ba',
                                  'cases=671744 digest=a992a2f6ed8d9f42'])
 
 

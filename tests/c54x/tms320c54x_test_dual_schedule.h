@@ -27,8 +27,6 @@ struct dual_operand_schedule
 	}
 };
 
-using dual_mpy_schedule = dual_operand_schedule<8192, 1>;
-using dual_alu_schedule = dual_operand_schedule<8192, 2>;
 using dual_macsu_schedule = dual_operand_schedule<65536, 1>;
 using dual_mac_schedule = dual_operand_schedule<65536, 8>;
 
