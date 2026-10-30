@@ -153,6 +153,18 @@ dispatcher; the CPU-only controller extraction remains outstanding. Legal
 standard-mode inputs keep ARP zero. These timer/interrupt observations do not
 establish physical frequencies or silicon restart latency.
 
+`idle_nmi` owns twelve independent atomic-frontend cases: IDLE1/2/3 crossed
+with INTM and empty/full IMR. Each reaches idle before an NMI is asserted.
+A fixture execution hold lets the synchronizer latch NMI while vector entry
+is frozen; the snapshot retains that pending request, original INTM/SP,
+unrelated IFR bits and untouched stack RAM. Releasing the hold reaches vector1
+with one continuation write and no maskable-IFR consumption. The external NMI
+level remains high across acknowledgement; reasserting the same high level
+must not create another interrupt. Clearing it on acknowledgement makes this
+negative control fail. MAME HALT is fixture control here, not an asserted
+C54x pin assignment. Cycle accuracy and staged-frontend equivalence are not
+claimed by this section.
+
 The independent `status_bitfield` section owns ST0/ST1 BITF sampling: 128
 register/pattern/mask/initial-TC/addressing combinations, with pages and three
 checkpoint positions distributed rather than multiplied into 768 executions.

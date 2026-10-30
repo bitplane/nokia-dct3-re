@@ -49,8 +49,6 @@ private:
 	bool m_xf_pin = true;
 	void start_repeat_endpoint_case(unsigned index);
 	void check_control_disassembler();
-	void start_idle_nmi_case(unsigned index);
-	void check_idle_nmi_result(unsigned index);
 	void start_idle_dma_case(unsigned index);
 	void start_idle_external_serial_case(unsigned index);
 	void start_idle_timer_case(unsigned index);
@@ -682,7 +680,6 @@ private:
 	void expect_opcode(u16 opcode, bool condition, const char *message);
 
 	// Return true only when the original callback would return; order is retained.
-	bool check_idle_nmi_result_results();
 	bool check_idle_wake_results();
 	bool restart_pipeline_observer(unsigned phase, u64 next_cycle)
 	{
@@ -867,7 +864,7 @@ private:
 	popd_fixture m_popd_fixture = {};
 	u32 m_popd_write_mask = 0;
 	// Separate checkpoint lifetimes; host observations still rewind explicitly.
-	std::stringstream m_idle_nmi_saved, m_idle_timer_saved, m_idle_dma_saved;
+	std::stringstream m_idle_timer_saved, m_idle_dma_saved;
 	std::stringstream m_bsp_saved, m_pll_saved, m_clock_rates_saved;
 };
 

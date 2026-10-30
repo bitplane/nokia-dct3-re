@@ -6,38 +6,6 @@
 
 namespace c54x_test {
 
-void tms320c54x_test_state::start_idle_nmi_case(unsigned index)
-{
-	auto &program = m_cpu->space(AS_PROGRAM);
-	u16 const idle[] = {0xf4e1, 0xf6e1, 0xf5e1};
-	program.write_word(0x010980, idle[index / 4]);
-	program.write_word(0x010981, 0xf4e1);
-	program.write_word(0x010004, 0xf4e1); // NMI ISR stops without changing masks.
-	m_cpu->set_input_line(INPUT_LINE_NMI, CLEAR_LINE);
-	set_registers(*m_cpu, {
-		{cpu_regs::STATE_IDLE, 0}, {cpu_regs::STATE_TCR, 0x10}, {cpu_regs::STATE_PMST, 0}, {cpu_regs::STATE_SP, 0x1000},
-		{cpu_regs::STATE_IFR, 0}, {cpu_regs::STATE_IMR, index & 1 ? 0xffff : 0},
-	});
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST1, BIT(index, 1) ? 0x0800 : 0);
-	m_cpu->set_state_int(STATE_GENPC, 0x010980);
-	m_cpu->space(AS_DATA).write_word(0x0fff, 0x5a5a);
-	m_phase = 7100 + index * 5;
-	m_check_timer->adjust(attotime::from_usec(100));
-}
-
-void tms320c54x_test_state::check_idle_nmi_result(unsigned index)
-{
-	expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) &&
-		m_cpu->state_int(STATE_GENPC) == 0x010005 &&
-		m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x0fff &&
-		m_cpu->space(AS_DATA).read_word(0x0fff) == 0x0981 &&
-		m_cpu->state_int(tms320c54x_device::STATE_IFR) == 0x8008 &&
-		m_cpu->state_int(tms320c54x_device::STATE_IMR) == (index & 1 ? 0xffff : 0) &&
-		m_cpu->state_int(tms320c54x_device::STATE_ST1) == 0x0800 &&
-		!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL),
-		"NMI wakes IDLE1/2/3 despite INTM and IMR, uses vector 1, preserves IFR and stacks continuation once");
-}
-
 void tms320c54x_test_state::start_idle_dma_case(unsigned index)
 {
 	auto &program = m_cpu->space(AS_PROGRAM);
@@ -510,72 +478,6 @@ void tms320c54x_test_state::start_bsp_interrupt_case(unsigned index)
 	m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
 	m_phase = 78000 + index * 4;
 	m_check_timer->adjust(attotime::from_usec(100));
-}
-
-bool tms320c54x_test_state::check_idle_nmi_result_results()
-{
-	[[maybe_unused]] auto &program = m_cpu->space(AS_PROGRAM);
-	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
-	if (m_phase >= 7100 && m_phase < 7160)
-	{
-		unsigned const index = (m_phase - 7100) / 5;
-		unsigned const step = (m_phase - 7100) % 5;
-		if (step == 0)
-		{
-			expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) &&
-				m_cpu->state_int(STATE_GENPC) == 0x010981,
-				"each idle mode remains suspended before NMI");
-			// Freeze instruction execution, not the input synchronizer, to
-			// capture an already-latched request before vector entry.
-			m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
-			m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0x8008);
-			m_cpu->set_input_line(INPUT_LINE_NMI, ASSERT_LINE);
-			++m_phase;
-			m_check_timer->adjust(attotime::from_usec(100));
-			return true;
-		}
-		if (step == 1)
-		{
-			expect(!m_cpu->state_int(tms320c54x_device::STATE_IDLE) &&
-				m_cpu->state_int(STATE_GENPC) == 0x010981 &&
-				m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x1000,
-				"NMI request wakes idle but remains unserviced while fixture execution is suspended");
-			expect(capture_snapshot(machine(), m_idle_nmi_saved) == STATERR_NONE,
-				"save latched NMI and held input before vector entry");
-			m_cpu->resume(SUSPEND_REASON_DISABLE);
-			++m_phase;
-			m_check_timer->adjust(attotime::from_usec(100));
-			return true;
-		}
-		check_idle_nmi_result(index);
-		if (step == 2)
-		{
-			expect(restore_snapshot(machine(), m_idle_nmi_saved) == STATERR_NONE &&
-				m_cpu->state_int(STATE_GENPC) == 0x010981 &&
-				m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x1000 &&
-				m_cpu->space(AS_DATA).read_word(0x0fff) == 0x5a5a &&
-				m_cpu->state_int(tms320c54x_device::STATE_IFR) == 0x8008 &&
-				m_cpu->state_int(tms320c54x_device::STATE_ST1) == (BIT(index, 1) ? 0x0800 : 0),
-				"restore pending NMI before its stack write, preserving masks and original INTM");
-			m_cpu->resume(SUSPEND_REASON_DISABLE);
-			++m_phase;
-			m_check_timer->adjust(attotime::from_usec(100));
-			return true;
-		}
-		if (step == 3)
-		{
-			m_cpu->set_input_line(INPUT_LINE_NMI, ASSERT_LINE);
-			++m_phase;
-			m_check_timer->adjust(attotime::from_usec(100));
-			return true;
-		}
-		if (index < 11) { start_idle_nmi_case(index + 1); return true; }
-		osd_printf_info("TMS320C54x NMI idle wake: PASS cases=12 cycle_accuracy_claim=0\n");
-		osd_printf_info("TMS320C54x NMI pending restore: PASS cases=12 held_line_cases=12 timing_claim=0\n");
-		check_control_disassembler();
-		return true;
-	}
-	return false;
 }
 
 bool tms320c54x_test_state::check_idle_wake_results()

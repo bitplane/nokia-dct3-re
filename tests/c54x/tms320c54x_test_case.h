@@ -67,6 +67,7 @@ struct clocked_irq_expectation
 	std::optional<u16> return_pc{};
 	std::vector<register_check> registers{};
 	std::optional<unsigned> io_events_before{};
+	bool clear_input_on_ack = true; // Held-input fixtures keep the external level asserted across IACK.
 };
 struct retired_instruction_check { u32 address; u16 opcode; unsigned count; unsigned first_cycle=0; };
 

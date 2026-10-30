@@ -104,7 +104,9 @@ protected:
 				if ((m_cpu->state_int(reg.index) & reg.mask) != (reg.value & reg.mask))
 					throw emu_fatalerror("Section IRQ case=%u register=%d value=%llx expected=%llx",index,reg.index,
 						(unsigned long long)m_cpu->state_int(reg.index),(unsigned long long)reg.value);
-			++m_case_irq_cursor; ++m_irq_acks; m_cpu->set_input_line(line, CLEAR_LINE); return 0;
+			++m_case_irq_cursor; ++m_irq_acks;
+			if (expected.clear_input_on_ack) m_cpu->set_input_line(line, CLEAR_LINE);
+			return 0;
 		}, "section_irq");
 		m_cases = c54x_test::section_cases();
 		m_fixture = std::make_unique<c54x_test::register_sequence_fixture>(machine(), *m_cpu, *m_timer,

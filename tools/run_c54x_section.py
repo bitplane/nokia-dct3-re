@@ -407,6 +407,7 @@ def main():
     counts['repeated_accumulator_counts'] = 4608
     counts['repeated_accumulator_block'] = 512
     counts['repeated_arithmetic_shift'] = 4096
+    counts['idle_nmi'] = 12
     counts['shifted_unowned'] = 20480
     counts['shifted_bsp'] = 5120
     counts['accumulator_call_frames'] = 216
