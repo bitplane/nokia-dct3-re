@@ -2360,13 +2360,21 @@ adds the signed product to the selected 40-bit source accumulator. FRCT shifts
 the product by one; SPRU131G section 4.5.3 requires SMUL pre-accumulation
 saturation only when SMUL, FRCT and OVM are all set. Final destination overflow
 and saturation use the shared multiplier helper; T and carry are preserved.
-`mac-t-imm` passes 172,032 cases/restores: 24,576 isolated and 147,456 with
-STLM-to-T producers, all four accumulator selections, 64 operand pairs and
-16 flag combinations. Literal replacement and post-Read T mutation cannot
-alter the retained operands. Zero-gap STLM sequences check the prototype's
-stale-T projection, not a guaranteed silicon result. Adjacent accumulator
-producer timing, repeat and interrupt composition remain unvalidated.
-The 86,016-case immediate-MPY control also passes after sharing this path.
+The independent `immediate_product` section replaces both immediate-MPY/MAC
+profiles with 4,224 cases/replays. Its 3,072 arithmetic cases cover all 64
+signed operand pairs, FRCT/OVM/SMUL combinations, both destinations and MPY,
+MAC-from-A and MAC-from-B. Its 1,152 transport cases cover eight STLM values,
+both source/destination accumulators, SATD/SXM pairs and gaps 0/1/2 for all
+three consumers. Arithmetic flags and literals are distributed in the transport
+bank rather than multiplied across it; SXM is distributed in the arithmetic
+bank because signed immediate multiplication does not use it.
+Literal replacement and post-Read T mutation cannot alter retained operands.
+Exact data traffic permits only the producer's T write at model clock 6;
+no memory operand read or destination read/write is allowed. Per-clock state
+predicates retain the publication boundary and status preservation through
+IDLE/replay. Zero-gap producer behavior is a model contract, not a guaranteed
+silicon schedule. Adjacent accumulator producer timing, repeat and interrupt
+composition remain unvalidated. The 258,048-execution legacy machinery is gone.
 
 Dual-memory ADD/SUB (`a000..a3ff`, SPRU172C syntax 6) uses the same retained
 address/read machinery as dual MPY, but does not load T. Both operands are

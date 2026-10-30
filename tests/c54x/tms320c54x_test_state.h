@@ -389,16 +389,6 @@ private:
 	static u16 nibble_input(unsigned variant);
 	void start_original_nibble(unsigned variant = 0);
 	void start_software_intr(unsigned variant = 0);
-	struct immediate_multiply_fixture
-	{
-		bool producer, source, destination;
-		unsigned start, read_cycle, checkpoint;
-		u16 t, literal, st0, st1, pmst, result_st0;
-		u64 a, b, result;
-		u32 base;
-	};
-	static immediate_multiply_fixture immediate_multiply_case(unsigned variant, bool mac = false);
-	void start_pipeline_immediate_multiply(unsigned variant = 0);
 	struct multiply_mapped_fixture
 	{
 		bool producer_b, consumer_b;
