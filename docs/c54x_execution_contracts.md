@@ -1952,6 +1952,18 @@ instead of expanding to 96 cases. IMR changes are explicit latch conformance;
 these are not physical interrupt timing measurements. The old profile and
 phase-specific IRQ hook are removed.
 
+### Unsigned IMR load
+
+`unsigned_imr_load` covers 64 form/value/SXM/accumulator cases. Direct,
+absolute and indirect IMR reads retain the mapped word without sign extension;
+the MVDK composition publishes a zero AR2 pointer before adjacent LDU address
+capture. Exact RAM/pointer/IMR transactions, later pointer/mask changes,
+retained/poisoned extension words and unchanged status are checked through
+IDLE/replay. Pages and three checkpoint positions are distributed instead of
+producing 384 executions. These are model capture/publication contracts;
+active interrupt composition is not qualified. The old LDU setup/result phase
+and profile are removed; the remaining status-write owner has its own name.
+
 ### Active repeat context and stack bypass
 
 The original wrapper uses `POPD *AR7` at logical `03:1f02`, with AR7

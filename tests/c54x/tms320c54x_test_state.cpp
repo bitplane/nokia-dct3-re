@@ -69,7 +69,6 @@ void tms320c54x_test_state::machine_reset()
 		{ {"move-rpt-owner"}, [](self &test) { test.start_move_repeat_owner(); } },
 		{ {"block-xc"}, [](self &test) { test.start_block_xc(); } },
 		{ {"ldu-periph"}, [](self &test) { test.start_ldu_peripheral(); } },
-		{ {"ldu-imr"}, [](self &test) { test.start_ldu_imr(); } },
 		{ {"mvmd-status-irq"}, [](self &test) { test.start_mvmd_status_irq(); } },
 		{ {"mpy-delay", "mac-delay", "maca-delay"}, [](self &test) { test.start_delay_multiply(); } },
 		{ {"mpyr-delay"}, [](self &test) { test.start_delay_multiply(); } },
