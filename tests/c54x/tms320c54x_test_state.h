@@ -95,18 +95,6 @@ private:
 	static memory_repeat_fixture memory_repeat_case(unsigned variant);
 	static std::array<u64, 2> repeat_subc_result(memory_repeat_fixture const &f, unsigned iterations);
 	void start_pipeline_memory_repeat(unsigned variant = 0);
-	struct repeat_load_fixture
-	{
-		unsigned selector, flags, pattern, count, setup, irq, checkpoint, first, outer;
-		bool asm_form, block, arithmetic;
-		int shift;
-		u32 base, body;
-		u16 word, st0, st1, address;
-	};
-	repeat_load_fixture repeat_load_case(unsigned v);
-	static std::array<u64, 3> repeat_load_initial(repeat_load_fixture const &f);
-	static std::array<u64, 3> repeat_load_step(repeat_load_fixture const &f, std::array<u64, 3> state);
-	void start_repeat_load(unsigned variant = 0);
 	struct rptbd_shift_store_fixture
 	{
 		unsigned count, form, kind, flags, irq, checkpoint;

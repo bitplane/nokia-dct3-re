@@ -27,6 +27,8 @@ public:
 #ifdef C54X_SECTION_COUNT_RETIREMENTS
 		m_cpu->instruction_observer_cb().set([this](offs_t pc,u16 opcode) {
 			auto const &expected=*m_cases.at(m_fixture->count()).retired_instruction;
+			if (pc==expected.address && expected.first_cycle && m_cpu->pipeline_cycles()!=expected.first_cycle+m_retired_count)
+				throw emu_fatalerror("Repeated instruction does not retire at its expected one-clock cadence");
 			if (pc==expected.address && (opcode!=expected.opcode || ++m_retired_count>expected.count))
 				throw emu_fatalerror("Repeated instruction retirement identity/count mismatch");
 		});
@@ -110,6 +112,9 @@ protected:
 #ifdef C54X_SECTION_COUNT_RETIREMENTS
 				if (i) check_retirements(i-1);
 				m_retired_count=0;
+				auto const &states=m_cases.at(i).retired_accumulator_states;
+				if (!states.empty() && states.size()!=m_cases.at(i).retired_instruction->count+1)
+					throw emu_fatalerror("Retirement state sequence must include initial state and every body result");
 #endif
 #ifdef C54X_SECTION_MCBSP_CONTROL
 				m_mcbsp->reset();
@@ -172,6 +177,25 @@ private:
 			throw emu_fatalerror("Repeated instruction count case=%u actual=%u expected=%u",index,m_retired_count,
 				m_cases.at(index).retired_instruction->count);
 	}
+	void check_retirement_state(unsigned index) {
+		auto const &body=*m_cases.at(index).retired_instruction;
+		if (body.first_cycle) {
+			unsigned const remaining=m_cpu->pipeline_cycles()<body.first_cycle-1 ? 0 : m_retired_count ? body.count-m_retired_count : body.count-1;
+			if (m_cpu->state_int(tms320c54x_device::STATE_RC)!=remaining)
+				throw emu_fatalerror("Repeated instruction RC does not match its retired-body count");
+		}
+		auto const &states=m_cases.at(index).retired_accumulator_states;
+		if (states.empty()) return;
+		if (m_retired_count>=states.size()) throw emu_fatalerror("Retirement state outside expected sequence");
+		auto const &expected=states[m_retired_count];
+		static constexpr int registers[]{tms320c54x_device::STATE_A,tms320c54x_device::STATE_B,tms320c54x_device::STATE_ST0};
+		for (unsigned i=0;i<3;++i) {
+			u64 const actual=m_cpu->state_int(registers[i]);
+			if (actual!=expected[i])
+				throw emu_fatalerror("Retirement state case=%u body=%u field=%u actual=%llx expected=%llx",index,m_retired_count,i,
+					(unsigned long long)actual,(unsigned long long)expected[i]);
+		}
+	}
 #endif
 	void program(address_map &map) {
 		map(0, 0x3ffff).ram();
@@ -209,6 +233,9 @@ private:
 	TIMER_CALLBACK_MEMBER(tick)
 	{
 		bool const complete = m_fixture->step();
+#ifdef C54X_SECTION_COUNT_RETIREMENTS
+		check_retirement_state(complete ? m_cases.size()-1 : m_fixture->count());
+#endif
 #ifdef C54X_SECTION_XF
 		if (m_xf != bool(BIT(m_cpu->state_int(tms320c54x_device::STATE_ST1),13)))
 			throw emu_fatalerror("Section XF output mismatch");

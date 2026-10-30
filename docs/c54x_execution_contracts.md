@@ -4329,6 +4329,36 @@ Category-I shift/bit-test consumers require a separating instruction;
 other consumers have zero latency. This gate establishes publication, not
 those consumer compositions, IRQ/delay interaction or physical bus phases.
 
+## Repeated accumulator loads
+
+`repeated_accumulator_load` owns 8,192 numeric cases/restores over all four
+source/destination selectors, shifts -16..15, eight guard/sign patterns,
+SXM/OVM and opcode/ASM shift sources. Counts0/1/7/255 and pages/checkpoints
+are distributed instead of crossed with every numeric input; full
+count-by-value correlations are not claimed.
+
+`repeated_accumulator_counts` owns 4,608 cases/restores over all six count
+sources (short/long immediate, DP/SP, absolute RAM/AR), four counts, selectors,
+SXM/OVM, two numeric boundaries, opcode/ASM and none/IRQ/NMI. One of shifts
+-16/-1/15 is assigned to each tuple. The retired composition range contained
+two identical 82,944-tuple cycles; the replacement removes that duplicate,
+page/checkpoint copies and the full count-source/shift cross-product.
+
+`repeated_accumulator_block` retains all512 inner/outer arithmetic tuples:
+outer counts0/2, inner counts0/1/7/255, four selectors, shifts -1/15,
+SXM/OVM and two patterns. Pages/checkpoints are distributed. The discarded
+block-setup prefetch has a deliberately different opcode; it must never
+retire. Every outer iteration fetches one fresh inner body and executes one
+continuation, proven by body counts and AR4 progression.
+
+All sections seed CPU/count state explicitly, poison captured body/count
+storage, and compare A/B/ST0 after every retirement and between retirements
+against a once-built independent bit-position/saturation sequence. Non-block
+cases retain exact one-clock retirement and RC cadence. The saved scalar
+retirement count also gates IRQ/NMI acknowledgement; RTN frame writes/reads
+balance after arithmetic completes. A stale per-iteration expectation fails
+immediately. These are model ownership/cadence contracts, not measured timing.
+
 ## Repeated arithmetic accumulator shifts
 
 Single-repeat SFTA reuses the ordinary instruction's arithmetic on each
@@ -4338,9 +4368,10 @@ new overflow for a zero shift (SPRU172C 4-155). The existing left-carry
 formula/zero-shift policy remains explicit: the manual's left-shift example
 and formula disagree, so these tests do not establish silicon behavior.
 
-`rpt-sfta` passes 16,384 cases plus save/load replay: all four source/destination
-selections, shifts -16 through 15, eight signed/guard-bit patterns, both SXM
-and OVM values, and short repeat counts 0, 1, 7 and 255. The independent
+`repeated_arithmetic_shift` owns 4,096 cases plus save/load replay: all four
+source/destination selections, shifts -16 through15, eight signed/guard-bit
+patterns and SXM/OVM. Counts0/1/7/255 and pages/checkpoints are distributed
+instead of crossing every numeric input with all counts. The independent
 expectation checks every arithmetic publication, carry and sticky overflow,
 one accepted body fetch despite opcode poisoning, and one fresh continuation.
 Both initial carry values and program pages are represented, but not a full

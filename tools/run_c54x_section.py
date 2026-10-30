@@ -403,6 +403,10 @@ def main():
     counts['repeated_write_a'] = 4800
     counts['repeated_write_a16'] = 4800
     counts['memory_count_repeat'] = 1730
+    counts['repeated_accumulator_load'] = 8192
+    counts['repeated_accumulator_counts'] = 4608
+    counts['repeated_accumulator_block'] = 512
+    counts['repeated_arithmetic_shift'] = 4096
     counts['shifted_unowned'] = 20480
     counts['shifted_bsp'] = 5120
     counts['accumulator_call_frames'] = 216
