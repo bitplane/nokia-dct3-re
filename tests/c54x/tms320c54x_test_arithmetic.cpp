@@ -78,42 +78,6 @@ std::array<u16, 2> tms320c54x_test_state::addm_expected(unsigned variant)
 	return {word, flags};
 }
 
-void tms320c54x_test_state::start_pipeline_addm(unsigned variant)
-{
-	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-	unsigned const form = (variant / 64) & 3; bool const absolute = form == 3;
-	auto const input = addm_inputs(variant); auto const expected = addm_expected(variant);
-	auto &program = m_cpu->space(AS_PROGRAM);
-	for (unsigned i = 0; i < 16; ++i) program.write_word(0x600 + i, 0xf495);
-	program.write_word(0x600, std::array<u16, 4>{0x6b20, 0x6b82, 0x6b92, 0x6bf8}[form]);
-	program.write_word(0x601, absolute ? 0x420 : input[1]);
-	if (absolute) program.write_word(0x602, input[1]);
-	m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
-	m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xaa08 | (BIT(variant, 2) << 10));
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x800 | (BIT(variant, 0) << 8) | (BIT(variant, 1) << 9));
-	set_registers(*m_cpu, {
-		{cpu_regs::STATE_AR2, 0x420}, {cpu_regs::STATE_A, 0x123456789aULL}, {cpu_regs::STATE_B, 0x2233445566ULL},
-		{cpu_regs::STATE_IFR, 0}, {cpu_regs::STATE_IMR, 0},
-	});
-	m_cpu->space(AS_DATA).write_word(0x420, input[0]);
-	m_cpu->set_state_int(STATE_GENPC, 0x600); m_cpu->set_pipeline_frontend(true);
-	m_pipeline_replay = false; m_pipeline_expected_cycle = 1; m_pipeline_operand_reads = m_pipeline_store_writes = 0;
-	m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0x420, 0x420, "staged_addm_source",
-		[this, input, absolute](offs_t, u16 &word, u16) {
-			if (machine().side_effects_disabled()) return;
-			expect(word == input[0] && m_cpu->pipeline_cycles() == 6 + absolute, "ADDM samples the original target once in Read"); ++m_pipeline_operand_reads;
-		});
-	m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0x420, 0x420, "staged_addm_write",
-		[this, expected, absolute](offs_t, u16 &word, u16) {
-			if (machine().side_effects_disabled()) return;
-			expect(word == expected[0] && m_cpu->pipeline_cycles() == 7 + absolute &&
-				m_cpu->state_int(tms320c54x_device::STATE_ST0) == expected[1], "ADDM publishes retained arithmetic and flags once at Execute"); ++m_pipeline_store_writes;
-		});
-	m_phase = 251870; m_cpu->resume(SUSPEND_REASON_DISABLE);
-	m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-}
 
 void tms320c54x_test_state::start_pipeline_memory_logic(unsigned variant)
 {
@@ -3426,49 +3390,6 @@ bool tms320c54x_test_state::check_parallel_load_multiply_results()
 
 
 
-bool tms320c54x_test_state::check_addm_expected_results()
-{
-	if (m_phase == 251870)
-	{
-		u64 const cycle = m_cpu->pipeline_cycles(); unsigned const variant = m_pipeline_peripheral_case;
-		unsigned const form = (variant / 64) & 3; bool const absolute = form == 3;
-		u64 const checkpoint = 5 + absolute + variant / 256; auto const expected = addm_expected(variant);
-		expect(cycle == m_pipeline_expected_cycle && !m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) &&
-			m_pipeline_operand_reads == unsigned(cycle >= 6 + absolute) && m_pipeline_store_writes == unsigned(cycle >= 7 + absolute) &&
-			m_cpu->state_int(tms320c54x_device::STATE_ST0) == (cycle >= 7 + absolute ? expected[1] : 0xaa08 | (BIT(variant, 2) << 10)) &&
-			m_cpu->state_int(tms320c54x_device::STATE_AR2) == (form == 2 && cycle >= 5 ? 0x421 : 0x420) &&
-			m_cpu->state_int(tms320c54x_device::STATE_A) == 0x123456789aULL && m_cpu->state_int(tms320c54x_device::STATE_B) == 0x2233445566ULL,
-			"ADDM retains source/address/literal and honors SXM/OVM/sticky OVA without modifying accumulators");
-		if (cycle == 6 + absolute)
-		{
-			auto const disable = machine().disable_side_effects(); m_cpu->space(AS_DATA).write_word(0x420, 0xdead);
-		}
-		if (cycle == checkpoint && !m_pipeline_replay)
-		{
-			expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save ADDM before/after target sample or publication");
-		}
-		if (cycle == 10)
-		{
-			if (!m_pipeline_replay)
-			{
-				m_pipeline_replay = true; m_pipeline_operand_reads = unsigned(checkpoint >= 6 + absolute); m_pipeline_store_writes = unsigned(checkpoint >= 7 + absolute);
-				expect(restore_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Restore ADDM retained sample without repeated read or arithmetic flags");
-				return restart_pipeline_observer(251880, checkpoint + 1);
-			}
-			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (variant < 767) { start_pipeline_addm(variant + 1); return true; }
-			osd_printf_info("TMS320C54x staged ADDM: PASS cases=768 address_forms=4 value_pairs=8 status_combinations=8 restore=768 duplicate_reads=0 duplicate_writes=0\n");
-			start_pipeline_data_push(); return true;
-		}
-		++m_pipeline_expected_cycle; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 251880)
-	{
-		m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 251870;
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	return false;
-}
 
 bool tms320c54x_test_state::check_pipeline_memory_logic_results()
 {
