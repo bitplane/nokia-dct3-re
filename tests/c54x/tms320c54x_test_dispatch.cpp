@@ -106,7 +106,6 @@ TIMER_CALLBACK_MEMBER(tms320c54x_test_state::check_results)
 	if (check_nibble_input_results()) return;
 	if (check_software_intr_results()) return;
 	if (check_block_branch_edge_results()) return;
-	if (check_circular_load_results()) return;
 	if (check_delay_dld_results()) return;
 	if (check_asm_mapped_results()) return;
 	if (check_t_store_results()) return;

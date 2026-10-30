@@ -6,13 +6,14 @@ inline std::vector<clocked_register_case> section_cases()
 {
 	std::vector<clocked_register_case> cases;
 	constexpr u64 values[]{0x123456789aULL,0xff80000001ULL,0x7fffffffULL,0xff7fffffffULL};
-	for (unsigned kind = 0; kind < 4; ++kind)
-	for (unsigned mode = 0; mode < (kind < 2 ? 4U : 2U); ++mode)
+	// Circular store, ASM store, indexed store, immediate store, circular/indexed LD.
+	for (unsigned kind = 0; kind < 6; ++kind)
+	for (unsigned mode = 0; mode < (kind < 2 || kind == 4 ? 4U : 2U); ++mode)
 	for (unsigned reg = 0; reg < 8; ++reg) for (unsigned cmpt = 0; cmpt < 2; ++cmpt)
-	for (unsigned scenario = 0; scenario < 8; ++scenario) for (unsigned selector = 0; selector < 4; ++selector) {
-		bool const circular = kind < 2, asm_shift = kind == 1, immediate = kind == 3, b = selector & 1;
+	for (unsigned scenario = 0; scenario < 8; ++scenario) for (unsigned selector = 0; selector < (kind >= 4 ? 2U : 4U); ++selector) {
+		bool const load = kind >= 4, circular = kind < 2 || kind == 4, asm_shift = kind == 1, immediate = kind == 3, b = selector & 1;
 		unsigned const selected = cmpt && !reg ? 4 : reg, seed = kind + mode + reg + cmpt + scenario + selector;
-		unsigned const flags = seed % 4, read = immediate ? 6 : 5;
+		unsigned const flags = seed % 4, read = immediate ? 6 : 5, address_tick = load ? 4 : read;
 		u16 const bk = selected == 0 && scenario % 4 ? 0x2000 : std::array<u16,4>{0,1,7,16}[scenario % 4];
 		std::array<u16,8> pointers;
 		for (unsigned ar = 0; ar < 8; ++ar) pointers[ar] = 0x1000 + ar * 0x100;
@@ -32,7 +33,7 @@ inline std::vector<clocked_register_case> section_cases()
 		}
 		int const shift = asm_shift ? std::array<int,4>{-16,-1,0,15}[scenario % 4] : 0;
 		unsigned const raw = shift & 31;
-		u16 const st1 = 0xa00 | (flags & 1 ? 0x100 : 0) | (cmpt ? 0x20 : 0) | raw;
+		u16 const st1 = (load ? 0x800 | (flags & 2 ? 0x200 : 0) : 0xa00) | (flags & 1 ? 0x100 : 0) | (cmpt ? 0x20 : 0) | raw;
 		u16 const st0 = !excluded && cmpt && reg ? 0x608 | (reg << 13) : 0x8608;
 		u64 const value = values[seed % 4];
 		u64 shifted = value;
@@ -48,44 +49,53 @@ inline std::vector<clocked_register_case> section_cases()
 				stored = u32(std::clamp(number,s64(-2147483648LL),s64(2147483647LL)));
 			} else stored = u32(std::min(shifted,u64(0xffffffff)));
 		}
-		u16 const word = immediate ? std::array<u16,4>{0,1,0x8000,0xffff}[selector] : u16(stored >> (selector & 2 ? 16 : 0));
-		u16 const opcode = (immediate ? 0x7600 : (asm_shift ? 0x8400 : 0x8000) | (selector << 8)) |
+		u16 const word = load ? std::array<u16,4>{0,1,0x8000,0xffff}[(scenario + selector) % 4] :
+			immediate ? std::array<u16,4>{0,1,0x8000,0xffff}[selector] : u16(stored >> (selector & 2 ? 16 : 0));
+		u64 const loaded = u64(flags & 1 ? s64(s16(word)) : s64(word)) & 0xffffffffffULL;
+		u16 const opcode = (immediate ? 0x7600 : (load ? 0x1000 : asm_shift ? 0x8400 : 0x8000) | (selector << 8)) |
 			(circular ? 0xc0 | (mode << 3) | reg : (mode ? 0xb0 : 0xa8) | reg);
 		u32 const base = seed & 1 ? 0x20000 : 0;
-		auto initial = initial_case("indexed-store-capture", {opcode,u16(immediate ? word : 0xf4e1),0xf4e1});
+		auto initial = initial_case(load ? "indexed-load-capture" : "indexed-store-capture", {opcode,u16(immediate ? word : 0xf4e1),0xf4e1});
 		for (auto &entry : initial.program) entry.address += base;
 		initial.initial.insert(initial.initial.end(), {{STATE_GENPC,base + 0x600},{r::STATE_ST0,0x8608},{r::STATE_ST1,st1},
 			{r::STATE_PMST,flags >> 1},{r::STATE_BK,bk},{r::STATE_T,0x5aa5},
-			{r::STATE_A,b ? 0x33445566 : value ^ 0xffffffffffULL},{r::STATE_B,b ? value ^ 0xffffffffffULL : 0x33445566}});
+			{r::STATE_A,load ? 0x123456789aULL : b ? 0x33445566 : value ^ 0xffffffffffULL},
+			{r::STATE_B,load ? 0xfedcba9876ULL : b ? value ^ 0xffffffffffULL : 0x33445566}});
+		if (load && !excluded) initial.data = {{address,word}};
 		for (unsigned ar = 0; ar < 8; ++ar) initial.initial.push_back({r::STATE_AR0 + ar,0x3300 + ar});
-		clocked_register_case c{{{0,std::move(initial)}},read - 1 + seed % 3,12};
+		clocked_register_case c{{{0,std::move(initial)}},address_tick - 1 + seed % 3,12};
 		c.require_idle = !excluded; c.clear_pipeline_before_restore = asm_shift;
 		for (unsigned tick = 1; tick <= 12; ++tick) {
 			u64 const live = !excluded && tick > read ? value : value ^ 0xffffffffffULL;
-			auto state = observation("read-address-execute-data", {{r::STATE_A,b ? 0x33445566 : live},
-				{r::STATE_B,b ? live : 0x33445566},{r::STATE_T,0x5aa5},{r::STATE_PMST,flags >> 1},
-				{r::STATE_ST0,tick >= read ? unsigned(st0) : 0x8608U},
+			auto state = observation("address-capture-and-execute-data", {
+				{r::STATE_A,load ? !excluded && !b && tick >= 6 ? loaded : 0x123456789aULL : b ? 0x33445566 : live},
+				{r::STATE_B,load ? !excluded && b && tick >= 6 ? loaded : 0xfedcba9876ULL : b ? live : 0x33445566},
+				{r::STATE_T,0x5aa5},{r::STATE_PMST,flags >> 1},
+				{r::STATE_ST0,tick >= address_tick ? unsigned(st0) : 0x8608U},
 				{r::STATE_ST1,asm_shift && !excluded && tick > read ? unsigned(st1 ^ 31) : unsigned(st1)},
-				{r::STATE_BK,asm_shift && tick > 3 ? 0x1234U : unsigned(bk)}});
-			state.expected.pop_back(); state.expected.push_back({r::STATE_ILLEGAL,excluded && tick >= read ? 1U : 0U});
-			for (unsigned ar = 0; ar < 8; ++ar) state.expected.push_back({int(r::STATE_AR0 + ar),tick < read ? 0x3300U + ar :
-				!excluded && tick > read ? 0x2200U + ar : !excluded && ar == selected ? unsigned(next) : unsigned(pointers[ar])});
+				{r::STATE_BK,(asm_shift || (load && circular)) && tick > 3 ? 0x1234U : unsigned(bk)}});
+			state.expected.pop_back(); state.expected.push_back({r::STATE_ILLEGAL,excluded && tick >= address_tick ? 1U : 0U});
+			for (unsigned ar = 0; ar < 8; ++ar) state.expected.push_back({int(r::STATE_AR0 + ar),tick < address_tick ? 0x3300U + ar :
+				!excluded && tick > address_tick ? 0x2200U + ar : !excluded && ar == selected ? unsigned(next) : unsigned(pointers[ar])});
 			c.states.push_back({tick,std::move(state)});
 		}
 		c.states.back().observation.expected.push_back({r::STATE_IDLE,excluded ? 0U : 1U});
 		if (asm_shift) c.actions.push_back({3,{{r::STATE_BK,0x1234}}});
 		if (immediate) c.actions.push_back({4,{},false,{{base + 0x601,0xdead}}});
-		clocked_register_action address_action{read - 1,{}};
+		clocked_register_action address_action{address_tick - 1,{}};
+		if (load && circular) address_action.values.push_back({r::STATE_BK,0x1234});
 		for (unsigned ar = 0; ar < 8; ++ar) address_action.values.push_back({r::STATE_AR0 + ar,pointers[ar]});
 		c.actions.push_back(std::move(address_action));
 		if (!excluded) {
-			clocked_register_action data_action{read,{{int(b ? r::STATE_B : r::STATE_A),value}}};
+			clocked_register_action data_action{address_tick,{}};
+			if (!load) data_action.values.push_back({int(b ? r::STATE_B : r::STATE_A),value});
 			for (unsigned ar = 0; ar < 8; ++ar) data_action.values.push_back({r::STATE_AR0 + ar,0x2200 + ar});
 			if (asm_shift) data_action.values.push_back({r::STATE_ST1,u64(st1 ^ 31)});
 			c.actions.push_back(std::move(data_action));
+			if (load) c.actions.push_back({5,{},false,{},{},{{address,u16(word ^ 0xffff)}}});
 		}
 		c.data_events = std::vector<clocked_data_event>{};
-		if (!excluded) c.data_events->push_back({true,address,word,read + 1});
+		if (!excluded) c.data_events->push_back({!load,address,word,load ? 5U : read + 1});
 		c.program_events = {{false,base + 0x600,opcode,0,false}};
 		if (immediate) c.program_events.push_back({false,base + 0x601,word,0,false});
 		cases.push_back(std::move(c));

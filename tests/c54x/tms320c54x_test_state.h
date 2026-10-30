@@ -850,10 +850,7 @@ private:
 		u8 mode;
 		std::array<u16, 8> initial;
 	};
-	static indexed_store_fixture indexed_store_case(unsigned v, bool immediate = false);
-	static indexed_store_fixture indexed_load_case(unsigned v);
 	static indexed_store_fixture circular_load_case(unsigned v);
-	void start_indexed_load(unsigned variant = 0);
 	struct indexed_mar_fixture
 	{
 		unsigned ar, selected, snapshot;
@@ -1629,7 +1626,6 @@ private:
 	bool check_nibble_input_results();
 	bool check_software_intr_results();
 	bool check_block_branch_edge_results();
-	bool check_circular_load_results();
 	bool check_delay_dld_results();
 	bool check_asm_mapped_results();
 	bool check_t_store_results();

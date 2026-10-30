@@ -174,7 +174,6 @@ void tms320c54x_test_state::machine_reset()
 		{ {"st-dagen"}, [](self &test) { test.start_constant_dagen(); } },
 		{ {"shift-delay"}, [](self &test) { test.start_delay_load(); } },
 		{ {"shift-alu-delay"}, [](self &test) { test.start_delay_load(); } },
-		{ {"ld-ar0-index", "ld-circular"}, [](self &test) { test.start_indexed_load(); } },
 		{ {"rptbd-shift-st"}, [](self &test) { test.start_rptbd_shift_store(); } },
 		{ {"rpt-smem"}, [](self &test) { test.start_basic_repeat(); } },
 		{ {"rpt-ld"}, [](self &test) { test.start_repeat_load(); } },

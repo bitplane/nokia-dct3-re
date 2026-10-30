@@ -2025,40 +2025,8 @@ void tms320c54x_test_state::start_delay_load(unsigned variant)
 }
 
 
-tms320c54x_test_state::indexed_store_fixture tms320c54x_test_state::indexed_store_case(unsigned v, bool immediate)
-{
-	indexed_store_fixture f{};
-	f.ar = v % 8; f.add = (v / 8) % 2; f.compatibility = (v / 16) % 2; f.selector = (v / 32) % 4;
-	f.selected = f.compatibility && !f.ar ? 4 : f.ar;
-	for (unsigned i = 0; i < 8; ++i) f.initial[i] = 0x1000 + i * 0x100;
-	f.initial[0] = std::array<u16, 8>{0, 1, 0x20, 0xffff, 0x8000, 0x7fff, 0x1234, 0xfffe}[(v / 128) % 8];
-	f.address = f.initial[f.selected]; f.excluded = f.address < 0x60;
-	f.final_ar = f.add ? f.address + f.initial[0] : f.address - f.initial[0];
-	f.value = std::array<u64, 4>{0x123456789aULL, 0xff80000001ULL, 0x7fffffff, 0xff7fffffffULL}[(v / 1024) % 4];
-	unsigned const flags = (v / 4096) % 4;
-	f.pmst = flags & 1; f.st1 = 0xa00 | (flags & 2 ? 0x100 : 0) | (f.compatibility ? 0x20 : 0);
-	u32 stored = u32(f.value);
-	if (f.pmst)
-	{
-		if (!(flags & 2)) stored = f.value > 0xffffffffULL ? 0xffffffffU : u32(f.value);
-		else { s64 const value = BIT(f.value, 39) ? s64(f.value) - (s64(1) << 40) : s64(f.value); stored = u32(std::clamp(value, s64(-2147483648LL), s64(2147483647LL))); }
-	}
-	f.word = f.selector & 2 ? stored >> 16 : stored;
-	if (immediate) f.word = std::array<u16, 4>{0, 1, 0x8000, 0xffff}[f.selector];
-	f.st0 = !f.excluded && f.compatibility && f.ar ? 0x608 | (f.ar << 13) : 0x8608;
-	f.base = (v / 16384) % 2 ? 0x20000 : 0; f.snapshot = v / 32768;
-	return f;
-}
 
 
-tms320c54x_test_state::indexed_store_fixture tms320c54x_test_state::indexed_load_case(unsigned v)
-{
-	auto f = indexed_store_case(v);
-	f.st1 = (f.st1 & ~0x200) | (f.selector & 2 ? 0x200 : 0);
-	f.word = std::array<u16, 4>{0, 1, 0x8000, 0xffff}[(v / 1024) % 4];
-	f.value = u64(f.st1 & 0x100 ? s64(s16(f.word)) : s64(f.word)) & 0xffffffffffULL;
-	return f;
-}
 
 tms320c54x_test_state::indexed_store_fixture tms320c54x_test_state::circular_load_case(unsigned v)
 {
@@ -2099,26 +2067,6 @@ tms320c54x_test_state::indexed_store_fixture tms320c54x_test_state::circular_loa
 
 
 
-void tms320c54x_test_state::start_indexed_load(unsigned variant)
-{
-	bool const circular = profile_is("ld-circular");
-	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant; auto const f = circular ? circular_load_case(variant) : indexed_load_case(variant);
-	auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
-	for (unsigned i = 0; i < 16; ++i) program.write_word(f.base + 0x600 + i, 0xf495);
-	program.write_word(f.base + 0x600, 0x1000 | ((f.selector & 1) << 8) | (circular ? f.mode : (f.add ? 0xb0 : 0xa8) | f.ar)); program.write_word(f.base + 0x601, 0xf4e1);
-	if (!f.excluded) data.write_word(f.address, f.word);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_PMST, f.pmst); m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10); m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x8608); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, f.st1); m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x123456789aULL); m_cpu->set_state_int(tms320c54x_device::STATE_B, 0xfedcba9876ULL); m_cpu->set_state_int(tms320c54x_device::STATE_T, 0x5aa5);
-	if (circular) m_cpu->set_state_int(tms320c54x_device::STATE_BK, f.bk);
-	for (unsigned i = 0; i < 8; ++i) m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + i, 0x3300 + i);
-	m_cpu->set_input_line(0, CLEAR_LINE); m_cpu->set_input_line(INPUT_LINE_NMI, CLEAR_LINE); m_pipeline_operand_reads = m_pipeline_extensions_reads = 0;
-	m_pipeline_operand_tap = data.install_read_tap(0, 0xffff, "indexed_load_read", [this, f](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return; expect(!f.excluded && at == f.address && word == f.word && !m_pipeline_operand_reads && m_cpu->pipeline_cycles() == 5, "AR0-indexed LD reads one retained old-address RAM word"); ++m_pipeline_operand_reads; });
-	m_pipeline_write_tap = data.install_write_tap(0, 0xffff, "indexed_load_no_write", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) expect(false, "AR0-indexed LD has no data writes"); });
-	m_pipeline_fetch_tap = program.install_read_tap(f.base + 0x600, f.base + 0x600, "indexed_load_fetch", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) { expect(!m_pipeline_extensions_reads, "Indexed LD fetches its single word once"); ++m_pipeline_extensions_reads; } });
-	m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 255300;
-	m_cpu->set_state_int(STATE_GENPC, f.base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-}
 
 tms320c54x_test_state::indexed_mar_fixture tms320c54x_test_state::indexed_mar_case(unsigned v, bool reverse)
 {
@@ -6718,47 +6666,6 @@ bool tms320c54x_test_state::check_move_brc_results()
 	return false;
 }
 
-bool tms320c54x_test_state::check_circular_load_results()
-{
-	if (m_phase == 255300)
-	{
-		bool const circular = profile_is("ld-circular");
-		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick; auto const f = circular ? circular_load_case(variant) : indexed_load_case(variant);
-		expect(bool(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL)) == (f.excluded && tick >= 4), "Indexed LD admits RAM and excludes low mapped sources before effects");
-		expect(m_cpu->state_int(tms320c54x_device::STATE_A) == (!f.excluded && tick >= 6 && !(f.selector & 1) ? f.value : 0x123456789aULL) && m_cpu->state_int(tms320c54x_device::STATE_B) == (!f.excluded && tick >= 6 && (f.selector & 1) ? f.value : 0xfedcba9876ULL) && m_cpu->state_int(tms320c54x_device::STATE_ST0) == (!f.excluded && tick >= 4 ? f.st0 : 0x8608) && m_cpu->state_int(tms320c54x_device::STATE_ST1) == f.st1 && m_cpu->state_int(tms320c54x_device::STATE_PMST) == f.pmst && m_cpu->state_int(tms320c54x_device::STATE_T) == 0x5aa5, "Indexed LD publishes a signed or unsigned word only in Execute without SST OVM or status side effects");
-		for (unsigned i = 0; i < 8; ++i)
-		{
-			u16 const expected = tick <= 3 ? 0x3300 + i : f.excluded ? f.initial[i] : tick == 4 ? i == f.selected ? f.final_ar : f.initial[i] : 0x2200 + i;
-			u16 const actual = m_cpu->state_int(tms320c54x_device::STATE_AR0 + i);
-			if (actual != expected) osd_printf_info("Indexed LD pointer failure: variant=%u tick=%u ar=%u actual=%04x expected=%04x mode=%02x bk=%04x\n", variant, tick, i, actual, expected, f.mode, f.bk);
-			expect(actual == expected, "Indexed LD samples AR and AR0 in Access and modifies its pointer exactly once");
-		}
-		if (tick == 3) for (unsigned i = 0; i < 8; ++i) m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + i, f.initial[i]);
-		if (circular) expect(m_cpu->state_int(tms320c54x_device::STATE_BK) == (tick <= 3 ? f.bk : f.bk ^ 0xffff), "Circular LD uses Decode-owned BK despite a later live size change");
-		if (circular && tick == 3) m_cpu->set_state_int(tms320c54x_device::STATE_BK, f.bk ^ 0xffff);
-		if (!f.excluded && tick == 4) for (unsigned i = 0; i < 8; ++i) m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + i, 0x2200 + i);
-		if (!f.excluded && tick == 5) { auto const disabled = machine().disable_side_effects(); m_cpu->space(AS_DATA).write_word(f.address, f.word ^ 0xffff); }
-		capture_pipeline_at(3 + f.snapshot, {&m_pipeline_operand_reads, &m_pipeline_extensions_reads},
-			"Save indexed LD around Decode address capture and RAM Read");
-		if (tick == 12)
-		{
-			expect(bool(m_cpu->state_int(tms320c54x_device::STATE_IDLE)) == !f.excluded && m_pipeline_operand_reads == unsigned(!f.excluded) && m_pipeline_extensions_reads == 1, "Indexed LD completes one source transaction or rejects without one");
-			if (replay_pipeline_at(255310, 3 + f.snapshot,
-				"Restore indexed LD without resampling pointers RAM or applying its index twice")) return true;
-			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (variant < (circular ? 393215 : 98303)) { start_indexed_load(variant + 1); return true; }
-			if (circular)
-			{
-				osd_printf_info("TMS320C54x circular LD: PASS cases=393216 restore=393216 ram_cases=368640 excluded_cases=24576 modifiers=4 registers=8 compatibility_states=2 destinations=2 bk=0,1,7,16,8192 index_patterns=4 valid_nonzero_steps=1 memory_values=4 sxm_ovm_sst=8 pages=2 snapshots=3 bk_sample=Decode address_index_sample=Access source_sample=Read result_publish=Execute self_index=1 pointer_updates=once data_writes=0 interrupt_delay_repeat_composition=unvalidated physical_phase_claim=0\n");
-				throw emu_fatalerror(0, "TMS320C54x isolated circular LD complete");
-			}
-			osd_printf_info("TMS320C54x AR0 indexed LD: PASS cases=98304 restore=98304 ram_cases=96000 excluded_cases=2304 registers=8 index_directions=2 compatibility_states=2 destinations=2 index_values=8 memory_values=4 sxm_sst_ovm=8 pages=2 snapshots=3 address_index_sample=Access source_sample=Read result_publish=Execute self_index=1 pointer_updates=once data_writes=0 interrupt_delay_composition=unvalidated physical_phase_claim=0\n"); throw emu_fatalerror(0, "TMS320C54x isolated AR0 indexed LD complete");
-		}
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 255310) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 255300; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true; }
-	return false;
-}
 
 bool tms320c54x_test_state::check_t_store_results()
 {
