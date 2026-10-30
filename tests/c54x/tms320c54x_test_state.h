@@ -12,7 +12,6 @@
 #include "tms320c54x_test_selection.h"
 #include "tms320c54x_test_support.h"
 #include "tms320c54x_test_register_sequence.h"
-#include "tms320c54x_test_repeat_state.h"
 #include "tms320c54x_test_snapshot.h"
 #include "tms320c54x_test_pipeline_state.h"
 #include <sstream>
@@ -408,9 +407,6 @@ private:
 	static u16 product_input_t(register_product_fixture const &f);
 	static std::array<u64,3> register_product_reference(register_product_fixture const &f);
 	void start_register_product(unsigned variant = 0);
-	using fcala_delay_fixture = c54x_test::fcala_delay_fixture;
-	static fcala_delay_fixture fcala_delay_case(unsigned v);
-	void start_fcala_delay(unsigned variant = 0);
 	void start_repeat_mvdp(unsigned variant = 0);
 	void start_repeat_mvdp_irq(unsigned variant = 0);
 	struct delayed_conditional_call_fixture
@@ -654,7 +650,6 @@ private:
 	bool check_rptbd_t_load_results();
 	bool check_memory_repeat_results();
 	bool check_asm_store_results_part2();
-	bool check_fcala_delay_results();
 	bool check_delayed_call_replay_results();
 	bool check_mvdk_producer_results();
 	bool check_mvdk_mapped_results();
@@ -721,7 +716,6 @@ private:
 	bool m_pipeline_replay = false;
 	instruction_observer_fixture m_instruction_observer;
 	rptbd_observations m_rptbd_counts, m_rptbd_saved_counts;
-	replay_fixture<fcala_delay_observations> m_fcala_delay;
 	u16 m_rptbd_return = 0, m_rptbd_saved_return = 0;
 	unsigned m_pipeline_drained_fetches = 0;
 	memory_passthrough_handler m_pipeline_fetch_tap;

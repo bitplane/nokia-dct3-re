@@ -4,7 +4,8 @@
 #ifndef MAME_NOKIA_TMS320C54X_TEST_PIPELINE_STATE_H
 #define MAME_NOKIA_TMS320C54X_TEST_PIPELINE_STATE_H
 
-#include "tms320c54x_test_repeat_state.h"
+#include "emumem.h"
+#include <sstream>
 #include <utility>
 #include <vector>
 

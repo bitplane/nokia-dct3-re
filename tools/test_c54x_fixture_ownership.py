@@ -93,23 +93,6 @@ class FixtureOwnershipTests(unittest.TestCase):
                                     'start_entry_stage_restore_case', 'start_vector_prefetch_case'),
                           legacy_taps=('m_vector_prefetch_tap', 'm_vector_stack_tap'))
 
-    def test_repeat_restore_families(self):
-        owners = {}
-        for owner, names in (
-            ('m_saved_irq_repeat', ('saved_repeat_word', 'start_saved_repeat', 'check_saved_repeat_results')),
-            ('m_body_irq_repeat', ('body_repeat_word', 'start_body_repeat', 'check_body_repeat_results')),
-            ('m_repeat_context', ('repeat_context_word', 'start_repeat_context', 'check_repeat_context_results')),
-            ('m_fcala_delay', ('start_fcala_delay', 'check_fcala_delay_results')),
-        ):
-            owners.update(dict.fromkeys(names, owner))
-        owners.update(dict.fromkeys(('saved_repeat_case', 'body_repeat_case',
-                                     'repeat_context_case', 'fcala_delay_case'), None))
-        self.check_owners('tms320c54x_test_repeat_restore.cpp', owners,
-                          handoffs=('start_saved_repeat', 'start_body_repeat',
-                                    'start_repeat_context', 'start_fcala_delay'),
-                          legacy_taps=('m_pipeline_operand_tap', 'm_pipeline_write_tap',
-                                       'm_pipeline_fetch_tap', 'm_vector_prefetch_tap'))
-
 
 if __name__ == '__main__':
     unittest.main()

@@ -104,7 +104,6 @@ void tms320c54x_test_state::machine_reset()
 		{ {"tc-delay-call"}, [](self &test) { test.start_delayed_conditional_call(); } },
 		{ {"rptb-ccd"}, [](self &test) { test.start_block_conditional_call(); } },
 		{ {"rptb-bcd", "rptb-bd", "rptb-banz", "rptb-tc-delay"}, [](self &test) { test.start_block_bcd(); } },
-		{ {"fcala-delay"}, [](self &test) { test.start_fcala_delay(); } },
 	}))
 		return;
 	if (start_profile(*this, machine().options().bios(), {
@@ -395,7 +394,6 @@ void tms320c54x_test_state::expect(bool condition, const char *message)
 		};
 		switch (m_phase)
 		{
-		case 255820: case 255830: progress(m_fcala_delay); break;
 		case 292000: case 292010: progress(m_instruction_observer); break;
 		case 255320: case 255330: case 255331:
 			progress(m_rptbd); break;

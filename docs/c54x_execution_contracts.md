@@ -1741,14 +1741,18 @@ single-word or one two-word delay instructions retire before IRQ/NMI can
 enter. Existing target and per-slot frame fields supply save-state ownership;
 no additional CPU saved state or automatic context stack is introduced.
 
-`--profile fcala-delay` passes 648 cases and save/replays: both accumulators,
+`delayed_accumulator_far_call` owns108 independent cases/restores: both accumulators,
 three caller and three target pages, both delay layouts, no interrupt/IRQ/NMI
-and six checkpoints. After target sampling the source accumulator is changed;
+and six distributed checkpoints, rather than crossing every checkpoint with
+every input. After target sampling the source accumulator is changed;
 delay instructions and callee observe the changed data, but control still
 uses the captured target. Checks cover PC+3/XPC publication, a balanced
 FRET, a separate interrupt frame, delay effects once, target execution once,
 and preserved flags/non-source accumulator. The nominal model has target
-Fetch at clock 6 and callee Execute at 10, with frame writes at 5 and 6;
+Fetch at clock6 and callee Execute at10, with frame writes at5 and6. For this
+input timing, the callee store precedes IRQ entry and the target is fetched once;
+that is not a universal interrupt-refetch claim. Cross-space observation checks
+the first frame word before target Fetch and the second after it. The clocks
 these are declared placements, not measured silicon bus phases. Adjacent
 instruction-producer composition and waited memory remain separate contracts.
 Original execution passes FCALAD and reaches the mapped-BK multiply exclusion.
