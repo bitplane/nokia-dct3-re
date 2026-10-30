@@ -289,44 +289,6 @@ int main() {
             output = subprocess.check_output([str(program)], text=True).strip()
         self.assertEqual(output, 'cases=262144 digest=020c459448602a55')
 
-    @unittest.skipUnless(shutil.which('c++'), 'C++ compiler required')
-    def test_memory_immediate_schedule_preserves_inputs_and_balances_checkpoints(self):
-        source = r'''
-#include <array>
-#include <cassert>
-#include <cstdio>
-#include "tests/c54x/tms320c54x_test_memory_immediate_schedule.h"
-#include "tests/c54x/tms320c54x_test_support.h"
-int main() {
-    using namespace c54x_test;
-    ordered_case_digest coverage;
-    for (unsigned mac = 0; mac != 2; ++mac) {
-        unsigned const inputs = mac ? 65536 : 24576, forms = mac ? 8 : 12;
-        unsigned const offset = mac ? 24576 : 0, old_offset = mac ? 98304 : 0;
-        std::array<unsigned, 65536> seen{};
-        std::array<std::array<unsigned, 4>, 1024> groups{};
-        for (unsigned i = 0; i < inputs; ++i) {
-            unsigned const key = memory_immediate_key(offset + i);
-            assert(key >= old_offset && key < old_offset + inputs * 4);
-            unsigned const input = (key - old_offset) % inputs;
-            unsigned const checkpoint = (key - old_offset) / inputs;
-            assert(input == i && !seen[input]++);
-            unsigned const group = input % forms + forms * (input / (forms * 64));
-            ++groups[group][checkpoint];
-            coverage.add(key);
-        }
-        for (unsigned i = 0; i < inputs; ++i) assert(seen[i] == 1);
-        for (unsigned group = 0; group < inputs / 64; ++group)
-            for (unsigned checkpoint = 0; checkpoint < 4; ++checkpoint)
-                assert(groups[group][checkpoint] == 16);
-    }
-    assert(coverage.count == 90112);
-    std::printf("cases=%u digest=%016llx\n", coverage.count, (unsigned long long)coverage.value);
-}
-'''
-        with compiled_cpp(source) as program:
-            output = subprocess.check_output([str(program)], text=True).strip()
-        self.assertEqual(output, 'cases=90112 digest=085b13667b310f01')
 
     @unittest.skipUnless(shutil.which('c++'), 'C++ compiler required')
     def test_snapshot_service_preserves_stream_and_timer_order(self):

@@ -663,26 +663,6 @@ void tms320c54x_test_state::start_rptbd_shift_store(unsigned variant)
 	m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 }
 
-void tms320c54x_test_state::start_memory_immediate_multiply(unsigned variant)
-{
-	if (!variant) { m_memory_immediate_coverage = {}; m_memory_immediate_restores = 0; }
-	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-	auto const f = memory_immediate_case(variant); auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
-	for (unsigned i = 0; i < 16; ++i) program.write_word(f.base + 0x600 + i, 0xf495);
-	program.write_word(f.base + 0x600, (f.accumulate ? 0x6400 : 0x6200) | (f.bsrc ? 0x200 : 0) | (f.bdst ? 0x100 : 0) | f.mode);
-	program.write_word(f.base + 0x601, f.words == 3 ? f.extension : f.literal); if (f.words == 3) program.write_word(f.base + 0x602, f.literal); program.write_word(f.base + 0x600 + f.words, 0xf4e1);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_PMST, f.pmst); m_cpu->set_state_int(tms320c54x_device::STATE_ST0, f.st0); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, f.st1);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
-	m_cpu->set_state_int(tms320c54x_device::STATE_A, f.a); m_cpu->set_state_int(tms320c54x_device::STATE_B, f.b); m_cpu->set_state_int(tms320c54x_device::STATE_T, 0x9abc);
-	m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1400); m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x140c); m_cpu->set_state_int(tms320c54x_device::STATE_BK, f.form == 7 ? 13 : 0); data.write_word(f.address, f.word);
-	m_pipeline_operand_reads = m_pipeline_extensions_reads = 0;
-	m_pipeline_operand_tap = data.install_read_tap(0, 0xffff, "memory_immediate_read", [this, f](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return; expect(at == f.address && word == f.word && !m_pipeline_operand_reads && m_cpu->pipeline_cycles() == f.read, "Memory/immediate MPY retains one Read-owned source"); ++m_pipeline_operand_reads; });
-	m_pipeline_write_tap = data.install_write_tap(0, 0xffff, "memory_immediate_no_write", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) expect(false, "Memory/immediate MPY has no data-memory write"); });
-	m_pipeline_fetch_tap = program.install_read_tap(f.base + 0x601, f.base + 0x600 + f.words - 1, "memory_immediate_literals", [this, f](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return; unsigned const i = m_pipeline_extensions_reads++; expect(i < f.words - 1 && at == f.base + 0x601 + i && word == (f.words == 3 && !i ? f.extension : f.literal), "MPY retains address then literal exactly once"); });
-	m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 254340;
-	m_cpu->set_state_int(STATE_GENPC, f.base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-}
 
 tms320c54x_test_state::delay_multiply_fixture tms320c54x_test_state::delay_multiply_case(unsigned variant, bool mac, bool rounded)
 {
@@ -2004,36 +1984,6 @@ bool tms320c54x_test_state::check_poly_results()
 
 
 
-bool tms320c54x_test_state::check_memory_immediate_results()
-{
-	if (m_phase == 254340)
-	{
-		auto const f = memory_immediate_case(m_pipeline_peripheral_case); unsigned const tick = ++m_idle_fixture_tick;
-		expect(m_cpu->state_int(tms320c54x_device::STATE_PMST) == f.pmst, "Memory multiply preserves the configured SMUL mode");
-		u64 a = f.a; if (tick > f.read && f.address == 8) a = (a & ~0xffffULL) | 0xdead; if (tick > f.read && f.address == 9) a = (a & ~0xffff0000ULL) | 0xdead0000ULL;
-		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) && m_cpu->state_int(tms320c54x_device::STATE_A) == (tick > f.read && !f.bdst ? f.result : a) && m_cpu->state_int(tms320c54x_device::STATE_B) == (tick > f.read && f.bdst ? f.result : f.b) && m_cpu->state_int(tms320c54x_device::STATE_ST0) == (tick > f.read ? f.result_st0 : f.st0) && m_cpu->state_int(tms320c54x_device::STATE_ST1) == f.st1, "Memory/immediate MPY publishes signed product and sticky overflow only at Execute");
-		expect(m_cpu->state_int(tms320c54x_device::STATE_T) == (tick > f.read ? 0xdead : tick == f.read || f.address == 0x0e ? f.word : 0x9abc), "MPY publishes the memory word to T during Read, independent of later T mutation");
-		if (tick == 3 || (f.words == 3 && tick == 4)) { auto const disable = machine().disable_side_effects(); m_cpu->space(AS_PROGRAM).write_word(f.base + 0x5fe + tick, 0xf495); }
-		if (tick == f.access) { expect(m_cpu->state_int(tms320c54x_device::STATE_AR2) == std::array<unsigned, 13>{0x140c, 0x140c, 0x140d, 0x140b, 0x140d, 0x140c, 0x140f, 0x1402, 0x140c, 0x140c, 0x140c, 0x140c, 0x140c}[f.form], "MPY applies its selected pointer modifier once"); m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x3333); }
-		if (tick == f.read) { auto const disable = machine().disable_side_effects(); m_cpu->space(AS_DATA).write_word(f.address, 0xdead); m_cpu->set_state_int(tms320c54x_device::STATE_T, 0xdead); }
-		if (tick == f.checkpoint && !m_pipeline_replay) { m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_extensions_reads}; expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save MPY across literal, address, Read and Execute ownership"); }
-		if (tick == 14)
-		{
-			expect(m_pipeline_operand_reads == 1 && m_pipeline_extensions_reads == f.words - 1 && m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x3333 && m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_cpu->state_int(STATE_GENPC) == f.base + 0x601 + f.words, "MPY keeps captured address/source/literals and resumes after the complete instruction");
-			if (!m_pipeline_replay) { m_pipeline_replay = true; m_idle_fixture_tick = f.checkpoint; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[1]; expect(restore_snapshot(machine(), *m_check_timer, m_saved_pipeline) == STATERR_NONE, "Replay memory/immediate MPY without duplicate operand accesses"); ++m_memory_immediate_restores; m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 254350; m_check_timer->enable(true); return true; }
-			unsigned const variant = m_pipeline_peripheral_case; m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			m_memory_immediate_coverage.add(memory_immediate_key(variant));
-			expect(m_memory_immediate_restores == m_memory_immediate_coverage.count, "Every selected memory/immediate input completed a real restore");
-			if (variant + 1 == memory_immediate_mpy_inputs) osd_printf_info("TMS320C54x memory immediate MPY: PASS cases=%u restore=%u forms=12 values=8 literals=8 flags=8 accumulators=2 pages=2 snapshots=4 checkpoint_policy=balanced source_reads=1 data_writes=0 t_publication=Read address_literal_retained=1 repeat_acceptance=0 irq_acceptance=0 silicon_phase_claim=0\n", m_memory_immediate_coverage.count, m_memory_immediate_restores);
-			if (variant + 1 < memory_immediate_inputs) { start_memory_immediate_multiply(variant + 1); return true; }
-			osd_printf_info("TMS320C54x memory immediate MAC: PASS cases=%u restore=%u ram_forms=8 values=8 literals=8 flags=16 selectors=4 pages=2 snapshots=4 checkpoint_policy=balanced source_reads=1 data_writes=0 t_publication=Read repeat_acceptance=0 irq_acceptance=0 silicon_phase_claim=0 coverage_cases=%u coverage_fnv64=%016llx\n", m_memory_immediate_coverage.count - memory_immediate_mpy_inputs, m_memory_immediate_restores - memory_immediate_mpy_inputs, m_memory_immediate_coverage.count, (unsigned long long)m_memory_immediate_coverage.value);
-			throw emu_fatalerror(3, "TMS320C54x isolated memory immediate MPY complete");
-		}
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 254350) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 254340; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true; }
-	return false;
-}
 
 bool tms320c54x_test_state::check_bd_long_accumulator_results()
 {

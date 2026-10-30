@@ -244,18 +244,6 @@ private:
 	};
 	static rptbd_shift_store_fixture rptbd_shift_store_case(unsigned v);
 	void start_rptbd_shift_store(unsigned variant = 0);
-	struct memory_immediate_fixture
-	{
-		unsigned form, read, access, checkpoint, words;
-		u16 mode, address, word, literal, extension, st0, st1, result_st0;
-		u32 base;
-		u64 a, b, result;
-		bool bdst;
-		bool bsrc = false, accumulate = false;
-		u16 pmst = 0;
-	};
-	static memory_immediate_fixture memory_immediate_case(unsigned variant);
-	void start_memory_immediate_multiply(unsigned variant = 0);
 	static unsigned block_branch_count(unsigned variant);
 	static u16 block_branch_source(unsigned variant, unsigned i);
 	struct block_exit_fixture
@@ -994,7 +982,6 @@ private:
 	bool check_poly_results();
 	bool check_popd_mapped_results();
 	bool check_mvdd_peripheral_results();
-	bool check_memory_immediate_results();
 	bool check_block_branch_count_results();
 	bool check_bd_long_accumulator_results();
 	bool check_block_xc_results();
@@ -1060,8 +1047,6 @@ private:
 	ordered_case_digest m_register_bank_coverage;
 	unsigned m_register_bank_replays = 0;
 	ordered_case_digest m_shifted_coverage;
-	ordered_case_digest m_memory_immediate_coverage;
-	unsigned m_memory_immediate_restores = 0;
 	unsigned m_shifted_replays = 0;
 	unsigned m_pipeline_branch_case = 0;
 	unsigned m_pipeline_stm_case = 0;

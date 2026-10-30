@@ -372,17 +372,18 @@ root and C54x CPU. Sharing the third group removes 10,285 C++ bytes/289 lines,
 including its new literal bank and routing. Every instruction case is retained;
 no runtime, all-ISA or physical-timing claim follows.
 
-`mpy-mem-imm` retains all 24,576 MPY and 65,536 MAC inputs, with the original
-result references, address/literal poisoning, Read-owned T publication and
-operand-identity observer checks. Its 64 value/literal pairs in every fixed
-operation/form/flags/selector/page group now distribute evenly across all four
-checkpoints, instead of replaying every pair four times. The ordered original
-case-key digest is `085b13667b310f01`; actual successful restores are counted.
-Admission controls are owned separately by `source-domain`, not this positive
-profile. Serial native capture time for the original balanced bundle dropped
-from about 156 to 40 seconds;
-this adds 2,517 C++ bytes/43 lines of scheduling and accounting rather than
-reducing source size. This isolated profile is not part of the default run.
+`memory_immediate_product` owns 7,424 independent cases/replays. Numerical
+coverage uses one RAM form: all 64 word/literal pairs, FRCT/OVM for MPY,
+and FRCT/OVM/SXM/SMUL plus all source/destination selectors for MAC.
+Address-routing coverage crosses all 12 MPY and 8 RAM MAC forms with four
+representative pairs, all prior flags/selectors and distributed pages/four
+checkpoints. SXM remains a routing check for MPY, not a duplicate numerical
+dimension. Exact source Read, Read-owned T publication, Execute-only result
+and sticky overflow, pointer capture, source/T/literal poisoning and retained
+operand observer identity are preserved. The legacy 90,112-input profile,
+factory, checker, accounting and enumeration-only schedule test are removed.
+Admission controls remain separately owned; repeat/interrupt compositions and
+physical phases are not newly qualified. Focused build/run: 6.235/2.846 seconds.
 
 These are SPRU172C MPY syntax 3 and MAC syntax 4 (MAC page 4-82). The retained
 memory word and signed immediate produce the result at Execute; MAC adds the
@@ -741,7 +742,7 @@ plus 147,456 numeric). Variable-shift ADD/SUB retains 81,920 distinct stimuli,
 with balanced checkpoints rather than three copies of each input.
 CMPM and BITF each retain 17,408 distinct inputs over 17 forms, with balanced
 checkpoints rather than three replays of every input. `rpt-subc-st` retains 38,400 SUBC and 38,400 repeated-store cases;
-memory/immediate MPY retains 24,576 inputs with balanced checkpoints. Paired reads retain 6,144 DSUB,
+Memory/immediate product coverage is now the 7,424-case section above. Paired reads retain 6,144 DSUB,
 12,288 DADD and 6,144 DRSUB cases over eight forms, omitting raw form 4.
 These totals describe selected fixture domains, not every legal operand.
 Circular-input constraints have their own
@@ -3390,8 +3391,8 @@ balanced replay schedule and smaller save graph. Explicit ownership and
 formatting add 1,824 C++ bytes/114 lines; this is not a source-size reduction.
 This isolated profile is not part of the default run.
 
-The `mpy-mem-imm` RAM/MPY controls retain their distinct inputs with balanced
-checkpoints, as described above. The implementation-limit controls for the
+The `memory_immediate_product` RAM/MPY section separates numerical and routing
+coverage as described above. The implementation-limit controls for the
 remaining eighty low/control/peripheral addresses and eight write-only MOD=3
 forms run separately in `source-domain`: all 1,408 cases/replays, selectors,
 pages and original checkpoint choices are retained. Producer, control, repeat and

@@ -14,6 +14,22 @@ public:
 	{
 		TMS320C54X(c, m_cpu, 13'000'000);
 		m_cpu->set_extended_program(true);
+#ifdef C54X_SECTION_OBSERVE_MEMORY_MULTIPLY
+		m_cpu->instruction_observer_cb().set([this](offs_t pc,u16 opcode) {
+			auto const &input=m_cases.at(m_fixture->count());
+			auto const &words=input.states.front().observation.program;
+			auto const &operand=input.data_events->front();
+			u16 source=0xdead,word=0xbeef,literal=0xcafe;
+			bool const retained=m_cpu->observe_execute_memory_multiply(pc,opcode,source,word,literal);
+			if (pc==words.front().address) {
+				if (!retained || source!=operand.address || word!=operand.value || literal!=input.retained_program_reads.back().value)
+					throw emu_fatalerror("Section multiply observer loses captured operand/literal");
+			} else if (retained || source!=0xdead || word!=0xbeef || literal!=0xcafe)
+				throw emu_fatalerror("Section non-multiply observer changes outputs");
+			if (m_cpu->observe_execute_memory_multiply(pc^1,opcode,source,word,literal))
+				throw emu_fatalerror("Section multiply observer accepts wrong PC");
+		});
+#endif
 #ifdef C54X_SECTION_C5416_BUS
 		m_cpu->set_c5416_bus_profile(true);
 #endif

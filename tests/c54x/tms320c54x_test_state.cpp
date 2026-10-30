@@ -73,7 +73,6 @@ void tms320c54x_test_state::machine_reset()
 		{ {"instr-observer"}, [](self &test) { test.start_instruction_observer(); } },
 		{ {"rptb-br-edges"}, [](self &test) { test.start_block_branch_edge(); } },
 		{ {"rptb-branch"}, [](self &test) { test.start_block_branch(); } },
-		{ {"mpy-mem-imm"}, [](self &test) { test.start_memory_immediate_multiply(); } },
 	}))
 		return;
 	if (start_profile(*this, machine().options().bios(), {
@@ -498,20 +497,6 @@ void tms320c54x_test_state::test(machine_config &config)
 		m_cpu->instruction_observer_cb().set([this](offs_t address, u16 opcode) { m_instruction_observer.observed.emplace_back(address, opcode); });
 	else if (!strcmp(config.options().bios(), "rpt-smem") || !strcmp(config.options().bios(), "rpt-ld") || !strcmp(config.options().bios(), "rpt-sfta") || !strcmp(config.options().bios(), "rpt-ld-block") || !strcmp(config.options().bios(), "rptb-call") || !strcmp(config.options().bios(), "rpt-mem-chain") || !strcmp(config.options().bios(), "bd-rpt") || !strcmp(config.options().bios(), "retd-rpt") || !strcmp(config.options().bios(), "calld-rpt") || !strcmp(config.options().bios(), "bcd-rpt"))
 		m_cpu->instruction_observer_cb().set([this](offs_t address, u16 opcode) { m_observed_instructions.emplace_back(address, opcode); });
-	if (!strcmp(config.options().bios(), "mpy-mem-imm"))
-		m_cpu->instruction_observer_cb().set([this](offs_t address, u16 opcode) {
-			u16 source = 0xdead, operand = 0xbeef, literal = 0xcafe;
-			bool const retained = m_cpu->observe_execute_memory_multiply(address, opcode, source, operand, literal);
-			auto const f = memory_immediate_case(m_pipeline_peripheral_case);
-			if (address == f.base + 0x600)
-				expect(retained && source == f.address && operand == f.word && literal == f.literal,
-					"Execute observer exposes the exact retained multiply operand without bus accesses");
-			else
-				expect(!retained && source == 0xdead && operand == 0xbeef && literal == 0xcafe,
-					"Non-multiply observation leaves diagnostic outputs untouched");
-			expect(!m_cpu->observe_execute_memory_multiply(address ^ 1, opcode, source, operand, literal),
-				"Retained multiply observation rejects a mismatched instruction address");
-		});
 	m_cpu->set_extended_program(true);
 	if (!strcmp(config.options().bios(), "std-swwsr") || !strcmp(config.options().bios(), "std-io") || !strcmp(config.options().bios(), "std-io-atomic")) m_cpu->set_standard_swwsr(true);
 	if (!strcmp(config.options().bios(), "bus-registers") || !strcmp(config.options().bios(), "bus-io") || !strcmp(config.options().bios(), "bus-io-atomic")) m_cpu->set_c5416_bus_profile(true);
