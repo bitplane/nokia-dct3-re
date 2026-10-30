@@ -92,7 +92,6 @@ void tms320c54x_test_state::machine_reset()
 	if (profile_is("load-variable")) { start_pipeline_offset_load(127872); return; }
 	if (start_profile(*this, machine().options().bios(), {
 		{ {"rpt-subc-st"}, [](self &test) { test.start_pipeline_memory_repeat(); } },
-		{ {"compare-delay"}, [](self &test) { test.start_delay_compare(); } },
 	}))
 		return;
 	if (profile_is("t-load-control")) { start_pipeline_memory_multiply(165888); return; }
@@ -539,7 +538,6 @@ void tms320c54x_test_state::test(machine_config &config)
 		if (m_phase == 254360) { unsigned const interrupt = m_pipeline_peripheral_case / 4096; expect(interrupt && line == (interrupt == 2 ? INPUT_LINE_NMI : 2) && !m_vector_acks, "In-block branch interrupt acknowledges its actual pending source once"); ++m_vector_acks; m_cpu->set_input_line(line, CLEAR_LINE); }
 		if (m_phase == 254200) { auto const &f = m_popd_fixture; expect(f.irq && line == (f.irq == 2 ? INPUT_LINE_NMI : 0) && !m_vector_acks && m_pipeline_store_writes == f.count + 1 && m_cpu->pipeline_cycles() > f.read_clock() + f.count + 1, "POPD acknowledges IRQ/NMI only after the last repeat iteration retires"); ++m_vector_acks; }
 		if (m_phase == 253550) { auto const f = bus_io_case(m_pipeline_peripheral_case); expect(f.interrupt && line == (f.interrupt == 2 ? INPUT_LINE_NMI : 0) && !m_vector_acks && bus_io_clock() > f.complete, "Interrupt acknowledgement cannot split the pending external transaction"); ++m_vector_acks; }
-		if (m_phase == 254980) { auto const f = delay_compare_case(m_pipeline_peripheral_case); expect(f.interrupt && line == (f.interrupt == 2 ? INPUT_LINE_NMI : 0) && !m_vector_acks && m_pipeline_operand_reads == (f.prefix ? 2U : 1U) && bool(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x1000) == f.final_tc && m_cpu->pipeline_cycles() > f.read, "IRQ NMI cannot enter before the complete delayed comparison publishes TC"); ++m_vector_acks; }
 		if (m_phase == 253530) { expect(line == 0 && !m_vector_acks, "Logical IRQ callback remains enabled with IACKOFF set"); ++m_vector_acks; }
 		if (m_phase == 253230)
 		{

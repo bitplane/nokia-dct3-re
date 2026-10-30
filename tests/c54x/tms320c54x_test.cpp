@@ -88,7 +88,6 @@ ROM_START(tms54test)
 	ROM_SYSTEM_BIOS(121, "mar-index", "Indexed MAR AR0 arithmetic and restoration")
 
 	ROM_SYSTEM_BIOS(122, "store-index", "AR0-indexed accumulator stores with retained Read addresses")
-	ROM_SYSTEM_BIOS(123, "compare-delay", "CMPM BITF delayed branch condition and interrupt ownership")
 	ROM_SYSTEM_BIOS(124, "asm-load", "Retained memory load to ASM without T publication")
 	ROM_SYSTEM_BIOS(125, "asm-consumer", "Zero-latency ASM load and adjacent register consumers")
 	ROM_SYSTEM_BIOS(126, "t-load-control", "Existing RAM mapped T loads and multiply pair control")

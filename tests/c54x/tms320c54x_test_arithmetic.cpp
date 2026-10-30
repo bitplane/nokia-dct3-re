@@ -807,47 +807,7 @@ tms320c54x_test_state::delay_load_fixture tms320c54x_test_state::delay_shift_alu
 
 
 
-tms320c54x_test_state::delay_compare_fixture tms320c54x_test_state::delay_compare_case(unsigned v)
-{
-	delay_compare_fixture f{};
-	f.kind = v % 3; f.bitfield = (v / 3) % 2; f.form = (v / 6) % 3;
-	unsigned const pair = (v / 18) % 16;
-	f.memory = std::array<u16, 4>{0, 1, 0x8000, 0xffff}[pair % 4];
-	f.literal = std::array<u16, 4>{0, 1, 0x8000, 0xf495}[pair / 4];
-	f.initial_tc = (v / 288) % 2; f.prefix = (v / 576) % 2 ? 2 : 0;
-	bool const branch_tc = f.prefix ? bool(f.memory & 1) : f.initial_tc;
-	f.taken = !f.kind || (f.kind == 1 ? branch_tc : !branch_tc);
-	f.final_tc = f.bitfield ? bool(f.memory & f.literal) : f.memory == f.literal;
-	f.interrupt = (v / 1152) % 3; f.base = (v / 3456) % 2 ? 0x20000 : 0;
-	f.read = (f.kind ? 9 : 8) + f.prefix; f.literal_clock = (f.kind ? 6 : 5) + f.prefix;
-	f.checkpoint = std::array<unsigned, 4>{f.read - 1, f.read, f.read + 1, f.read + 3}[v / 6912];
-	return f;
-}
 
-void tms320c54x_test_state::start_delay_compare(unsigned variant)
-{
-	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant; auto const f = delay_compare_case(variant);
-	auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
-	for (unsigned i = 0; i < 64; ++i) { program.write_word(f.base + 0x600 + i, 0xf495); program.write_word(f.base + 0x700 + i, 0xf495); program.write_word(f.base + i, 0xf495); }
-	if (f.prefix) { program.write_word(f.base + 0x600, 0x6102); program.write_word(f.base + 0x601, 1); }
-	program.write_word(f.base + 0x600 + f.prefix, f.kind == 0 ? 0xf273 : f.kind == 1 ? 0xfa30 : 0xfa20); program.write_word(f.base + 0x601 + f.prefix, 0x700);
-	program.write_word(f.base + 0x602 + f.prefix, (f.bitfield ? 0x6100 : 0x6000) | (f.form == 2 ? 0x92 : 2)); program.write_word(f.base + 0x603 + f.prefix, f.literal);
-	program.write_word(f.base + 0x604 + f.prefix, 0xe922); program.write_word(f.base + 0x605 + f.prefix, 0xf4e1); program.write_word(f.base + 0x700, 0xe911); program.write_word(f.base + 0x701, 0xf4e1);
-	program.write_word(f.base + 4, 0xf4eb); program.write_word(f.base + 0x40, 0xf4eb); data.write_word(0x1002, f.memory);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0); m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 1);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xae20 | (f.initial_tc ? 0x1000 : 0)); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x100 | (f.form == 1 ? 0x4000 : 0));
-	m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x123456789aULL); m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x55); m_cpu->set_state_int(tms320c54x_device::STATE_T, 0x5aa5);
-	m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000); m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x1002);
-	m_cpu->set_input_line(0, CLEAR_LINE); m_cpu->set_input_line(INPUT_LINE_NMI, CLEAR_LINE);
-	m_pipeline_operand_reads = m_pipeline_store_writes = m_pipeline_extensions_reads = m_vector_acks = 0;
-	m_pipeline_operand_tap = data.install_read_tap(0x1002, 0x1002, "delay_compare_read", [this, f](offs_t, u16 &word, u16) { if (machine().side_effects_disabled()) return; unsigned const clock = f.prefix && !m_pipeline_operand_reads ? 6 : f.read; if (m_cpu->pipeline_cycles() != clock) osd_printf_info("delay_compare_read: case=%u actual=%llu expected=%u reads=%u\n", m_pipeline_peripheral_case, (unsigned long long)m_cpu->pipeline_cycles(), clock, m_pipeline_operand_reads); expect(word == f.memory && m_pipeline_operand_reads < (f.prefix ? 2U : 1U) && m_cpu->pipeline_cycles() == clock, "Delay comparison reads its retained source once after any prefix producer"); ++m_pipeline_operand_reads; });
-	m_pipeline_write_tap = data.install_write_tap(0x1002, 0x1002, "delay_compare_no_write", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) { ++m_pipeline_store_writes; expect(false, "Delay CMPM BITF never writes the operand"); } });
-	m_pipeline_fetch_tap = program.install_read_tap(f.base + 0x600, f.base + 0x605 + f.prefix, "delay_compare_literals", [this, f](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return; if (f.prefix && at == f.base + 0x601) { expect(word == 1 && !m_pipeline_extensions_reads, "Prefix BITF owns its mask literal"); ++m_pipeline_extensions_reads; } else if (at == f.base + 0x601 + f.prefix) { expect(word == 0x700 && m_pipeline_extensions_reads == unsigned(bool(f.prefix)), "Delayed branch owns its target literal"); ++m_pipeline_extensions_reads; } else if (at == f.base + 0x603 + f.prefix) { expect(word == f.literal && m_pipeline_extensions_reads == 1 + unsigned(bool(f.prefix)) && m_cpu->pipeline_cycles() == f.literal_clock, "Two-word comparison owns its delay literal, including opcode-shaped values"); ++m_pipeline_extensions_reads; } });
-	m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 254980;
-	m_cpu->set_state_int(STATE_GENPC, f.base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-}
 
 tms320c54x_test_state::parallel_load_fixture tms320c54x_test_state::parallel_arithmetic_case(unsigned variant)
 {
@@ -2033,38 +1993,6 @@ bool tms320c54x_test_state::check_bd_long_accumulator_results()
 
 
 
-bool tms320c54x_test_state::check_delay_compare_results()
-{
-	if (m_phase == 254980)
-	{
-		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick; auto const f = delay_compare_case(variant);
-		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Complete short CMPM BITF is admitted in a BD BCD delay span");
-		if (tick == 5 + f.prefix && f.interrupt) m_cpu->set_input_line(f.interrupt == 2 ? INPUT_LINE_NMI : 0, ASSERT_LINE);
-		if (tick == f.literal_clock) { auto const disable = machine().disable_side_effects(); m_cpu->space(AS_PROGRAM).write_word(f.base + 0x603 + f.prefix, 0xdead); m_cpu->space(AS_PROGRAM).write_word(f.base + 0x601 + f.prefix, 0xbeef); }
-		if (tick == f.read - 1 && f.form == 2) { expect(m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x1003, "Delay comparison updates its pointer once in Access"); m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x2200); }
-		if (tick == f.read) { auto const disable = machine().disable_side_effects(); m_cpu->space(AS_DATA).write_word(0x1002, 0xdead); }
-		capture_pipeline_at(f.checkpoint, {&m_pipeline_operand_reads, &m_pipeline_extensions_reads, &m_vector_acks, &m_pipeline_store_writes},
-			"Save delayed comparison with settled IRQ and retained operand ownership");
-		if (tick == 64)
-		{
-			// A pending IRQ may wake the prefetched IDLE and return after it.
-			u64 const pc = m_cpu->state_int(STATE_GENPC);
-			bool const on_path = pc >= f.base + (f.taken ? 0x700 : 0x604 + f.prefix) && pc < f.base + (f.taken ? 0x740 : 0x640);
-			bool const state_ok = on_path && m_cpu->state_int(tms320c54x_device::STATE_B) == (f.taken ? 0x11 : 0x22) && m_cpu->state_int(tms320c54x_device::STATE_ST0) == (0xae20 | (f.final_tc ? 0x1000 : 0)) && m_cpu->state_int(tms320c54x_device::STATE_ST1) == (0x100 | (f.form == 1 ? 0x4000 : 0)) && m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x1000 && m_cpu->state_int(tms320c54x_device::STATE_A) == 0x123456789aULL && m_cpu->state_int(tms320c54x_device::STATE_T) == 0x5aa5 && m_cpu->state_int(tms320c54x_device::STATE_AR2) == (f.form == 2 ? 0x2200 : 0x1002);
-			if (!state_ok) osd_printf_info("delay_compare_state: case=%u replay=%u pc=%llx idle=%llu a=%llx b=%llx st0=%llx sp=%llx ar2=%llx t=%llx taken=%u tc=%u reads=%u literals=%u acks=%u\n", variant, unsigned(m_pipeline_replay), (unsigned long long)m_cpu->state_int(STATE_GENPC), (unsigned long long)m_cpu->state_int(tms320c54x_device::STATE_IDLE), (unsigned long long)m_cpu->state_int(tms320c54x_device::STATE_A), (unsigned long long)m_cpu->state_int(tms320c54x_device::STATE_B), (unsigned long long)m_cpu->state_int(tms320c54x_device::STATE_ST0), (unsigned long long)m_cpu->state_int(tms320c54x_device::STATE_SP), (unsigned long long)m_cpu->state_int(tms320c54x_device::STATE_AR2), (unsigned long long)m_cpu->state_int(tms320c54x_device::STATE_T), unsigned(f.taken), unsigned(f.final_tc), m_pipeline_operand_reads, m_pipeline_extensions_reads, m_vector_acks);
-			expect(state_ok, "Delay comparison publishes TC without changing the retained branch decision or duplicating pointer updates");
-			expect(m_pipeline_operand_reads == (f.prefix ? 2U : 1U) && m_pipeline_extensions_reads == 2 + unsigned(bool(f.prefix)) && !m_pipeline_store_writes && m_vector_acks == unsigned(bool(f.interrupt)), "Delay comparison retains literal and source across one deferred IRQ NMI entry");
-			if (replay_pipeline_at(254990, f.checkpoint,
-				"Restore delay comparison and deferred interrupt without repeated transactions")) return true;
-			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_input_line(0, CLEAR_LINE); m_cpu->set_input_line(INPUT_LINE_NMI, CLEAR_LINE); m_cpu->set_pipeline_frontend(false);
-			if (variant < 27647) { start_delay_compare(variant + 1); return true; }
-			osd_printf_info("TMS320C54x delayed CMPM BITF: PASS cases=27648 restore=27648 controls=BD,BCD_TC,BCD_NTC operations=2 forms=DP,SP,postincrement value_pairs=16 initial_tc=2 prefix=none,BITF sources=none,IRQ,NMI pages=2 snapshots=4 branch_decision=retained literal_reads=once operand_writes=0 interrupt_after_publication=1 physical_phase_claim=0\n"); throw emu_fatalerror(0, "TMS320C54x isolated delayed comparison complete");
-		}
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 254990) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 254980; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true; }
-	return false;
-}
 
 
 bool tms320c54x_test_state::check_mapped_alu_results()

@@ -462,15 +462,6 @@ private:
 	};
 	block_single_fixture block_single_case(unsigned v) const;
 	void start_block_single(unsigned variant = 0);
-	struct delay_compare_fixture
-	{
-		unsigned kind, form, interrupt, prefix, read, literal_clock, checkpoint;
-		bool bitfield, initial_tc, taken, final_tc;
-		u16 memory, literal;
-		u32 base;
-	};
-	static delay_compare_fixture delay_compare_case(unsigned v);
-	void start_delay_compare(unsigned variant = 0);
 	struct indexed_store_fixture
 	{
 		unsigned ar, selected, selector, snapshot;
@@ -988,7 +979,6 @@ private:
 	bool check_move_repeat_owner_results();
 	bool check_block_branch_edge_results();
 	bool check_delay_dld_results();
-	bool check_delay_compare_results();
 	bool check_mapped_parallel_load_results();
 	bool check_mapped_alu_results();
 	bool check_memory_copy_repeat_results();

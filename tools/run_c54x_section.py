@@ -326,6 +326,7 @@ def main():
     counts['atomic_waited_io_control'] = 12
     counts['memory_immediate_product'] = 7424
     counts['mapped_immediate_mac'] = 18432
+    counts['delayed_compare'] = 3456
     counts['accumulator_call_frames'] = 216
     parser.add_argument('section', choices=[*counts, 'all'])
     parser.add_argument('--jobs', type=int, default=8)

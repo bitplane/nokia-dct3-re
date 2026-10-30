@@ -58,7 +58,6 @@ TIMER_CALLBACK_MEMBER(tms320c54x_test_state::check_results)
 	if (check_move_repeat_owner_results()) return;
 	if (check_block_branch_edge_results()) return;
 	if (check_delay_dld_results()) return;
-	if (check_delay_compare_results()) return;
 	if (check_mapped_parallel_load_results()) return;
 	if (check_mapped_alu_results()) return;
 	if (check_memory_copy_repeat_results()) return;

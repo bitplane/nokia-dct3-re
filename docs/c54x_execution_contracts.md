@@ -2462,10 +2462,12 @@ Short two-word CMPM/BITF is admitted in a complete BD/BCD delay span. The
 owner is recovered from retained pipeline slots, not reread from program
 memory; calls and returns remain excluded. SPRU131G section 6.3.2 permits one
 two-word instruction after a delayed conditional branch and requires that its
-effects do not change the condition already tested. `compare-delay` passes
-27,648 cases/restores across BD/BCD TC/BCD NTC, CMPM/BITF, DP/SP/postincrement
+effects do not change the condition already tested. `delayed_compare` passes
+3,456 cases/restores across BD/BCD TC/BCD NTC, CMPM/BITF, DP/SP/postincrement
 RAM sources, 16 value pairs, both initial TC states, an optional instruction-
-driven BITF prefix, none/IRQ/NMI, two pages and four snapshots. The comparison
+driven BITF prefix and none/IRQ/NMI. Pages/four checkpoints are distributed,
+not multiplied into 27,648 executions. The legacy factory/setup/result/IRQ
+hook/profile are removed. The comparison
 may overwrite TC without retargeting the branch. Replaced literals, RAM and
 postincrement pointers cannot change retained inputs; IRQ/NMI acknowledgement
 follows TC publication. Interrupt return is checked by the selected continuation,
