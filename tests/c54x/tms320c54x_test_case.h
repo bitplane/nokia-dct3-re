@@ -111,7 +111,7 @@ struct clocked_register_case
 	std::optional<std::vector<clocked_line_sample>> bio_samples{};
 	bool observe_data_reads = true; // Write-only contracts can leave variable polling reads unconstrained.
 	std::vector<memory_word> synthetic_data_reads{}; // Test endpoints, not claims about peripheral register contents.
-	unsigned observation_subticks = 1; // Two samples per CPU clock avoid timer-edge observation ties.
+	unsigned observation_subticks = 1; // Half-clock samples avoid ties; sixteenths resolve fractional PLL deadlines.
 	bool forbid_program_writes = false;
 	bool reset_cpu_before_case = false; // Explicit cold-start contracts, not implicit predecessor cleanup.
 	std::vector<memory_word> volatile_data_reads{}; // Synthetic endpoints toggle after each side-effecting read.

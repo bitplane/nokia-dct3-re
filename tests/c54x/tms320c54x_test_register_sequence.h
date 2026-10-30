@@ -179,7 +179,8 @@ private:
 		m_observing_outputs = false;
 		m_cpu.suspend(SUSPEND_REASON_DISABLE, true); m_input = m_build(m_case);
 		if (m_input.reset_cpu_before_case) m_cpu.reset();
-		require(m_input.observation_subticks == 1 || m_input.observation_subticks == 2, "whole/half CPU clock observation cadence");
+		require(m_input.observation_subticks == 1 || m_input.observation_subticks == 2 || m_input.observation_subticks == 16,
+			"whole/half/sixteenth CPU clock observation cadence");
 		require(!m_input.states.empty() && m_input.states.front().tick == 0, "explicit initial observation");
 		for (unsigned i = 1; i < m_input.states.size(); ++i)
 			require(m_input.states[i - 1].tick < m_input.states[i].tick, "ordered observation clocks");

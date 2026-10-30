@@ -213,6 +213,16 @@ The completion input is a fixture route to DMAC0/BRINT2. These are internal DMA
 clock/phase and replay contracts; external waits, arbitration and handset PLL
 latencies are not established by them.
 
+`pll_transitions` isolates the CLKMD source/lock state machine with a fixed
+13MHz fixture reference and execution held. The x8 cold transition is sampled
+around 4086+7/16 reference clocks; x10 around 4086.35. Repeating a pending
+request cannot extend its deadline. PLL fields stay protected until exit
+actually completes; an opposite request cancels that exit without editing
+protected fields. Warm re-entry skips the lock count, but a multiplier change
+requires a new lock. A pending-lock checkpoint replays the complete sequence
+over later source/multiplier changes. Sixteenth-clock observations resolve
+the rational switch edge without asserting a CPU or peripheral clock-rate model.
+
 The independent `status_bitfield` section owns ST0/ST1 BITF sampling: 128
 register/pattern/mask/initial-TC/addressing combinations, with pages and three
 checkpoint positions distributed rather than multiplied into 768 executions.

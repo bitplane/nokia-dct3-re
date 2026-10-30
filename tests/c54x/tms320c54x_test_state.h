@@ -200,7 +200,6 @@ private:
 	void start_block_xc(unsigned variant = 0);
 	void start_move_repeat_owner(unsigned variant = 0);
 	void start_long_mapped_original(unsigned variant = 0);
-	void start_pll_transition_case();
 	void start_rate_dma(bool input_clock = false);
 	void start_clkmd_rate_case();
 	void start_idle3_pll_relock_case();
@@ -848,7 +847,7 @@ private:
 	popd_fixture m_popd_fixture = {};
 	u32 m_popd_write_mask = 0;
 	// Separate checkpoint lifetimes; host observations still rewind explicitly.
-	std::stringstream m_pll_saved, m_clock_rates_saved;
+	std::stringstream m_clock_rates_saved;
 };
 
 } // namespace c54x_test

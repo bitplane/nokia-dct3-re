@@ -29,6 +29,9 @@ public:
 	void test(machine_config &c)
 	{
 		TMS320C54X(c, m_cpu, 13'000'000);
+#ifdef C54X_SECTION_PLL_TRANSITIONS
+		m_cpu->set_pll_reference_clock(13'000'000);
+#endif
 		m_cpu->set_extended_program(true);
 #ifdef C54X_SECTION_COUNT_RETIREMENTS
 		m_cpu->instruction_observer_cb().set([this](offs_t pc,u16 opcode) {
