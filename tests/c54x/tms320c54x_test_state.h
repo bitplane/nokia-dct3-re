@@ -139,30 +139,6 @@ private:
 	static u16 repeated_writa_word(unsigned reg, unsigned index);
 	static u32 repeated_writa_destination(repeated_writa_fixture const &f, unsigned index);
 	void start_repeated_writa(unsigned variant = 0);
-	struct delay_bitt_fixture
-	{
-		unsigned control, form, slot, selector, snapshot;
-		bool upper, invert, initial_tc;
-		u32 base;
-		unsigned timing_kind() const { return control >= 6 ? 1 : control; }
-		unsigned read() const { return delay_multiply_fixture::operand_read(timing_kind(), slot); }
-		unsigned producer_read() const { return delay_multiply_fixture::operand_read(timing_kind(), 0); }
-		u16 t() const { return selector | (upper ? 0xa5f0 : 0); }
-		u16 final_t() const { return upper ? t() ^ 15 : t(); }
-		u16 value() const { u16 const mask = 1U << (15 - selector); return invert ? u16(~mask) : mask; }
-		u16 opcode() const { return 0x3400 | (form == 0 || form == 3 ? 0x60 : form == 1 ? 0x84 : 0x94); }
-		u16 final_sp() const { return 0x3000 + (control == 3 ? -1 : control == 4 ? -2 : control == 5 ? 1 : 0); }
-		u16 source() const { return form == 0 ? 0x1060 : form == 3 ? final_sp() + 0x60 : 0x5000; }
-		u16 status(unsigned tick) const { return 0xa820 | (tick > read() ? invert ? 0 : 0x1000 : initial_tc ? 0x1000 : 0); }
-		u16 st1() const { return 0xb00 | (form == 3 ? 0x4000 : 0); }
-		bool taken() const { return control == 2 ? false : control == 6 ? !initial_tc : control == 7 ? initial_tc : true; }
-		u32 target_base() const { return control == 4 ? base ^ 0x20000 : base; }
-		u32 selected() const { return taken() ? target_base() + 0x700 : base + 0x604; }
-		u16 delay_start() const { return control == 5 ? 0x601 : 0x602; }
-		u64 a() const { return control == 1 ? 0 : control == 2 ? 1 : 0xff12345678ULL; }
-	};
-	static delay_bitt_fixture delay_bitt_case(unsigned v);
-	void start_delay_bitt(unsigned variant = 0);
 	void start_ar_addm_load(unsigned variant = 0);
 	void start_instruction_observer(unsigned variant = 0);
 	void start_pipeline_peripheral_logic(unsigned variant = 0);
@@ -1585,7 +1561,6 @@ private:
 	};
 	// Return true only when the original callback would return; order is retained.
 	bool check_repeated_writa_results();
-	bool check_delay_bitt_results();
 	bool check_mapped_addm_results();
 	bool check_shifted_store_dld_results();
 	bool check_idle_nmi_result_results();
@@ -1906,7 +1881,6 @@ private:
 	unsigned m_phase = 0;
 	bool (tms320c54x_test_state::*m_result_owner)() = nullptr;
 	static constexpr unsigned native_store_phase = 1'000'000; // Outside legacy phase bands.
-	static constexpr unsigned delay_bitt_phase = 1'000'020;
 	static constexpr unsigned push_mvmm_phase = 1'000'060;
 	static constexpr unsigned mvdm_t_phase = 1'000'070;
 	std::bitset<65536> m_asserted_opcodes;

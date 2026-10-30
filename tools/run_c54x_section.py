@@ -110,6 +110,7 @@ def main():
     counts['delayed_signed_branch'] = 60
     counts['branch_arithmetic'] = 1536
     counts['bit_test_t'] = 320
+    counts['delayed_bit_test'] = 2048
     parser.add_argument('section', choices=[*counts, 'all'])
     parser.add_argument('--jobs', type=int, default=8)
     parser.add_argument('--negative-control', action='store_true', help='require failure of an intentionally wrong expectation')
