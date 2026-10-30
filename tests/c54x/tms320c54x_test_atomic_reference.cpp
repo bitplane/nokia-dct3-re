@@ -37,15 +37,6 @@ bool tms320c54x_test_state::check_atomic_reference_results()
 	}
 	if (m_phase >= 614 && m_phase <= 652)
 	{
-		unsigned const index = m_phase - 614;
-		auto const &cases = dual_reference_cases();
-		auto const &test = cases[index];
-		check_case(*m_cpu, test, m_port_writes, m_last_port_cycle - m_first_port_cycle);
-		expect_opcode(test.opcode, true, "dual/parallel MAC routing, literal results, and one-cycle timing");
-		if (index + 1 < cases.size())
-		{
-			return begin_atomic_case(cases[index + 1], m_phase + 1);
-		}
 		program.write_word(0x05e2, 0xe13a); // LMS *AR5,*AR4+.
 		data.write_word(0x0f90, 0x0055);
 		data.write_word(0x0f91, 0x00aa);

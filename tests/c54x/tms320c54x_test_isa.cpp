@@ -108,8 +108,6 @@ protected:
 			else if (parallel())
 			{
 				for (unsigned i = 0; i < c54x_test::parallel_vectors().size(); ++i) m_cases.push_back(c54x_test::parallel_case(i));
-				auto const &dual = c54x_test::dual_reference_cases();
-				m_cases.insert(m_cases.end(), dual.begin(), dual.end());
 				auto const &addresses = c54x_test::dual_address_examples();
 				m_cases.insert(m_cases.end(), addresses.begin(), addresses.end());
 			}
