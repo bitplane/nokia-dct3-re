@@ -12,81 +12,8 @@ bool tms320c54x_test_state::check_atomic_reference_results()
 {
 	[[maybe_unused]] auto &program = m_cpu->space(AS_PROGRAM);
 	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
-	if (m_phase >= 614 && m_phase <= 652)
-	{
-		program.write_word(0x05e2, 0xe13a); // LMS *AR5,*AR4+.
-		data.write_word(0x0f90, 0x0055);
-		data.write_word(0x0f91, 0x00aa);
-		m_port_writes = 0;
-		set_registers(*m_cpu, {
-			{cpu_regs::STATE_A, 0x77778888}, {cpu_regs::STATE_B, 0x100}, {cpu_regs::STATE_T, 0x4444},
-			{cpu_regs::STATE_ST0, 0},
-		});
-		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100); // SXM.
-		set_registers(*m_cpu, {
-			{cpu_regs::STATE_AR4, 0x0f91}, {cpu_regs::STATE_AR5, 0x0f90}, {cpu_regs::STATE_PC, 0x05e0},
-			{cpu_regs::STATE_IDLE, 0},
-		});
-		return next_atomic_phase(653);
-	}
-	if (m_phase == 653)
-	{
-		expect_opcode(0xe13a,
-			m_cpu->state_int(tms320c54x_device::STATE_A) == 0x77cd0888 &&
-			m_cpu->state_int(tms320c54x_device::STATE_B) == 0x3972 &&
-			m_cpu->state_int(tms320c54x_device::STATE_T) == 0x4444 &&
-			m_cpu->state_int(tms320c54x_device::STATE_AR4) == 0x0f92 &&
-			m_cpu->state_int(tms320c54x_device::STATE_AR5) == 0x0f90 &&
-			m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
-			"TI LMS example updates both accumulators without overwriting T in one cycle");
-		program.write_word(0x05e2, 0xa6ab); // MACSU *AR4+,*AR5+,A.
-		data.write_word(0x0f90, 0x8765);
-		data.write_word(0x0f91, 0x1234);
-		m_port_writes = 0;
-		set_registers(*m_cpu, {
-			{cpu_regs::STATE_A, 0x1000}, {cpu_regs::STATE_B, 0x2222}, {cpu_regs::STATE_T, 8}, {cpu_regs::STATE_ST0, 0},
-		});
-		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100); // SXM.
-		set_registers(*m_cpu, {
-			{cpu_regs::STATE_AR4, 0x0f90}, {cpu_regs::STATE_AR5, 0x0f91}, {cpu_regs::STATE_PC, 0x05e0},
-			{cpu_regs::STATE_IDLE, 0},
-		});
-		return next_atomic_phase(654);
-	}
-	if (m_phase == 654)
-	{
-		expect_opcode(0xa6ab,
-			m_cpu->state_int(tms320c54x_device::STATE_A) == 0x09a0aa84 &&
-			m_cpu->state_int(tms320c54x_device::STATE_B) == 0x2222 &&
-			m_cpu->state_int(tms320c54x_device::STATE_T) == 0x8765 &&
-			m_cpu->state_int(tms320c54x_device::STATE_AR4) == 0x0f91 &&
-			m_cpu->state_int(tms320c54x_device::STATE_AR5) == 0x0f92 &&
-			m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
-			"TI MACSU example uses unsigned X, signed Y, and one-cycle dual addressing");
-		program.write_word(0x05e2, 0xa7ab); // MACSU *AR4+,*AR5+,B.
-		data.write_word(0x0f90, 0x8765);
-		data.write_word(0x0f91, 0xfffe);
-		m_port_writes = 0;
-		set_registers(*m_cpu, {
-			{cpu_regs::STATE_A, 0x1234}, {cpu_regs::STATE_B, 0}, {cpu_regs::STATE_T, 0}, {cpu_regs::STATE_ST0, 0},
-		});
-		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0140); // SXM, FRCT.
-		set_registers(*m_cpu, {
-			{cpu_regs::STATE_AR4, 0x0f90}, {cpu_regs::STATE_AR5, 0x0f91}, {cpu_regs::STATE_PC, 0x05e0},
-			{cpu_regs::STATE_IDLE, 0},
-		});
-		return next_atomic_phase(655);
-	}
 	if (m_phase == 655)
 	{
-		expect_opcode(0xa7ab,
-			m_cpu->state_int(tms320c54x_device::STATE_A) == 0x1234 &&
-			m_cpu->state_int(tms320c54x_device::STATE_B) == 0xfffffde26cULL &&
-			m_cpu->state_int(tms320c54x_device::STATE_T) == 0x8765 &&
-			m_cpu->state_int(tms320c54x_device::STATE_AR4) == 0x0f91 &&
-			m_cpu->state_int(tms320c54x_device::STATE_AR5) == 0x0f92 &&
-			m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
-			"MACSU B uses signed Y, unsigned X, FRCT doubling, and one cycle");
 		program.write_word(0x05e2, 0x788b); // MACP *AR3-,0700,A.
 		write_words(program, {
 			{0x05e3, 0x0700}, {0x05e4, 0x75d6}, {0x05e5, 0x0124}, {0x05e6, 0xf5e1}, {0x0700, 0x1234},

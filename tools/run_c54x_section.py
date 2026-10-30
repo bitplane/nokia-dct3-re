@@ -252,6 +252,7 @@ def main():
     counts['atomic_memory_pairs'] = 13
     counts['atomic_memory_address_literals'] = 28
     counts['atomic_memory_arithmetic'] = 45
+    counts['atomic_dual_arithmetic_literals'] = 3
     parser.add_argument('section', choices=[*counts, 'all'])
     parser.add_argument('--jobs', type=int, default=8)
     parser.add_argument('--negative-control', action='store_true', help='require failure of an intentionally wrong expectation')

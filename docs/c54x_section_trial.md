@@ -331,6 +331,8 @@ Subsequent replacements use the same section-only workflow:
 
 | `atomic_memory_arithmetic.h` | Retain45 SUBC/SUBB/ADD/SUBS/AND, DADST, multiply/round/unsigned/square/MAC/MAS/ACCA/POLY, T-load and shifted arithmetic literals. Explicit A/B/T/AR2/AR3/SXM/FRCT/carry and decoys replace ordered-bank state, including SUBC C16 and DADST's inherited B. Fixed literal outcomes and original carry masks, exact ordered source reads/no writes, unchanged sources, pointer updates and pre-instruction replay. Drop port-marker timing; atomic semantic/access scope. | Native45 cases/restores, unchanged count; build6.104s/run0.032s. Delete memory_examples/header, phase catalogue/iteration, owning atomic routes and all source/ISA references. |
 
+| `atomic_dual_arithmetic_literals.h` | Retain three fixed LMS/MACSU examples: both-accumulator LMS result without T overwrite, unsigned-X/signed-Y MACSU A and fractional MACSU B. Explicit operands/A/B/T/flags/FRCT/pointers, exact ordered dual reads/no writes, fixed literal results, unchanged sources/status and pre-instruction replay. Drop port-marker timing; atomic semantic/access scope. | Native3 cases/restores, unchanged count; build5.405s/run0.015s. Delete614..652 preparation,653/654 and655 assertions/preparations with owning route interval. Only following coefficient-MAC setup remains reference material. |
+
 `python3 tools/run_c54x_section.py all` rebuilds/runs each replacement in
 sequence. Final measurements: immediate-store5.214/0.019s,
 basic-memory5.423/0.020s, stack5.262/0.069s, DAGEN5.406/0.126s (build/run).
