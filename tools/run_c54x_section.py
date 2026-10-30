@@ -245,6 +245,7 @@ def main():
     counts['atomic_register_copy_sequences'] = 4
     counts['atomic_guard_conditions'] = 18
     counts['atomic_memory_alu_literals'] = 9
+    counts['atomic_mmr_transfer_literals'] = 4
     parser.add_argument('section', choices=[*counts, 'all'])
     parser.add_argument('--jobs', type=int, default=8)
     parser.add_argument('--negative-control', action='store_true', help='require failure of an intentionally wrong expectation')

@@ -317,6 +317,8 @@ Subsequent replacements use the same section-only workflow:
 
 | `atomic_memory_alu_literals.h` | Retain stationary SUB AR2 and signed/unsigned SUB AR1, four A/B×SXM postincrement ADD literals and indirect/absolute OR B. Explicit flags/SXM/accumulators/source pointers and decoy words; fixed signed/unsigned results, carry/no-borrow, exact one read/no writes, pointer and source/sibling preservation, pre-instruction replay. Drop port-marker timing; atomic semantic/access scope. | Native9 cases/restores, unchanged count; build5.315s/run0.017s. Delete phase6586 setup,510/6501/6502/6525..6528/511 and512 assertions/preparations. Following absolute high-load setup remains reference material. Supersedes atomic_guard_conditions' pending SUB setup. |
 
+| `atomic_mmr_transfer_literals.h` | Retain absolute signed high-load B, paired LDM AR6/AR3 despite SXM, MVDM→two MVMDs and mixed STLM AR6/AR7/backing21/AR0/AR1→LDM backing20. Explicit registers/flags/source RAM replace marker and predecessor state. Exact ordered mapped/backing accesses, fixed values, source/sibling preservation and pre-sequence replay. Drop port-marker timing; atomic semantics/access only, not peripheral-device latency. | Native4 cases/restores, unchanged count; build5.251s/run0.015s. Delete phase512 setup,513..515 and516 assertions/preparations. Following data/program transfer sequence remains reference material. Supersedes atomic_memory_alu_literals' pending high-load setup. |
+
 `python3 tools/run_c54x_section.py all` rebuilds/runs each replacement in
 sequence. Final measurements: immediate-store5.214/0.019s,
 basic-memory5.423/0.020s, stack5.262/0.069s, DAGEN5.406/0.126s (build/run).
