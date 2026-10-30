@@ -395,6 +395,10 @@ def main():
     counts['shifted_memory_alu'] = 17408
     counts['shifted_bk_alu'] = 4096
     counts['memory_subc'] = 10240
+    counts['scalar_offset_load'] = 4224
+    counts['scalar_unsigned_load'] = 18176
+    counts['scalar_shift16_load'] = 18176
+    counts['scalar_variable_load'] = 5248
     counts['shifted_unowned'] = 20480
     counts['shifted_bsp'] = 5120
     counts['accumulator_call_frames'] = 216

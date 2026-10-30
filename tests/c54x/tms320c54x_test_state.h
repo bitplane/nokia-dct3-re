@@ -98,11 +98,6 @@ private:
 	void start_pipeline_store_mvmm(unsigned variant = 0);
 	struct indexed_store_fixture;
 	static memory_arithmetic_fixture memory_arithmetic_case(unsigned variant, bool unsigned_memory = false, unsigned shift16_selector = 8);
-	static memory_arithmetic_fixture offset_load_case(unsigned variant);
-	static memory_arithmetic_fixture unsigned_load_case(unsigned variant);
-	static memory_arithmetic_fixture shifted_memory_load_case(unsigned variant);
-	static memory_arithmetic_fixture staged_load_case(unsigned variant);
-	void start_pipeline_offset_load(unsigned variant = 0);
 	struct extended_banz_fixture
 	{
 		unsigned form, reg, selected;
@@ -786,7 +781,6 @@ private:
 	bool check_mvdd_source_results();
 	bool check_branch_repeat_results();
 	bool check_rptbd_t_load_results();
-	bool check_staged_load_results();
 	bool check_memory_repeat_results();
 	bool check_asm_store_results_part2();
 	bool check_fcala_delay_results();

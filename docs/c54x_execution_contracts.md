@@ -782,14 +782,30 @@ Corrected positive load domains are:
 | Profile | Admitted cases/restores | Domain |
 | --- | --- | --- |
 | `indirect-load` | 6 | Stationary/postdecrement/postincrement, both destinations; two invalid cases omitted. |
-| `ldu-shift16` | 54,528 per family | 17 RAM forms plus mapped AR sources; 3,072 invalid cases omitted per family. |
+| `scalar_offset_load` | 4,224 | Four long forms plus mapped-AR offset reads; checkpoints distributed. |
+| `scalar_unsigned_load`, `scalar_shift16_load` | 18,176 each | 17 RAM forms plus mapped AR sources; write-only short MOD3 omitted. |
 | `ld-ts` | 208,896 | Reindexed 17-form domain; 12,288 invalid cases omitted. |
-| `load-variable` | 104,448 | 17 forms and all 32 shifts; 6,144 invalid cases omitted. |
+| `scalar_variable_load` | 5,248 | 17 forms; all32 shifts at postincrement AR1, boundary shifts elsewhere. |
 | `paired_indirect_load` | 7,680 | 15 indirect/long forms; short write-only MOD3 omitted; checkpoints distributed. |
 
-The legacy LDU/shift-16/variable banks preserve raw case IDs and skip invalid
-forms rather than substituting duplicate legal cases. Shared scalar
-arithmetic omits `memory_arithmetic_case` form 5.
+Shared scalar arithmetic omits `memory_arithmetic_case` form 5.
+
+The four independent scalar-load sections initialize every AR and keep
+signed/unsigned result semantics, all fixed-load status/address combinations,
+and mapped AR source values through direct, absolute and long-offset reads.
+AR7-as-source remains special: its original pointer value is sampled before
+the post-Read poison, not overwritten by the address-retention probe.
+Variable shifts retain all32 values at postincrement RAM through AR1;
+the remaining33 address/register routes retain -16/-1/0/15. Interior shift
+correlations across those routes are not claimed. Pages and checkpoints are
+distributed rather than multiplied into every tuple.
+
+Each checks one Read/no writes, Access-owned ARP/pointer changes, retained
+address/operation extensions, pointer/SP/BK poison before Read and RAM/AR
+poison afterward. Accumulators remain unchanged through Read and publish
+only at Execute. SXM/OVM and unrelated registers remain unchanged through
+replay. A bit-position oracle supplies signed shifts without CPU helpers;
+these checks do not establish physical memory-bank or bus-clock behavior.
 
 Independent memory-product sections omit the same write-only short form:
 `memory_accumulator_product`, `memory_unsigned_product`,

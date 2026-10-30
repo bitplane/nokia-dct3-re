@@ -82,8 +82,6 @@ void tms320c54x_test_state::machine_reset()
 		{ {"indirect-load"}, [](self &test) { test.start_pipeline_indirect_case(); } },
 	}))
 		return;
-	if (profile_is("ldu-shift16")) { start_pipeline_offset_load(12672); return; }
-	if (profile_is("load-variable")) { start_pipeline_offset_load(127872); return; }
 	if (start_profile(*this, machine().options().bios(), {
 		{ {"rpt-subc-st"}, [](self &test) { test.start_pipeline_memory_repeat(); } },
 	}))
@@ -115,7 +113,6 @@ void tms320c54x_test_state::machine_reset()
 		{ {"popd-mapped", "popd-repeat"}, [](self &test) { test.start_popd_mapped(); } },
 		{ {"popd-edges"}, [](self &test) { test.start_popd_edges(); } },
 		{ {"popd-ram"}, [](self &test) { test.start_pipeline_data_pop(); } },
-		{ {"load-offset"}, [](self &test) { test.start_pipeline_offset_load(); } },
 		{ {"rpt-mvdp-irq"}, [](self &test) { test.start_repeat_mvdp_irq(); } },
 		{ {"conditional-cd"}, [](self &test) { test.start_delayed_conditional_call(); } },
 		{ {"tc-delay-call"}, [](self &test) { test.start_delayed_conditional_call(); } },

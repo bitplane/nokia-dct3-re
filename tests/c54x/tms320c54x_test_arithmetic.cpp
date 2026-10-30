@@ -105,19 +105,6 @@ tms320c54x_test_state::memory_arithmetic_fixture tms320c54x_test_state::memory_a
 
 
 
-tms320c54x_test_state::memory_arithmetic_fixture tms320c54x_test_state::shifted_memory_load_case(unsigned variant)
-{
-	auto f = unsigned_load_case(variant);
-	f.opcode = (f.opcode & 0x01ff) | 0x4400;
-	s64 const value = BIT(f.st1, 8) ? s16(f.memory) : f.memory;
-	f.result = u64(value * 0x10000) & 0xffffffffffULL;
-	return f;
-}
-
-
-
-
-
 std::array<u64, 2> tms320c54x_test_state::repeat_subc_result(memory_repeat_fixture const &f, unsigned iterations)
 {
 	u64 accumulator = f.dividend; u16 flags = 0x1804;
