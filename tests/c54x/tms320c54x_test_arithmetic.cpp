@@ -21,41 +21,6 @@ namespace c54x_test {
 
 
 
-tms320c54x_test_state::accumulator_stm_fixture tms320c54x_test_state::accumulator_stm_case(unsigned v)
-{
-	accumulator_stm_fixture f{};
-	f.lane = v % 6; f.literal = std::array<u16, 6>{0, 1, 0x7fff, 0x8000, 0xff00, 0xffff}[(v / 6) % 6];
-	u64 const initial = std::array<u64, 4>{0, 0xffffffffffULL, 0x123456789aULL, 0x8000000000ULL}[(v / 36) % 4];
-	f.a = initial; f.b = initial ^ 0x123456789aULL;
-	f.final_a = f.a ^ 0xffffffffffULL; f.final_b = f.b ^ 0xffffffffffULL;
-	unsigned const shift = 16 * (f.lane % 3);
-	u64 const mask = (f.lane % 3 == 2 ? 0xffULL : 0xffffULL) << shift;
-	u64 &selected = f.lane < 3 ? f.final_a : f.final_b;
-	selected = (selected & ~mask) | ((u64(f.literal) << shift) & mask);
-	f.st1 = 0x800 | (((v / 144) % 4) << 8);
-	f.base = (v / 576) % 2 ? 0x20000 : 0; f.snapshot = v / 1152;
-	return f;
-}
-
-void tms320c54x_test_state::start_accumulator_stm(unsigned variant)
-{
-	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant; auto const f = accumulator_stm_case(variant);
-	auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
-	for (unsigned i = 0; i < 16; ++i) program.write_word(f.base + 0x600 + i, 0xf495);
-	program.write_word(f.base + 0x600, 0x7708 + f.lane); program.write_word(f.base + 0x601, f.literal);
-	program.write_word(f.base + 0x602, 0x7108 + f.lane); program.write_word(f.base + 0x603, 0x1200); program.write_word(f.base + 0x604, 0xf4e1);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xa600); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, f.st1);
-	m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0); m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10); m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_A, f.a); m_cpu->set_state_int(tms320c54x_device::STATE_B, f.b);
-	m_pipeline_store_writes = m_pipeline_operand_reads = 0;
-	u16 const observed = f.lane % 3 == 2 ? u8(f.literal) : f.literal;
-	m_pipeline_operand_tap = data.install_read_tap(0, 0xffff, "accumulator_stm_read", [this, f, observed](offs_t at, u16 &value, u16) { if (machine().side_effects_disabled()) return; expect(at == 8 + f.lane && value == observed && m_cpu->pipeline_cycles() == 7 && m_pipeline_store_writes == 1 && !m_pipeline_operand_reads, "Adjacent MVDK reads the completed mapped write with no accumulator conflict"); ++m_pipeline_operand_reads; });
-	m_pipeline_write_tap = data.install_write_tap(0, 0xffff, "accumulator_stm_write", [this, f, observed](offs_t at, u16 &value, u16) { if (machine().side_effects_disabled()) return; unsigned const n = m_pipeline_store_writes++; expect(n < 2 && at == (n ? 0x1200 : 8 + f.lane) && value == (n ? observed : f.literal) && m_cpu->pipeline_cycles() == (n ? 8 : 7), "STM writes its original literal once at Execute before the retained MVDK RAM publication"); });
-	m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 62132;
-	m_cpu->set_state_int(STATE_GENPC, f.base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE);
-	m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-}
 
 
 
@@ -4226,28 +4191,6 @@ bool tms320c54x_test_state::check_accumulator_cmpm_results()
 
 bool tms320c54x_test_state::check_accumulator_stm_results()
 {
-	if (m_phase == 62132)
-	{
-		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick; auto const f = accumulator_stm_case(variant);
-		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "STM accumulator fields use the staged frontend");
-		if (tick == 4) { auto const disable = machine().disable_side_effects(); m_cpu->space(AS_PROGRAM).write_word(f.base + 0x601, 0xdead); }
-		if (tick == 6) { m_cpu->set_state_int(tms320c54x_device::STATE_A, f.a ^ 0xffffffffffULL); m_cpu->set_state_int(tms320c54x_device::STATE_B, f.b ^ 0xffffffffffULL); }
-		expect(m_cpu->state_int(tms320c54x_device::STATE_A) == (tick < 6 ? f.a : tick < 7 ? f.a ^ 0xffffffffffULL : f.final_a) && m_cpu->state_int(tms320c54x_device::STATE_B) == (tick < 6 ? f.b : tick < 7 ? f.b ^ 0xffffffffffULL : f.final_b), "STM preserves live sibling fields and truncates only AG/BG to eight bits at Execute");
-		unsigned const checkpoint = std::array<unsigned, 3>{4, 6, 7}[f.snapshot];
-		capture_pipeline_at(checkpoint, {&m_pipeline_store_writes, &m_pipeline_operand_reads},
-			"Save STM accumulator literal or publication and mapped consumer");
-		if (tick == 20)
-		{
-			expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_pipeline_store_writes == 2 && m_pipeline_operand_reads == 1 && m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0xa600 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == f.st1, "Accumulator STM and MVDK preserve flags/modes and complete exactly once");
-			if (replay_pipeline_at(62133, checkpoint,
-				"Restore accumulator STM without repeated publication")) return true;
-			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (variant < 3455) { start_accumulator_stm(variant + 1); return true; }
-			osd_printf_info("TMS320C54x accumulator STM: PASS cases=3456 restore=3456 lanes=6 literals=6 patterns=4 sxm_ovm=4 pages=2 snapshots=3 literal_retained=1 live_siblings=1 guard_mask=8 publication=Execute adjacent_mvdk=1 writes=2 reads=1 silicon_phase_claim=0\n"); throw emu_fatalerror(0, "TMS320C54x isolated accumulator STM complete");
-		}
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 62133) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 62132; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true; }
 	if (m_phase == 254030)
 	{
 		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick, checkpoint = std::array<unsigned, 3>{3, 6, 7}[variant / 128];

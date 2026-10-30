@@ -77,15 +77,6 @@ private:
 	void check_timer_reserved_fields();
 	void start_pipeline_frontend_case(bool memory = false, bool memory_b = false);
 	void start_empty_pipeline_case(bool nmi);
-	struct accumulator_stm_fixture
-	{
-		unsigned lane, snapshot;
-		u16 literal, st1;
-		u32 base;
-		u64 a, b, final_a, final_b;
-	};
-	static accumulator_stm_fixture accumulator_stm_case(unsigned v);
-	void start_accumulator_stm(unsigned variant = 0);
 	void start_peripheral_mmr_timing_audit(unsigned variant = 0);
 	void start_pipeline_peripheral_case(unsigned variant = 0);
 	void start_pipeline_mu4_prologue(unsigned variant = 0);

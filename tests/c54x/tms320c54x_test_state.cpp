@@ -299,7 +299,6 @@ void tms320c54x_test_state::machine_reset()
 		{ {"cmpm-direct"}, [](self &test) { test.start_direct_cmpm(); } },
 		{ {"cmpm-acc"}, [](self &test) { test.start_accumulator_cmpm(); } },
 		{ {"cmpm-map", "cmpm-map-edge"}, [](self &test) { test.start_accumulator_cmpm(); } },
-		{ {"stm-acc"}, [](self &test) { test.start_accumulator_stm(); } },
 		{ {"cmpm-smem", "bitf-smem"}, [](self &test) { test.start_pipeline_bitfield(); } },
 		{ {"cmpm-branch"}, [](self &test) { test.start_pipeline_bitfield_ar7(); } },
 		{ {"st-extended-ar", "st-ar-consumer", "st-shift-ar", "st-shift-ar-use"}, [](self &test) { test.start_extended_ar_store(); } },
