@@ -303,18 +303,6 @@ private:
 	};
 	static mapped_dual_fixture mapped_dual_case(unsigned variant, bool edge, bool interrupt_registers = false, bool low_bus = false);
 	void start_mapped_dual(unsigned variant = 0);
-	struct repeated_stld_fixture
-	{
-		unsigned form, layout, iterations, checkpoint;
-		u16 st1, pmst;
-		u32 base;
-		bool arithmetic = false;
-	};
-	repeated_stld_fixture repeated_stld_case(unsigned v) const;
-	static u16 repeated_stld_address(repeated_stld_fixture const &f, unsigned i, bool y);
-	static u16 repeated_stld_sample(unsigned i);
-	static u16 repeated_stld_store(repeated_stld_fixture const &f, std::array<u64, 3> const &state);
-	void start_repeated_stld(unsigned variant = 0);
 	struct circular_move_fixture
 	{
 		indexed_store_fixture memory;

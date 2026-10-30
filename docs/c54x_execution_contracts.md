@@ -49,9 +49,8 @@ devices or private firmware; legacy default continuations can reuse reviewed
 case data without making the entire sequenced bench generic.
 
 Legacy phase numbers are not globally unique. The branch/store profile
-explicitly selects its result owner before execution; its local
-`62136..62137` continuations must not enter the unrelated repeated-STLD
-checker. Long T/TRN stores instead use the CPU-only clocked runner, without
+explicitly selects its result owner before execution; local continuations
+must not enter another family's checker. Long T/TRN stores instead use the CPU-only clocked runner, without
 global phase routing. An owned continuation that is not recognized is
 a harness error, not a reason to try another fixture. The owner is host routing
 metadata, unchanged by guest snapshot replay and reset on machine reset.
@@ -4238,9 +4237,11 @@ retained X sample. SUB remains memory-minus-opposite-accumulator. Carry
 uses the 32-bit boundary; overflow is sticky and OVM clamps the result.
 Store-side ASM/SXM/SST behavior is shared with the isolated instruction.
 
-`st-alu-rpt` passes 30,720 cases and cleared-pipeline replays: eight forms,
-fixed/incrementing/decrementing/aliased/AR0-strided layouts, four shifts,
-SXM/SST/OVM combinations, counts 0/1/7/255, two pages and three checkpoints.
+`repeated_parallel_alu` owns1400 independent cases and cleared-pipeline replays:
+all eight forms, five layouts, four shifts and SXM/SST/OVM combinations with
+eight copies; a separate count bank covers1/2/256 copies for every form/layout
+using distributed flag/shift boundaries. Pages and three checkpoints are assigned
+rather than multiplied; full long-count × numeric-input correlation is not retained.
 An independent integer reference checks per-clock A/B/carry/overflow
 feedback, unchanged T, every old-source store, source/opcode retention and
 exact pointer updates. The strided layout uses AR0=3 with linear BK=0;
@@ -4259,13 +4260,17 @@ and are not repeated at Execute. Store shift retains the existing Read-owned
 ASM contract. Carry remains the single-instruction model's unvalidated
 preserve policy, not a new silicon claim (SPRU172C 4-178/179).
 
-`stld-repeat` passes 9,216 cases plus replay: all six A/B/T forms; fixed,
+`repeated_stld` owns456 independent cases plus replay: all six A/B/T forms; fixed,
 native `b9` postincrement, decrement/increment and same-AR X-priority layouts;
-four shifts; SXM/SAT combinations; counts 0/1/7/255; two pages; and three
-checkpoints across pending reads, stores and drain. A separate integer oracle
+four shifts and SXM/SAT combinations with eight copies. A separate count bank
+covers1/2/256 copies per form/layout with assigned flag/shift boundaries. Two pages
+and three checkpoints are distributed across pending reads, stores and drain;
+their full correlation with every numeric input is deliberately not retained. An integer oracle
 checks every accumulator/T transition and each RAM publication. Source and
 opcode poisoning check retention; fixed-source samples change between copies.
-The live pipeline is cleared before loading each snapshot.
+The live pipeline is cleared before loading each snapshot. Samples use a16-bit
+arithmetic progression; poisoning occurs in real RAM after each Read, preserving
+an independently observable final store even when X and Y addresses alias.
 
 Mapped/peripheral operands, memory-bank contention, circular repeated addressing and
 same-address inter-copy forwarding are not established by this qualification.

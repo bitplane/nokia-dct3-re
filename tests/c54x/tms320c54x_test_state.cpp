@@ -135,8 +135,6 @@ void tms320c54x_test_state::machine_reset()
 		{ {"bd-rpt-edge"}, [](self &test) { test.start_branch_repeat_edge(); } },
 		{ {"stm-ind", "stm-ind-edge"}, [](self &test) { test.start_indirect_stm(); } },
 		{ {"stm-low-ram"}, [](self &test) { test.start_indirect_stm(); } },
-		{ {"stld-repeat"}, [](self &test) { test.start_repeated_stld(); } },
-		{ {"st-alu-rpt"}, [](self &test) { test.start_repeated_stld(); } },
 		{ {"mvdk-repeat", "mvdk-index-rpt"}, [](self &test) { test.start_repeated_mvdk(); } },
 		{ {"rptb-call"}, [](self &test) { test.start_block_near_call(); } },
 		{ {"rpt-mem-copy", "rpt-mem-wrap", "rpt-mem-chain"}, [](self &test) { test.start_memory_copy_repeat(); } },

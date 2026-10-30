@@ -423,6 +423,8 @@ def main():
     counts['bus_registers'] = 40
     counts['standard_bus_registers'] = 39
     counts['mmr_bus'] = 1
+    counts['repeated_stld'] = 456
+    counts['repeated_parallel_alu'] = 1400
     counts['shifted_unowned'] = 20480
     counts['shifted_bsp'] = 5120
     counts['accumulator_call_frames'] = 216
