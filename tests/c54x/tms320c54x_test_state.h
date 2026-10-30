@@ -1549,7 +1549,6 @@ private:
 	bool check_bitf_offset_results();
 	bool check_bio_results();
 	bool check_bit_results();
-	bool check_reverse_carry_reference_results();
 	bool check_intm_protection_results();
 	bool check_bsp_interrupt_results();
 	bool check_idle_pll_results();

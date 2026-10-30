@@ -4261,28 +4261,6 @@ void tms320c54x_test_state::start_staged_conditional_store(unsigned variant)
 
 
 
-bool tms320c54x_test_state::check_reverse_carry_reference_results()
-{
-	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
-	if (m_phase == 6162 || m_phase == 6163)
-	{
-		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
-		m_cpu->set_state_int(tms320c54x_device::STATE_PRD, 0x1234);
-		m_cpu->set_state_int(tms320c54x_device::STATE_TIM, 0x5678);
-		expect(m_cpu->state_int(tms320c54x_device::STATE_TCR) == 0x10 &&
-			m_cpu->state_int(tms320c54x_device::STATE_PRD) == 0x1234 &&
-			m_cpu->state_int(tms320c54x_device::STATE_TIM) == 0x5678,
-			"Debugger timer registers retain independent values while stopped");
-		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x30);
-		expect(m_cpu->state_int(tms320c54x_device::STATE_TCR) == 0x10 &&
-			m_cpu->state_int(tms320c54x_device::STATE_TIM) == 0x1234,
-			"Debugger TCR reload uses the same self-clearing TRB contract as MMR writes");
-		osd_printf_info("TMS320C54x timer debugger registers: PASS independent=1 reload=1\n");
-		start_intm_protection_case(0);
-		return true;
-	}
-	return false;
-}
 
 
 

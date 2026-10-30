@@ -95,7 +95,7 @@ def main():
     counts['repeat_nop'] = 30
     counts['repeat_rearm'] = 10
     counts['block_repeat_control'] = 8
-    counts['clock_control'] = 16
+    counts['clock_control'] = 17
     counts['accumulator_call'] = 2
     counts['instruction_examples'] = 50
     counts['shifted_arithmetic'] = 104

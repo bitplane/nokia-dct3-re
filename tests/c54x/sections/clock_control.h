@@ -23,6 +23,14 @@ inline std::vector<clocked_register_case> section_cases()
 			{{0x501,u16(first | 3)},{0x502,u16(first | 3)},{0x503,u16(replacement | 3)}})});
 		cases.push_back(std::move(c));
 	}
+	auto initial = initial_case("stopped-timer-debugger-reload", {0xf4e1});
+	initial.initial.insert(initial.initial.end(), {{r::STATE_PRD,0x1234},{r::STATE_TIM,0x5678}});
+	clocked_register_case timer{{{0,std::move(initial)},
+		{1,observation("independent-stopped-registers", {{r::STATE_TCR,0x10},{r::STATE_PRD,0x1234},{r::STATE_TIM,0x5678}})},
+		{2,observation("reload-self-clears-without-starting", {{r::STATE_TCR,0x10},{r::STATE_PRD,0x1234},{r::STATE_TIM,0x1234}})}},1,16};
+	timer.actions = {{2,{{r::STATE_TCR,0x30}},true}};
+	// Debugger TCR reload reads PRD through the mapped peripheral bus.
+	cases.push_back(std::move(timer));
 	return cases;
 }
 }
