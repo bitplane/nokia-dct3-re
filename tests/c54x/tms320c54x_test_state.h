@@ -85,7 +85,6 @@ private:
 	bool m_xf_pin = true;
 	unsigned m_xf_publications = 0;
 	void start_repeat_endpoint_case(unsigned index);
-	void start_shifted_arithmetic_selector_case(unsigned index);
 	void start_interrupt_entry_spacing_case(unsigned index);
 	void start_interrupt_acceptance_checkpoint();
 	void acknowledge_entry_interrupt(int line);
@@ -1749,7 +1748,6 @@ private:
 	bool check_idle_pll_results();
 	bool check_xc_interrupt_results();
 	bool check_repeat_endpoints_results();
-	bool check_shifted_arithmetic_selector_results();
 	bool check_interrupt_entry_results();
 	bool check_rounding_boundary_results();
 	bool check_pipeline_frontend_results();

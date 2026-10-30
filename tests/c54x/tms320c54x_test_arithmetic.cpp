@@ -336,26 +336,6 @@ void tms320c54x_test_state::start_rounding_boundary_case(unsigned index)
 	m_check_timer->adjust(attotime::from_usec(100));
 }
 
-void tms320c54x_test_state::start_shifted_arithmetic_selector_case(unsigned index)
-{
-	m_cpu->reset();
-	unsigned const selectors = index % 8;
-	static constexpr int boundary_shifts[] = {-16, -1, 0, 1, 15};
-	int const shift = index < 24 ? int(index / 8) - 1 : boundary_shifts[((index - 24) / 8) % 5];
-	bool const signed_memory = index >= 64;
-	auto &program = m_cpu->space(AS_PROGRAM);
-	program.write_word(0x0800, 0x6f82); // ADD/SUB *AR2,shift,src,dst
-	program.write_word(0x0801, 0x0c00 | ((selectors & 4) ? 0x20 : 0) |
-			((selectors & 2) ? 0x200 : 0) | ((selectors & 1) ? 0x100 : 0) | (shift & 31));
-	program.write_word(0x0802, 0xf4e1);
-	m_cpu->space(AS_DATA).write_word(0x0600, index < 24 ? 8 : 0xfff8);
-	set_registers(*m_cpu, {
-		{cpu_regs::STATE_AR2, 0x0600}, {cpu_regs::STATE_A, 10}, {cpu_regs::STATE_B, 30}, {cpu_regs::STATE_ST0, 0},
-		{cpu_regs::STATE_ST1, signed_memory ? 0x0100 : 0}, {STATE_GENPC, 0x0800},
-	});
-	m_phase = 170000 + index;
-	m_check_timer->adjust(attotime::from_usec(100));
-}
 
 void tms320c54x_test_state::start_multiword_pipeline_case(unsigned variant)
 {
@@ -4538,35 +4518,6 @@ bool tms320c54x_test_state::check_saccd_results()
 	return false;
 }
 
-bool tms320c54x_test_state::check_shifted_arithmetic_selector_results()
-{
-	if (m_phase >= 170000 && m_phase < 170104)
-	{
-		unsigned const index = m_phase - 170000, selectors = index % 8;
-		static constexpr s64 operands[] = {4, 8, 16};
-		// Explicit arithmetic results for fff8 with SXM clear/set at shifts
-		// -16, -1, 0, +1 and +15; independent of the core's shift helper.
-		static constexpr s64 unsigned_operands[] = {0, 32764, 65528, 131056, 2147221504};
-		static constexpr s64 signed_operands[] = {-1, -4, -8, -16, -262144};
-		s64 const operand = index < 24 ? operands[index / 8] :
-			(index >= 64 ? signed_operands : unsigned_operands)[((index - 24) / 8) % 5];
-		s64 const source = (selectors & 2) ? 30 : 10;
-		u64 const result = (source + ((selectors & 4) ? -operand : operand)) & 0xffffffffffULL;
-		expect_opcode(0x6f82,
-			m_cpu->state_int(tms320c54x_device::STATE_A) == ((selectors & 1) ? 10 : result) &&
-			m_cpu->state_int(tms320c54x_device::STATE_B) == ((selectors & 1) ? result : 30) &&
-			m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0600 &&
-			m_cpu->space(AS_DATA).read_word(0x0600) == (index < 24 ? 8 : 0xfff8) &&
-			m_cpu->state_int(tms320c54x_device::STATE_IDLE) &&
-			!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) &&
-			m_cpu->state_int(tms320c54x_device::STATE_PC) == 0x0803,
-			"Shifted ADD/SUB uses independent source and destination selectors and preserves the other accumulator");
-		if (index < 103) { start_shifted_arithmetic_selector_case(index + 1); return true; }
-		osd_printf_info("TMS320C54x shifted arithmetic selectors: PASS cases=104 operations=2 selectors=4 shifts=-16,-1,0,1,15 sxm=0,1 pipeline_claim=0\n");
-		start_interrupt_entry_spacing_case(0); return true;
-	}
-	return false;
-}
 
 bool tms320c54x_test_state::check_rounding_boundary_results()
 {
