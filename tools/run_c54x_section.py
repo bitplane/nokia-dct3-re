@@ -411,6 +411,7 @@ def main():
     counts['idle_wake'] = 6
     counts['deep_idle_clocks'] = 8
     counts['bsp_interrupt'] = 9
+    counts['idle_dma'] = 10
     counts['shifted_unowned'] = 20480
     counts['shifted_bsp'] = 5120
     counts['accumulator_call_frames'] = 216
@@ -436,6 +437,9 @@ def main():
     if args.section in ('mcbsp_control', 'deep_idle_clocks'):
         for name in ('tms320c54x_mcbsp.h', 'tms320c54x_mcbsp.cpp'):
             copy_changed(ROOT / 'driver' / name, overlay / name)
+    if args.section == 'idle_dma':
+        for name in ('tms320c54x_dma.h', 'tms320c54x_dma.cpp'):
+            copy_changed(ROOT / 'driver' / name, overlay / name)
     selected_source = ROOT / ('tests/firmware/c54x_' + args.section + '.h') if args.section in ('descriptor_copy', 'byte_swap', 'block_swap', 'signed_branch', 'store_compare', 'conditional_store', 'stack_alignment', 'store_move_compare', 'xc_context', 'logic_composition', 'nibble_composition') else sections / (args.section + '.h')
     copy_changed(selected_source, overlay / 'c54x_section_selected.h')
     if args.negative_control:
@@ -449,6 +453,8 @@ def main():
     sources = 'src/mame/nokia/tms320c54x_test_isa.cpp'
     if args.section in ('mcbsp_control', 'deep_idle_clocks'):
         sources += ',src/mame/nokia/tms320c54x_mcbsp.cpp'
+    if args.section == 'idle_dma':
+        sources += ',src/mame/nokia/tms320c54x_dma.cpp'
     with (output / 'build.log').open('w') as log:
         build = subprocess.run(['make', '-C', str(ROOT / 'mame'), 'REGENIE=1', 'SUBTARGET=c54xisa',
                         'SOURCES=' + sources, 'USE_QTDEBUG=0',

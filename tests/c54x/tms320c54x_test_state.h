@@ -49,7 +49,6 @@ private:
 	bool m_xf_pin = true;
 	void start_repeat_endpoint_case(unsigned index);
 	void check_control_disassembler();
-	void start_idle_dma_case(unsigned index);
 	void start_pipeline_mu4_prologue(unsigned variant = 0);
 	void observe_context_irq(int line);
 	bool check_rom4_context_results();
@@ -676,7 +675,6 @@ private:
 	void expect_opcode(u16 opcode, bool condition, const char *message);
 
 	// Return true only when the original callback would return; order is retained.
-	bool check_deep_idle_results();
 	bool restart_pipeline_observer(unsigned phase, u64 next_cycle)
 	{
 		// This replaces the deadline with one CPU clock; timed restores keep theirs.
@@ -841,9 +839,6 @@ private:
 	bool m_idle_mcbsp_external = false;
 	optional_device<tms320c54x_dma_device> m_idle_dma;
 	unsigned m_idle_dma_completions = 0;
-	attotime m_idle_dma_start = attotime::zero;
-	u32 m_idle_dma_rate = 0;
-	u8 m_idle_dma_first_ticks = 4;
 	u64 m_first_operand_cycle = 0;
 	u64 m_last_operand_cycle = 0;
 	u64 m_first_port_cycle = 0;
@@ -858,7 +853,6 @@ private:
 	popd_fixture m_popd_fixture = {};
 	u32 m_popd_write_mask = 0;
 	// Separate checkpoint lifetimes; host observations still rewind explicitly.
-	std::stringstream m_idle_dma_saved;
 	std::stringstream m_pll_saved, m_clock_rates_saved;
 };
 

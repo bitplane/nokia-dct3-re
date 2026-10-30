@@ -18,9 +18,6 @@ void tms320c54x_test_state::machine_start()
 	save_item(NAME(m_stack_mmr));
 	save_item(NAME(m_bus_start_cycles));
 	m_check_timer = timer_alloc(FUNC(tms320c54x_test_state::check_results), this);
-	save_item(NAME(m_idle_dma_start));
-	save_item(NAME(m_idle_dma_rate));
-	save_item(NAME(m_idle_dma_first_ticks));
 	save_item(NAME(m_shifted_bus_word));
 	save_item(NAME(m_shifted_bsp.control));
 	save_item(NAME(m_shifted_bsp.receive));
@@ -532,10 +529,6 @@ void tms320c54x_test_state::test(machine_config &config)
 	});
 	m_idle_dma->completion_cb().set([this](u8 channel) {
 		expect(channel == 0, "idle DMA fixture completes only its configured channel");
-		if (m_phase < 79600 || m_phase > 79604)
-			expect(machine().time() - m_idle_dma_start == attotime::from_ticks(4, m_idle_dma_rate) * 3 +
-			attotime::from_ticks(m_idle_dma_first_ticks, m_idle_dma_rate),
-			"internal DMA retains its first-word clock phase through clock loss and replay");
 		++m_idle_dma_completions;
 		// Fixture routing selects the documented DMAC0/BRINT2 vector slot.
 		m_cpu->set_input_line(6, ASSERT_LINE);

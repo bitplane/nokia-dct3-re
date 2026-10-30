@@ -196,6 +196,19 @@ and ordinary unmasked requests push one continuation and enter the appropriate
 vector. PC, SP, status/masks, pending IFR and exact writes survive replay.
 This verifies completed-word routing, not serial pin cadence or handset audio.
 
+`idle_dma` owns ten independent atomic idle/DMA contracts using the real DMA
+device: IDLE1/2 system clocks, IDLE3 input clocks, absent input clocks, and
+clock loss halfway through the first word, each with its completion mask off/on.
+Four explicit source words must be read and copied in order; each destination
+write is checked against the modeled four-clock cadence. Clockless channels
+remain enabled and unwritten until the fixture restores their clock. The
+partial-word checkpoint must preserve two remaining clocks, not restart a word.
+All cases restore before the first transfer, complete exactly once, publish
+IFR bit6 and resume foreground only when IMR allows it, independently of INTM.
+The completion input is a fixture route to DMAC0/BRINT2. These are internal DMA
+clock/phase and replay contracts; external waits, arbitration and handset PLL
+latencies are not established by them.
+
 The independent `status_bitfield` section owns ST0/ST1 BITF sampling: 128
 register/pattern/mask/initial-TC/addressing combinations, with pages and three
 checkpoint positions distributed rather than multiplied into 768 executions.

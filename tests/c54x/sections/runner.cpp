@@ -3,6 +3,9 @@
 #include "emu.h"
 #include "tms320c54x_test_register_sequence.h"
 #include "c54x_section_selected.h"
+#ifdef C54X_SECTION_IDLE_DMA
+#include "tms320c54x_dma.h"
+#endif
 #if defined(C54X_SECTION_BSP_WORD_SOURCE) || defined(C54X_SECTION_BSP_INTERRUPT)
 #include "tms320c54x_bsp_state.h"
 #endif
@@ -16,6 +19,9 @@ class section_state : public driver_device
 public:
 	section_state(machine_config const &c, device_type t, char const *tag)
 		: driver_device(c, t, tag), m_cpu(*this, "cpu")
+#ifdef C54X_SECTION_IDLE_DMA
+		, m_dma(*this,"dma")
+#endif
 #if defined(C54X_SECTION_MCBSP_CONTROL) || defined(C54X_SECTION_DEEP_IDLE_CLOCKS)
 		, m_mcbsp(*this, "mcbsp")
 #endif
@@ -58,6 +64,16 @@ public:
 		m_cpu->set_addrmap(AS_PROGRAM, &section_state::program);
 		m_cpu->set_addrmap(AS_DATA, &section_state::data);
 		m_cpu->set_addrmap(AS_IO, &section_state::data);
+#ifdef C54X_SECTION_IDLE_DMA
+		TMS320C54X_DMA(c,m_dma,13'000'000);
+		m_dma->set_cpu(m_cpu);
+		m_cpu->pll_clock_stop_cb().set(m_dma,FUNC(tms320c54x_dma_device::pll_clock_stop_w));
+		m_cpu->system_clock_cb().set([this](u32 hz) { m_dma->set_unscaled_clock(hz); });
+		m_dma->completion_cb().set([this](u8 channel) {
+			if (channel || ++m_dma_completions!=1) throw emu_fatalerror("DMA completed the wrong channel/count");
+			m_cpu->set_input_line(6,ASSERT_LINE); m_cpu->set_input_line(6,CLEAR_LINE);
+		});
+#endif
 #ifdef C54X_SECTION_MCBSP_CONTROL
 		TMS320C54X_MCBSP(c, m_mcbsp, 13'000'000);
 		m_mcbsp->tx_word_cb().set([](u16) { throw emu_fatalerror("McBSP control fixture must reset before transmitting a word"); });
@@ -82,6 +98,9 @@ protected:
 	void machine_start() override
 	{
 		m_timer = timer_alloc(FUNC(section_state::tick), this);
+#ifdef C54X_SECTION_IDLE_DMA
+		save_item(NAME(m_dma_completions)); save_item(NAME(m_dma_start));
+#endif
 #ifdef C54X_SECTION_DEEP_IDLE_CLOCKS
 		save_item(NAME(m_serial_words)); save_item(NAME(m_frozen_tim)); save_item(NAME(m_frozen_tcr));
 		save_item(NAME(m_serial_external));
@@ -125,6 +144,12 @@ protected:
 		m_cases = c54x_test::section_cases();
 		m_fixture = std::make_unique<c54x_test::register_sequence_fixture>(machine(), *m_cpu, *m_timer,
 			m_cases.size(), [this](unsigned i) {
+#ifdef C54X_SECTION_IDLE_DMA
+				m_dma->reset(); m_dma_completions=0;
+				m_dma->set_input_clock(i>=6 ? 0 : 3'250'000);
+				m_dma->write(1,0);
+				for (u16 value : {0x520,0x530,3,0,0x4145}) m_dma->write(2,value);
+#endif
 #ifdef C54X_SECTION_COUNT_RETIREMENTS
 				if (i) check_retirements(i-1);
 				m_retired_count=0;
@@ -154,6 +179,16 @@ protected:
 #endif
 				return m_cases.at(i);
 			});
+#ifdef C54X_SECTION_IDLE_DMA
+		m_fixture->set_data_observer([this](bool write,u32 address,u16) {
+			if (!write || address<0x530 || address>0x533) return;
+			unsigned const index=m_fixture->count(), word=address-0x530;
+			u32 const rate=index/2==2 ? 3'250'000 : 13'000'000;
+			unsigned const first=index>=8 ? 2 : 4;
+			if (machine().time()-m_dma_start!=attotime::from_ticks(first,rate)+attotime::from_ticks(4,rate)*word)
+				throw emu_fatalerror("DMA word lost its four-clock cadence or partial-word phase");
+		});
+#endif
 #ifdef C54X_SECTION_MCBSP_CONTROL
 		m_fixture->set_data_observer([this](bool write,u32 at,u16) {
 			if (!write && at==0x39) {
@@ -257,6 +292,26 @@ private:
 #endif
 	TIMER_CALLBACK_MEMBER(tick)
 	{
+#ifdef C54X_SECTION_IDLE_DMA
+		unsigned const dma_now=m_fixture->tick_count(), dma_index=m_fixture->count();
+		if (dma_now==16) {
+			m_dma_start=machine().time();
+			if (dma_index>=8) m_dma->pll_clock_stop_w(0);
+			m_dma->write(0,1);
+		}
+		if (dma_now==18 && dma_index>=8) m_dma->pll_clock_stop_w(1);
+		if (dma_now==80 && dma_index>=6) {
+			{
+				auto const disable=machine().disable_side_effects();
+				if (m_dma_completions || !(m_dma->read(0)&1) || m_cpu->space(AS_DATA).read_word(0x530))
+					throw emu_fatalerror("Clockless DMA must retain its enabled, unwritten block");
+			}
+			m_dma_start=machine().time();
+			m_dma->pll_clock_stop_w(0);
+		}
+		if (dma_now==159 && (m_dma_completions!=1 || (m_dma->read(0)&1)))
+			throw emu_fatalerror("DMA must disable its channel after one complete block");
+#endif
 #ifdef C54X_SECTION_BSP_INTERRUPT
 		if (m_fixture->tick_count()==16) {
 			unsigned const index=m_fixture->count(), source=index<4 ? 4 : 5;
@@ -329,6 +384,11 @@ private:
 		throw emu_fatalerror(0, "C54x section complete");
 	}
 	required_device<tms320c54x_device> m_cpu;
+#ifdef C54X_SECTION_IDLE_DMA
+	required_device<tms320c54x_dma_device> m_dma;
+	u32 m_dma_completions=0;
+	attotime m_dma_start=attotime::zero;
+#endif
 #if defined(C54X_SECTION_MCBSP_CONTROL) || defined(C54X_SECTION_DEEP_IDLE_CLOCKS)
 	required_device<tms320c54x_mcbsp_device> m_mcbsp;
 #endif
