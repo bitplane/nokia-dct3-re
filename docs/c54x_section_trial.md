@@ -297,6 +297,8 @@ Subsequent replacements use the same section-only workflow:
 
 | `atomic_parallel_load_literals.h` | Retain unsigned SST DST, two parallel ST/MACR ASM values, three signed/unsigned loads and two LDM AR-source literals. Explicit PMST/SXM/ASM, accumulators/T/pointers/BK and memory remove inherited state. Exact ordered reads/writes, literal results, source/sibling/status (where originally checked), pointer updates and pre-instruction replay. Drop port-marker timing; atomic semantics/access scope. | Native8 cases/restores, unchanged count; build5.395s/run0.018s. Delete phase6575 setup,435..441 and6560 assertions/preparations; following MVMD setup remains reference material. Supersedes atomic_high_store_literals' pending unsigned-DST setup. |
 
+| `atomic_move_modify_literals.h` | Retain MVMD BL, two pointer-selective ANDM literals, indexed/circular MAR, immediate B loads0/1, RPT31 with32 literal stores and AR0 postincrement ST with neighbors. Explicit operands, source registers, pointers/BK/flags and memory replace predecessor setup; fixed outputs, complete ordered bus effects, preserved siblings/flags and pre-instruction replay. Drop port-marker cycle deltas; atomic semantics/access scope. | Native9 cases/restores, unchanged count; build5.521s/run0.017s. Delete phase6560 setup,442..449 and6553 assertions/preparations; next circular-marker entry remains reference material. Supersedes atomic_parallel_load_literals' pending MVMD setup. |
+
 `python3 tools/run_c54x_section.py all` rebuilds/runs each replacement in
 sequence. Final measurements: immediate-store5.214/0.019s,
 basic-memory5.423/0.020s, stack5.262/0.069s, DAGEN5.406/0.126s (build/run).
