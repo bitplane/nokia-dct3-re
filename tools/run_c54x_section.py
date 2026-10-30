@@ -92,6 +92,7 @@ def main():
     counts['copy_dependency'] = 192
     counts['repeated_store'] = 1024
     counts['repeat_zero'] = 128
+    counts['repeat_nop'] = 30
     parser.add_argument('section', choices=[*counts, 'all'])
     parser.add_argument('--jobs', type=int, default=8)
     parser.add_argument('--negative-control', action='store_true', help='require failure of an intentionally wrong expectation')

@@ -794,14 +794,6 @@ void tms320c54x_test_state::test(machine_config &config)
 			expect(f.interrupt && line == (f.interrupt == 2 ? INPUT_LINE_NMI : 0) && m_cpu->pipeline_cycles() > last && m_cpu->state_int(tms320c54x_device::STATE_RC) == 0 &&
 				m_cpu->state_int(tms320c54x_device::STATE_RTN) == u16(f.body + (store ? 2 : 1)) && !m_vector_acks, "Memory repeat acknowledges its pending interrupt after the final iteration at the fresh continuation"); ++m_vector_acks;
 		}
-		if (m_phase == 252750)
-		{
-			unsigned const variant = m_pipeline_peripheral_case, interrupt = (variant / 10) % 3;
-			unsigned const count = std::array<unsigned, 5>{0, 1, 3, 32, 255}[(variant / 2) % 5], first = variant % 2 ? 8 : 7;
-			expect(interrupt && line == (interrupt == 2 ? INPUT_LINE_NMI : 0) && m_cpu->pipeline_cycles() > first + count &&
-				m_cpu->state_int(tms320c54x_device::STATE_RC) == 0 && m_cpu->state_int(tms320c54x_device::STATE_RTN) == (variant % 2 ? 0x603 : 0x602) && !m_vector_acks,
-				"NOP repeat acknowledges its original pending source only after the final body and stacks the fresh continuation"); ++m_vector_acks;
-		}
 		if (m_phase == 252230)
 		{
 			unsigned const kind = pipeline_idle_kind(m_pipeline_peripheral_case);
