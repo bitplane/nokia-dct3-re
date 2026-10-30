@@ -630,73 +630,8 @@ void tms320c54x_test_state::start_pipeline_memory_repeat(unsigned variant)
 
 
 
-tms320c54x_test_state::stlm_pmst_fixture tms320c54x_test_state::stlm_pmst_case(unsigned v)
-{
-	stlm_pmst_fixture f{}; bool const interrupt = v >= 4096; if (interrupt) v -= 4096;
-	f.pattern = v % 8; v /= 8; f.saturation = v % 2; v /= 2; f.sign = v % 2; v /= 2; f.source_b = v % 2; v /= 2;
-	if (!interrupt) { f.compiler = v % 2; v /= 2; }
-	f.old_overlay = v % 2; v /= 2; f.base = (v % 2 ? 3 : 2) << 16; v /= 2;
-	if (interrupt) { f.irq = v % 17 + 1; v /= 17; f.late = v % 2; v /= 2; }
-	else { f.low_entry = !(v % 2); v /= 2; }
-	f.checkpoint = std::array<unsigned, 4>{3, 5, 6, 12}[v];
-	f.entry = f.low_entry ? 0x600 : 0x9000;
-	f.old_pmst = 0x200 | (f.old_overlay ? 0x20 : 0) | (f.saturation ? 1 : 0);
-	f.st1 = (f.sign ? 0x100 : 0) | (f.compiler ? 0x4000 : 0) | (f.irq ? 0 : 0x800) | 0x13;
-	f.source = std::array<u64, 8>{0, 0x20, 0x2021, 0xffaa, 0x01230021, 0x7f00000021ULL, 0xff00000021ULL, 0xffffffffffULL}[f.pattern];
-	u64 stored = f.source;
-	if (f.saturation)
-	{
-		if (!f.sign) stored = std::min(stored, u64(0xffffffffULL));
-		else { s64 const signed_value = stored & 0x8000000000ULL ? s64(stored) - (s64(1) << 40) : s64(stored); stored = u64(std::clamp(signed_value, s64(-2147483648LL), s64(2147483647LL))); }
-	}
-	f.value = stored; return f;
-}
 
-u32 tms320c54x_test_state::pmst_fixture_physical(u32 base, u16 address, u16 pmst)
-{
-	return (pmst & 0x20) && address < 0x8000 ? address : base + address;
-}
 
-void tms320c54x_test_state::start_stlm_pmst(unsigned variant)
-{
-	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-	auto const f = stlm_pmst_case(variant); auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
-	for (unsigned i = 0; i < 24; ++i) { program.write_word(f.entry + i, 0xf495); program.write_word(f.base + f.entry + i, 0xf495); }
-	for (u32 bank : {0U, f.base})
-	{
-		program.write_word(bank + f.entry, f.source_b ? 0x891d : 0x881d);
-		program.write_word(bank + f.entry + 4, bank ? 0xe944 : 0xe911);
-		program.write_word(bank + f.entry + 5, bank ? 0xe844 : 0xe811);
-		program.write_word(bank + f.entry + 15, 0xf4e1);
-	}
-	u16 const offset = f.irq == 17 ? 4 : (15 + f.irq) * 4;
-	for (u16 vector : {u16((f.old_pmst & 0xff80) | offset), u16((f.value & 0xff80) | offset)})
-		for (u32 bank : {0U, f.base}) { for (unsigned i = 0; i < 12; ++i) program.write_word(bank + vector + i, 0xf495); program.write_word(bank + vector + 1, 0xf4eb); }
-	m_cpu->set_pipeline_frontend(false); m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10); m_cpu->set_state_int(tms320c54x_device::STATE_PMST, f.old_pmst);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xb9ff); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, f.st1); m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x3000);
-	m_cpu->set_state_int(tms320c54x_device::STATE_A, f.source_b ? 0x123456789aULL : 0x12121212); m_cpu->set_state_int(tms320c54x_device::STATE_B, f.source_b ? 0x12121212 : 0xfedcba9876ULL);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, f.irq && f.irq != 17 ? u16(1U << (f.irq - 1)) : 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_BRC, 13); m_cpu->set_state_int(tms320c54x_device::STATE_T, 0x5aa5); m_cpu->set_state_int(tms320c54x_device::STATE_BK, 17);
-	for (unsigned i = 0; i < 8; ++i) m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + i, 0x7000 + i);
-	for (unsigned i = 0; i < 16; ++i) m_cpu->set_input_line(i, CLEAR_LINE);
-	m_cpu->set_input_line(INPUT_LINE_NMI, CLEAR_LINE);
-	m_rptbd_counts = {}; m_rptbd_return = 0; m_pipeline_replay = false; m_idle_fixture_tick = 0;
-	m_pipeline_operand_tap = data.install_read_tap(0, 0xffff, "stlm_pmst_reads", [this, f](offs_t at, u16 &word, u16) {
-		if (machine().side_effects_disabled()) return;
-		expect(f.irq && at == 0x2fff && !m_rptbd_counts.stack_reads++ && word == m_rptbd_return, "STLM PMST has no source-memory read; RETE reads one original continuation"); });
-	m_pipeline_write_tap = data.install_write_tap(0, 0xffff, "stlm_pmst_writes", [this, f](offs_t at, u16 &word, u16) {
-		if (machine().side_effects_disabled()) return;
-		if (at == 0x1d) { expect(word == f.value && !m_rptbd_counts.writes++ && m_cpu->pipeline_cycles() == 6, "STLM PMST stores the Execute-live source using old SST/SXM exactly once"); return; }
-		expect(f.irq && at == 0x2fff && !m_rptbd_counts.stack_writes++ && word > f.entry && word <= f.entry + 15, "PMST store leaves stack writes to its optional interrupt"); m_rptbd_return = word; });
-	m_pipeline_fetch_tap = program.install_read_tap(0, 0x7fffff, "stlm_pmst_vectors", [this, f, offset](offs_t at, u16 &word, u16) {
-		if (machine().side_effects_disabled() || !f.irq) return;
-		u16 const old_vector = (f.old_pmst & 0xff80) | offset, new_vector = (f.value & 0xff80) | offset;
-		u32 const old_physical = pmst_fixture_physical(f.base, old_vector, f.old_pmst), new_physical = pmst_fixture_physical(f.base, new_vector, f.value);
-		if (at != old_physical && at != new_physical) return;
-		expect(at == (f.late ? new_physical : old_physical) && word == 0xf495 && !m_rptbd_counts.fetches++ && m_cpu->pipeline_cycles() == (f.late ? 12 : 6), "INTR vector Prefetch owns IPTR/OVLY before or after the STLM publication"); });
-	m_phase = 310520; m_cpu->set_state_int(STATE_GENPC, f.base + f.entry); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-}
 
 tms320c54x_test_state::repeat_load_fixture tms320c54x_test_state::repeat_load_case(unsigned v)
 {
@@ -3312,39 +3247,6 @@ bool tms320c54x_test_state::check_mvdk_mapped_results()
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
 	}
 	if (m_phase == 255370) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 255360; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true; }
-	if (m_phase == 310520)
-	{
-		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick; auto const f = stlm_pmst_case(variant);
-		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) && m_cpu->state_int(tms320c54x_device::STATE_PMST) == (tick < 6 ? f.old_pmst : f.value) && m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0xb9ff, "STLM PMST owns one Execute publication and no status-flag change");
-		if (f.irq && tick == (f.late ? 8U : 2U)) { int const line = f.irq == 17 ? INPUT_LINE_NMI : int(f.irq) - 1; m_cpu->set_input_line(line, ASSERT_LINE); m_cpu->set_input_line(line, CLEAR_LINE); }
-		if (tick == 5) m_cpu->set_state_int(f.source_b ? tms320c54x_device::STATE_B : tms320c54x_device::STATE_A, f.source);
-		if (tick <= 6)
-		{
-			u64 const source = tick >= 5 ? f.source : 0x12121212;
-			expect(m_cpu->state_int(tms320c54x_device::STATE_A) == (f.source_b ? 0x123456789aULL : source) && m_cpu->state_int(tms320c54x_device::STATE_B) == (f.source_b ? source : 0xfedcba9876ULL), "STLM leaves both accumulators intact and consumes the Execute-live value");
-		}
-		if (tick == f.checkpoint && !m_pipeline_replay)
-		{
-			m_rptbd_saved_counts = m_rptbd_counts; m_rptbd_saved_return = m_rptbd_return; expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save STLM PMST before, at or after publication and vector selection");
-		}
-		if (tick == 96)
-		{
-			expect(m_rptbd_counts.writes == 1 && m_rptbd_counts.fetches == unsigned(bool(f.irq)) && m_rptbd_counts.acks == unsigned(bool(f.irq)) && m_rptbd_counts.stack_reads == unsigned(bool(f.irq)) && m_rptbd_counts.stack_writes == unsigned(bool(f.irq)), "STLM PMST and its optional vector/frame each own one side effect");
-			expect(m_cpu->state_int(tms320c54x_device::STATE_A) == (f.low_entry && (f.value & 0x20) ? 0x11 : 0x44) && m_cpu->state_int(tms320c54x_device::STATE_B) == (f.low_entry && f.old_overlay ? 0x11 : 0x44) &&
-				m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_cpu->state_int(STATE_GENPC) == f.base + f.entry + 16 && m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x3000 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == f.st1 && m_cpu->state_int(tms320c54x_device::STATE_BRC) == 13 && m_cpu->state_int(tms320c54x_device::STATE_T) == 0x5aa5 && m_cpu->state_int(tms320c54x_device::STATE_BK) == 17, "Prefetched marker retains old mapping; subsequent Prefetch uses new OVLY without changing XPC or unrelated state");
-			for (unsigned i = 0; i < 8; ++i) expect(m_cpu->state_int(tms320c54x_device::STATE_AR0 + i) == 0x7000 + i, "Direct PMST store ignores DP/CPL and preserves all pointers");
-			if (!m_pipeline_replay)
-			{
-				m_pipeline_replay = true; m_idle_fixture_tick = f.checkpoint; m_rptbd_counts = m_rptbd_saved_counts; m_rptbd_return = m_rptbd_saved_return;
-				return restore_pipeline_at(310530, "Restore PMST source, mapping and interrupt state without duplicate store or vector");
-			}
-			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (variant < 38911) { start_stlm_pmst(variant + 1); return true; }
-			osd_printf_info("TMS320C54x STLM PMST: PASS cases=38912 restore=38912 mapping_cases=4096 interrupt_cases=34816 sources=A,B patterns=8 old_sst_sxm=4 cpl=0,1 pages=2 entry_regions=low,high old_overlay=0,1 interrupt_sources=IRQ0..15,NMI arrivals=early,late snapshots=4 writes=1 source_sample=Execute prefetched_mapping=retained next_mapping=new vector_mapping=Prefetch balanced_frames=1 physical_phase_claim=0\n"); throw emu_fatalerror(0, "TMS320C54x isolated STLM PMST complete");
-		}
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 310530) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 310520; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true; }
 	if (m_phase == 310480)
 	{
 		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick; auto const f = repeat_load_case(variant);

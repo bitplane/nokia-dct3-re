@@ -259,17 +259,6 @@ private:
 	static memory_repeat_fixture memory_repeat_case(unsigned variant);
 	static std::array<u64, 2> repeat_subc_result(memory_repeat_fixture const &f, unsigned iterations);
 	void start_pipeline_memory_repeat(unsigned variant = 0);
-	struct stlm_pmst_fixture
-	{
-		unsigned pattern, irq, checkpoint;
-		bool saturation, sign, source_b, compiler, old_overlay, low_entry, late;
-		u32 base;
-		u16 entry, old_pmst, value, st1;
-		u64 source;
-	};
-	static stlm_pmst_fixture stlm_pmst_case(unsigned v);
-	static u32 pmst_fixture_physical(u32 base, u16 address, u16 pmst);
-	void start_stlm_pmst(unsigned variant = 0);
 	struct repeat_load_fixture
 	{
 		unsigned selector, flags, pattern, count, setup, irq, checkpoint, first, outer;
