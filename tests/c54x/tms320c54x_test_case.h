@@ -45,6 +45,7 @@ struct clocked_register_action
 	std::vector<memory_word> data{};
 	bool reset_cpu = false;
 	std::optional<bool> bio_level{};
+	std::vector<memory_word> io{};
 };
 struct clocked_line_sample { unsigned cycle; bool level; bool check_cycle = true; };
 struct clocked_data_event

@@ -168,7 +168,6 @@ private:
 	};
 	static circular_portr_block_fixture circular_portr_block_case(unsigned v);
 	void start_circular_portr_block(unsigned variant = 0);
-	void start_pipeline_port_read(unsigned variant = 0);
 	struct accumulator_store_fixture
 	{
 		unsigned reg, selected, kind, selector;
@@ -1117,7 +1116,6 @@ private:
 	bool check_accumulator_shift_results();
 	bool check_branch_repeat_results();
 	bool check_rptbd_t_load_results();
-	bool check_pipeline_port_read_results();
 	bool check_long_accumulator_store_results();
 	bool check_absolute_xorm_results();
 	bool check_staged_load_results();

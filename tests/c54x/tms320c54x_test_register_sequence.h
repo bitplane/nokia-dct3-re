@@ -112,11 +112,12 @@ private:
 			if (action.bio_level) m_bio_level = *action.bio_level;
 			for (auto const &value : action.values) m_cpu.set_state_int(value.index, value.value);
 			for (auto const &line : action.input_lines) m_cpu.set_input_line(line.index, int(line.value));
-			if (!action.program.empty() || !action.data.empty())
+			if (!action.program.empty() || !action.data.empty() || !action.io.empty())
 			{
 				auto const disable = m_machine.disable_side_effects();
 				for (auto const &word : action.program) m_cpu.space(AS_PROGRAM).write_word(word.address, word.value);
 				for (auto const &word : action.data) m_cpu.space(AS_DATA).write_word(word.address, word.value);
+				for (auto const &word : action.io) m_cpu.space(AS_IO).write_word(word.address, word.value);
 			}
 		}
 	}

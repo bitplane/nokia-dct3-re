@@ -285,6 +285,7 @@ def main():
     counts['atomic_xc_word_boundary'] = 3
     counts['bio_atomic'] = 29
     counts['bio_pipeline'] = 32
+    counts['port_read_destinations'] = 52
     parser.add_argument('section', choices=[*counts, 'all'])
     parser.add_argument('--jobs', type=int, default=8)
     parser.add_argument('--negative-control', action='store_true', help='require failure of an intentionally wrong expectation')

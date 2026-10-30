@@ -557,51 +557,6 @@ void tms320c54x_test_state::start_circular_portr_block(unsigned variant)
 	m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 }
 
-void tms320c54x_test_state::start_pipeline_port_read(unsigned variant)
-{
-	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-	unsigned const mode = variant % 13;
-	u16 const value = std::array<u16, 4>{0, 1, 0x8000, 0xffff}[(variant / 13) % 4];
-	bool const absolute = mode <= 8, compiler = mode == 10;
-	u16 const target = mode < 8 ? 8 + mode : compiler ? 0x1020 : mode == 9 ? 0x4a0 : 0x500;
-	u32 const base = (variant / 52) % 2 ? 0x20000 : 0;
-	auto &program = m_cpu->space(AS_PROGRAM);
-	for (unsigned i = 0; i < 32; ++i) program.write_word(base + 0x600 + i, 0xf495);
-	program.write_word(base + 0x600, absolute ? 0x74f8 : mode == 11 ? 0x7491 : mode == 12 ? 0x7489 : 0x7420);
-	program.write_word(base + 0x601, absolute ? target : 0x125);
-	if (absolute) program.write_word(base + 0x602, 0x125);
-	set_registers(*m_cpu, {
-		{cpu_regs::STATE_IDLE, 0}, {cpu_regs::STATE_TCR, 0x10}, {cpu_regs::STATE_PMST, 0}, {cpu_regs::STATE_ILLEGAL, 0},
-		{cpu_regs::STATE_ST0, 0x609}, {cpu_regs::STATE_ST1, 0x900 | (compiler ? 0x4000 : 0)},
-	});
-	m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000); m_cpu->set_state_int(tms320c54x_device::STATE_AR1, 0x500);
-	m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x1212345678ULL);
-	m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x349abcdef0ULL);
-	m_cpu->set_state_int(tms320c54x_device::STATE_T, 0x1234); m_cpu->set_state_int(tms320c54x_device::STATE_TRN, 0x5678);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
-	if (mode >= 8) m_cpu->space(AS_DATA).write_word(target, 0xdead);
-	m_cpu->space(AS_IO).write_word(0x125, value);
-	m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_cpu->set_pipeline_frontend(true);
-	m_pipeline_replay = false; m_idle_fixture_tick = 0;
-	m_pipeline_operand_reads = m_pipeline_store_writes = m_pipeline_extensions_reads = 0;
-	unsigned const read_cycle = absolute ? 7 : 6;
-	m_pipeline_operand_tap = m_cpu->space(AS_IO).install_read_tap(0, 0xffff, "portr_sample",
-		[this, value, read_cycle](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return;
-			expect(at == 0x125 && word == value && !m_pipeline_operand_reads && m_cpu->pipeline_cycles() == read_cycle,
-				"PORTR samples the retained external port once in Read"); ++m_pipeline_operand_reads; });
-	m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0, 0xffff, "portr_publication",
-		[this, target, value, read_cycle](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return;
-			expect(at == target && word == value && !m_pipeline_store_writes && m_cpu->pipeline_cycles() == read_cycle + 1,
-				"PORTR writes its captured data destination once in Execute"); ++m_pipeline_store_writes; });
-	m_operand_data_tap = m_cpu->space(AS_DATA).install_read_tap(0, 0xffff, "portr_no_destination_read",
-		[this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) expect(false, "PORTR does not read its data destination"); });
-	m_pipeline_fetch_tap = program.install_read_tap(base + 0x601, base + (absolute ? 0x602 : 0x601), "portr_literals",
-		[this, absolute, target](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return;
-			expect(m_pipeline_extensions_reads < (absolute ? 2 : 1) && word == (absolute && !m_pipeline_extensions_reads ? target : 0x125) &&
-				(at & 0xffff) == 0x601 + m_pipeline_extensions_reads, "PORTR retains absolute destination before port literal"); ++m_pipeline_extensions_reads; });
-	m_phase = 252790; m_cpu->resume(SUSPEND_REASON_DISABLE);
-	m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-}
 
 tms320c54x_test_state::accumulator_store_fixture tms320c54x_test_state::peripheral_long_rmw_fixture(unsigned variant)
 {
@@ -2200,72 +2155,6 @@ bool tms320c54x_test_state::check_pipeline_peripheral_logic_results()
 }
 
 
-bool tms320c54x_test_state::check_pipeline_port_read_results()
-{
-	if (m_phase == 252790)
-	{
-		unsigned const variant = m_pipeline_peripheral_case, mode = variant % 13;
-		u16 const value = std::array<u16, 4>{0, 1, 0x8000, 0xffff}[(variant / 13) % 4];
-		bool const absolute = mode <= 8, compiler = mode == 10;
-		u16 const target = mode < 8 ? 8 + mode : compiler ? 0x1020 : mode == 9 ? 0x4a0 : 0x500;
-		u32 const base = (variant / 52) % 2 ? 0x20000 : 0;
-		unsigned const tick = ++m_idle_fixture_tick, read_cycle = absolute ? 7 : 6;
-		unsigned const checkpoint = std::array<unsigned, 4>{3, 5, 7, 8}[variant / 104];
-		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "PORTR has retained staged ownership");
-		if (tick == read_cycle)
-			m_cpu->space(AS_IO).write_word(0x125, value ^ 0xffff); // Retained sample must survive a changing peripheral.
-		if (tick == (absolute ? 5 : 4))
-		{
-			auto const disable = machine().disable_side_effects();
-			m_cpu->space(AS_PROGRAM).write_word(base + 0x601, 0xf495);
-			if (absolute) m_cpu->space(AS_PROGRAM).write_word(base + 0x602, 0xf495);
-		}
-		if (tick == checkpoint && !m_pipeline_replay)
-		{
-			m_idle_fixture_saved_tick = tick; m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_store_writes, m_pipeline_extensions_reads};
-			expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save PORTR at partial Decode, Access, Read or publication");
-		}
-		if (tick == 20)
-		{
-			u64 a = 0x1212345678ULL, b = 0x349abcdef0ULL;
-			if (mode < 6)
-			{
-				unsigned const shift = (mode % 3) * 16;
-				u64 const mask = (mode % 3 == 2 ? 0xffULL : 0xffffULL) << shift;
-				u64 &destination = mode < 3 ? a : b;
-				destination = (destination & ~mask) | ((u64(value) << shift) & mask);
-			}
-			{
-				auto const disable = machine().disable_side_effects();
-				expect(m_pipeline_operand_reads == 1 && m_pipeline_store_writes == 1 && m_pipeline_extensions_reads == (absolute ? 2 : 1) &&
-					m_cpu->state_int(tms320c54x_device::STATE_A) == a && m_cpu->state_int(tms320c54x_device::STATE_B) == b &&
-					m_cpu->state_int(tms320c54x_device::STATE_T) == (mode == 6 ? value : 0x1234) &&
-					m_cpu->state_int(tms320c54x_device::STATE_TRN) == (mode == 7 ? value : 0x5678) &&
-					m_cpu->state_int(tms320c54x_device::STATE_AR1) == (mode == 11 ? 0x501 : mode == 12 ? 0x4ff : 0x500) &&
-					m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0x609 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == (0x900 | (compiler ? 0x4000 : 0)) &&
-					(mode < 8 || m_cpu->space(AS_DATA).read_word(target) == value),
-					"PORTR preserves status/unselected lanes and replays one port read and one data write");
-			}
-			if (!m_pipeline_replay)
-			{
-				m_pipeline_replay = true; m_idle_fixture_tick = m_idle_fixture_saved_tick;
-				m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_store_writes = m_recurring_irq_snapshot[1]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[2];
-				return restore_pipeline_at(252800, "Restore PORTR without duplicate port read or data write");
-			}
-			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_operand_data_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (variant < 415) { start_pipeline_port_read(variant + 1); return true; }
-			osd_printf_info("TMS320C54x staged PORTR: PASS cases=416 destination_modes=13 values=4 pages=2 restore=416 retained_literals=1 duplicate_port_reads=0 duplicate_data_writes=0 destination_reads=0\n");
-			start_pipeline_long_accumulator_store(); return true;
-		}
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 252800)
-	{
-		m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 252790;
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	return false;
-}
 
 
 bool tms320c54x_test_state::check_mcbsp_control_sequence_results()
