@@ -134,6 +134,7 @@ def main():
     counts['compact_load'] = 28
     counts['stack_address_dependency'] = 24
     counts['transition_register'] = 20
+    counts['compact_store'] = 512
     parser.add_argument('section', choices=[*counts, 'all'])
     parser.add_argument('--jobs', type=int, default=8)
     parser.add_argument('--negative-control', action='store_true', help='require failure of an intentionally wrong expectation')

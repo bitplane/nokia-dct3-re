@@ -1781,21 +1781,6 @@ void tms320c54x_test_state::start_asm_store_case(unsigned index)
 	m_check_timer->adjust(attotime::from_usec(100));
 }
 
-void tms320c54x_test_state::start_compact_store_case(unsigned index)
-{
-	unsigned const operand = (index >> 4) & 15;
-	auto &program = m_cpu->space(AS_PROGRAM);
-	program.write_word(0x0109d0, 0x9800 | index);
-	program.write_word(0x0109d1, 0xf4e1);
-	m_cpu->space(AS_DATA).write_word(0x0507, 0xbeef);
-	set_registers(*m_cpu, {
-		{STATE_GENPC, 0x0109d0}, {cpu_regs::STATE_ST0, 0x0aa5}, {cpu_regs::STATE_ST1, 0x0900},
-		{cpu_regs::STATE_A, 0x12345678}, {cpu_regs::STATE_B, 0xff87654321ULL}, {cpu_regs::STATE_AR0, 3},
-		{cpu_regs::STATE_AR2 + (operand & 3), 0x0507}, {cpu_regs::STATE_BK, 8}, {cpu_regs::STATE_IDLE, 0},
-	});
-	m_phase = 2765 + index;
-	m_check_timer->adjust(attotime::from_usec(100));
-}
 
 
 
@@ -4497,30 +4482,6 @@ bool tms320c54x_test_state::check_banz_offset_results()
 
 
 
-bool tms320c54x_test_state::check_compact_store_results()
-{
-	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
-	if (m_phase >= 2765 && m_phase < 3277)
-	{
-		unsigned const index = m_phase - 2765;
-		unsigned const operand = (index >> 4) & 15;
-		u64 const value = index & 256 ? 0xff87654321ULL : 0x12345678;
-		int const increments[] = {0, -1, 1, -5};
-		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) &&
-			m_cpu->state_int(tms320c54x_device::STATE_IDLE) &&
-			data.read_word(0x0507) == u16(value << (index & 15)) &&
-			m_cpu->state_int(tms320c54x_device::STATE_AR2 + (operand & 3)) == 0x0507 + increments[operand >> 2] &&
-			m_cpu->state_int(tms320c54x_device::STATE_A) == 0x12345678 &&
-			m_cpu->state_int(tms320c54x_device::STATE_B) == 0xff87654321ULL &&
-			m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0x0aa5 &&
-			m_cpu->state_int(tms320c54x_device::STATE_ST1) == 0x0900,
-			"SPRU172C STL SHFT Xmem preserves accumulators/status and uses compact AR2-5 addressing");
-		if (index < 511) { start_compact_store_case(index + 1); return true; }
-		osd_printf_info("TMS320C54x compact store conformance: PASS variants=512\n");
-		return true;
-	}
-	return false;
-}
 
 bool tms320c54x_test_state::check_asm_store_results()
 {
