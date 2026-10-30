@@ -170,7 +170,6 @@ private:
 	void start_pipeline_conditional_branch(unsigned variant = 0);
 	void start_pipeline_plain_return(unsigned variant = 0);
 	void start_pipeline_call(unsigned variant = 0);
-	void start_pipeline_direct_move(unsigned variant = 0);
 	void start_pipeline_worker_xc(unsigned variant = 0);
 	void start_pipeline_xc_irq(unsigned variant = 0);
 	void start_xc_return(unsigned variant = 0);

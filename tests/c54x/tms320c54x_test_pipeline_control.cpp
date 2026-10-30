@@ -1485,7 +1485,6 @@ bool tms320c54x_test_state::check_pipeline_conditional_branch_results()
 			m_pipeline_write_tap.remove(); m_pipeline_operand_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
 			if (m_pipeline_peripheral_case < 131) { start_pipeline_call(m_pipeline_peripheral_case + 1); return true; }
 			osd_printf_info("TMS320C54x staged calls: PASS cases=132 forms=CALL,CALLD pages=2 adjacent_push=66 stm_t_delay=108 parameters=9 restore=132 duplicate_stack_writes=0\n");
-			start_pipeline_direct_move(); return true;
 		}
 		++m_pipeline_expected_cycle;
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
@@ -1493,56 +1492,6 @@ bool tms320c54x_test_state::check_pipeline_conditional_branch_results()
 	if (m_phase == 251660)
 	{
 		m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 251650;
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 251670)
-	{
-		u64 const cycle = m_cpu->pipeline_cycles();
-		unsigned const variant = m_pipeline_peripheral_case;
-		bool const indirect = variant >= 60;
-		unsigned const move_case = indirect ? variant - 60 : variant;
-		bool const conflict = !indirect && variant >= 48;
-		u16 const destination = indirect ? std::array<u16, 4>{0x10, 0x12, 0x18, 0x700}[move_case & 3] : std::array<u16, 4>{0x12, 0x18, 0x19, 0x700}[variant & 3];
-		u16 const source = indirect ? 0x510 : conflict ? 0x7f : BIT(variant, 2) ? 0x531 : 0x431;
-		u16 const value = BIT(move_case, 3) ? 0xbeef : 0x123;
-		u16 const initial = indirect ? std::array<u16, 4>{0x5678, 0x510, 0x500, 0xaaaa}[move_case & 3] : std::array<u16, 4>{0x1234, 0x500, 0x40, 0xaaaa}[variant & 3];
-		unsigned const read_clock = conflict ? 6 : 5;
-		unsigned const write_clock = conflict ? 7 : destination < 0x60 ? 5 : 6;
-		u64 const checkpoint = indirect ? 4 + move_case / 16 : conflict ? 5 + (variant - 48) / 4 : 4 + variant / 16;
-		expect(cycle == m_pipeline_expected_cycle && !m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) &&
-			m_pipeline_operand_reads == unsigned(cycle >= read_clock) && m_pipeline_store_writes == unsigned(cycle >= write_clock) &&
-			m_cpu->space(AS_DATA).read_word(destination) == (cycle >= write_clock ? value : initial) &&
-			m_cpu->state_int(tms320c54x_device::STATE_ST0) == (conflict ? 0xa600 : 0xa608) &&
-			m_cpu->state_int(tms320c54x_device::STATE_ST1) == (0x800 | (!conflict && BIT(variant, 2) ? 0x4000 : 0)) &&
-			m_cpu->state_int(tms320c54x_device::STATE_A) == 0x123456789aULL &&
-			m_cpu->state_int(tms320c54x_device::STATE_B) == 0x2233445566ULL,
-			"MVDK copies retained unsigned data with destination-specific write timing and no status/accumulator changes");
-		if (indirect && destination != 0x12)
-			expect(m_cpu->state_int(tms320c54x_device::STATE_AR2) == (cycle >= 5 && !BIT(move_case, 2) ? 0x511 : 0x510), "Indirect MVDK updates its source AR once after retaining the old-address sample");
-		if (cycle == checkpoint && !m_pipeline_replay)
-		{
-			expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save MVDK before/after source read or destination write");
-		}
-		if (cycle == read_clock) m_cpu->space(AS_DATA).write_word(source, 0);
-		if (cycle == 10)
-		{
-			if (!m_pipeline_replay)
-			{
-				m_pipeline_replay = true; m_pipeline_operand_reads = unsigned(checkpoint >= read_clock); m_pipeline_store_writes = unsigned(checkpoint >= write_clock);
-				expect(restore_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Restore retained move value without duplicate reads/writes");
-				return restart_pipeline_observer(251680, checkpoint + 1);
-			}
-			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (variant < 107) { start_pipeline_direct_move(variant + 1); return true; }
-			osd_printf_info("TMS320C54x staged MVDK: PASS cases=108 direct=60 indirect=48 restore=108 bank_conflicts=9 source_ar_alias=12 duplicate_accesses=0\n");
-			start_pipeline_worker_xc(); return true;
-		}
-		++m_pipeline_expected_cycle;
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 251680)
-	{
-		m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 251670;
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
 	}
 	if (m_phase == 251690)

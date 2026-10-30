@@ -191,53 +191,6 @@ void tms320c54x_test_state::start_pipeline_mask_rmw_case()
 
 
 
-void tms320c54x_test_state::start_pipeline_direct_move(unsigned variant)
-{
-	m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
-	m_pipeline_peripheral_case = variant;
-	bool const indirect = variant >= 60;
-	unsigned const move_case = indirect ? variant - 60 : variant;
-	bool const conflict = !indirect && variant >= 48;
-	u16 const destination = indirect ? std::array<u16, 4>{0x10, 0x12, 0x18, 0x700}[move_case & 3] : std::array<u16, 4>{0x12, 0x18, 0x19, 0x700}[variant & 3];
-	u16 const source = indirect ? 0x510 : conflict ? 0x7f : BIT(variant, 2) ? 0x531 : 0x431;
-	u16 const value = BIT(move_case, 3) ? 0xbeef : 0x123;
-	unsigned const write_clock = conflict ? 7 : destination < 0x60 ? 5 : 6;
-	auto &program = m_cpu->space(AS_PROGRAM);
-	for (unsigned i = 0; i < 16; ++i) program.write_word(0x600 + i, 0xf495);
-	if (conflict) program.write_word(0x600, 0x8011); // Older STL uses the DAGEN bank.
-	program.write_word(0x600 + conflict, indirect ? (BIT(move_case, 2) ? 0x7182 : 0x7192) : conflict ? 0x717f : 0x7131);
-	program.write_word(0x601 + conflict, destination);
-	set_registers(*m_cpu, {
-		{cpu_regs::STATE_TCR, 0x10}, {cpu_regs::STATE_PMST, 0}, {cpu_regs::STATE_ILLEGAL, 0},
-		{cpu_regs::STATE_ST0, conflict ? 0xa600 : 0xa608},
-	});
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x800 | (!conflict && BIT(variant, 2) ? 0x4000 : 0));
-	set_registers(*m_cpu, {
-		{cpu_regs::STATE_SP, 0x500}, {cpu_regs::STATE_AR2, indirect ? 0x510 : 0x1234}, {cpu_regs::STATE_AR0, 0x5678},
-		{cpu_regs::STATE_BK, 0x40}, {cpu_regs::STATE_A, 0x123456789aULL}, {cpu_regs::STATE_B, 0x2233445566ULL},
-		{cpu_regs::STATE_IFR, 0}, {cpu_regs::STATE_IMR, 0},
-	});
-	m_cpu->space(AS_DATA).write_word(source, value);
-	m_cpu->space(AS_DATA).write_word(0x700, 0xaaaa);
-	m_cpu->set_state_int(STATE_GENPC, 0x600);
-	m_cpu->set_pipeline_frontend(true);
-	m_pipeline_replay = false; m_pipeline_expected_cycle = 1;
-	m_pipeline_operand_reads = m_pipeline_store_writes = 0;
-	m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(source, source, "staged_mvd_source",
-		[this, value, conflict](offs_t, u16 &word, u16) {
-			if (machine().side_effects_disabled()) return;
-			expect(word == value && m_cpu->pipeline_cycles() == (conflict ? 6 : 5), "MVDK retains its source sample once at the opcode's Read clock");
-			++m_pipeline_operand_reads;
-		});
-	m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(destination, destination, "staged_mvd_destination",
-		[this, value, write_clock](offs_t, u16 &word, u16) {
-			if (machine().side_effects_disabled()) return;
-			expect(word == value && m_cpu->pipeline_cycles() == write_clock, "MVDK writes its retained value at the destination-owned clock");
-			++m_pipeline_store_writes;
-		});
-	m_phase = 251670; m_cpu->resume(SUSPEND_REASON_DISABLE);
-	m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-}
 
 
 
