@@ -17,7 +17,6 @@ struct atomic_phase_range
 // Routing only: values and assertions remain in the owning fixture.
 // test_c54x_atomic_routing checks the complete guard partition independently.
 inline constexpr atomic_phase_range atomic_phase_ranges[] = {
-	{106, 116, atomic_fixture::corpus},
 	{128, 128, atomic_fixture::corpus},
 	{191, 386, atomic_fixture::corpus},
 	{422, 422, atomic_fixture::corpus},

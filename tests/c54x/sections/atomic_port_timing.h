@@ -5,7 +5,7 @@ namespace c54x_test {
 inline std::vector<clocked_register_case> section_cases()
 {
 	std::vector<clocked_register_case> cases;
-	for (unsigned variant = 0; variant != 13; ++variant) {
+	for (unsigned variant = 0; variant != 15; ++variant) {
 		bool const writing = variant == 2 || variant >= 6;
 		bool const single = variant == 1;
 		u16 const port = writing ? 0x124 : 0x123;
@@ -18,14 +18,19 @@ inline std::vector<clocked_register_case> section_cases()
 		if (variant == 10) words.insert(words.end(),{0xf073,0x605}); // B next port.
 		if (!single) words.insert(words.end(),{opcode,port});
 		words.push_back(0xf4e1);
-		if (variant >= 11) words = {0x75d6,0x124,u16(variant == 11 ? 0x75f8 : 0x74f8),0x120,
+		if (variant == 11 || variant == 12) words = {0x75d6,0x124,u16(variant == 11 ? 0x75f8 : 0x74f8),0x120,
 			u16(variant == 11 ? 0x124 : 0x123),0x75d6,0x124,0xf4e1};
+		if (variant >= 13) words = {0x75d6,0x124,0x6082,0x1234,0x75d6,0x124,0xf4e1};
 		auto initial = initial_case("atomic-port-address-value-wrap-and-clock-interval",{0xf495});
 		for (unsigned i = 0; i != words.size(); ++i) initial.program[1+i].value = words[i];
 		initial.initial.insert(initial.initial.end(),{{r::STATE_AR6,0x103},{r::STATE_AR4,0x113},{r::STATE_BK,4},
 			{r::STATE_A,variant == 3 ? 1U : 0U},{r::STATE_AR2,variant == 6 ? 1U : 0U},
 			{r::STATE_ST0,variant == 8 ? 0x1000U : 0U},{r::STATE_ST1,variant == 5 ? 0x100U : 0U}});
 		initial.data = {{0x100,0x5678},{0x103,0x1234},{0x110,0xbeef},{0x113,0},{0x120,u16(variant >= 11 ? 0x9abc : 0xfffe)}};
+		if (variant >= 13) {
+			initial.initial.push_back({r::STATE_AR2,0x120});
+			initial.data.back().value = variant == 13 ? 0x1234 : 0x5678;
+		}
 		auto final = observation("port-results-and-independent-AR-selection",{{STATE_GENPC,0x601+words.size()},
 			{r::STATE_AR6,single ? 0x103U : 0x101U},{r::STATE_AR4,single ? 0x110U : 0x113U},
 			{r::STATE_A,variant == 5 ? 0xfffffffffeULL : variant == 3 ? 1U : 0U}});
@@ -33,7 +38,12 @@ inline std::vector<clocked_register_case> section_cases()
 		final.expected_data = writing ? std::vector<memory_word>{{0x103,0x1234},{0x100,0x5678}} :
 			single ? std::vector<memory_word>{{0x113,0xabcd},{0x110,0xbeef},{0x103,0x1234}} :
 			std::vector<memory_word>{{0x103,0xabcd},{0x100,0xabcd},{0x113,0},{0x110,0xbeef}};
-		if (variant >= 11) final.expected_data.push_back({0x120,u16(variant == 11 ? 0x9abc : 0xabcd)});
+		if (variant == 11 || variant == 12) final.expected_data.push_back({0x120,u16(variant == 11 ? 0x9abc : 0xabcd)});
+		if (variant >= 13) {
+			final.expected.push_back({r::STATE_AR2,0x120});
+			final.expected.push_back({r::STATE_ST0,variant == 13 ? 0x1000U : 0U,0x1000});
+			final.expected_data.push_back({0x120,u16(variant == 13 ? 0x1234 : 0x5678)});
+		}
 		clocked_register_case c{{{0,std::move(initial)},{1,observation("before-port-program",{{STATE_GENPC,0x601}})},
 			{2,observation("port-program-running",{})},{48,std::move(final)}},1,48};
 		c.pipeline_frontend = false;
@@ -43,9 +53,10 @@ inline std::vector<clocked_register_case> section_cases()
 		if (!single) c.data_events->push_back({writing,port,u16(writing ? 0x5678 : 0xabcd),0,false,{},
 			variant == 3 || variant == 8 ? 7U : variant == 4 || variant == 9 ? 5U :
 			variant == 5 || variant == 7 ? 4U : variant == 6 || variant == 10 ? 6U : 2U});
-		if (variant >= 11) c.data_events = std::vector<clocked_data_event>{{true,0x124,0x1234,0,false},
+		if (variant == 11 || variant == 12) c.data_events = std::vector<clocked_data_event>{{true,0x124,0x1234,0,false},
 			{variant == 11,u32(variant == 11 ? 0x124 : 0x123),u16(variant == 11 ? 0x9abc : 0xabcd),0,false},
 			{true,0x124,0x5678,0,false,{},{},5}};
+		if (variant >= 13) c.data_events->back().cycles_from_previous = 4;
 		if (!single) c.checkpoint = 3; // Port progress and the elapsed-clock origin survive restore.
 		cases.push_back(std::move(c));
 	}
