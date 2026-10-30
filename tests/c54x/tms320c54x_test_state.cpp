@@ -286,7 +286,6 @@ void tms320c54x_test_state::machine_reset()
 		{ {"far-call-delay"}, [](self &test) { test.start_delayed_far_call(); } },
 	}))
 		return;
-	if (profile_is("mvdm-delay") || mvkd_delay()) { start_mvdm_delay(); return; }
 	if (start_profile(*this, machine().options().bios(), {
 		{ {"stack-page0", "stack-page0-edge"}, [](self &test) { test.start_page_zero_stack(); } },
 	}))
@@ -730,7 +729,6 @@ void tms320c54x_test_state::test(machine_config &config)
 		if (m_phase == 253550) { auto const f = bus_io_case(m_pipeline_peripheral_case); expect(f.interrupt && line == (f.interrupt == 2 ? INPUT_LINE_NMI : 0) && !m_vector_acks && bus_io_clock() > f.complete, "Interrupt acknowledgement cannot split the pending external transaction"); ++m_vector_acks; }
 		if (m_phase == 253570) { unsigned const transfers = m_pipeline_peripheral_case / 8 ? 1 : 1 + (m_pipeline_peripheral_case / 2) % 4; expect(line == 0 && !m_vector_acks && m_pipeline_operand_reads + m_pipeline_store_writes == transfers, "IRQ acknowledgement follows the complete guarded I/O sequence"); ++m_vector_acks; }
 		if (m_phase == 254980) { auto const f = delay_compare_case(m_pipeline_peripheral_case); expect(f.interrupt && line == (f.interrupt == 2 ? INPUT_LINE_NMI : 0) && !m_vector_acks && m_pipeline_operand_reads == (f.prefix ? 2U : 1U) && bool(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x1000) == f.final_tc && m_cpu->pipeline_cycles() > f.read, "IRQ NMI cannot enter before the complete delayed comparison publishes TC"); ++m_vector_acks; }
-		if (m_phase == 253650) { unsigned const source = (m_pipeline_peripheral_case / 64) % 3; expect(source && line == (source == 2 ? INPUT_LINE_NMI : 0) && !m_vector_acks && m_pipeline_store_writes == 1, "IRQ/NMI acknowledgement cannot split the two-word MVDM delay slot"); ++m_vector_acks; }
 		if (m_phase == 253670) { unsigned const source = (m_pipeline_peripheral_case / 27) % 3; expect(source && line == (source == 2 ? INPUT_LINE_NMI : 0) && !m_vector_acks && m_pipeline_store_writes == 2, "Pending IRQ/NMI cannot split the delayed far-call frame"); ++m_vector_acks; }
 		if (m_phase == 253530) { expect(line == 0 && !m_vector_acks, "Logical IRQ callback remains enabled with IACKOFF set"); ++m_vector_acks; }
 		if (m_phase == 253510)
