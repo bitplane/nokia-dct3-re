@@ -14,6 +14,7 @@ build/run times are in ignored `tmp/c54x-section-trial/SECTION/`.
 | 1 | `immediate_store.h`: eight direct/indirect/absolute/peripheral literal-store checkpoints | Legacy immediate-store start and phases251250/251260 | Native eight cases/restores; build5.083s, run0.016s |
 | 2 | `basic_memory.h`: twelve stores and six indirect loads, captured address, IRQ drain and store observation API | Two starts and phases251070..251100 | Native18 cases/restores; build5.246s, run0.021s |
 | 3 | `stack.h`:66 PSHM and57 ordinary POPM checkpoints; literal source expectations | PSHM start/phase handlers; ordinary branch removed from shared POPM reference | Native123 cases/restores; build5.235s, run0.061s |
+| 4 | `dagen.h`:240 constant-DAGEN,12 STM-arbitration and40 repeated-write rejection cases | Constant-DAGEN fixture/starts/results and STM start/results | Native292 cases/restores; build5.398s, run0.126s |
 
 The pilot retains opcode-shaped literals, pointer updates, exact data writes
 and before/after-write replay. Clock assertions describe the current pipeline
@@ -24,3 +25,10 @@ Stack coverage keeps three replay boundaries and both XPC pages. It retires
 redundant ordinary-page replication and PSHM reserved/zero-source cases;
 special IMR/IFR POPM remains in the unmigrated reference. Ordinary POPM also
 checks XF output against its architectural ST1 bit on every observation.
+
+DAGEN retains every target, value pattern, address form and older-store class
+but distributes replay/gap choices instead of multiplying them by pages and
+all snapshot points. It retains literal poisoning and complete bus events.
+Standard-mode ARP is corrected to zero. Same-clock DAGEN/RAM event order is
+an observed model regression, not a silicon ordering claim. Repeated-write
+rejection is an implementation limit. Its40 cases retire duplicate page runs.

@@ -147,21 +147,6 @@ private:
 	};
 	static delay_asm_fixture delay_asm_case(unsigned v);
 	void start_delay_asm(unsigned variant = 0);
-	struct constant_dagen_fixture
-	{
-		unsigned form, target, pattern, prefix, gap, checkpoint;
-		u32 base;
-		u16 value;
-		unsigned words() const { return 2 + form; }
-		unsigned prefix_words() const { return unsigned(prefix != 0); }
-		unsigned write() const { return 5 + prefix_words() + form + unsigned(prefix == 1 && !form); }
-		unsigned consumer() const { return 0x600 + prefix_words() + words() + gap + (target == 9 ? 1 + unsigned(prefix == 1 && !form) : 0); }
-		unsigned read() const { return consumer() - 0x600 + 5; }
-		u16 circular_source() const { return pattern == 1 ? 0x5002 : 0x5003; }
-	};
-	static constant_dagen_fixture constant_dagen_case(unsigned v);
-	void start_constant_dagen(unsigned variant = 0);
-	void start_constant_dagen_edge(unsigned variant = 0);
 	struct indirect_stm_fixture
 	{
 		unsigned selector, ar, snapshot;
@@ -183,7 +168,6 @@ private:
 	};
 	static accumulator_stm_fixture accumulator_stm_case(unsigned v);
 	void start_accumulator_stm(unsigned variant = 0);
-	void start_pipeline_stm_case(unsigned variant = 0);
 	void start_peripheral_mmr_timing_audit(unsigned variant = 0);
 	void start_pipeline_peripheral_case(unsigned variant = 0);
 	void start_pipeline_far_return(unsigned variant = 0);
@@ -2048,7 +2032,6 @@ private:
 	bool check_multiword_pipeline_results();
 	bool check_pipeline_store_results();
 	bool check_pipeline_rmw_results();
-	bool check_constant_dagen_results();
 	bool check_peripheral_mmr_timing_audit_results();
 	bool check_pipeline_immediate_store_results();
 	bool check_pipeline_far_return_results();

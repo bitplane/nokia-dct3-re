@@ -28,60 +28,6 @@ void tms320c54x_test_state::start_indirect_popm_case(unsigned index)
 }
 
 
-tms320c54x_test_state::constant_dagen_fixture tms320c54x_test_state::constant_dagen_case(unsigned v)
-{
-	constant_dagen_fixture f{};
-	f.form = v % 2; v /= 2; f.target = v % 10; v /= 10; f.pattern = v % 4; v /= 4;
-	f.prefix = v % 3; v /= 3; f.gap = v % 2; v /= 2; f.base = v % 2 ? 0x20000 : 0; v /= 2;
-	f.value = f.target == 9 ? std::array<u16, 4>{0, 1, 4, 8}[f.pattern] : 0x5000 + 2 * f.pattern;
-	f.checkpoint = std::array<unsigned, 4>{3 + f.prefix_words(), f.write() - 1, f.write(), f.read()}[v];
-	return f;
-}
-
-void tms320c54x_test_state::start_constant_dagen(unsigned variant)
-{
-	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-	auto const f = constant_dagen_case(variant); auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
-	for (unsigned i = 0; i < 24; ++i) program.write_word(f.base + 0x600 + i, 0xf495);
-	if (f.prefix) program.write_word(f.base + 0x600, f.prefix == 1 ? 0x8817 : 0x8060);
-	unsigned const at = 0x600 + f.prefix_words();
-	program.write_word(f.base + at, f.form ? 0x76f8 : 0x7610 + f.target);
-	if (f.form) program.write_word(f.base + at + 1, 0x10 + f.target);
-	program.write_word(f.base + at + 1 + f.form, f.value);
-	program.write_word(f.base + f.consumer(), f.target < 8 ? 0x1090 | f.target : f.target == 8 ? 0x4a10 : 0x10d1);
-	// Keep circular Decode after BK publication, including bank deferral;
-	// the closest conflict composition needs independent silicon evidence.
-	program.write_word(f.base + f.consumer() + 1, 0xf4e1);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xa600); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x900);
-	m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0);
-	m_cpu->set_input_line(0, CLEAR_LINE); m_cpu->set_input_line(INPUT_LINE_NMI, CLEAR_LINE);
-	m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x1234566000ULL); m_cpu->set_state_int(tms320c54x_device::STATE_B, 0xfeabcd9876ULL); m_cpu->set_state_int(tms320c54x_device::STATE_T, 0x5aa5);
-	m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x4200); m_cpu->set_state_int(tms320c54x_device::STATE_BK, 16);
-	for (unsigned i = 0; i < 8; ++i) m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + i, f.target == 9 && i == 1 ? f.circular_source() : 0x4000 + i);
-	if (f.target != 8) data.write_word(f.target == 9 ? f.circular_source() : f.value, 0x1350 + f.pattern);
-	m_pipeline_operand_reads = m_pipeline_store_writes = m_pipeline_register_writes = m_fast_stack_reads = m_pipeline_extensions_reads = 0;
-	m_pipeline_operand_tap = data.install_read_tap(0, 0xffff, "constant_dagen_consumer", [this, f](offs_t address, u16 &word, u16) { if (machine().side_effects_disabled()) return; expect(!m_pipeline_operand_reads++ && address == (f.target == 8 ? 0x10 : f.target == 9 ? f.circular_source() : f.value) && word == (f.target == 8 ? 0x4000 : 0x1350 + f.pattern) && m_cpu->pipeline_cycles() == f.read(), "Constant DAGEN initialization feeds the retained address or stack consumer once"); });
-	m_pipeline_write_tap = data.install_write_tap(0, 0xffff, "constant_dagen_publication", [this, f](offs_t address, u16 &word, u16) { if (machine().side_effects_disabled()) return; if (f.prefix && address == (f.prefix == 1 ? 0x17 : 0x60) && word == 0x6000) { expect(!m_pipeline_register_writes++ && m_cpu->pipeline_cycles() == 6, "Older store owns its separate Execute write"); return; } if (address == 0x10 + f.target) { expect(!m_pipeline_store_writes++ && word == f.value && m_cpu->pipeline_cycles() == f.write(), "Constant ST publishes its retained DAGEN word once, with bank arbitration"); return; } expect(f.target == 8 && address == f.value - 1 && word == 0x4000 && !m_fast_stack_reads++ && m_cpu->pipeline_cycles() == f.read() + 1, "Following PSHM uses the new SP for its one stack write"); });
-	m_pipeline_fetch_tap = program.install_read_tap(f.base + at + 1, f.base + at + 1 + f.form, "constant_dagen_literals", [this, f](offs_t, u16 &word, u16) { if (machine().side_effects_disabled()) return; unsigned const i = m_pipeline_extensions_reads++; expect(i <= f.form && word == (f.form && !i ? 0x10 + f.target : f.value) && m_cpu->pipeline_cycles() == 3 + f.prefix_words() + i, "Constant ST retains its address/value extensions in order"); });
-	m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 310000;
-	m_cpu->set_state_int(STATE_GENPC, f.base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-}
-
-void tms320c54x_test_state::start_constant_dagen_edge(unsigned variant)
-{
-	start_constant_dagen(); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-	unsigned const form = variant % 2, target = (variant / 2) % 10; u32 const base = (variant / 20) % 2 ? 0x20000 : 0;
-	auto &program = m_cpu->space(AS_PROGRAM);
-	m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove();
-	for (unsigned i = 0; i < 16; ++i) program.write_word(base + 0x600 + i, 0xf495);
-	program.write_word(base + 0x600, 0xec01); program.write_word(base + 0x601, form ? 0x76f8 : 0x7610 + target);
-	if (form) program.write_word(base + 0x602, 0x10 + target);
-	program.write_word(base + 0x602 + form, 0x1234);
-	m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0, 0xffff, "constant_dagen_edge_read", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) ++m_pipeline_operand_reads; });
-	m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0, 0xffff, "constant_dagen_edge_write", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) ++m_pipeline_store_writes; });
-	m_phase = 310020; m_cpu->set_pipeline_frontend(false); m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE);
-}
 
 tms320c54x_test_state::indirect_stm_fixture tms320c54x_test_state::indirect_stm_case(unsigned v) const
 {
@@ -136,39 +82,6 @@ void tms320c54x_test_state::start_indirect_stm(unsigned variant)
 	m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 }
 
-void tms320c54x_test_state::start_pipeline_stm_case(unsigned variant)
-{
-	m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
-	m_pipeline_stm_case = variant;
-	bool const conflict = variant >= 6;
-	u16 const target = std::array<u16, 3>{0x12, 0x18, 0x19}[variant % 3];
-	auto &program = m_cpu->space(AS_PROGRAM);
-	for (unsigned i = 0; i < 20; ++i) program.write_word(0x600 + i, 0xf495);
-	if (conflict) program.write_word(0x600, 0x8011); // STL A,AR1: shared DAGEN bank.
-	program.write_word(0x600 + conflict, 0x7700 | target);
-	program.write_word(0x601 + conflict, 0x1234);
-	m_cpu->set_input_line(0, CLEAR_LINE);
-	set_registers(*m_cpu, {
-		{cpu_regs::STATE_TCR, 0x10}, {cpu_regs::STATE_ILLEGAL, 0}, {cpu_regs::STATE_ST1, 0x800},
-		{cpu_regs::STATE_ST0, 0}, {cpu_regs::STATE_IFR, 0}, {cpu_regs::STATE_SP, 0x1000}, {cpu_regs::STATE_AR1, 0},
-		{cpu_regs::STATE_AR2, 0}, {cpu_regs::STATE_BK, 0}, {cpu_regs::STATE_A, 0x5678}, {STATE_GENPC, 0x600},
-	});
-	m_cpu->set_pipeline_frontend(true);
-	m_pipeline_replay = false;
-	m_pipeline_expected_cycle = 1;
-	m_pipeline_store_writes = 0;
-	m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0x10, 0x19, "stm_dagen_write",
-		[this, target, conflict](offs_t address, u16 &value, u16) {
-			if (machine().side_effects_disabled()) return;
-			bool const older_store = conflict && address == 0x11;
-			expect(address == (older_store ? 0x11 : target) && value == (older_store ? 0x5678 : 0x1234) &&
-				m_cpu->pipeline_cycles() == (older_store ? 6 : conflict ? 7 : 5), "STM DAGEN bus write uses first-word Read or its one-cycle conflict deferral");
-			++m_pipeline_store_writes;
-		});
-	m_phase = 251190;
-	m_cpu->resume(SUSPEND_REASON_DISABLE);
-	m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-}
 
 
 
@@ -6126,96 +6039,6 @@ bool tms320c54x_test_state::check_pipeline_store_results()
 	return false;
 }
 
-bool tms320c54x_test_state::check_constant_dagen_results()
-{
-	if (m_phase == 310000)
-	{
-		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick; auto const f = constant_dagen_case(variant);
-		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Constant DAGEN store uses retained staged publication");
-		if (tick == 3 + f.prefix_words()) { auto const disabled = machine().disable_side_effects(); m_cpu->space(AS_PROGRAM).write_word(f.base + 0x601 + f.prefix_words(), 0xdead); }
-		if (f.form && tick == 4 + f.prefix_words()) { auto const disabled = machine().disable_side_effects(); m_cpu->space(AS_PROGRAM).write_word(f.base + 0x602 + f.prefix_words(), 0xbeef); }
-		capture_pipeline_at(f.checkpoint, {&m_pipeline_operand_reads, &m_pipeline_store_writes, &m_pipeline_register_writes, &m_fast_stack_reads, &m_pipeline_extensions_reads},
-			"Save constant DAGEN destination, value, bank deferral and consumer state");
-		if (tick == 24)
-		{
-			expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_cpu->state_int(STATE_GENPC) == f.base + f.consumer() + 2 && m_pipeline_operand_reads == 1 && m_pipeline_store_writes == 1 && m_pipeline_register_writes == unsigned(f.prefix != 0) && m_fast_stack_reads == unsigned(f.target == 8) && m_pipeline_extensions_reads == f.words() - 1, "Constant DAGEN store and its selected consumer own each bus access exactly once");
-			for (unsigned i = 0; i < 8; ++i)
-			{
-				u16 expected = f.prefix == 1 && i == 7 ? 0x6000 : 0x4000 + i;
-				if (f.target == i) expected = f.value + 1;
-				if (f.target == 9 && i == 1) expected = std::array<u16, 4>{0x5004, 0x5002, 0x5000, 0x5004}[f.pattern];
-				if (m_cpu->state_int(tms320c54x_device::STATE_AR0 + i) != expected) osd_printf_info("constant_dagen_ar: case=%u replay=%u ar=%u actual=%04x expected=%04x\n", variant, unsigned(m_pipeline_replay), i, unsigned(m_cpu->state_int(tms320c54x_device::STATE_AR0 + i)), expected);
-				expect(m_cpu->state_int(tms320c54x_device::STATE_AR0 + i) == expected, "Only the selected constant initialization and owned address update alter AR state");
-			}
-			expect(m_cpu->state_int(tms320c54x_device::STATE_A) == (f.target == 8 ? 0x1234566000ULL : 0x1350 + f.pattern) && m_cpu->state_int(tms320c54x_device::STATE_B) == 0xfeabcd9876ULL && m_cpu->state_int(tms320c54x_device::STATE_SP) == (f.target == 8 ? f.value - 1 : 0x4200) && m_cpu->state_int(tms320c54x_device::STATE_BK) == (f.target == 9 ? f.value : 16) && m_cpu->state_int(tms320c54x_device::STATE_T) == 0x5aa5 && m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0xa600 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == 0x900, "DAGEN initialization preserves unrelated architectural state and feeds stack/circular consumers");
-			if (replay_pipeline_at(310010, f.checkpoint,
-				"Replay constant DAGEN publication without duplicate early/Execute writes")) return true;
-			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (variant < 3839) { start_constant_dagen(variant + 1); return true; }
-			start_constant_dagen_edge(); return true;
-		}
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 310010) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 310000; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true; }
-	if (m_phase == 310020)
-	{
-		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick, checkpoint = variant < 40 ? 3 : 9;
-		if (tick == checkpoint && !m_pipeline_replay) { expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save repeated DAGEN store exclusion before or after rejection"); }
-		if (tick == 20)
-		{
-			expect(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) && !m_pipeline_operand_reads && !m_pipeline_store_writes && m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x4200 && m_cpu->state_int(tms320c54x_device::STATE_BK) == 16, "Repeated constant DAGEN stores remain excluded before publication");
-			for (unsigned i = 0; i < 8; ++i) expect(m_cpu->state_int(tms320c54x_device::STATE_AR0 + i) == 0x4000 + i, "Rejected repeated constant store never alters an AR");
-			if (!m_pipeline_replay) { m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; return restore_pipeline_at(310030, "Replay rejected constant DAGEN store without bus activity"); }
-			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (variant < 79) { start_constant_dagen_edge(variant + 1); return true; }
-			osd_printf_info("TMS320C54x constant DAGEN ST: PASS cases=3840 excluded=80 restore=3920 forms=direct,absolute destinations=AR0..AR7,SP,BK patterns=4 older_stores=none,DAGEN,RAM gaps=0,1 pages=2 snapshots=4 consumers=indirect_LD,PSHM,circular_LD bk_min_gap=1_deferred_2 cpl=0 writes_each=1 extensions=retained repeated_publication=0 indirect_aliases=unvalidated physical_phase_claim=0\n"); throw emu_fatalerror(3, "TMS320C54x isolated constant DAGEN ST complete");
-		}
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 310030) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 310020; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true; }
-	if (m_phase == 251190)
-	{
-		u64 const cycle = m_cpu->pipeline_cycles();
-		bool const conflict = m_pipeline_stm_case >= 6;
-		u64 const write_cycle = conflict ? 7 : 5;
-		u64 const checkpoint = (conflict ? 6 : 4) + ((m_pipeline_stm_case % 6) >= 3);
-		int const reg = std::array<int, 3>{tms320c54x_device::STATE_AR2, tms320c54x_device::STATE_SP, tms320c54x_device::STATE_BK}[m_pipeline_stm_case % 3];
-		expect(cycle == m_pipeline_expected_cycle && !m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "STM staged frontend advances without atomic fallback");
-		expect(m_cpu->state_int(reg) == (cycle >= write_cycle ? 0x1234 : reg == tms320c54x_device::STATE_SP ? 0x1000 : 0), "STM DAGEN visibility follows documented Read-stage arbitration");
-		expect(m_pipeline_store_writes == unsigned(conflict && cycle >= 6) + unsigned(cycle >= write_cycle), "Pending DAGEN writes are committed once per instruction");
-		if (cycle == checkpoint && !m_pipeline_replay)
-		{
-			expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save STM before/after early or conflict-deferred write");
-		}
-		if (cycle == 9)
-		{
-			if (!m_pipeline_replay)
-			{
-				m_pipeline_replay = true;
-				m_pipeline_store_writes = unsigned(conflict && checkpoint >= 6) + unsigned(checkpoint >= write_cycle);
-				expect(restore_snapshot(machine(), m_saved_pipeline) == STATERR_NONE && m_cpu->pipeline_cycles() == checkpoint, "Restore DAGEN write arbitration without repeating a committed store");
-				return restart_pipeline_observer(251200, checkpoint + 1);
-			}
-			m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (m_pipeline_stm_case < 11) { start_pipeline_stm_case(m_pipeline_stm_case + 1); return true; }
-			osd_printf_info("TMS320C54x staged DAGEN immediate: PASS cases=12 targets=AR,SP,BK write=5 conflicting_write=7 deferred_restore=3 committed_restore=6 duplicate_writes=0\n");
-			start_peripheral_mmr_timing_audit();
-			return true;
-		}
-		++m_pipeline_expected_cycle;
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-		return true;
-	}
-	if (m_phase == 251200)
-	{
-		u64 const checkpoint = (m_pipeline_stm_case >= 6 ? 6 : 4) + ((m_pipeline_stm_case % 6) >= 3);
-		expect(m_cpu->pipeline_cycles() == checkpoint, "Settlement does not perform a deferred DAGEN write");
-		m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 251190;
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-		return true;
-	}
-	return false;
-}
 
 bool tms320c54x_test_state::check_pipeline_immediate_store_results()
 {
