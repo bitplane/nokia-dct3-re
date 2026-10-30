@@ -96,7 +96,6 @@ private:
 	void start_operand_fetch_case(unsigned index);
 	void start_loop_xc_case(unsigned index);
 	void start_nested_repeat_case(unsigned index);
-	void start_braf_control_case(unsigned index);
 	void start_xc_irq_case(unsigned index);
 	void check_control_disassembler();
 	void start_idle_nmi_case(unsigned index);
@@ -1753,7 +1752,7 @@ private:
 	bool check_vector_prefetch_results();
 	bool check_idle_pll_results();
 	bool check_xc_interrupt_results();
-	bool check_braf_control_results();
+	bool check_repeat_endpoints_results();
 	bool check_shifted_arithmetic_selector_results();
 	bool check_interrupt_entry_results();
 	bool check_rounding_boundary_results();

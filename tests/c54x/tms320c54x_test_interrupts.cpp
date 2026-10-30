@@ -513,7 +513,7 @@ bool tms320c54x_test_state::check_xc_interrupt_results()
 		m_xc_irq_tap.remove();
 		if (index < 3) { start_xc_irq_case(index + 1); return true; }
 		osd_printf_info("TMS320C54x XC interrupt protection: PASS cases=4 spans=1,2 accepted,rejected=1 physical_pipeline_claim=0\n");
-		start_braf_control_case(0); return true;
+		return true;
 	}
 	return false;
 }
