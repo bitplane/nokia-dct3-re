@@ -1493,20 +1493,14 @@ bool tms320c54x_test_state::check_literal_guard_results()
 		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick, count = (variant / 3) % 3;
 		unsigned const checkpoint = std::array<unsigned, 3>{4, 7, 12}[variant / 18];
 		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Instruction admission must not classify a retained extension as an opcode");
-		if (tick == checkpoint && !m_pipeline_replay)
-		{
-			m_recurring_irq_snapshot = {m_pipeline_store_writes};
-			expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save a block with an opcode-shaped extension");
-		}
+		capture_pipeline_at(checkpoint, {&m_pipeline_store_writes},
+			"Save a block with an opcode-shaped extension");
 		if (tick == 64)
 		{
 			expect(m_pipeline_store_writes == count + 1 && m_cpu->state_int(tms320c54x_device::STATE_IDLE), "Literal-bearing block retires each complete ST exactly once");
 			{ auto const disable = machine().disable_side_effects(); expect(m_cpu->space(AS_DATA).read_word(std::array<u16, 3>{0x7cf8, 0x7df8, 0x7ff8}[variant % 3]) == 0x1357, "Block literal names the committed RAM location"); }
-			if (!m_pipeline_replay)
-			{
-				m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; m_pipeline_store_writes = m_recurring_irq_snapshot[0];
-				return restore_pipeline_at(literal_guard_phase + 1, "Restore a retained extension without duplicate block stores");
-			}
+			if (replay_pipeline_at(literal_guard_phase + 1, checkpoint,
+				"Restore a retained extension without duplicate block stores")) return true;
 			m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
 			if (variant < 53) { start_literal_guard(variant + 1); return true; }
 			osd_printf_info("TMS320C54x opcode-shaped extensions: PASS cases=54 restore=54 literals=7cf8,7df8,7ff8 block_counts=0,1,2 pages=2 snapshots=3 instruction=ST_absolute writes=count+1 transfer_admission=0\n");
@@ -1801,11 +1795,13 @@ bool tms320c54x_test_state::check_pipeline_rmw_results()
 		if (f.long_form() && tick == f.literal_clock()) { auto const disabled = machine().disable_side_effects(); m_cpu->space(AS_PROGRAM).write_word(f.base + 0x603 + f.prefix(), 0xdead); }
 		if (tick == f.read() - 1) { expect(m_cpu->state_int(tms320c54x_device::STATE_AR3) == (f.form == 2 ? 0x1003 : f.form == 3 ? 0xfff : 0x1002), "ASM source updates its selected pointer once in Access"); m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x4444); }
 		if (tick == f.read()) { auto const disabled = machine().disable_side_effects(); m_cpu->space(AS_DATA).write_word(0x1002, 0xdead); }
-		if (tick == f.checkpoint && !m_pipeline_replay) { m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_store_writes, m_pipeline_register_writes, m_pipeline_extensions_reads}; expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save ASM source, control-delay words and adjacent shift across publication"); }
+		capture_pipeline_at(f.checkpoint, {&m_pipeline_operand_reads, &m_pipeline_store_writes, &m_pipeline_register_writes, &m_pipeline_extensions_reads},
+			"Save ASM source, control-delay words and adjacent shift across publication");
 		if (tick == 24)
 		{
 			expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_cpu->state_int(STATE_GENPC) == f.base + f.store() + 2 && m_pipeline_operand_reads == 1 && m_pipeline_store_writes == 1 && m_pipeline_register_writes == f.prefix() && m_pipeline_extensions_reads == unsigned(f.long_form()) && m_cpu->state_int(tms320c54x_device::STATE_A) == f.result && m_cpu->state_int(tms320c54x_device::STATE_B) == (f.pattern ? 0xfffffffff9ULL : 7) && m_cpu->state_int(tms320c54x_device::STATE_TRN) == u16(f.result) && m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x1002 && m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0xa620 && m_cpu->state_int(tms320c54x_device::STATE_T) == 0x5aa5 && m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x4444, "ASM delay and selected target preserve the sampled shift, source, status and one observed result");
-			if (!m_pipeline_replay) { m_pipeline_replay = true; m_idle_fixture_tick = f.checkpoint; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_store_writes = m_recurring_irq_snapshot[1]; m_pipeline_register_writes = m_recurring_irq_snapshot[2]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[3]; return restore_pipeline_at(311010, "Replay delayed ASM without repeated source reads or target writes"); }
+			if (replay_pipeline_at(311010, f.checkpoint,
+				"Replay delayed ASM without repeated source reads or target writes")) return true;
 			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
 			if (variant < 30719) { start_delay_asm(variant + 1); return true; }
 			osd_printf_info("TMS320C54x delayed LD ASM: PASS cases=30720 restore=30720 controls=BD,BCD_taken,BCD_untaken,BD_store_prefix forms=DP,SP,postincrement,offset,absolute shifts=32 patterns=2 sxm_ovm=4 pages=2 snapshots=3 source_reads=1 extension_fetches=owned t_preserved=1 adjacent_consumer=LD_B_ASM_A target_observes_result=1 call_interrupt_repeat_composition=unvalidated physical_phase_claim=0\n"); throw emu_fatalerror(3, "TMS320C54x isolated delayed LD ASM complete");

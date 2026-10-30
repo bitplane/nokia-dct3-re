@@ -794,11 +794,13 @@ bool tms320c54x_test_state::check_ldu_imr_results()
 		if (tick == 4 && (form == 1 || form == 3)) { auto const disable = machine().disable_side_effects(); m_cpu->space(AS_PROGRAM).write_word((variant & 64 ? 0x20000 : 0) + 0x601, 0xdead); }
 		if (tick == read - 1 && form >= 2) { expect(m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0, "Adjacent LDU consumes the published zero pointer before later changes"); m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x2222); }
 		if (tick == read) m_cpu->set_state_int(tms320c54x_device::STATE_IMR, value ^ 0xffff);
-		if (tick == checkpoint && !m_pipeline_replay) { m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_store_writes, m_pipeline_extensions_reads, m_pipeline_register_writes}; expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save mapped load around pointer and IMR sampling"); }
+		capture_pipeline_at(checkpoint, {&m_pipeline_operand_reads, &m_pipeline_store_writes, &m_pipeline_extensions_reads, &m_pipeline_register_writes},
+			"Save mapped load around pointer and IMR sampling");
 		if (tick == 18)
 		{
 			expect(m_pipeline_operand_reads == 1 && m_pipeline_store_writes == unsigned(form == 3) && m_pipeline_register_writes == unsigned(form == 3) && m_pipeline_extensions_reads == unsigned(form == 1 || form == 3) && m_cpu->state_int(tms320c54x_device::STATE_A) == (b ? 0xabcdef1234ULL : value) && m_cpu->state_int(tms320c54x_device::STATE_B) == (b ? value : 0x123456789aULL) && m_cpu->state_int(tms320c54x_device::STATE_IMR) == (value ^ 0xffff) && m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0x1600 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == (sxm ? 0x900 : 0x800) && m_cpu->state_int(tms320c54x_device::STATE_AR2) == (form >= 2 ? 0x2222 : 0), "LDU retains actual IMR without sign extension, resampling or extra pointer writes");
-			if (!m_pipeline_replay) { m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_store_writes = m_recurring_irq_snapshot[1]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[2]; m_pipeline_register_writes = m_recurring_irq_snapshot[3]; return restore_pipeline_at(253920, "Restore mapped load without rereading changed IMR or pointer"); }
+			if (replay_pipeline_at(253920, checkpoint,
+				"Restore mapped load without rereading changed IMR or pointer")) return true;
 			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
 			if (variant < 383) { start_ldu_imr(variant + 1); return true; }
 			osd_printf_info("TMS320C54x staged LDU IMR: PASS cases=384 restore=384 forms=direct,absolute,indirect,MVDK values=4 sxm_states=2 accumulators=2 pages=2 snapshots=3 imr_reads=1 producer_reads=1 producer_writes=1 source_retained=1 interrupt_composition=unvalidated silicon_phase_claim=0\n");
@@ -910,11 +912,8 @@ bool tms320c54x_test_state::check_ifr_pair_results()
 			if (variant < 72) m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0x1000);
 			else { m_cpu->set_input_line(INPUT_LINE_NMI, ASSERT_LINE); m_cpu->set_input_line(INPUT_LINE_NMI, CLEAR_LINE); }
 		}
-		if (tick == checkpoint && !m_pipeline_replay)
-		{
-			m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_store_writes, m_vector_acks};
-			expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save IFR pair around Read and acknowledgement");
-		}
+		capture_pipeline_at(checkpoint, {&m_pipeline_operand_reads, &m_pipeline_store_writes, &m_vector_acks},
+			"Save IFR pair around Read and acknowledgement");
 		if (tick == (variant >= 48 ? 40 : 12))
 		{
 			u16 const flags = std::array<u16, 4>{0, 8, 0x438, 0xffff}[(variant / 2) % 4];
@@ -922,11 +921,8 @@ bool tms320c54x_test_state::check_ifr_pair_results()
 			expect(m_cpu->state_int(tms320c54x_device::STATE_IFR) == remaining && m_pipeline_operand_reads == 1 && m_pipeline_store_writes == 1, "Read-back/write-back clears sampled IFR bits and retains a newly pending IRQ");
 			expect(m_cpu->state_int((variant & 1) ? tms320c54x_device::STATE_A : tms320c54x_device::STATE_B) == ((variant & 1) ? 0x12345678 : 0x23456789), "IFR acknowledgement preserves the unselected accumulator");
 			expect(m_vector_acks == unsigned(variant >= 48) && m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x1000, "Accepted IRQ/NMI completes exactly one entry and RETE restores the stack");
-			if (!m_pipeline_replay)
-			{
-				m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_store_writes = m_recurring_irq_snapshot[1]; m_vector_acks = m_recurring_irq_snapshot[2];
-				return restore_pipeline_at(253740, "Replay IFR acknowledgement ownership");
-			}
+			if (replay_pipeline_at(253740, checkpoint,
+				"Replay IFR acknowledgement ownership")) return true;
 			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
 			if (variant < 95) { start_ifr_pair(variant + 1); return true; }
 			osd_printf_info("TMS320C54x staged IFR pair: PASS cases=96 restore=96 accumulators=2 patterns=4 pending_only=1 late_irq=1 accepted_irq=1 nmi=1 interrupt_return=1 silicon_phase_claim=0\n");
@@ -981,13 +977,15 @@ bool tms320c54x_test_state::check_software_intr_results()
 		if (tick == 3) { expect(m_cpu->state_int(tms320c54x_device::STATE_RTN) == 0x601, "Software INTR captures RTN at Decode"); m_cpu->space(AS_PROGRAM).write_word(base + 0x600, 0xf495); }
 		if (tick == 5) m_cpu->space(AS_PROGRAM).write_word(base + 0x100 + (variant % 32) * 4, 0xf495);
 		if (tick == 9) { auto const disabled = machine().disable_side_effects(); m_cpu->space(AS_DATA).write_word(0x2fff, 0xdead); }
-		if (tick == checkpoint && !m_pipeline_replay) { m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_store_writes}; expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save retained software interrupt entry"); }
+		capture_pipeline_at(checkpoint, {&m_pipeline_operand_reads, &m_pipeline_store_writes},
+			"Save retained software interrupt entry");
 		if (tick == 32)
 		{
 			unsigned const vector = variant % 32;
 			expect(m_cpu->state_int(STATE_GENPC) == base + 0x603 && m_cpu->state_int(tms320c54x_device::STATE_PMST) == 0x100 && m_cpu->state_int(tms320c54x_device::STATE_IMR) == 0 && m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0xa608 && m_cpu->state_int(tms320c54x_device::STATE_A) == 0x123456789aULL && m_cpu->state_int(tms320c54x_device::STATE_B) == 0xfedcba9876ULL, "Software INTR preserves program page, configuration and arithmetic state");
 			expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_pipeline_operand_reads == 1 && m_pipeline_store_writes == 3 && m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x3000 && m_cpu->state_int(tms320c54x_device::STATE_T) == 0x789a && m_cpu->state_int(tms320c54x_device::STATE_TRN) == 0x9876 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == 0x900 && m_cpu->state_int(tms320c54x_device::STATE_IFR) == (vector < 16 ? 0xffff : 0xffff ^ (1U << (vector - 16))), "Software INTR masks interrupts, clears only its IFR bit and returns to the preserved page");
-			if (!m_pipeline_replay) { m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_store_writes = m_recurring_irq_snapshot[1]; return restore_pipeline_at(254410, "Replay software interrupt without duplicate frame or handler writes"); }
+			if (replay_pipeline_at(254410, checkpoint,
+				"Replay software interrupt without duplicate frame or handler writes")) return true;
 			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
 			if (variant < 255) { start_software_intr(variant + 1); return true; }
 			osd_printf_info("TMS320C54x staged software INTR: PASS cases=256 restore=256 vectors=32 masks=2 pages=2 snapshots=2 frame_writes=1 return_reads=1 silicon_phase_claim=0\n");

@@ -1554,20 +1554,16 @@ bool tms320c54x_test_state::check_tc_return_results()
 			auto const disable = machine().disable_side_effects(); m_cpu->space(AS_DATA).write_word(0x2000, 0xdead);
 			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xa824 | (!tc ? 0x1000 : 0));
 		}
-		if (tick == checkpoint && !m_pipeline_replay)
-		{
-			m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_fast_stack_reads}; expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save TC return around producer, condition sampling and retained target");
-		}
+		capture_pipeline_at(checkpoint, {&m_pipeline_operand_reads, &m_fast_stack_reads},
+			"Save TC return around producer, condition sampling and retained target");
 		if (tick == 32)
 		{
 			u32 const base = (variant / 48) % 2 ? 0x20000 : 0;
 			expect(m_cpu->state_int(STATE_GENPC) == base + (taken ? 0x9101 : 0x9002 + offset) && m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x2000 + unsigned(taken) &&
 				m_pipeline_operand_reads == unsigned(producer != 0) && m_fast_stack_reads == unsigned(taken) && m_cpu->state_int(tms320c54x_device::STATE_ST0) == (0xa824 | (!tc ? 0x1000 : 0)) && m_cpu->state_int(tms320c54x_device::STATE_ST1) == 0xb00 &&
 				m_cpu->state_int(tms320c54x_device::STATE_A) == 0xff12345678ULL && m_cpu->state_int(tms320c54x_device::STATE_B) == 0x81abcdef01ULL && m_cpu->state_int(tms320c54x_device::STATE_T) == (0xa5f0 | ((variant / 24) % 2 ? 15 : 0)), "TC/NTC return retains predicate and target, preserves registers and never touches an untaken stack");
-			if (!m_pipeline_replay)
-			{
-				m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_fast_stack_reads = m_recurring_irq_snapshot[1]; return restore_pipeline_at(tc_return_phase + 1, "Restore TC return without duplicate producer or stack accesses");
-			}
+			if (replay_pipeline_at(tc_return_phase + 1, checkpoint,
+				"Restore TC return without duplicate producer or stack accesses")) return true;
 			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
 			if (variant < 383) { start_tc_return(variant + 1); return true; }
 			osd_printf_info("TMS320C54x TC returns: PASS cases=384 restore=384 predicates=TC,NTC outcomes=2 producers=status,BITT_short,BITT_absolute gaps=0,1 selectors=0,15 pages=2 snapshots=4 predicate_retained=1 target_retained=1 untaken_stack_reads=0 data_writes=0 silicon_phase_claim=0\n");
@@ -2783,18 +2779,14 @@ bool tms320c54x_test_state::check_conditional_call_results()
 		if (tick == 5) { auto const disable = machine().disable_side_effects(); if (returning) m_cpu->space(AS_DATA).write_word(0x1000, 0xdead); else m_cpu->space(AS_PROGRAM).write_word(base + 0x601, 0xdead); }
 		if (tick == (returning ? 5 : 6)) m_cpu->set_state_int(b ? tms320c54x_device::STATE_B : tms320c54x_device::STATE_A, changed);
 		if (tc_call && tick == 6) m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xa608 | ((((variant / 2) & 1) ^ 1) << 12));
-		if (tick == checkpoint && !m_pipeline_replay)
-		{
-			m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_store_writes, m_pipeline_extensions_reads, m_fast_stack_reads}; expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save CC around predicate, held clock and conditional publication");
-		}
+		capture_pipeline_at(checkpoint, {&m_pipeline_operand_reads, &m_pipeline_store_writes, &m_pipeline_extensions_reads, &m_fast_stack_reads},
+			"Save CC around predicate, held clock and conditional publication");
 		if (tick == 32)
 		{
 			expect(m_cpu->state_int(b ? tms320c54x_device::STATE_B : tms320c54x_device::STATE_A) == changed && m_cpu->state_int(b ? tms320c54x_device::STATE_A : tms320c54x_device::STATE_B) == (b ? 0x1234 : 0x2345), "CC/RC preserves the changed predicate source and unselected accumulator");
 			expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_cpu->state_int(STATE_GENPC) == base + (returning ? taken ? 0x701 : 0x602 : 0x603) && m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x1000 + unsigned(returning && taken) && m_pipeline_operand_reads == unsigned(taken) && m_pipeline_store_writes == unsigned(!returning && taken) && m_pipeline_extensions_reads == unsigned(taken) && m_fast_stack_reads == unsigned(!returning) && m_cpu->state_int(tms320c54x_device::STATE_ST0) == (0xa608 | (tc_call ? ((((variant / 2) & 1) ^ 1) << 12) : 0)) && m_cpu->state_int(tms320c54x_device::STATE_ST1) == 0x800, "CC/RC retains its decision and target; untaken paths never touch SP or stack memory");
-			if (!m_pipeline_replay)
-			{
-				m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_store_writes = m_recurring_irq_snapshot[1]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[2]; m_fast_stack_reads = m_recurring_irq_snapshot[3]; return restore_pipeline_at(253820, "Replay conditional allocation and call/return without duplicate accesses");
-			}
+			if (replay_pipeline_at(253820, checkpoint,
+				"Replay conditional allocation and call/return without duplicate accesses")) return true;
 			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_operand_data_tap.remove(); m_cpu->set_pipeline_frontend(false);
 			if (variant < (all_conditions ? 767 : 63)) { start_conditional_call(variant + 1); return true; }
 			if (returning)
@@ -2829,12 +2821,14 @@ bool tms320c54x_test_state::check_delayed_condition_return_results()
 	{
 		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick; auto const f = delayed_condition_return_case(variant);
 		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "RCD signed accumulator and TC predicates are admitted outside block and delay contexts");
-		if (tick == f.checkpoint && !m_pipeline_replay) { m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_store_writes, m_pipeline_extensions_reads, m_pipeline_drained_fetches}; expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save RCD predicate stack sample and retained delay words"); }
+		capture_pipeline_at(f.checkpoint, {&m_pipeline_operand_reads, &m_pipeline_store_writes, &m_pipeline_extensions_reads, &m_pipeline_drained_fetches},
+			"Save RCD predicate stack sample and retained delay words");
 		if (tick == 96)
 		{
 			expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_cpu->state_int(STATE_GENPC) == f.base + (f.taken ? 0x706 : 0x609) && m_cpu->state_int(tms320c54x_device::STATE_SP) == f.sp + unsigned(f.taken) && m_cpu->state_int(tms320c54x_device::STATE_A) == f.final_a && m_cpu->state_int(tms320c54x_device::STATE_B) == (f.taken ? 0x55 : 0x33) && m_cpu->state_int(tms320c54x_device::STATE_ST0) == f.final_st0 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == 0x900 && m_cpu->state_int(tms320c54x_device::STATE_T) == 0x5aa5 && m_cpu->state_int(tms320c54x_device::STATE_AR2) == (f.layout ? 0xf4e1 : 0x1234), "RCD retains its predicate and target while both delay words retire and only taken paths pop");
 			expect(m_pipeline_operand_reads == unsigned(f.taken) && m_pipeline_store_writes == 2 && m_pipeline_extensions_reads == 3 && m_pipeline_drained_fetches == 1, "RCD has no untaken stack access no duplicate delay fetch and exactly one continuation");
-			if (!m_pipeline_replay) { m_pipeline_replay = true; m_idle_fixture_tick = f.checkpoint; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_store_writes = m_recurring_irq_snapshot[1]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[2]; m_pipeline_drained_fetches = m_recurring_irq_snapshot[3]; return restore_pipeline_at(276010, "Restore RCD without repeated stack or delay transactions"); }
+			if (replay_pipeline_at(276010, f.checkpoint,
+				"Restore RCD without repeated stack or delay transactions")) return true;
 			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
 			if (variant < 4479) { start_delayed_condition_return(variant + 1); return true; }
 			osd_printf_info("TMS320C54x conditional delayed returns: PASS cases=4480 restore=4480 predicates=14 patterns=8 delay_layouts=2 stack_alignments=2 pages=2 snapshots=5 predicate_before_delay=1 taken_stack_reads=1 untaken_stack_reads=0 retained_target=1 delay_fetches=once interrupt_block_composition=unvalidated physical_phase_claim=0\n"); throw emu_fatalerror(3, "TMS320C54x isolated conditional delayed returns complete");
@@ -2856,21 +2850,15 @@ bool tms320c54x_test_state::check_signed_xc_results()
 		unsigned const checkpoint = std::array<unsigned, 4>{3, 4, 5, 8}[variant / 576];
 		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) && m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0xa60e && m_cpu->state_int(tms320c54x_device::STATE_ST1) == 0x800 && m_cpu->state_int(tms320c54x_device::STATE_T) == 0x5aa5, "Signed XC preserves status and T");
 		if (tick == 3 || tick == 4) m_cpu->set_state_int(f.b ? tms320c54x_device::STATE_B : tms320c54x_device::STATE_A, tick == 3 ? f.value : f.opposite);
-		if (tick == checkpoint && !m_pipeline_replay)
-		{
-			m_recurring_irq_snapshot = {m_pipeline_store_writes, m_pipeline_extensions_reads};
-			expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save signed XC before/after predicate and protected-slot decisions");
-		}
+		capture_pipeline_at(checkpoint, {&m_pipeline_store_writes, &m_pipeline_extensions_reads},
+			"Save signed XC before/after predicate and protected-slot decisions");
 		if (tick == 16)
 		{
 			unsigned const writes = unsigned(f.taken) + unsigned(f.taken || f.layout != 1);
 			u16 const opcode = 0xfd42 + f.condition + (f.b ? 8 : 0) + (f.layout ? 0x200 : 0);
 			expect_opcode(opcode, m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_pipeline_store_writes == writes && m_pipeline_extensions_reads == 3 && m_cpu->state_int(tms320c54x_device::STATE_A) == (f.b ? 0x1234 : f.opposite) && m_cpu->state_int(tms320c54x_device::STATE_B) == (f.b ? f.opposite : 0x3456), "Signed XC uses a retained 40-bit comparison, legal slot layout and no duplicate effects");
-			if (!m_pipeline_replay)
-			{
-				m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; m_pipeline_store_writes = m_recurring_irq_snapshot[0]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[1];
-				return restore_pipeline_at(254890, "Restore signed XC without resampling predicate or decoding rejected literal");
-			}
+			if (replay_pipeline_at(254890, checkpoint,
+				"Restore signed XC without resampling predicate or decoding rejected literal")) return true;
 			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
 			if (variant < 2303) { start_signed_xc(variant + 1); return true; }
 			osd_printf_info("TMS320C54x staged signed XC: PASS cases=2304 restore=2304 conditions=GE,LT,NE,EQ,GT,LE accumulators=A,B patterns=8 layouts=XC1_single,XC2_two_single,XC2_one_double pages=2 snapshots=4 predicate=Access rejected_writes=0 opcode_literal=1 signed_irq_composition=unvalidated\n");

@@ -767,7 +767,7 @@ execution. This is the existing emulator phase contract, not a new physical
 timing claim. Conformance failures now print the case, tick, replay, registers
 and transaction counters, and the runner rejects any such assertion diagnostic
 even if completion markers are also present.
-The revision-bound full default checkpoint below reproduces its 294 required
+The full default checkpoint below reproduces its 289 required
 markers exactly once, including the legal MACP/MACD examples. The separate
 program-multiply rejection and repeated-SUBC/ST profiles and the complete tool
 suite also pass. These are executable emulator regressions, not all-ISA or
@@ -2527,23 +2527,20 @@ Repeat/interrupt composition and physical timing remain separate scopes.
 
 ## Core regression checkpoint
 
-The immutable `c54x_fidelity_checkpoint.json` capture records an earlier
-full default run with all 294 then-required markers exactly once,
-with 295 ordered PASS records, intentional MAME exit 3 and runner exit 0.
-It takes 1,058.73 seconds (17m39s), versus 1,061.85 at the previous measured
-checkpoint. The serialization cleanup is not a runtime optimization.
+The current full-default capture is the `default_checkpoint` under
+`named-observer-checkpoint-service` in `fixtures/c54x_test_reviews.json`.
+It records all 289 required markers exactly once, 293 native ordered PASS
+records, intentional MAME exit 3 and runner exit 0, in 965.59 seconds.
+All ordered PASS records match the preceding `29aaf6a1` full-default capture
+byte-for-byte. The review binds the result to its executable, acceptance-source
+hashes and exact bench patch over `502df38d`; no CPU/device source changed.
+The observer-plumbing rewrite claims no runtime improvement.
 
-Every previous result record is byte-identical and in the same order. The one
-added record checks active-repeat restoration without a DSPIF device; it was
-introduced by the earlier ownership separation, not this stream cleanup.
-All 5,690 asserted opcode words are unchanged, with set SHA256
-`7fd37083d052b81e65f629b5e2062965e612cab737cd54ee85a0f84d60ed76e4`
-(sorted four-digit opcode strings joined by newlines, no final newline).
-
-`fixtures/c54x_fidelity_checkpoint.json` owns the capture, immutable executable
-identity, current CPU/bench and acceptance-source hashes, and explicit result
-comparison. The inputs predate the run and their hashes were rechecked at
-completion. The separate ROM-free admission census retains its own capture.
+`fixtures/c54x_fidelity_checkpoint.json` remains an immutable historical
+capture: 294 then-required markers, 295 native PASS records and 1,058.73 seconds.
+Its source hashes and 5,690-word asserted-opcode inventory apply to that
+revision, not the current bench. The separate ROM-free admission census
+retains its own capture.
 
 ```sh
 python3 tools/run_c54x_core.py --mame mame/mame --rompath mame/roms \
@@ -2556,8 +2553,9 @@ end-to-end handset speech/calls. Later source/device changes do not silently
 renew this checkpoint. Earlier revision-bound controls below preserve their
 narrower results, not competing current default-suite baselines.
 
-The subsequent balanced BITF/CMPM and memory-arithmetic schedules have focused native acceptance;
-those runs do not renew this full-default checkpoint.
+Focused isolated-profile and handset runs retain their own scopes; this
+default run is not their renewal. The full retained isolated-profile regression
+and final handset acceptance for the family-by-family audit remain outstanding.
 
 The historical `c54x_modularization_checkpoint.json` separately records seven named core scopes, representative
 arithmetic, interrupt and restore profiles, and ROM4 CRC/FR decoder controls on

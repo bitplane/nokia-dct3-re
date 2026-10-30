@@ -3153,11 +3153,13 @@ bool tms320c54x_test_state::check_ldu_peripheral_results()
 		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Peripheral LDU uses retained bus stages");
 		if (form == 1 && tick == 4) { auto const disabled = machine().disable_side_effects(); m_cpu->space(AS_PROGRAM).write_word(((variant / 1536) % 2 ? 0x20000 : 0) + 0x601, 0xdead); }
 		if (form == 2 && tick == read - 1) m_cpu->set_state_int(tms320c54x_device::STATE_AR1, 0x2222);
-		if (tick == checkpoint && !m_pipeline_replay) { m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_extensions_reads}; expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save peripheral LDU before, during and after its paid wait"); }
+		capture_pipeline_at(checkpoint, {&m_pipeline_operand_reads, &m_pipeline_extensions_reads},
+			"Save peripheral LDU before, during and after its paid wait");
 		if (tick == 18)
 		{
 			expect(m_pipeline_operand_reads == 1 && m_pipeline_extensions_reads == unsigned(form == 1) && m_cpu->state_int(tms320c54x_device::STATE_A) == (b ? 0xabcdef1234ULL : value) && m_cpu->state_int(tms320c54x_device::STATE_B) == (b ? value : 0x123456789aULL) && m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0x1600 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == 0x900, "Peripheral LDU zero-extends one retained word without changing status or the other accumulator");
-			if (!m_pipeline_replay) { m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[1]; return restore_pipeline_at(254430, "Replay peripheral LDU without duplicate endpoint transactions"); }
+			if (replay_pipeline_at(254430, checkpoint,
+				"Replay peripheral LDU without duplicate endpoint transactions")) return true;
 			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
 			if (variant < 9215) { start_ldu_peripheral(variant + 1); return true; }
 			osd_printf_info("TMS320C54x staged peripheral LDU: PASS cases=9216 restore=9216 addresses=64 forms=direct,absolute,indirect values=4 accumulators=2 pages=2 snapshots=3 source_reads=1 writes=0 peripheral_extra_clock=1 physical_mapping=unvalidated\n");
@@ -3224,12 +3226,14 @@ bool tms320c54x_test_state::check_circular_portr_results()
 			for (unsigned i = 0; i < 8; ++i) { expect(m_cpu->state_int(tms320c54x_device::STATE_AR0 + i) == (i == f.selected ? f.final_ar : f.initial[i]), "PORTR circular address modification belongs to Access once"); m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + i, 0x2200 + i); }
 		}
 		unsigned const checkpoint = 4 + f.snapshot;
-		if (tick == checkpoint && !m_pipeline_replay) { m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_store_writes, m_pipeline_extensions_reads}; expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save circular PORTR literal, address or sampled I/O value"); }
+		capture_pipeline_at(checkpoint, {&m_pipeline_operand_reads, &m_pipeline_store_writes, &m_pipeline_extensions_reads},
+			"Save circular PORTR literal, address or sampled I/O value");
 		if (tick == 16)
 		{
 			expect(m_pipeline_operand_reads == unsigned(!f.excluded) && m_pipeline_store_writes == unsigned(!f.excluded) && m_pipeline_extensions_reads == 1 && bool(m_cpu->state_int(tms320c54x_device::STATE_IDLE)) == !f.excluded && m_cpu->state_int(tms320c54x_device::STATE_ST0) == f.st0 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == f.st1 && m_cpu->state_int(tms320c54x_device::STATE_A) == 0x123456789aULL && m_cpu->state_int(tms320c54x_device::STATE_B) == 0x9876543210ULL, "Circular PORTR retains address and sample across replay without duplicate I/O, writes or flag changes");
 			for (unsigned i = 0; i < 8; ++i) expect(m_cpu->state_int(tms320c54x_device::STATE_AR0 + i) == (f.excluded ? f.initial[i] : 0x2200 + i), "PORTR never resamples AR after Access or modifies an excluded pointer");
-			if (!m_pipeline_replay) { m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_store_writes = m_recurring_irq_snapshot[1]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[2]; return restore_pipeline_at(62139, "Restore circular PORTR without repeating a consumed port sample"); }
+			if (replay_pipeline_at(62139, checkpoint,
+				"Restore circular PORTR without repeating a consumed port sample")) return true;
 			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_operand_data_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
 			if (variant < 98303) { start_circular_portr(variant + 1); return true; }
 			osd_printf_info("TMS320C54x circular PORTR: PASS cases=98304 restore=98304 modes=4 registers=8 compatibility=2 bk=4 indices=4 samples=4 ports=2 flags=2 pages=2 snapshots=3 literal_retained=1 sample_retained=1 pointer_updates=once destination_reads=0 excluded_io_reads=0 excluded_writes=0 bk_zero=legacy_linear silicon_phase_claim=0\n"); throw emu_fatalerror(0, "TMS320C54x isolated circular PORTR complete");
@@ -3260,20 +3264,14 @@ bool tms320c54x_test_state::check_circular_portr_results()
 		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
 		auto const f = t_peripheral_case(variant);
 		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "STLM/ST peripheral pair remains admitted");
-		if (tick == f.checkpoint && !m_pipeline_replay)
-		{
-			m_recurring_irq_snapshot = {m_pipeline_register_writes, m_pipeline_store_writes};
-			expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save STLM/ST before producer, during peripheral wait or after publication");
-		}
+		capture_pipeline_at(f.checkpoint, {&m_pipeline_register_writes, &m_pipeline_store_writes},
+			"Save STLM/ST before producer, during peripheral wait or after publication");
 		if (tick == 16)
 		{
 			{ auto const disable = machine().disable_side_effects(); expect(m_cpu->space(AS_DATA).read_word(f.destination) == f.value && m_cpu->space(AS_DATA).read_word(f.source) == f.value, "Peripheral ST preserves its T/TRN source"); }
 			expect(!m_pipeline_operand_reads && m_pipeline_register_writes == 1 && m_pipeline_store_writes == 1 && m_cpu->state_int(tms320c54x_device::STATE_AR2) == f.destination + unsigned(f.postincrement) && m_cpu->state_int(tms320c54x_device::STATE_A) == f.value && m_cpu->state_int(tms320c54x_device::STATE_B) == 0xfedcba9876ULL && m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0xa608 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == 0x800, "Peripheral ST preserves status/accumulators and updates its pointer once");
-			if (!m_pipeline_replay)
-			{
-				m_pipeline_replay = true; m_idle_fixture_tick = f.checkpoint; m_pipeline_register_writes = m_recurring_irq_snapshot[0]; m_pipeline_store_writes = m_recurring_irq_snapshot[1];
-				return restore_pipeline_at(253780, "Replay T/TRN producer and peripheral publication once");
-			}
+			if (replay_pipeline_at(253780, f.checkpoint,
+				"Replay T/TRN producer and peripheral publication once")) return true;
 			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
 			if (variant < 863) { start_t_peripheral(variant + 1); return true; }
 			osd_printf_info("TMS320C54x staged peripheral T/TRN store: PASS cases=864 restore=864 sources=T,TRN producer=STLM gaps=0,1,2 forms=indirect,postincrement destinations=3b,48,49 pages=2 destination_reads=0 writes=1 peripheral_extra_clock=1 pointer_updates=once silicon_phase_claim=0\n");
@@ -3294,20 +3292,14 @@ bool tms320c54x_test_state::check_circular_portr_results()
 			m_cpu->space(AS_PROGRAM).write_word(f.base + 0x601, 0xbeef);
 			if (f.form == 2) m_cpu->space(AS_PROGRAM).write_word(f.base + 0x602, 0xbeef);
 		}
-		if (tick == f.checkpoint && !m_pipeline_replay)
-		{
-			m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_store_writes, m_pipeline_extensions_reads};
-			expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save MVKD before Read, before peripheral wait or after publication");
-		}
+		capture_pipeline_at(f.checkpoint, {&m_pipeline_operand_reads, &m_pipeline_store_writes, &m_pipeline_extensions_reads},
+			"Save MVKD before Read, before peripheral wait or after publication");
 		if (tick == 14)
 		{
 			{ auto const disable = machine().disable_side_effects(); expect(m_cpu->space(AS_DATA).read_word(f.destination) == f.value && m_cpu->space(AS_DATA).read_word(f.source) == 0xdead, "MVKD retains its source across the peripheral wait"); }
 			expect(m_pipeline_operand_reads == 1 && m_pipeline_store_writes == 1 && m_pipeline_extensions_reads == (f.form == 2 ? 2 : 1) && m_cpu->state_int(tms320c54x_device::STATE_AR2) == f.destination + unsigned(f.form == 1) && m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0xa608 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == 0x800 && m_cpu->state_int(tms320c54x_device::STATE_A) == 0x123456789aULL && m_cpu->state_int(tms320c54x_device::STATE_B) == 0xfedcba9876ULL, "MVKD peripheral replay preserves status/accumulators and modifies its pointer once");
-			if (!m_pipeline_replay)
-			{
-				m_pipeline_replay = true; m_idle_fixture_tick = f.checkpoint; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_store_writes = m_recurring_irq_snapshot[1]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[2];
-				return restore_pipeline_at(253760, "Replay MVKD without duplicating its peripheral wait or write");
-			}
+			if (replay_pipeline_at(253760, f.checkpoint,
+				"Replay MVKD without duplicating its peripheral wait or write")) return true;
 			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
 			if (variant < 647) { start_mvkd_peripheral(variant + 1); return true; }
 			osd_printf_info("TMS320C54x staged peripheral MVKD: PASS cases=648 restore=648 sources=AR,BK,RAM forms=indirect,postincrement,absolute destinations=3b,48,49 pages=2 reads=1 writes=1 peripheral_extra_clock=1 pointer_updates=once bk_producer_latency=unvalidated silicon_phase_claim=0\n");
@@ -3330,12 +3322,14 @@ bool tms320c54x_test_state::check_mvdd_peripheral_results()
 		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "RAM-to-peripheral MVDD remains staged");
 		if (tick == 4) { unsigned const xm = (variant / 12) % 4, ym = (variant / 48) % 4; auto delta = [](unsigned mode) { return mode == 1 ? -1 : mode == 2 ? 1 : mode == 3 ? 3 : 0; }; expect(m_cpu->state_int(tms320c54x_device::STATE_AR2) == unsigned(0x14b2 + delta(xm)) && m_cpu->state_int(tms320c54x_device::STATE_AR3) == unsigned(destination + delta(ym)), "MVDD applies each selected dual modifier once before waiting"); m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x2222); m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x3333); }
 		if (tick == 5) { auto const disable = machine().disable_side_effects(); m_cpu->space(AS_DATA).write_word(0x14b2, 0xdead); }
-		if (tick == checkpoint && !m_pipeline_replay) { m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_store_writes}; expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save MVDD before, during or after its peripheral wait"); }
+		capture_pipeline_at(checkpoint, {&m_pipeline_operand_reads, &m_pipeline_store_writes},
+			"Save MVDD before, during or after its peripheral wait");
 		if (tick == 12)
 		{
 			{ auto const disable = machine().disable_side_effects(); expect(m_cpu->space(AS_DATA).read_word(destination) == value && m_cpu->space(AS_DATA).read_word(0x14b2) == 0xdead, "MVDD uses its captured source and peripheral destination"); }
 			expect(m_pipeline_operand_reads == 1 && m_pipeline_store_writes == 1 && m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x2222 && m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x3333 && m_cpu->state_int(tms320c54x_device::STATE_A) == 0x123456789aULL && m_cpu->state_int(tms320c54x_device::STATE_B) == 0xfedcba9876ULL && m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x1000 && m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0xa608 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == 0x900, "Peripheral MVDD preserves status, stack and retained pointers without duplicate accesses");
-			if (!m_pipeline_replay) { m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_store_writes = m_recurring_irq_snapshot[1]; return restore_pipeline_at(254330, "Restore MVDD with its peripheral wait already paid when appropriate"); }
+			if (replay_pipeline_at(254330, checkpoint,
+				"Restore MVDD with its peripheral wait already paid when appropriate")) return true;
 			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
 			if (variant < 1535) { start_mvdd_peripheral(variant + 1); return true; }
 			osd_printf_info("TMS320C54x peripheral MVDD: PASS cases=1536 restore=1536 destinations=3 values=4 dual_modifiers=16 pages=2 snapshots=4 source_reads=1 peripheral_writes=1 extra_cycles=1 retained_address=1 retained_source=1 repeat_acceptance=0 irq_acceptance=0 silicon_phase_claim=0\n");
@@ -3358,18 +3352,14 @@ bool tms320c54x_test_state::check_portr_bypass_results()
 		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick; auto const f = portr_bypass_case(variant);
 		unsigned const checkpoint = std::array<unsigned, 4>{4, 6, 7, 11}[f.snapshot];
 		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "PORTR consumer sequence is admitted");
-		if (tick == checkpoint && !m_pipeline_replay)
-		{
-			m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_store_writes, m_pipeline_extensions_reads, m_port_reads}; expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save PORTR around sample, pending write and consumer");
-		}
+		capture_pipeline_at(checkpoint, {&m_pipeline_operand_reads, &m_pipeline_store_writes, &m_pipeline_extensions_reads, &m_port_reads},
+			"Save PORTR around sample, pending write and consumer");
 		if (tick == 24)
 		{
 			if (m_cpu->state_int(tms320c54x_device::STATE_A) != f.a || m_cpu->state_int(tms320c54x_device::STATE_B) != f.b) osd_printf_info("PORTR bypass mismatch: case=%u a=%010llx expected_a=%010llx b=%010llx expected_b=%010llx reads=%u\n", variant, (unsigned long long)m_cpu->state_int(tms320c54x_device::STATE_A), (unsigned long long)f.a, (unsigned long long)m_cpu->state_int(tms320c54x_device::STATE_B), (unsigned long long)f.b, m_port_reads);
 			expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_cpu->state_int(tms320c54x_device::STATE_A) == f.a && m_cpu->state_int(tms320c54x_device::STATE_B) == f.b && m_cpu->state_int(tms320c54x_device::STATE_T) == 0xbeef && m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0xa608 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == (0x800 | (f.sxm ? 0x100 : 0)) && m_pipeline_operand_reads == (f.chain ? 2U : 1U) && m_pipeline_store_writes == m_pipeline_operand_reads && m_pipeline_extensions_reads == m_pipeline_operand_reads && m_port_reads <= (f.chain ? 2U : 1U), "PORTR consumers use retained incoming data without duplicate I/O or RAM writes");
-			if (!m_pipeline_replay)
-			{
-				m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_store_writes = m_recurring_irq_snapshot[1]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[2]; m_port_reads = m_recurring_irq_snapshot[3]; return restore_pipeline_at(62145, "Restore PORTR without replaying an I/O sample or publication");
-			}
+			if (replay_pipeline_at(62145, checkpoint,
+				"Restore PORTR without replaying an I/O sample or publication")) return true;
 			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_operand_data_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
 			if (variant < 6655) { start_portr_bypass(variant + 1); return true; }
 			osd_printf_info("TMS320C54x PORTR consumer bypass: PASS cases=6656 restore=6656 generic_cases=6144 dispatcher_cases=512 consumers=LD,AND,OR,XOR gaps=0,1,2 alias_controls=2 accumulators=2 sxm=2 patterns=8 pages=2 snapshots=4 volatile_io=1 real_writes=1 peripheral_bypass_claim=0 physical_banks=unvalidated\n"); throw emu_fatalerror(3, "TMS320C54x isolated PORTR consumer bypass complete");
@@ -3493,11 +3483,8 @@ bool tms320c54x_test_state::check_staged_bus_stm_results()
 			if (f.interrupt) m_cpu->set_input_line(f.interrupt == 2 ? INPUT_LINE_NMI : 0, ASSERT_LINE);
 		}
 		if (f.hold && f.waits >= 2 && tick == f.complete - 1) m_bus_ready = true;
-		if (tick == f.checkpoint && !m_pipeline_replay)
-		{
-			m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_store_writes, m_pipeline_extensions_reads, m_vector_acks};
-			expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save external transfer before/during waits or after its side effect");
-		}
+		capture_pipeline_at(f.checkpoint, {&m_pipeline_operand_reads, &m_pipeline_store_writes, &m_pipeline_extensions_reads, &m_vector_acks},
+			"Save external transfer before/during waits or after its side effect");
 		if (tick == f.complete + 12)
 		{
 			unsigned const form = bus_io_form(variant), literals = 1 + unsigned(form >= 1 && form <= 3);
@@ -3508,11 +3495,8 @@ bool tms320c54x_test_state::check_staged_bus_stm_results()
 			{ auto const disable = machine().disable_side_effects(); expect((f.write || m_cpu->space(AS_DATA).read_word(bus_io_address(variant)) == expected_ram) && m_pipeline_operand_reads == unsigned(!f.write) && m_pipeline_store_writes == unsigned(f.write) && m_pipeline_extensions_reads == literals && m_vector_acks == unsigned(bool(f.interrupt)), "Waited transfer keeps address/data ownership, MMR alias ordering and deferred interrupt delivery"); }
 			unsigned const elapsed = 0xffff - unsigned(m_cpu->state_int(tms320c54x_device::STATE_TIM));
 			expect(elapsed >= tick - 1 && elapsed <= tick + 1, "Timer clocks continue during external bus suspension");
-			if (!m_pipeline_replay)
-			{
-				m_pipeline_replay = true; m_idle_fixture_tick = f.checkpoint; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_store_writes = m_recurring_irq_snapshot[1]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[2]; m_vector_acks = m_recurring_irq_snapshot[3];
-				return restore_pipeline_at(253560, "Restore retained wait/READY state without duplicate I/O");
-			}
+			if (replay_pipeline_at(253560, f.checkpoint,
+				"Restore retained wait/READY state without duplicate I/O")) return true;
 			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
 			unsigned next = variant + 1;
 			// Original SWWSR has no multiplier: omit, rather than relabel,

@@ -15,8 +15,34 @@
       "case_ids": [],
       "basis": "Manual snapshot-slot assignments duplicate the same unsigned observer selection at capture and rewind. Name the observers once, retain zero-filled spare slots, rewind them and the host tick before the existing guest-stream restore, and keep pointer bindings outside guest serialization. Guest setup, result predicates, checkpoint expressions and continuation messages are unchanged.",
       "pilot": {"phase": 255360, "continuation": 255370, "observers": ["m_pipeline_operand_reads", "m_pipeline_store_writes", "m_pipeline_extensions_reads"], "profiles": ["mvdk-mapped", "mvdk-acc", "clock-mvdk"]},
+      "scaled_scope": {"additional_phase_blocks": 82, "additional_observer_bindings": 275, "phase_blocks_including_pilot": 83, "observer_bindings_including_pilot": 278, "phases_by_source": {
+        "tms320c54x_test_peripherals.cpp": ["254420", "62138", "253770", "253750", "254320", "62144", "253550"],
+        "tms320c54x_test_addressing.cpp": ["310000", "600020", "255500", "255560", "255380", "253490", "253510", "254010", "62174", "259980", "62128", "259920", "259900", "254800", "62136", "253710", "253650", "254140", "254300", "254520", "254480", "254460", "255620", "254440", "255300", "255100", "255020", "254920", "62162", "254840", "254120", "254070", "62066", "62060"],
+        "tms320c54x_test_pipeline_control.cpp": ["tc_return_phase", "253810", "276000", "254880"],
+        "tms320c54x_test_interrupts.cpp": ["253910", "253730", "254400"],
+        "tms320c54x_test_pipeline.cpp": ["literal_guard_phase", "311000"],
+        "tms320c54x_test_arithmetic.cpp": ["branch_arithmetic_phase", "bitt_phase", "bitt_phase+2", "ar_addm_phase+2", "310100", "253470", "62126", "62132", "254030", "253830", "253790", "253690", "254240", "399900", "255140", "255060", "254980", "62158", "62160"],
+        "tms320c54x_test_pipeline_repeat.cpp": ["repeated_writa_phase", "294000", "255460", "253670", "254360", "255680", "254380", "255260", "255240", "255200", "255160", "62150", "62064"]
+      }},
+      "selection_proof": "Only canonical tick-based capture/replay pairs with identical checkpoint expressions, contiguous index-ordered copies of plain unsigned members and fixed continuation phases are replaced. Expanding the new calls with their exact old capture/replay fragments reconstructs all seven pre-edit source files byte-for-byte; extra CPU resets, input-line changes and mixed-width state remain explicit.",
+      "measurements": {"before_scale_cpp_bytes": 3374428, "before_scale_cpp_lines": 51110, "after_scale_cpp_bytes": 3344165, "after_scale_cpp_lines": 50951, "source_assessment": "The scaled edit removes 30263 bytes and 159 C++ lines; including the helper pilot, the net reduction is 29227 bytes and 136 lines. No test identity, checkpoint or result expectation is retired."},
       "limits": ["no case retirement or new ISA expectation", "legacy adapter around the generic stream service, not a relocation to the CPU-only executable", "only simple tick-based unsigned observers; custom reset/input-line work remains explicit"],
-      "verification": "Executable tests compile the actual helpers without MAME/CPU code and check capture timing, replay suppression, capacity/null/missing-binding errors, zero-filled spare slots, observer rewind before load, continuation ordering, and save/load failure paths. All 382 focused C54x host tests pass. Rebuilt mvdk-mapped (14256 cases/restores), mvdk-acc (8208) and clock-mvdk (72) pass their complete native oracles. The unchanged 402-profile inventory passes; full-default and handset checkpoints are not renewed by the pilot."
+      "default_checkpoint": {
+        "capture": "tmp/c54x-corpus-transfer-review/run_c54x_core_zl9ofzc3",
+        "source_base_commit": "502df38d",
+        "bench_patch_command": "git diff --no-ext-diff --binary 502df38d -- tests/c54x",
+        "bench_patch_sha256": "6f6318a18d7f3872053fbda56b2b8f31257879ed546048bf919974fc5d5d4615",
+        "executable_sha256": "b8ac8f420de05be090cc94a6fe09f5dd7aad5b806ede5e5222d3961e82228fcd",
+        "acceptance_sha256": {"tools/run_c54x_core.py": "70ef9f2bc24630e9a7b2eff039f2781f7d6ed82f20424c1b22ccdd831b8e061d", "tools/c54x_test_oracles.py": "3f42fb7a9dd60f0afbf433666fd2e443083fef5da8ba9d236527a7423fac9c63"},
+        "required_markers": 289,
+        "native_ordered_pass_records": 293,
+        "mame_exit": 3,
+        "runner_exit": 0,
+        "wall_seconds": 965.59,
+        "comparison": "All ordered PASS records are byte-identical to tmp/c54x-store-domain-review/default-repaired-both.log (29aaf6a1 full-default capture). Wrapper output adds one further PASS record to each log; it is not a native fixture result.",
+        "scope": "Full default regression only; not every isolated profile, handset acceptance or silicon timing. No CPU or device source changed."
+      },
+      "verification": "Executable tests compile the actual helpers without MAME/CPU code and check capture timing, replay suppression, capacity/null/missing-binding errors, zero-filled spare slots, observer rewind before load, continuation ordering, and save/load failure paths. All 382 focused C54x host tests pass. The pilot's rebuilt mvdk-mapped (14256 cases/restores), mvdk-acc (8208) and clock-mvdk (72) pass their complete native oracles. The scaled build and all 5079 host tests pass (one established skip); the unchanged 402-profile inventory passes. Seven scaled native controls pass their complete original oracles: tc-return (384 cases/restores), literal-guard (54), ifr-pair (96), serial-stm (12), bitt (6144), stm-ind (1536) and rpt-writa16 (19200). The scaled full-default checkpoint is recorded above; handset acceptance is not renewed."
     },
     {
       "id": "parallel-transfer-numeric-checkpoint-projection",
