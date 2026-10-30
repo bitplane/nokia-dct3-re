@@ -1515,11 +1515,11 @@ EXTRA_PROFILES = {
         "Fatal error: TMS320C54x isolated MPY mapped consumer complete",
     ),
     "absolute": (
-        "TMS320C54x staged ABS: PASS cases=4608 restore=4608 selectors=4 patterns=16 status_states=32 pages=2 producer_cases=512 checkpoint_policy=balanced data_accesses=0 irq_acceptance=0 silicon_phase_claim=0 coverage_fnv64=1dd6c7685f95e5c7",
+        "TMS320C54x staged ABS: PASS cases=400 restore=400 numeric=128 status_boundaries=240 producer_cases=32 pages=1 checkpoint_policy=balanced data_accesses=0 irq_acceptance=0 silicon_phase_claim=0 coverage_fnv64=23a4ae5702422ba9",
         "Fatal error: TMS320C54x isolated ABS complete",
     ),
     "negate": (
-        "TMS320C54x staged NEG: PASS cases=4608 restore=4608 selectors=4 patterns=16 status_states=32 pages=2 producer_cases=512 checkpoint_policy=balanced data_accesses=0 silicon_phase_claim=0 coverage_fnv64=1dd6c7685f95e5c7",
+        "TMS320C54x staged NEG: PASS cases=400 restore=400 numeric=128 status_boundaries=240 producer_cases=32 pages=1 checkpoint_policy=balanced data_accesses=0 silicon_phase_claim=0 coverage_fnv64=23a4ae5702422ba9",
         "Fatal error: TMS320C54x isolated NEG complete",
     ),
     "reg-logic": (

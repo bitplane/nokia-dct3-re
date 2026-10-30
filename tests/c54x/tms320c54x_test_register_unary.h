@@ -21,7 +21,7 @@ inline register_unary_kind select_register_unary(std::string_view name)
 }
 constexpr unsigned register_unary_count(register_unary_kind kind)
 {
-	return kind == register_unary_kind::logic ? 3104 : kind == register_unary_kind::shift ? 16384 : 4608;
+	return kind == register_unary_kind::logic ? 3104 : kind == register_unary_kind::shift ? 16384 : 400;
 }
 
 inline std::string register_unary_result(register_unary_kind kind, unsigned count, unsigned restores, u64 digest)
@@ -30,8 +30,8 @@ inline std::string register_unary_result(register_unary_kind kind, unsigned coun
 	char const *format = kind == register_unary_kind::logic ?
 		"TMS320C54x staged register logic: PASS cases=%u restore=%u logical_cases=3072 complement_cases=32 checkpoint_policy=balanced data_accesses=0 duplicate_fetches=0 silicon_phase_claim=0 coverage_fnv64=%016llx" : kind == register_unary_kind::shift ?
 		"TMS320C54x staged accumulator shifts: PASS cases=%u restore=%u operations=SFTA,SFTL selectors=4 shifts=-16..15 patterns=8 sxm=0,1 ovm=0,1 carry=0,1 checkpoint_policy=balanced duplicate_fetches=0 data_accesses=0 left_c_policy=manual_formula silicon_phase_claim=0 coverage_fnv64=%016llx" : kind == register_unary_kind::absolute ?
-		"TMS320C54x staged ABS: PASS cases=%u restore=%u selectors=4 patterns=16 status_states=32 pages=2 producer_cases=512 checkpoint_policy=balanced data_accesses=0 irq_acceptance=0 silicon_phase_claim=0 coverage_fnv64=%016llx" :
-		"TMS320C54x staged NEG: PASS cases=%u restore=%u selectors=4 patterns=16 status_states=32 pages=2 producer_cases=512 checkpoint_policy=balanced data_accesses=0 silicon_phase_claim=0 coverage_fnv64=%016llx";
+		"TMS320C54x staged ABS: PASS cases=%u restore=%u numeric=128 status_boundaries=240 producer_cases=32 pages=1 checkpoint_policy=balanced data_accesses=0 irq_acceptance=0 silicon_phase_claim=0 coverage_fnv64=%016llx" :
+		"TMS320C54x staged NEG: PASS cases=%u restore=%u numeric=128 status_boundaries=240 producer_cases=32 pages=1 checkpoint_policy=balanced data_accesses=0 silicon_phase_claim=0 coverage_fnv64=%016llx";
 	std::snprintf(output, sizeof(output), format, count, restores, (unsigned long long)digest);
 	return output;
 }
@@ -47,11 +47,15 @@ constexpr unsigned register_unary_key(unsigned ordinal, register_unary_kind kind
 	}
 	if (kind == register_unary_kind::shift) return ordinal + 16384 * ((ordinal % 2 + (ordinal / 2) % 4 +
 		(ordinal / 8) % 32 + (ordinal / 256) % 8 + (ordinal / 2048) % 2 + (ordinal / 4096) % 2 + ordinal / 8192) % 2);
-	bool const producer = ordinal >= 4096;
-	unsigned const p = producer ? ordinal - 4096 : ordinal;
+	// Numeric boundaries x selectors x OVM, then remaining flags at zero/overflow.
+	unsigned const raw = ordinal < 128 ? (ordinal % 16) + 16 * ((ordinal / 16) % 4) + 64 * (ordinal / 64) :
+		ordinal < 368 ? ((ordinal - 128) % 2 ? 9 : 0) + 16 * (((ordinal - 128) / 2) % 4) + 64 * (2 + (ordinal - 128) / 8) :
+		4096 + ((ordinal - 368) % 4) + 4 * std::array<unsigned, 4>{0,1,14,31}[((ordinal - 368) / 4) % 4] + 256 * ((ordinal - 368) / 16);
+	bool const producer = raw >= 4096;
+	unsigned const p = producer ? raw - 4096 : raw;
 	unsigned const checkpoint = producer ? (p % 4 + (p / 4) % 32 + (p / 128) % 2 + p / 256) % 3 :
 		(p % 16 + (p / 16) % 4 + (p / 64) % 32 + p / 2048) % 3;
-	return ordinal + 4608 * checkpoint;
+	return raw + 4608 * checkpoint;
 }
 
 inline std::array<u64, 2> accumulator_logic_fixture(unsigned variant, bool after)

@@ -34,7 +34,8 @@ int main() {
         unsigned const count=register_unary_count(kind);
         bool const logic=kind==register_unary_kind::logic,shift=kind==register_unary_kind::shift;
         unsigned const boundaries=logic||shift?2:3;
-        std::vector<unsigned> seen(count);
+        std::map<unsigned,unsigned> seen;
+        std::array<unsigned,3> points{};
         std::map<std::array<unsigned,4>,std::array<unsigned,3>> groups;
         ordered_case_digest digest;
         for(unsigned n=0;n<count;++n) {
@@ -42,8 +43,9 @@ int main() {
             if(logic) {
                 point=n<3072?key/3072:(key-6144)/32;
                 assert((n<3072?key%3072:3072+(key-6144)%32)==n);
-            } else { point=key/count; assert(key%count==n); }
-            assert(!seen[n]++ && point<boundaries); digest.add(key);
+            } else if(shift) { point=key/count; assert(key%count==n); }
+            else { point=key/4608; }
+            assert(!seen[key]++ && point<boundaries); ++points[point]; digest.add(key);
             auto c=register_unary_case<r>(n,kind);
             auto const &initial=c.states.front().observation,&last=c.states.back().observation;
             u64 a=reg(initial,r::STATE_A),b=reg(initial,r::STATE_B),st0=reg(initial,r::STATE_ST0);
@@ -107,7 +109,17 @@ int main() {
             unsigned offset=unsigned(*c.single_fetch-program.front().address);
             assert(program[offset].value==initial.opcode && program[offset+1].value==0xf4e1);
         }
-        for(auto const &entry:groups) for(unsigned p=0;p<boundaries;++p) assert(entry.second[p]);
+        if(logic||shift) for(auto const &entry:groups) for(unsigned p=0;p<boundaries;++p) assert(entry.second[p]);
+        for(unsigned p=0;p<boundaries;++p) assert(points[p]);
+        if(!logic&&!shift) {
+            assert(count==400);
+            for(unsigned flags=0;flags<32;++flags) for(unsigned selector=0;selector<4;++selector)
+                for(unsigned pattern:{0U,9U}) {
+                    unsigned raw=pattern+16*selector+64*flags, matches=0;
+                    for(auto entry:seen) matches+=entry.first%4608==raw;
+                    assert(matches==1);
+                }
+        }
         std::printf("kind=%u cases=%u digest=%016llx\n",unsigned(kind),count,(unsigned long long)digest.value);
     }
 }

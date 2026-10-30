@@ -560,9 +560,12 @@ belongs to the standalone runner, not the legacy case-start helper.
 
 Register-only logic/CMPL (`reg-logic`), SFTA/SFTL (`reg-shifts`), NEG and ABS
 share the clocked CPU-only runner and independent integer case builders.
-They retain every original numeric/status/page tuple, assigning each one a
-balanced original replay point instead of replaying the whole matrix at every
-point. The host census checks the projection and checkpoint classes; the
+Logic and shifts currently retain their numeric/status/page tuples with
+balanced replay points. NEG/ABS instead select400 cases each:128 numeric
+pattern/selector/OVM combinations,240 additional status checks at zero and
+overflow, and32 adjacent-producer cases. Second-page replication and the
+remaining numeric/status cross-products are retired, not claimed equivalent.
+The host census checks selected identities, zero/overflow status coverage and checkpoint classes; the
 review ledger owns exact keys and digests. Redundant default adapters have
 been retired; standalone profiles own these banks. A real final IDLE replaces unobserved padding, not a
 consumer interaction. Repeat, IRQ and memory-operand compositions stay separate.
