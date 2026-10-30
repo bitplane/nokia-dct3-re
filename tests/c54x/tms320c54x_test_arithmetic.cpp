@@ -3262,13 +3262,13 @@ tms320c54x_test_state::parallel_load_fixture tms320c54x_test_state::parallel_mul
 	return c;
 }
 
-tms320c54x_test_state::sqdst_fixture tms320c54x_test_state::sqdst_case(unsigned variant, bool edge, bool lms)
+tms320c54x_test_state::sqdst_fixture tms320c54x_test_state::sqdst_case(unsigned variant, bool lms)
 {
-	bool const numeric = !edge && variant >= 9216;
+	bool const numeric = variant >= 9216;
 	unsigned const n = numeric ? variant - 9216 : variant;
 	sqdst_fixture c{};
 	auto &f = c.memory;
-	f = dual_multiply_case(edge ? n : numeric ? 0 : n % 256 + 512 * (n / 256), edge);
+	f = dual_multiply_case(numeric ? 0 : n % 256 + 512 * (n / 256), false);
 	static constexpr std::array<u16, 8> words{0, 1, 0xffff, 0x8000, 0x7fff, 0x1234, 0x5555, 0xaaaa};
 	if (numeric)
 	{
@@ -3312,8 +3312,7 @@ void tms320c54x_test_state::start_sqdst(unsigned variant)
 {
 	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
 	bool const lms = !strncmp(machine().options().bios(), "lms", 3);
-	bool const edge = profile_is("sqdst-edge") || profile_is("lms-edge");
-	auto const c = sqdst_case(variant, edge, lms); auto const &f = c.memory;
+	auto const c = sqdst_case(variant, lms); auto const &f = c.memory;
 	auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
 	for (unsigned i = 0; i < 16; ++i) program.write_word(f.base + 0x600 + i, 0xf495);
 	program.write_word(f.base + 0x600, (lms ? 0xe100 : 0xe200) | (f.x << 4) | f.y); program.write_word(f.base + 0x601, 0xf4e1);
@@ -3322,12 +3321,12 @@ void tms320c54x_test_state::start_sqdst(unsigned variant)
 	m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
 	m_cpu->set_state_int(tms320c54x_device::STATE_PMST, f.pmst); m_cpu->set_state_int(tms320c54x_device::STATE_ST0, f.st0); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, f.st1);
 	m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10); m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_A, c.a ^ (edge ? 0 : 0xffffffffffULL)); m_cpu->set_state_int(tms320c54x_device::STATE_B, c.b ^ (edge ? 0 : 0xffffffffffULL)); m_cpu->set_state_int(tms320c54x_device::STATE_T, 0xbeef);
+	m_cpu->set_state_int(tms320c54x_device::STATE_A, c.a ^ 0xffffffffffULL); m_cpu->set_state_int(tms320c54x_device::STATE_B, c.b ^ 0xffffffffffULL); m_cpu->set_state_int(tms320c54x_device::STATE_T, 0xbeef);
 	for (unsigned i = 0; i < 4; ++i) m_cpu->set_state_int(tms320c54x_device::STATE_AR2 + i, f.initial[i]);
 	m_cpu->set_state_int(tms320c54x_device::STATE_AR0, 3); m_cpu->set_state_int(tms320c54x_device::STATE_BK, f.linear ? 0 : 16);
 	m_cpu->set_input_line(0, CLEAR_LINE); m_cpu->set_input_line(INPUT_LINE_NMI, CLEAR_LINE);
 	m_pipeline_operand_reads = m_pipeline_extensions_reads = 0;
-	m_pipeline_operand_tap = data.install_read_tap(0, 0xffff, "sqdst_reads", [this, f, edge](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return; expect(!edge && m_pipeline_operand_reads < 2 && at == (m_pipeline_operand_reads ? f.yaddress : f.xaddress) && word == (m_pipeline_operand_reads ? f.yword : f.xword) && m_cpu->pipeline_cycles() == 5, "SQDST reads both retained operands once"); ++m_pipeline_operand_reads; });
+	m_pipeline_operand_tap = data.install_read_tap(0, 0xffff, "sqdst_reads", [this, f](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return; expect(m_pipeline_operand_reads < 2 && at == (m_pipeline_operand_reads ? f.yaddress : f.xaddress) && word == (m_pipeline_operand_reads ? f.yword : f.xword) && m_cpu->pipeline_cycles() == 5, "SQDST reads both retained operands once"); ++m_pipeline_operand_reads; });
 	m_pipeline_write_tap = data.install_write_tap(0, 0xffff, "sqdst_no_write", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) expect(false, "SQDST has no data write"); });
 	m_pipeline_fetch_tap = program.install_read_tap(f.base + 0x600, f.base + 0x600, "sqdst_fetch", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) { expect(!m_pipeline_extensions_reads, "SQDST opcode fetched once"); ++m_pipeline_extensions_reads; } });
 	m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 62142;
@@ -7299,18 +7298,17 @@ bool tms320c54x_test_state::check_sqdst_results()
 	{
 		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
 		bool const lms = !strncmp(machine().options().bios(), "lms", 3);
-		bool const edge = profile_is("sqdst-edge") || profile_is("lms-edge");
-		auto const c = sqdst_case(variant, edge, lms); auto const &f = c.memory;
+		auto const c = sqdst_case(variant, lms); auto const &f = c.memory;
 		unsigned const checkpoint = 3 + f.snapshot;
-		expect(bool(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL)) == (edge && tick >= 4), "SQDST rejects mapped operands before effects");
-		u64 const mask = !edge && tick <= 5 ? 0xffffffffffULL : 0;
-		expect(m_cpu->state_int(tms320c54x_device::STATE_A) == (!edge && tick >= 6 ? c.result_a : c.a ^ mask) && m_cpu->state_int(tms320c54x_device::STATE_B) == (!edge && tick >= 6 ? c.result_b : c.b ^ mask) && m_cpu->state_int(tms320c54x_device::STATE_ST0) == (!edge && tick >= 6 ? c.result_st0 : f.st0), "SQDST computes both results from Execute-owned old A/B and retains independent overflow flags");
+		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "SQDST admits its RAM operands");
+		u64 const mask = tick <= 5 ? 0xffffffffffULL : 0;
+		expect(m_cpu->state_int(tms320c54x_device::STATE_A) == (tick >= 6 ? c.result_a : c.a ^ mask) && m_cpu->state_int(tms320c54x_device::STATE_B) == (tick >= 6 ? c.result_b : c.b ^ mask) && m_cpu->state_int(tms320c54x_device::STATE_ST0) == (tick >= 6 ? c.result_st0 : f.st0), "SQDST computes both results from Execute-owned old A/B and retains independent overflow flags");
 		if (tick == 4)
 		{
-			for (unsigned i = 0; i < 4; ++i) { expect(m_cpu->state_int(tms320c54x_device::STATE_AR2 + i) == f.final[i], "SQDST updates aliased pointers with X priority"); if (!edge) m_cpu->set_state_int(tms320c54x_device::STATE_AR2 + i, 0x2200 + i); }
-			if (!edge) m_cpu->set_state_int(tms320c54x_device::STATE_BK, 32);
+			for (unsigned i = 0; i < 4; ++i) { expect(m_cpu->state_int(tms320c54x_device::STATE_AR2 + i) == f.final[i], "SQDST updates aliased pointers with X priority"); m_cpu->set_state_int(tms320c54x_device::STATE_AR2 + i, 0x2200 + i); }
+			m_cpu->set_state_int(tms320c54x_device::STATE_BK, 32);
 		}
-		if (!edge && tick == 5)
+		if (tick == 5)
 		{
 			expect(m_cpu->state_int(tms320c54x_device::STATE_T) == 0xbeef, "SQDST does not publish T");
 			m_cpu->set_state_int(tms320c54x_device::STATE_T, 0xdead); m_cpu->set_state_int(tms320c54x_device::STATE_A, c.a); m_cpu->set_state_int(tms320c54x_device::STATE_B, c.b);
@@ -7322,8 +7320,8 @@ bool tms320c54x_test_state::check_sqdst_results()
 		}
 		if (tick == 12)
 		{
-			expect(m_pipeline_operand_reads == (edge ? 0 : 2) && m_pipeline_extensions_reads == 1 && bool(m_cpu->state_int(tms320c54x_device::STATE_IDLE)) == !edge && m_cpu->state_int(tms320c54x_device::STATE_T) == (edge ? 0xbeef : 0xdead) && m_cpu->state_int(tms320c54x_device::STATE_ST1) == f.st1 && m_cpu->state_int(tms320c54x_device::STATE_PMST) == f.pmst, "SQDST retains memory samples without changing T or mode bits");
-			for (unsigned i = 0; i < 4; ++i) expect(m_cpu->state_int(tms320c54x_device::STATE_AR2 + i) == (edge ? f.initial[i] : 0x2200 + i), "SQDST does not repeat pointer updates");
+			expect(m_pipeline_operand_reads == 2 && m_pipeline_extensions_reads == 1 && m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_cpu->state_int(tms320c54x_device::STATE_T) == 0xdead && m_cpu->state_int(tms320c54x_device::STATE_ST1) == f.st1 && m_cpu->state_int(tms320c54x_device::STATE_PMST) == f.pmst, "SQDST retains memory samples without changing T or mode bits");
+			for (unsigned i = 0; i < 4; ++i) expect(m_cpu->state_int(tms320c54x_device::STATE_AR2 + i) == 0x2200 + i, "SQDST does not repeat pointer updates");
 			if (!m_pipeline_replay)
 			{
 				m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[1];
@@ -7331,13 +7329,11 @@ bool tms320c54x_test_state::check_sqdst_results()
 				m_check_timer->adjust(attotime::never); expect(restore_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Restore SQDST without duplicate reads or publications"); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 62143; m_check_timer->enable(true); return true;
 			}
 			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (variant + 1 < (edge ? 16U : 402432U)) { start_sqdst(variant + 1); return true; }
+			if (variant + 1 < 402432U) { start_sqdst(variant + 1); return true; }
 			if (lms)
 			{
-				if (edge) { osd_printf_info("TMS320C54x LMS exclusions: PASS cases=16 restore=16 reads=0 pointer_updates=0 register_publication=0 silicon_trap_claim=0\n"); throw emu_fatalerror(3,"TMS320C54x isolated LMS exclusions complete"); }
 				osd_printf_info("TMS320C54x staged LMS: PASS address_cases=9216 arithmetic_cases=393216 restore=402432 encodings=256 layouts=3 bk_modes=2 value_pairs=64 old_a_patterns=8 old_b_patterns=8 arithmetic_flags=32 snapshots=3 reads=2 writes=0 t_unchanged=1 old_accumulators=Execute physical_banks=unvalidated interrupt_repeat_composition=unvalidated\n"); throw emu_fatalerror(3,"TMS320C54x isolated LMS complete");
 			}
-			if (edge) { osd_printf_info("TMS320C54x SQDST exclusions: PASS cases=16 restore=16 reads=0 pointer_updates=0 register_publication=0 silicon_trap_claim=0\n"); throw emu_fatalerror(3, "TMS320C54x isolated SQDST exclusions complete"); }
 			osd_printf_info("TMS320C54x staged SQDST: PASS address_cases=9216 arithmetic_cases=393216 restore=402432 encodings=256 layouts=3 bk_modes=2 value_pairs=64 old_a_patterns=8 old_b_patterns=8 arithmetic_flags=32 snapshots=3 reads=2 writes=0 t_unchanged=1 old_accumulators=Execute physical_banks=unvalidated interrupt_repeat_composition=unvalidated\n"); throw emu_fatalerror(3, "TMS320C54x isolated SQDST complete");
 		}
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;

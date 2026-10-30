@@ -1334,7 +1334,7 @@ private:
 		u64 a, b, result_a, result_b;
 		u16 result_st0;
 	};
-	static sqdst_fixture sqdst_case(unsigned variant, bool edge, bool lms = false);
+	static sqdst_fixture sqdst_case(unsigned variant, bool lms);
 	void start_sqdst(unsigned variant = 0);
 	struct circular_move_fixture
 	{

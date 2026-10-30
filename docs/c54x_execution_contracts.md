@@ -1772,10 +1772,9 @@ remains Execute-owned, with FRCT, SMUL product handling, OVM and sticky
 destination overflow handled by the existing arithmetic helpers.
 
 The same-accumulator MAC contract belongs to operation/selector block zero
-of `mac-family`; its mapped-source exclusions belong to block zero of
-`mac-family-edge`. A compiled comparison establishes identical descriptors
-and snapshots for all 215,040 former `mac-dual` cases and 16 edge cases.
-The duplicate profile names, routing and completion paths are retired.
+of `mac-family`. The separate `mac-dual` profile was an exact descriptor/
+snapshot duplicate. Low-page admission is represented by the shared dual-read
+guard controls, not an additional MAC-specific rejection matrix.
 Operand/pointer/BK mutation after capture detects rereads or repeated updates;
 accumulator mutation before Execute checks feedback ownership. The complete
 family includes cross-accumulator MAC, rounded MACR and MAS/MASR; physical
@@ -2096,9 +2095,9 @@ remain. This is not the address/arithmetic full cross-product.
 Post-Access pointer replacement and post-Read RAM/T replacement cannot change
 retained inputs; replacing the accumulator after Read checks Execute ownership.
 Paired reads are ordered and occur twice even when logical addresses alias;
-only Xmod updates a shared AR. `macsu-dual-edge` adds 16 low mapped/peripheral
-source exclusions before reads, pointer updates or register publication.
-These are prototype exclusions, not silicon traps. Physical bank arbitration
+only Xmod updates a shared AR. Low-page rejection shares the dual-read guard
+represented by `mpy-dual-edge`; this is prototype admission, not a silicon trap.
+Physical bank arbitration
 and general interrupt/repeat composition remain unvalidated.
 
 Short-immediate RPT is admitted within an active block; tested bodies remain
@@ -4563,8 +4562,8 @@ operand pair, feedback seed, flag combination, selector and page, but each
 now uses one of the original three checkpoints. Every fixed non-pair group
 splits its 64 pairs 21/21/22 between those checkpoints. The former complete
 value-by-checkpoint Cartesian product is intentionally retired.
-`mac-family-edge` adds 128 exclusion/replay cases with no mapped reads or
-register publication. Physical memory-bank timing and interrupt/repeat
+Low-page rejection uses the shared dual-read admission controls rather than
+a separate per-operation matrix. Physical memory-bank timing and interrupt/repeat
 composition remain unvalidated; this is not native handset acceptance.
 
 ## Staged parallel store/MAC
@@ -4608,35 +4607,38 @@ access and retained T; Execute owns one Y write and accumulator publication.
 Mutating X, T, ASM, source pointers and feedback after their respective
 sampling points verifies retention. Expected stores independently apply
 SXM and SST to the shifted old source, including source/destination aliases.
-`stmac-edge` passes 128 mapped-operand exclusions/replays with no bus writes,
+`stmac-edge` retains sixteen first-operation/source-destination mapped-operand
+exclusions/replays with no bus writes,
 reads or pointer updates. The acceptance marker explicitly leaves C
 unvalidated rather than promoting the carry-preservation hypothesis.
 Both profiles require ordered raw-case digest `a992a2f6ed8d9f42` and count
-successful restores, not requested ones. Their 128-case exclusion banks
-remain unchanged, with digest `709f2462c272f725`. A compiled descriptor/seed
+successful restores, not requested ones. A compiled descriptor/seed
 census establishes numerical snapshot equivalence, 147,456 distinct
 addressing cases and zero address/numerical overlap in either profile.
 The cached descriptor belongs to a complete live/replay pair; arithmetic
 expectations and all per-clock mutation/assertion points are unchanged.
-These banks use the independent CPU-only machine. The shared staged fixture
-also hosts the MPY, dual ALU and MACSU profiles and their exclusion banks.
-Their separate family reviews own the retained inputs and reduced replay
-schedules described above; extraction alone was not semantic classification.
-Both expectation-function bodies are byte-identical to their former owners;
-all eleven predicates/messages, seventeen register-setting calls and five
-program/data write calls retain their arguments and order. The standalone
-device graph contains only root and CPU, and every moved profile runs with
-an empty ROM directory. Program pages zero/two and data RAM replace the
-unused legacy program pages and I/O RAM window; case/reset policy is unchanged.
-The measured serial `stmac` run falls from 800.72 to 307.08 seconds; the
-retained `mac-family` run takes 306.00 seconds. Explicit scheduling and
-coverage/restore accounting add 910 C++ bytes/35 lines across the C54x
-sources, despite removing two redundant profile names and their routing.
-This is not a source-size win or a renewal of the full-default checkpoint.
-The subsequent CPU-only extraction measures 266.77 seconds for `stmac` and
-266.16 for `mac-family`, with the same cases, restores and digests. It adds
-691 C++ bytes/78 lines, including both new headers; dependency removal and
-roughly 13% focused runtime improvement are not claimed as source shrinkage.
+These banks use the independent CPU-only machine: root and CPU only, an empty
+ROM directory, program pages zero/two and data RAM. The shared staged fixture
+also hosts the positive MPY, dual ALU and MACSU profiles. Their family reviews
+own the retained inputs, replay schedules and bounded measurements.
+
+### Representative dual admission controls
+
+The MPY/MACSU/MAC/SQDST/LMS Access paths share one low-page operand guard.
+Dual ALU uses the same guard with a mapped-register exception; parallel
+ST/MAC uses a separate source/destination guard. Retain `mpy-dual-edge` (16),
+`alu-dual-edge` (32) and `stmac-edge` (16): four X/Y low-page placements, both
+program pages and before/after-guard snapshots, with ADD/SUB separate for ALU.
+Their ordered raw-key digests are `2135120b48416d25`, `f77b12af4e26bfa5` and
+`2135120b48416d25`, respectively. They assert no operand effects or pointer
+updates and retained live/replay state. These model-limit tests do not overlap
+the Smem admission grammar or establish a hardware exception policy.
+
+Per-operation MAC-family/MACSU/SQDST/LMS profiles and seven further parallel
+operation/selector blocks are retired. The 288 removed executions no longer
+qualify those individual opcode/feedback combinations' rejection behavior.
+Representative guard coverage is not equivalent to the old per-opcode matrix;
+successful arithmetic and address coverage is unchanged.
 
 ## Staged square distance
 
@@ -4654,8 +4656,8 @@ eight signed-17-bit A patterns, eight B patterns, 32 status combinations
 and three snapshots. Independent expected results check subtraction carry,
 separate sticky A/B overflow, OVM clamping, FRCT, and the existing SMUL model.
 Post-Read accumulator mutation distinguishes Execute-owned feedback from
-retained X/Y words; it also detects squaring A after replacing it. Sixteen
-mapped-operand exclusion/replay cases reject before reads or publications.
+retained X/Y words; it also detects squaring A after replacing it. Low-page
+admission is covered by the representative shared dual-read guard controls.
 Physical memory-bank timing and interrupt/single-repeat composition remain
 unvalidated.
 
@@ -4806,8 +4808,8 @@ pointer layouts, linear/circular updates, 64 sample pairs, eight old-A and
 eight old-B patterns, 32 arithmetic flag configurations and three snapshots.
 It changes A/B after Read to distinguish Execute-owned feedback, poisons
 source words and pointers after capture, and checks exact paired reads,
-carry/overflow, no writes and unchanged newer T. `lms-edge` passes sixteen
-rejection cases and replays without data or register effects. Physical bank
+carry/overflow, no writes and unchanged newer T. Low-page admission is covered
+by the representative shared dual-read guard controls. Physical bank
 conflicts, measured silicon phases and repeat/interrupt compositions are
 not established by these fixtures.
 

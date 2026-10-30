@@ -8,6 +8,24 @@
   },
   "families": [
     {
+      "id": "shared-dual-guard-census",
+      "classification": "implementation_limit",
+      "decision": "merge",
+      "profiles": [],
+      "case_ids": [],
+      "retired_profiles": ["macsu-dual-edge", "mac-family-edge", "sqdst-edge", "lms-edge"],
+      "retired_profile_cases": {"macsu-dual-edge": 16, "mac-family-edge": 128, "sqdst-edge": 16, "lms-edge": 16},
+      "reduced_profile": {"name": "stmac-edge", "retained_raw_ordinals": "0..15", "retired_raw_ordinals": "16..127", "before_cases": 128, "after_cases": 16},
+      "basis": "A bounded read of the Access-stage ownership establishes one shared low-page guard for staged_dual_multiply (MPY/MACSU/MAC family), LMS and SQDST. Dual ALU reaches the same guard with a mapped-register exception; parallel ST/MAC reaches a separate guard. Keep representative MPY (16), ALU (32) and parallel-store (16) inputs rather than one rejection matrix per opcode family/operation. These assertions specify current model admission, not silicon exceptions; the Smem census is a different grammar and is not claimed as replacement coverage.",
+      "retained": ["four X/Y CPU-register/peripheral placements, both program pages and both snapshots in each representative guard bank", "ADD and SUB separate in the ALU bank", "no operand effects, pointer changes or accumulator/T/status changes before rejection, one opcode fetch and successful live/replay restoration", "all successful instruction inputs, fixture-owned arithmetic expressions, checkpoints and result markers"],
+      "coverage_loss": ["288 rejected executions/restores retired in total: 176 from four profile names and 112 from seven additional parallel operation/selector blocks", "individual retired opcodes and feedback-selector combinations no longer have dedicated rejection qualification", "representative common-guard coverage is not equivalent to every old opcode/accumulator-state combination"],
+      "baseline": "All seven original exclusion profiles pass their complete native oracles before the edit.",
+      "proof": "Compiled comparison matches all fields of 804864 retained SQDST/LMS descriptors against beb01ed1's edge=false path. All 1507328 positive dual-profile keys/counts/modes remain unchanged; the three retained negative banks keep their original first-block keys. The shared dual input/reference generator and production CPU/device sources are unchanged.",
+      "verification": "The rebuilt complete SQDST and LMS profiles each pass all 402432 cases/restores. MPY (26624), ALU (53248), MACSU (83968), all three representative negative banks (16/32/16), isa-parallel (60 literal IDs) and legacy-atomic pass their full native oracles. All 5079 host tests pass with one established skip. The 398-profile/289-default-requirement inventory passes. Full MAC-family/STMAC matrices, full-default and handset checkpoints are not renewed by this bounded run.",
+      "standalone_verification": "The CPU-only target rebuilds and passes all three representative negative banks plus isa-parallel with an empty ROM directory.",
+      "measurements": {"baseline_commit": "beb01ed1", "before_cpp_bytes": 3341419, "before_cpp_lines": 50886, "after_cpp_bytes": 3339483, "after_cpp_lines": 50877, "source_assessment": "1936 C++ bytes and nine lines removed; the mixed SQDST/LMS paths lose their negative-mode argument/conditions. Most of the removed case volume was already generated compactly, so this is guard-coverage consolidation, not a large source reduction. No paired runtime improvement is claimed."}
+    },
+    {
       "id": "named-observer-checkpoint-service",
       "classification": "harness_infrastructure",
       "decision": "rewrite",
@@ -1982,35 +2000,28 @@
     {
       "id": "dual-mac-family-admission",
       "classification": "implementation_limit",
-      "decision": "keep",
+      "decision": "merge",
       "source": "tests/c54x/tms320c54x_test_dual.h; tests/c54x/tms320c54x_test_dual_input.h",
       "profiles": [
-        "mac-family-edge",
         "stmac-edge"
       ],
       "case_ids": [],
-      "basis": "Current staged decoder admits RAM X/Y operands but rejects CPU/peripheral low-page sources before effects. These are implementation limits, not proof of a silicon trap or unsupported real instruction.",
+      "basis": "Retain the separate parallel-store guard as sixteen representative first-operation/selector cases. The dual-read MAC guard is shared with MPY/MACSU/SQDST/LMS, represented by mpy-dual-edge; dual ALU's mapped-register exception remains separately represented by alu-dual-edge. These are implementation limits, not a silicon exception contract.",
       "profile_coverage": {
-        "mac-family-edge": {
-          "cases": 128,
-          "fnv64": "709f2462c272f725",
-          "result_prefix": "TMS320C54x dual MAC family exclusions: PASS",
-          "key": "Original raw ordinals 0..127: eight operation/selector blocks times 16 X/Y CPU-register/peripheral/page/checkpoint controls."
-        },
         "stmac-edge": {
-          "cases": 128,
-          "fnv64": "709f2462c272f725",
+          "cases": 16,
+          "fnv64": "2135120b48416d25",
           "result_prefix": "TMS320C54x parallel MAC exclusions: PASS",
-          "key": "Original raw ordinals 0..127: eight operation/selector blocks times 16 X/Y CPU-register/peripheral/page/checkpoint controls."
+          "key": "Original raw ordinals 0..15: first MAC operation/source-destination block, four X/Y CPU-register/peripheral placements, both pages and both checkpoints. The other seven blocks are retired, not equivalent encoding coverage."
         }
       },
       "obligations": [
-        "retain every original rejection case and snapshot; no schedule reduction for this bank",
+        "retain every original first-block rejection input and snapshot",
         "no operand read/write or pointer update before rejection; retain original accumulator/T/status/PMST expectations and one opcode fetch",
         "record actual restore count and ordered raw identity digest"
       ],
       "limits": [
-        "these X/Y decoder-admission controls do not duplicate the Smem source-domain bank",
+        "these X/Y decoder-admission controls do not duplicate the Smem source-domain bank; they are representative, not every opcode's rejection qualification",
         "no silicon exception policy or general mapped-operand support claim",
         "CPU-only fixture support does not establish the physical handset's mapped-operand behavior"
       ]
@@ -2223,16 +2234,15 @@
       "classification": "implementation_limit",
       "decision": "keep",
       "source": "tests/c54x/tms320c54x_test_dual.h; tests/c54x/tms320c54x_test_dual_input.h",
-      "profiles": ["mpy-dual-edge", "alu-dual-edge", "macsu-dual-edge"],
+      "profiles": ["mpy-dual-edge", "alu-dual-edge"],
       "case_ids": [],
       "basis": "The staged X/Y grammar rejects low-page CPU-register and peripheral sources before operand effects. Four X/Y source placements, two program pages and checkpoints3/4 retain distinct pending-instruction states. ADD/SUB have separate opcode blocks. This is implementation admission, not architectural illegality.",
       "profile_coverage": {
         "mpy-dual-edge": {"cases": 16, "fnv64": "2135120b48416d25", "result_prefix": "TMS320C54x staged dual MPY exclusions: PASS", "key": "Original raw ordinals0..15, all retained."},
-        "alu-dual-edge": {"cases": 32, "fnv64": "f77b12af4e26bfa5", "result_prefix": "TMS320C54x staged dual ALU exclusions: PASS", "key": "Original raw ordinals0..31: ADD and SUB blocks, all retained."},
-        "macsu-dual-edge": {"cases": 16, "fnv64": "2135120b48416d25", "result_prefix": "TMS320C54x dual MACSU exclusions: PASS", "key": "Original raw ordinals0..15, all retained."}
+        "alu-dual-edge": {"cases": 32, "fnv64": "f77b12af4e26bfa5", "result_prefix": "TMS320C54x staged dual ALU exclusions: PASS", "key": "Original raw ordinals0..31: ADD and SUB blocks, all retained."}
       },
       "obligations": ["retain every existing input/checkpoint and its unchanged setup; no positive scheduling reduction applies here", "preserve accumulator/T/status/PMST and all four relevant address registers; one opcode fetch and no data read/write or pointer update", "retain illegal-latch timing, live/replay observation rewinds, actual restore accounting and ordered raw identities"],
-      "limits": ["these use X/Y addressing, not the Smem source-domain grammar; opcode families have distinct admission paths", "only existing destination-A rejection cases are covered; no full encoding or silicon exception-policy claim", "keep separately classified from successful architectural examples"]
+      "limits": ["these use X/Y addressing, not the Smem source-domain grammar; MPY and ALU share one guard but ALU has a mapped-register exception", "only existing destination-A rejection cases are covered; no full encoding or silicon exception-policy claim", "keep separately classified from successful architectural examples"]
     },
     {
       "id": "dual-multiply-cpu-only-ownership",

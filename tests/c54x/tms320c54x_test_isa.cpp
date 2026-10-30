@@ -205,12 +205,10 @@ private:
 				if (edge) { osd_printf_info("TMS320C54x parallel MAC exclusions: PASS cases=%u restore=%u reads=0 writes=0 pointer_updates=0 silicon_trap_claim=0 coverage_fnv64=%016llx\n", m_dual->count(), m_dual->restores(), (unsigned long long)m_dual->digest()); throw emu_fatalerror(3, "TMS320C54x isolated parallel MAC exclusions complete"); }
 				osd_printf_info("TMS320C54x parallel MAC: PASS cases=%u restore=%u address_cases=147456 arithmetic_cases=524288 checkpoint_policy=balanced operations=MAC,MACR,MAS,MASR encodings=4096 source_destination_pairs=4 shifts=32 reads=1 writes=1 retained=T,X,ASM old_source_store=1 carry=unvalidated physical_banks=unvalidated interrupt_repeat_composition=unvalidated coverage_fnv64=%016llx\n", m_dual->count(), m_dual->restores(), (unsigned long long)m_dual->digest()); throw emu_fatalerror(3, "TMS320C54x isolated parallel MAC complete");
 			}
-			if (edge) { osd_printf_info("TMS320C54x dual MAC family exclusions: PASS cases=%u restore=%u reads=0 pointer_updates=0 register_publication=0 silicon_trap_claim=0 coverage_fnv64=%016llx\n", m_dual->count(), m_dual->restores(), (unsigned long long)m_dual->digest()); throw emu_fatalerror(3, "TMS320C54x isolated dual MAC family exclusions complete"); }
 			osd_printf_info("TMS320C54x dual MAC family: PASS cases=%u restore=%u address_cases=147456 arithmetic_cases=524288 checkpoint_policy=balanced operations=MAC,MACR,MAS,MASR encodings=4096 source_destination_pairs=4 snapshots=3 reads=2 t_publish=Read accumulator_sample=Execute physical_banks=unvalidated interrupt_repeat_composition=unvalidated coverage_fnv64=%016llx\n", m_dual->count(), m_dual->restores(), (unsigned long long)m_dual->digest()); throw emu_fatalerror(3, "TMS320C54x isolated dual MAC family complete");
 		}
 		if (macsu)
 		{
-			if (edge) { osd_printf_info("TMS320C54x dual MACSU exclusions: PASS cases=%u restore=%u operands=X,Y sources=cpu_register,peripheral pages=2 snapshots=2 reads=0 pointer_updates=0 register_publication=0 silicon_trap_claim=0 coverage_fnv64=%016llx\n", m_dual->count(), m_dual->restores(), (unsigned long long)m_dual->digest()); throw emu_fatalerror(0, "TMS320C54x isolated dual MACSU exclusions complete"); }
 			osd_printf_info("TMS320C54x staged dual MACSU: PASS address_cases=18432 arithmetic_cases=65536 restore=%u encodings=512 layouts=3 bk_modes=2 value_pairs=64 accumulator_patterns=8 arithmetic_flags=32 pages=2 snapshots=3 checkpoint_policy=balanced reads=2 data_writes=0 x_unsigned_y_signed=1 x_alias_priority=1 t_publish=Read accumulator_sample=Execute physical_banks=unvalidated interrupt_repeat_composition=unvalidated coverage_fnv64=%016llx\n", m_dual->restores(), (unsigned long long)m_dual->digest()); throw emu_fatalerror(0, "TMS320C54x isolated dual MACSU complete");
 		}
 		if (alu)
@@ -379,27 +377,25 @@ ROM_START(tms54isa)
 	ROM_SYSTEM_BIOS(11, "alu-dual", "Dual-memory ADD SUB retained arithmetic replay")
 	ROM_SYSTEM_BIOS(12, "alu-dual-edge", "Excluded dual-memory ADD SUB low-page operands")
 	ROM_SYSTEM_BIOS(13, "macsu-dual", "Dual signed unsigned multiply accumulate ownership")
-	ROM_SYSTEM_BIOS(14, "macsu-dual-edge", "Dual MACSU low mapped source exclusions")
-	ROM_SYSTEM_BIOS(15, "mac-family", "Dual MAC MACR MAS MASR with independent source and destination")
-	ROM_SYSTEM_BIOS(16, "mac-family-edge", "Dual MAC family mapped operand exclusions")
-	ROM_SYSTEM_BIOS(17, "stmac", "Parallel MAC stores with retained T X and ASM")
-	ROM_SYSTEM_BIOS(18, "stmac-edge", "Parallel MAC mapped operand exclusions")
-	ROM_SYSTEM_BIOS(19, "norm", "Retained normalization shift sampling and replay")
-	ROM_SYSTEM_BIOS(20, "norm-edge", "Recovered negative normalization-count aliases")
-	ROM_SYSTEM_BIOS(21, "exp-norm", "EXP producer and normalization T latency")
-	ROM_SYSTEM_BIOS(22, "exp-t", "Staged exponent publication and T consumer latency")
-	ROM_SYSTEM_BIOS(23, "sat", "Staged signed saturation and overflow publication")
-	ROM_SYSTEM_BIOS(24, "rotate", "Staged accumulator rotates and carry forwarding")
-	ROM_SYSTEM_BIOS(25, "minmax", "Signed accumulator MAX MIN Execute ownership and replay")
-	ROM_SYSTEM_BIOS(26, "squr", "Accumulator square with signed 17-bit operand")
-	ROM_SYSTEM_BIOS(27, "reg-logic", "Register logic and complement without memory access")
-	ROM_SYSTEM_BIOS(28, "reg-shifts", "Arithmetic and logical accumulator shifts")
-	ROM_SYSTEM_BIOS(29, "negate", "Accumulator negate with producer and replay")
-	ROM_SYSTEM_BIOS(30, "absolute", "Accumulator absolute value with producer and replay")
-	ROM_SYSTEM_BIOS(31, "isa-words", "Atomic instruction-word arithmetic and addressing examples")
-	ROM_SYSTEM_BIOS(32, "isa-disasm", "Debugger syntax length page wrapping and stepping contracts")
-	ROM_SYSTEM_BIOS(33, "st-t-long", "Long-address T/TRN stores and retained Execute source")
-	ROM_SYSTEM_BIOS(34, "st-t-long-edge", "Rejected mapped destinations of long-address T/TRN stores")
+	ROM_SYSTEM_BIOS(14, "mac-family", "Dual MAC MACR MAS MASR with independent source and destination")
+	ROM_SYSTEM_BIOS(15, "stmac", "Parallel MAC stores with retained T X and ASM")
+	ROM_SYSTEM_BIOS(16, "stmac-edge", "Parallel MAC mapped operand exclusions")
+	ROM_SYSTEM_BIOS(17, "norm", "Retained normalization shift sampling and replay")
+	ROM_SYSTEM_BIOS(18, "norm-edge", "Recovered negative normalization-count aliases")
+	ROM_SYSTEM_BIOS(19, "exp-norm", "EXP producer and normalization T latency")
+	ROM_SYSTEM_BIOS(20, "exp-t", "Staged exponent publication and T consumer latency")
+	ROM_SYSTEM_BIOS(21, "sat", "Staged signed saturation and overflow publication")
+	ROM_SYSTEM_BIOS(22, "rotate", "Staged accumulator rotates and carry forwarding")
+	ROM_SYSTEM_BIOS(23, "minmax", "Signed accumulator MAX MIN Execute ownership and replay")
+	ROM_SYSTEM_BIOS(24, "squr", "Accumulator square with signed 17-bit operand")
+	ROM_SYSTEM_BIOS(25, "reg-logic", "Register logic and complement without memory access")
+	ROM_SYSTEM_BIOS(26, "reg-shifts", "Arithmetic and logical accumulator shifts")
+	ROM_SYSTEM_BIOS(27, "negate", "Accumulator negate with producer and replay")
+	ROM_SYSTEM_BIOS(28, "absolute", "Accumulator absolute value with producer and replay")
+	ROM_SYSTEM_BIOS(29, "isa-words", "Atomic instruction-word arithmetic and addressing examples")
+	ROM_SYSTEM_BIOS(30, "isa-disasm", "Debugger syntax length page wrapping and stepping contracts")
+	ROM_SYSTEM_BIOS(31, "st-t-long", "Long-address T/TRN stores and retained Execute source")
+	ROM_SYSTEM_BIOS(32, "st-t-long-edge", "Rejected mapped destinations of long-address T/TRN stores")
 	ROM_REGION(1, "unused", ROMREGION_ERASE00)
 ROM_END
 

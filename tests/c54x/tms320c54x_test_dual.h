@@ -24,7 +24,7 @@ struct dual_multiply_mode
 	bool macsu() const { return family() || op == operation::unsigned_mac; }
 	unsigned count() const
 	{
-		if (edge) return 16 * (family() ? 8 : alu() ? 2 : 1);
+		if (edge) return alu() ? 32 : 16;
 		return family() ? dual_mac_schedule::cases : macsu() ? dual_macsu_schedule::cases :
 			alu() ? dual_alu_schedule::cases : dual_mpy_schedule::cases;
 	}
@@ -41,6 +41,7 @@ struct dual_multiply_mode
 		operation const op = name == "mpy-dual" ? operation::multiply : name == "alu-dual" ? operation::arithmetic :
 			name == "macsu-dual" ? operation::unsigned_mac : name == "mac-family" ? operation::mac :
 			name == "stmac" ? operation::parallel_mac : operation::none;
+		if (edge && op != operation::multiply && op != operation::arithmetic && op != operation::parallel_mac) return {};
 		return {op, edge};
 	}
 };

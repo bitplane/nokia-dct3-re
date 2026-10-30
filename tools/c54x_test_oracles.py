@@ -848,10 +848,6 @@ EXTRA_PROFILES = {
         "TMS320C54x staged LMS: PASS address_cases=9216 arithmetic_cases=393216 restore=402432 encodings=256 layouts=3 bk_modes=2 value_pairs=64 old_a_patterns=8 old_b_patterns=8 arithmetic_flags=32 snapshots=3 reads=2 writes=0 t_unchanged=1 old_accumulators=Execute physical_banks=unvalidated interrupt_repeat_composition=unvalidated",
         "Fatal error: TMS320C54x isolated LMS complete",
     ),
-    "lms-edge": (
-        "TMS320C54x LMS exclusions: PASS cases=16 restore=16 reads=0 pointer_updates=0 register_publication=0 silicon_trap_claim=0",
-        "Fatal error: TMS320C54x isolated LMS exclusions complete",
-    ),
     "tmac-repeat": (
         "TMS320C54x repeated T MAC: PASS cases=98304 restore=98304 operations=MAC,MACR,MAS,MASR destinations=A,B forms=DP,indirect,postincrement patterns=8 flags=16 counts=0,1,7,255 pages=2 snapshots=4 per_clock_accumulator=1 t_preserved=1 source_opcode_poison=1 data_writes=0 physical_phase_claim=0",
         "Fatal error: TMS320C54x isolated repeated T MAC complete",
@@ -1263,10 +1259,6 @@ EXTRA_PROFILES = {
     "macsu-dual": (
         "TMS320C54x staged dual MACSU: PASS address_cases=18432 arithmetic_cases=65536 restore=83968 encodings=512 layouts=3 bk_modes=2 value_pairs=64 accumulator_patterns=8 arithmetic_flags=32 pages=2 snapshots=3 checkpoint_policy=balanced reads=2 data_writes=0 x_unsigned_y_signed=1 x_alias_priority=1 t_publish=Read accumulator_sample=Execute physical_banks=unvalidated interrupt_repeat_composition=unvalidated coverage_fnv64=a57c305fd5b3a3ba",
         "Fatal error: TMS320C54x isolated dual MACSU complete",
-    ),
-    "macsu-dual-edge": (
-        "TMS320C54x dual MACSU exclusions: PASS cases=16 restore=16 operands=X,Y sources=cpu_register,peripheral pages=2 snapshots=2 reads=0 pointer_updates=0 register_publication=0 silicon_trap_claim=0 coverage_fnv64=2135120b48416d25",
-        "Fatal error: TMS320C54x isolated dual MACSU exclusions complete",
     ),
     "rptb-single": (
         "TMS320C54x single repeat in block: PASS cases=768 restore=768 outer_counts=4 inner_counts=4 bodies=MVDD,ST,NOP positions=middle,end pages=2 snapshots=4 ordered_memory=1 outer_counts_preserved=1 duplicate_transactions=0 interrupt_composition=unvalidated physical_phase_claim=0",
@@ -1750,25 +1742,17 @@ EXTRA_PROFILES = {
         "TMS320C54x staged SQDST: PASS address_cases=9216 arithmetic_cases=393216 restore=402432 encodings=256 layouts=3 bk_modes=2 value_pairs=64 old_a_patterns=8 old_b_patterns=8 arithmetic_flags=32 snapshots=3 reads=2 writes=0 t_unchanged=1 old_accumulators=Execute physical_banks=unvalidated interrupt_repeat_composition=unvalidated",
         "Fatal error: TMS320C54x isolated SQDST complete",
     ),
-    "sqdst-edge": (
-        "TMS320C54x SQDST exclusions: PASS cases=16 restore=16 reads=0 pointer_updates=0 register_publication=0 silicon_trap_claim=0",
-        "Fatal error: TMS320C54x isolated SQDST exclusions complete",
-    ),
     "stmac": (
         "TMS320C54x parallel MAC: PASS cases=671744 restore=671744 address_cases=147456 arithmetic_cases=524288 checkpoint_policy=balanced operations=MAC,MACR,MAS,MASR encodings=4096 source_destination_pairs=4 shifts=32 reads=1 writes=1 retained=T,X,ASM old_source_store=1 carry=unvalidated physical_banks=unvalidated interrupt_repeat_composition=unvalidated coverage_fnv64=a992a2f6ed8d9f42",
         "Fatal error: TMS320C54x isolated parallel MAC complete",
     ),
     "stmac-edge": (
-        "TMS320C54x parallel MAC exclusions: PASS cases=128 restore=128 reads=0 writes=0 pointer_updates=0 silicon_trap_claim=0 coverage_fnv64=709f2462c272f725",
+        "TMS320C54x parallel MAC exclusions: PASS cases=16 restore=16 reads=0 writes=0 pointer_updates=0 silicon_trap_claim=0 coverage_fnv64=2135120b48416d25",
         "Fatal error: TMS320C54x isolated parallel MAC exclusions complete",
     ),
     "mac-family": (
         "TMS320C54x dual MAC family: PASS cases=671744 restore=671744 address_cases=147456 arithmetic_cases=524288 checkpoint_policy=balanced operations=MAC,MACR,MAS,MASR encodings=4096 source_destination_pairs=4 snapshots=3 reads=2 t_publish=Read accumulator_sample=Execute physical_banks=unvalidated interrupt_repeat_composition=unvalidated coverage_fnv64=a992a2f6ed8d9f42",
         "Fatal error: TMS320C54x isolated dual MAC family complete",
-    ),
-    "mac-family-edge": (
-        "TMS320C54x dual MAC family exclusions: PASS cases=128 restore=128 reads=0 pointer_updates=0 register_publication=0 silicon_trap_claim=0 coverage_fnv64=709f2462c272f725",
-        "Fatal error: TMS320C54x isolated dual MAC family exclusions complete",
     ),
     "repeat-rearm": (
         "TMS320C54x adjacent block rearm: PASS cases=64 restore=64 first_counts=0,1,3,7 second_counts=0,2 pages=2 snapshots=4 brc_publications=1 actual_iterations=1 write_owner=Access interrupt_composition=unvalidated physical_phase_claim=0",
