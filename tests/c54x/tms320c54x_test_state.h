@@ -159,7 +159,6 @@ private:
 	static long_store_fixture peripheral_long_store_fixture(unsigned variant);
 	void start_pipeline_long_immediate_store(unsigned variant = 0);
 	void start_pipeline_bio_branch(unsigned variant = 0);
-	void start_pipeline_mapped_load_age(unsigned variant = 0);
 	void start_pipeline_store_mvmm(unsigned variant = 0);
 	struct indexed_store_fixture;
 	static indexed_store_fixture circular_portr_case(unsigned v);

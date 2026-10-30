@@ -210,6 +210,7 @@ def main():
     counts['status_store_consumers'] = 5376
     counts['repeated_mvkd'] = 816
     counts['delay_copy'] = 7424
+    counts['mapped_load_age'] = 8064
     parser.add_argument('section', choices=[*counts, 'all'])
     parser.add_argument('--jobs', type=int, default=8)
     parser.add_argument('--negative-control', action='store_true', help='require failure of an intentionally wrong expectation')
