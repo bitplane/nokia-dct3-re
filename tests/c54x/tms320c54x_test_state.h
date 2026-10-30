@@ -1029,7 +1029,6 @@ private:
 	};
 	static page_zero_stack_fixture page_zero_stack_case(unsigned v, bool edge);
 	void start_page_zero_stack(unsigned variant = 0);
-	void start_mvdm_ar(unsigned variant = 0);
 	bool mvkd_delay() const;
 	void start_mvdm_delay(unsigned variant = 0);
 	void start_delayed_far_call(unsigned variant = 0);

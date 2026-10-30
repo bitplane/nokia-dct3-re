@@ -2977,32 +2977,6 @@ void tms320c54x_test_state::start_page_zero_stack(unsigned variant)
 
 
 
-void tms320c54x_test_state::start_mvdm_ar(unsigned variant)
-{
-	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-	unsigned const reg = variant % 8, kind = (variant / 8) % 3, gap = (variant / 96) % 2;
-	u16 const value = std::array<u16, 4>{0, 1, 0x8000, 0xffff}[(variant / 24) % 4];
-	u16 const source = kind == 0 ? 0x500 : 0x10 + (kind == 1 ? reg : (reg + 1) % 8);
-	u32 const base = (variant / 192) % 2 ? 0x20000 : 0;
-	auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
-	for (unsigned i = 0; i < 32; ++i) program.write_word(base + 0x600 + i, 0xf495);
-	program.write_word(base + 0x600, 0x7210 | reg); program.write_word(base + 0x601, source); program.write_word(base + 0x602 + gap, 0xf4a8 | reg);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xa608); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x800);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
-	m_cpu->set_input_line(0, CLEAR_LINE); m_cpu->set_input_line(INPUT_LINE_NMI, CLEAR_LINE);
-	for (unsigned i = 0; i < 8; ++i) data.write_word(0x10 + i, 0x400 + i);
-	data.write_word(0x10, value); data.write_word(source, value);
-	m_pipeline_operand_reads = m_pipeline_store_writes = m_pipeline_extensions_reads = 0;
-	m_pipeline_operand_tap = data.install_read_tap(0, 0xffff, "mvdm_ar_source",
-		[this, source, value](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return; expect(!m_pipeline_operand_reads && at == source && word == value && m_cpu->pipeline_cycles() == 6, "MVDM samples one absolute source at its retained Class 19A Read"); ++m_pipeline_operand_reads; });
-	m_pipeline_write_tap = data.install_write_tap(0, 0xffff, "mvdm_ar_destination",
-		[this, reg, value](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return; expect(!m_pipeline_store_writes && at == 0x10 + reg && word == value && m_cpu->pipeline_cycles() == 6, "MVDM publishes one encoded MMR destination without DP addressing"); ++m_pipeline_store_writes; });
-	m_pipeline_fetch_tap = program.install_read_tap(base + 0x601, base + 0x601, "mvdm_ar_literal",
-		[this, source](offs_t, u16 &word, u16) { if (machine().side_effects_disabled()) return; expect(!m_pipeline_extensions_reads && word == source, "MVDM owns one source-address literal"); ++m_pipeline_extensions_reads; });
-	m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 253630;
-	m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-}
 
 bool tms320c54x_test_state::mvkd_delay() const
 { return profile_is("mvkd-delay"); }
@@ -5994,38 +5968,6 @@ bool tms320c54x_test_state::check_mvkd_delay_results()
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
 	}
 	if (m_phase == 253660) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 253650; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true; }
-	if (m_phase == 253630)
-	{
-		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick, reg = variant % 8, kind = (variant / 8) % 3, gap = (variant / 96) % 2;
-		u16 const value = std::array<u16, 4>{0, 1, 0x8000, 0xffff}[(variant / 24) % 4];
-		u32 const base = (variant / 192) % 2 ? 0x20000 : 0;
-		unsigned const checkpoint = std::array<unsigned, 3>{5, 6, 8}[variant / 384];
-		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "MVDM AR executes without atomic fallback");
-		if (tick == 4) { auto const disable = machine().disable_side_effects(); m_cpu->space(AS_PROGRAM).write_word(base + 0x601, 0xdead); }
-		if (tick == 6 && !kind) { auto const disable = machine().disable_side_effects(); m_cpu->space(AS_DATA).write_word(0x500, 0xdead); }
-		if (tick == checkpoint && !m_pipeline_replay)
-		{
-			m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_store_writes, m_pipeline_extensions_reads, 0};
-			expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save MVDM before/after source publication and consumer");
-		}
-		if (tick == 12)
-		{
-			bool const equal = gap || kind == 1 || reg == 0;
-			expect(m_cpu->state_int(tms320c54x_device::STATE_AR0 + reg) == value && m_cpu->state_int(tms320c54x_device::STATE_ST0) == (0xa608 | (equal ? 0x1000 : 0)) && m_cpu->state_int(tms320c54x_device::STATE_ST1) == 0x800, "MVDM preserves status while CMPR observes the table-7-7 one-gap AR latency");
-			expect(m_pipeline_operand_reads == 1 && m_pipeline_store_writes == 1 && m_pipeline_extensions_reads == 1, "MVDM retains exactly one literal, source read and MMR write");
-			if (!m_pipeline_replay)
-			{
-				m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_store_writes = m_recurring_irq_snapshot[1]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[2];
-				return restore_pipeline_at(253640, "Replay MVDM source ownership and AR consumer latency");
-			}
-			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (variant < 1151) { start_mvdm_ar(variant + 1); return true; }
-			osd_printf_info("TMS320C54x staged MVDM AR: PASS cases=1152 restore=1152 registers=8 sources=RAM,self_AR,other_AR gaps=0,1 pages=2 literal_fetches=1 reads=1 writes=1 repeat_acceptance=0 silicon_phase_claim=0\n");
-			throw emu_fatalerror(0, "TMS320C54x isolated MVDM AR complete");
-		}
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 253640) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 253630; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true; }
 	if (m_phase == 253610)
 	{
 		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;

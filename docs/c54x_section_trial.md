@@ -200,6 +200,8 @@ Subsequent replacements use the same section-only workflow:
 
 | `mvdm_t_trn.h` | Keep T/TRN destinations ×RAM/AR4/AR1 sources ×eight word boundaries ×gap/no-gap unsigned LDM consumers. Preserve exact source Read6/Write6/consumer Read7..8, literal/source poison, destination/sibling/status, final A/PC/IDLE and replay from a cleared pipeline. Distribute16 ignored status modes, pages and four checkpoints instead of crossing them; deliberately lose their exhaustive pairings. | Native96 cases/restores versus12288; build5.523s/run0.050s. Delete setup/helper/fixture, named phase pair, profile route/declarations/phase constant; mixed mapped-write checker retains its other banks. |
 
+| `mvdm_ar.h` | Keep all AR destinations ×RAM/self-AR/other-AR sources ×four word boundaries ×gap/no-gap CMPR consumers. Preserve Class19A source Read6/mapped Write6, one-gap category-I register visibility, self-source/AR0 equality controls, literal/RAM poison, other pointers, TC/status, terminal PC/IDLE and replay. Distribute pages and three checkpoints rather than crossing them. | Native192 cases/restores versus1152; build5.456s/run0.088s. Delete setup, phases253630/253640, profile route/declaration; mixed mapped-write checker retains its other banks. |
+
 `python3 tools/run_c54x_section.py all` rebuilds/runs each replacement in
 sequence. Final measurements: immediate-store5.214/0.019s,
 basic-memory5.423/0.020s, stack5.262/0.069s, DAGEN5.406/0.126s (build/run).

@@ -155,6 +155,7 @@ def main():
     counts['t_store'] = 2944
     counts['mvdm_accumulator'] = 1152
     counts['mvdm_t_trn'] = 96
+    counts['mvdm_ar'] = 192
     parser.add_argument('section', choices=[*counts, 'all'])
     parser.add_argument('--jobs', type=int, default=8)
     parser.add_argument('--negative-control', action='store_true', help='require failure of an intentionally wrong expectation')
