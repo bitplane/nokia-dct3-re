@@ -78,7 +78,7 @@ TIMER_CALLBACK_MEMBER(tms320c54x_test_state::check_results)
 	if (check_pipeline_push_sp_latency_results()) return;
 	if (check_interrupt_pop_edge_results()) return;
 	if (check_pipeline_mmr_pop_results()) return;
-	if (check_pipeline_mu4_prologue_results()) return;
+	if (check_pipeline_load_add_results()) return;
 	if (check_pipeline_dst_results()) return;
 	if (check_pipeline_logical_immediate_results()) return;
 	if (check_absolute_memory_dp_results()) return;
@@ -87,16 +87,13 @@ TIMER_CALLBACK_MEMBER(tms320c54x_test_state::check_results)
 	if (check_pipeline_xc_tc_results()) return;
 	if (check_pipeline_xc_accumulator_results()) return;
 	if (check_pipeline_delayed_return_results()) return;
-	if (check_pipeline_original_worker_roundtrip_results()) return;
-	if (check_pipeline_original_context_call_results()) return;
 	if (check_addm_expected_results()) return;
 	if (check_pipeline_data_push_results()) return;
 	if (check_pipeline_retd_data_order_results()) return;
 	if (check_pipeline_data_pop_results()) return;
 	if (check_pipeline_cmpr_results()) return;
 	if (check_pipeline_memory_logic_results()) return;
-	if (check_pipeline_context_body_results()) return;
-	if (check_pipeline_mu4_timer_context_results()) return;
+	if (check_pipeline_far_branch_results()) return;
 	if (check_pipeline_absolute_load_results()) return;
 	if (check_pipeline_far_call_results()) return;
 	if (check_pipeline_idle_sp_tail_results()) return;

@@ -43,7 +43,9 @@ void tms320c54x_test_state::machine_reset()
 	using self = tms320c54x_test_state;
 	m_result_owner = nullptr;
 	m_pipeline_counter_count = 0;
+	m_context_coverage = {};
 	if (start_profile(*this, machine().options().bios(), {
+		{ {"rom4-context"}, [](self &test) { test.m_result_owner = &self::check_rom4_context_results; test.start_pipeline_mu4_prologue(); } },
 		{ {"reg-banks"}, [](self &test) { test.start_pipeline_accumulator_arithmetic(); } },
 		{ {"idle-modes"}, [](self &test) { test.start_pipeline_idle1(); } },
 		{ {"pop-irq"}, [](self &test) { test.start_pipeline_mmr_pop(); } },
@@ -891,11 +893,7 @@ void tms320c54x_test_state::test(machine_config &config)
 				"IDLE1 wake acknowledges the actual source with its unexecuted continuation");
 			++m_vector_acks;
 		}
-		if (m_phase == 252110 || m_phase == 252130)
-		{
-			expect(line == 3, "Original MU4 timer fixture acknowledges only the hardware timer source");
-			++m_vector_acks; m_timer_probe_return_pc = m_cpu->state_int(tms320c54x_device::STATE_RTN);
-		}
+		observe_context_irq(line);
 		if (m_phase == 251170)
 		{
 			expect(m_pipeline_branch_case >= 8 && line == 0 && m_cpu->pipeline_cycles() == (m_pipeline_branch_case & 1 ? 10 : 12), "Branch IRQ acknowledges during its vector Fetch");

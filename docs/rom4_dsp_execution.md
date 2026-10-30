@@ -1075,30 +1075,17 @@ logical reads and the final store requires exactly two reads and one
 write. This closes the selected tail composition, not the complete
 zero-control worker, IRQ entry or a native recorder transaction.
 
-The complete original worker is now separately pinned at
-`02:3dbc`--`02:3de1`: 38 words, including its 22-word zero-control body.
-The composed fixture also executes the four original CALLD/STM-parameter
-words at `02:3d92`--`02:3d95`. Forty-eight cases cover both CMPR/XC
-outcomes, both saved INTM states, both SXM states and six replay boundaries.
-Each leg requires ten ordered data reads and nine or ten writes,
-including the forwarded RMW source through PSHD/POPD, consecutive B high/low
-and T publications, the conditional control-word store and final mask/merge
-store. The stack balances, the worker restores the saved INTM predicate,
-and RETD reaches its page-2 continuation without fetching a third delay
-word. The caller continuation is an explicit test marker, not a claim to
-execute the rest of the original outer handler.
-
-The non-taken BC retains the already-fetched first body word; its body
-timeline is one clock earlier than a redirect-style expectation. With
-the selected fixture, ADDM Read is clock 20, PSHD retains the pending result
-through the internal bypass before ADDM Write in clock 21, and the final
-result is written in clock 41.
-The selected CMPR match controls a store in clock 33. The exact values
-and clocks are bounded CPU-fixture observations, not measured silicon or
-recovered recorder operand provenance.
+The complete worker at `02:3dbc`--`02:3de1` is 38 words, including its
+22-word zero-control body. The retained outer-context composition below
+executes it with the original CALLD/STM parameter sequence. Its copied code
+and typed inputs live in `tests/firmware/tms320c54x_test_rom4_context.cpp`,
+selected by `tools/run_c54x_core.py --profile rom4-context`. The six banks
+cover 334 cases/restores separately from the default CPU regression. They
+qualify supplied firmware/context interactions, not recovered recorder
+operand provenance or measured silicon timing.
 
 The logical and worker fixtures use ST1 bit 8 for SXM; bit 9 is OVM.
-The corrected 576-case matrix checks zero-extension against actual SXM.
+The 576-case matrix checks zero-extension against actual SXM.
 The original outer-context handler is also composed with the active body:
 51 handler words plus all 38 worker words, rather than the former
 skip-body subset. The 128 cases cover pages 0/2, both saved INTM and SXM
@@ -3188,22 +3175,11 @@ during return: A=0 allows the INTM clear, but the first resumed instruction
 must retire before IRQ acknowledgement; A=0800 rejects the clear and leaves
 the source pending. This validates that bounded delay/IRQ composition, not
 RETED, nested controls, NMI, other XC placements or physical silicon timing.
-Ten further cases execute all seven original `02:3ddb`--`02:3de1` return-tail
-words with saved ST1 values `0034`/`0834`. POPM samples the saved status,
-AND reduces A to its INTM bit, and the original XC/RSBX pair either restores
-unmasked state or preserves the mask. Both stack words are changed after
-sampling; five replay boundaries must still reproduce the retained values,
-one target Fetch and the correct delayed IRQ outcome. The first continuation
-instruction retires before IRQ acknowledgement. The continuation/vector are
-neutral test instructions, not the native caller/ISR. The read-only contract
-tool pins all seven words and classifies every saved ST1 value: 32,768 masked
-and 32,768 unmasked. It describes restoration of INTM only, not full ST1.
-Complete worker-body execution and the native recorder remain unvalidated.
-
-The original nonzero-control-word route has a coherent call/return fixture:
+The `rom4-context` nonzero-control route has a coherent call/return fixture:
 four CALLD/STM parameter words at `02:3d92`, nine worker-entry words and
 seven return-tail words, all unchanged from R060. Sixteen cases cover saved
-masked/unmasked ST1 and eight replay boundaries. The call stacks `3d96`,
+masked/unmasked ST1 (`0014`/`0814`) and eight replay boundaries, with CMPT
+clear and ARP zero throughout. The call stacks `3d96`,
 the worker stacks that ST1, and its skip-body branch consumes two source
 samples before the tail pops both owned words and balances the caller SP.
 T receives parameter 6. Source and stack RAM changes after sampling must
@@ -3225,8 +3201,9 @@ return slot. Terminal checks require original A/B, ST0/ST1, AR0/AR2/AR3/T,
 balanced SP, one counter increment and one reserved-return Fetch. Checkpoint
 bus counts are retained separately from emulated device state so replay
 cannot hide duplicate operations. The routine is entered directly with
-fixture RAM and a neutral final continuation; timer-driven interrupt entry,
-the zero-control-word worker body and live recorder remain unvalidated.
+fixture RAM and a neutral final continuation. Timer-driven entry and the
+zero-control body have separate banks in the same integration profile;
+none of these supplied workloads establishes live recorder behavior.
 
 Staged CALL/CALLD retain a stack destination at the opcode's Access clock
 (complete target Decode), load RTN in the next clock and write the retained

@@ -546,62 +546,6 @@ void tms320c54x_test_state::start_pipeline_xc_accumulator(unsigned variant)
 	m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 }
 
-void tms320c54x_test_state::start_pipeline_original_worker_roundtrip(unsigned variant)
-{
-	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-	bool const masked = BIT(variant, 0); u16 const saved_status = masked ? 0x0834 : 0x0034;
-	auto &program = m_cpu->space(AS_PROGRAM);
-	for (unsigned i = 0; i < 96; ++i) program.write_word(0x23d90 + i, 0xf495);
-	for (unsigned i = 0; i < 32; ++i) program.write_word(0x20040 + i, 0xf495);
-	std::array<u16, 4> const call{0xf274, 0x3dbc, 0x770e, 0x0006};
-	std::array<u16, 9> const entry{0xfd00, 0x4a07, 0xfd00, 0xf7bb, 0x7192, 0x0010, 0x1092, 0xf844, 0x3ddb};
-	std::array<u16, 7> const tail{0x8a08, 0xf030, 0x0800, 0xf495, 0xfe00, 0xfd45, 0xf6bb};
-	for (unsigned i = 0; i < call.size(); ++i) program.write_word(0x23d92 + i, call[i]);
-	for (unsigned i = 0; i < entry.size(); ++i) program.write_word(0x23dbc + i, entry[i]);
-	for (unsigned i = 0; i < tail.size(); ++i) program.write_word(0x23ddb + i, tail[i]);
-	program.write_word(0x23de2, 0xffff); program.write_word(0x23d96, 0xe955);
-	set_registers(*m_cpu, {
-		{cpu_regs::STATE_TCR, 0x10}, {cpu_regs::STATE_PMST, 0}, {cpu_regs::STATE_ILLEGAL, 0},
-		{cpu_regs::STATE_ST0, 0xa608}, {cpu_regs::STATE_ST1, saved_status}, {cpu_regs::STATE_SP, 0x1000},
-		{cpu_regs::STATE_A, 0x2233445566ULL}, {cpu_regs::STATE_B, 0x1122334455ULL}, {cpu_regs::STATE_T, 0xcafe},
-		{cpu_regs::STATE_AR0, 0x5678}, {cpu_regs::STATE_AR2, 0x510}, {cpu_regs::STATE_IFR, 0}, {cpu_regs::STATE_IMR, 1},
-	});
-	m_cpu->space(AS_DATA).write_word(0x510, 0xbeef); m_cpu->space(AS_DATA).write_word(0x511, 1);
-	m_cpu->set_state_int(STATE_GENPC, 0x23d92); m_cpu->set_pipeline_frontend(true);
-	m_pipeline_replay = false; m_pipeline_expected_cycle = 1;
-	m_pipeline_operand_reads = m_pipeline_extensions_reads = m_pipeline_store_writes = m_pipeline_drained_fetches = m_vector_reads = 0;
-	m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0xffe, 0xfff, "worker_roundtrip_stack_reads",
-		[this, saved_status](offs_t address, u16 &word, u16) {
-			if (machine().side_effects_disabled()) return;
-			expect(word == (address == 0xffe ? saved_status : 0x3d96) && m_cpu->pipeline_cycles() == (address == 0xffe ? 21 : 25), "Original worker reads its own saved ST1 and CALLD return once"); ++m_pipeline_operand_reads;
-		});
-	m_vector_stack_tap = m_cpu->space(AS_DATA).install_write_tap(0xffe, 0xfff, "worker_roundtrip_stack_writes",
-		[this, saved_status, masked](offs_t address, u16 &word, u16) {
-			if (machine().side_effects_disabled()) return;
-			u64 const clock = m_cpu->pipeline_cycles();
-			expect((clock == 6 && address == 0xfff && word == 0x3d96) ||
-				(clock == 11 && address == 0xffe && word == saved_status) ||
-				(!masked && clock == 35 && address == 0xfff), "CALLD, worker status push and later IRQ own separate stack writes"); ++m_pipeline_store_writes;
-		});
-	m_pipeline_write_tap = m_cpu->space(AS_DATA).install_read_tap(0x510, 0x511, "worker_roundtrip_sources",
-		[this](offs_t address, u16 &word, u16) {
-			if (machine().side_effects_disabled()) return;
-			expect(word == (address == 0x510 ? 0xbeef : 1) && m_cpu->pipeline_cycles() == (address == 0x510 ? 13 : 15), "Original worker samples its two adjacent source words once"); ++m_pipeline_extensions_reads;
-		});
-	m_pipeline_fetch_tap = program.install_read_tap(0x23d96, 0x23de2, "worker_roundtrip_route",
-		[this](offs_t address, u16 &, u16) {
-			if (machine().side_effects_disabled()) return;
-			if (address != 0x23dbc && address != 0x23ddb && address != 0x23d96 && address != 0x23de2) return;
-			expect(address != 0x23de2 && m_cpu->pipeline_cycles() == (address == 0x23dbc ? 6 : address == 0x23ddb ? 18 : 27), "Original worker follows CALLD, skip-body BC and RETD once without a third delay word"); ++m_pipeline_drained_fetches;
-		});
-	m_vector_prefetch_tap = program.install_read_tap(0x20040, 0x20040, "worker_roundtrip_irq",
-		[this, masked](offs_t, u16 &, u16) {
-			if (machine().side_effects_disabled()) return;
-			expect(!masked && m_cpu->pipeline_cycles() == 34 && m_cpu->state_int(tms320c54x_device::STATE_B) == 0x55, "Original worker restores interrupt delivery after returning to its caller"); ++m_vector_reads;
-		});
-	m_phase = 251830; m_cpu->resume(SUSPEND_REASON_DISABLE);
-	m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-}
 
 std::array<u16, 2> tms320c54x_test_state::addm_inputs(unsigned variant)
 {
@@ -5136,66 +5080,6 @@ bool tms320c54x_test_state::check_pipeline_xc_accumulator_results()
 	return false;
 }
 
-bool tms320c54x_test_state::check_pipeline_original_worker_roundtrip_results()
-{
-	[[maybe_unused]] auto &program = m_cpu->space(AS_PROGRAM);
-	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
-	if (m_phase == 251830)
-	{
-		u64 const cycle = m_cpu->pipeline_cycles(); unsigned const variant = m_pipeline_peripheral_case;
-		bool const masked = BIT(variant, 0); u16 const saved_status = masked ? 0x0834 : 0x0034;
-		u64 const checkpoint = std::array<unsigned, 8>{4, 6, 11, 17, 21, 25, 29, 30}[variant / 2];
-		auto const reads_at = [](u64 clock) { return unsigned(clock >= 21) + unsigned(clock >= 25); };
-		auto const sources_at = [](u64 clock) { return unsigned(clock >= 13) + unsigned(clock >= 15); };
-		auto const fetches_at = [](u64 clock) { return unsigned(clock >= 6) + unsigned(clock >= 18) + unsigned(clock >= 27); };
-		auto const writes_at = [masked](u64 clock) { return unsigned(clock >= 6) + unsigned(clock >= 11) + unsigned(!masked && clock >= 35); };
-		expect(cycle == m_pipeline_expected_cycle && !m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) &&
-			m_pipeline_operand_reads == reads_at(cycle) && m_pipeline_extensions_reads == sources_at(cycle) &&
-			m_pipeline_drained_fetches == fetches_at(cycle) && m_pipeline_store_writes == writes_at(cycle) && m_vector_reads == unsigned(!masked && cycle >= 34) &&
-			m_cpu->state_int(tms320c54x_device::STATE_SP) == (!masked && cycle >= 33 ? 0xfff : cycle >= 24 ? 0x1000 : cycle >= 21 ? 0xfff : cycle >= 10 ? 0xffe : cycle >= 4 ? 0xfff : 0x1000) &&
-			m_cpu->state_int(tms320c54x_device::STATE_ST1) == (!masked && cycle >= 30 && cycle < 34 ? saved_status : cycle >= 13 ? saved_status | 0x800 : saved_status) &&
-			m_cpu->state_int(tms320c54x_device::STATE_A) == (cycle >= 24 ? (masked ? 0x800 : 0) : cycle >= 22 ? saved_status : cycle >= 16 ? 1 : 0x2233445566ULL) &&
-			m_cpu->state_int(tms320c54x_device::STATE_B) == (cycle >= 31 ? 0x55 : 0x1122334455ULL) &&
-			m_cpu->state_int(tms320c54x_device::STATE_T) == (cycle >= 7 ? 6 : 0xcafe) &&
-			m_cpu->state_int(tms320c54x_device::STATE_AR0) == (cycle >= 13 ? 0xbeef : 0x5678) &&
-			m_cpu->state_int(tms320c54x_device::STATE_AR2) == (cycle >= 14 ? 0x512 : cycle >= 13 ? 0x511 : 0x510),
-			"Original skip-body worker call composes parameter, context, source, branch and return ownership");
-		if (cycle == 26) m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 1);
-		if (cycle == 13) m_cpu->space(AS_DATA).write_word(0x510, 0);
-		if (cycle == 15) m_cpu->space(AS_DATA).write_word(0x511, 0);
-		if (cycle == 21 || cycle == 25)
-		{
-			auto const disable = machine().disable_side_effects();
-			m_cpu->space(AS_DATA).write_word(cycle == 21 ? 0xffe : 0xfff, 0xdead);
-		}
-		if (cycle == checkpoint && !m_pipeline_replay)
-		{
-			expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save original worker roundtrip at eight ownership boundaries");
-		}
-		if (cycle == 40)
-		{
-			if (!m_pipeline_replay)
-			{
-				m_pipeline_replay = true; m_pipeline_operand_reads = reads_at(checkpoint); m_pipeline_extensions_reads = sources_at(checkpoint);
-				m_pipeline_drained_fetches = fetches_at(checkpoint); m_pipeline_store_writes = writes_at(checkpoint); m_vector_reads = 0;
-				expect(restore_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Restore original worker roundtrip without duplicate stack or source ownership");
-				m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_expected_cycle = checkpoint + 1; m_phase = 251840;
-				m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-			}
-			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_vector_stack_tap.remove(); m_vector_prefetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (variant < 15) { start_pipeline_original_worker_roundtrip(variant + 1); return true; }
-			osd_printf_info("TMS320C54x staged original worker roundtrip: PASS cases=16 original_words=20 route=skip_body saved_intm_states=2 restore=16 duplicate_stack_reads=0 duplicate_source_reads=0\n");
-			start_pipeline_original_context_call(); return true;
-		}
-		++m_pipeline_expected_cycle; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 251840)
-	{
-		m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 251830;
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	return false;
-}
 
 bool tms320c54x_test_state::check_addm_expected_results()
 {
@@ -5333,7 +5217,7 @@ bool tms320c54x_test_state::check_pipeline_memory_logic_results()
 			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
 			if (m_pipeline_peripheral_case < 4) { start_pipeline_mu4_logic_tail(m_pipeline_peripheral_case + 1); return true; }
 			osd_printf_info("TMS320C54x staged original MU4 logical tail: PASS cases=5 original_words=6 page=2 restore=5 duplicate_reads=0 duplicate_writes=0\n");
-			start_pipeline_original_context_call(0, true); return true;
+			start_pipeline_far_branch(); return true;
 		}
 		++m_pipeline_expected_cycle;
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;

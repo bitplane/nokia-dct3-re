@@ -6713,7 +6713,7 @@ bool tms320c54x_test_state::check_pipeline_mmr_pop_results()
 			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
 			if (m_pipeline_peripheral_case < 11) { start_pipeline_pop_dagen_conflict(m_pipeline_peripheral_case + 1); return true; }
 			osd_printf_info("TMS320C54x staged POPM DAGEN conflict: PASS cases=12 bank_conflicts=6 ram_controls=6 restore=12 duplicate_accesses=0\n");
-			start_pipeline_mu4_prologue(); return true;
+			start_pipeline_dld(); return true;
 		}
 		++m_pipeline_expected_cycle;
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;

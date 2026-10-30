@@ -8,6 +8,52 @@
   },
   "families": [
     {
+      "id": "rom4-context-legal-entry-and-isolation",
+      "classification": "firmware_integration",
+      "decision": "relocate",
+      "profiles": ["rom4-context"],
+      "case_ids": [],
+      "profile_coverage": {
+        "rom4-context": {"cases": 334, "fnv64": "f2680b443bf25b9c", "result_prefix": "Nokia ROM4 context integration: PASS", "key": "(bank<<8)|raw, banks in order: prologue0..5, roundtrip0..15, skip-body context0..39, active-body context0..127, timer ISR0..47, recurring timer0..95. Same raw identities, explicitly corrected input contents; digest does not certify unchanged stimuli."}
+      },
+      "basis": "SPRU131G section5.5/page7-61 note3 requires ARP0 in standard mode. The copied firmware snippets use standard-mode indirect addressing and an INTM-only worker return. Clear the unrelated ARP sentinel in ST0 and the roundtrip's incidental CMPT bit, while retaining low status/ASM sentinels, both INTM states, instruction words and original result predicates. These are firmware ABI/context integration expectations, not an independent ISA specification or measured pipeline oracle.",
+      "changes": ["outer prologue/context/timer seeds and saved/restored ST0 words change a61b->061b", "roundtrip seed changes a608->0608 and saved ST1 changes0034/0834->0014/0814; no incidental compatibility-mode qualification remains", "runtime guard checks ARP0 and CMPT0 at every integration observation", "move five setups, twelve result-phase handlers and the timer IRQ observation into tests/firmware/tms320c54x_test_rom4_context.cpp", "new focused profile owns the334 existing cases; remove their duplicate execution and six requirements from the default sequence, preserving all six banks in the separate integration profile", "the generic CPU-only runner and production CPU/device sources are unchanged"],
+      "known_limits": ["legacy controller/class storage remains shared; this is physical fixture ownership and execution-scope separation, not full class decoupling", "the remaining original-idle fixture still borrows the timer image setup helper; other copied prefix/tail snippets require separate review", "exact old clock/bus predicates remain software-model regressions; clearing invalid seeds does not prove silicon timing"],
+      "verification": "Pre-correction, corrected, relocated and final reset-selected profile executions pass all334 cases/restores with empty ROM directory and byte-identical native consoles, including recurring-return observations and digest f2680b443bf25b9c. The final selected result-owner route is covered by the compiled dispatcher-priority test (five host tests) and focused native rerun. All5079 host tests pass with one established skip in63.677 seconds. The full-default checkpoint precedes the final owner-only routing cleanup, as explicitly qualified in that record. The395-profile/281-default inventory passes. No full retained-isolated-suite or handset renewal is claimed.",
+      "final_route_checkpoint": {
+        "capture": "tmp/c54x-corpus-transfer-review/run_c54x_core_le_2omkp",
+        "source_base_commit": "66cfbfc9",
+        "bench_patch_command": "git diff --no-ext-diff --binary 66cfbfc9 -- tests/c54x tests/firmware",
+        "bench_patch_sha256": "4fbf917af5aa0e6f0161dec4bae25112bacc1c94d658401d278ec996583e4a4a",
+        "executable_sha256": "2e3d4eb33cddcd0a5c6d633082bbae869a85a6a1f9a9c56a141b2463e2edcd2d",
+        "cases": 334,
+        "restores": 334,
+        "coverage_fnv64": "f2680b443bf25b9c",
+        "mame_exit": 3,
+        "runner_exit": 0,
+        "wall_seconds": 0.27,
+        "scope": "Final reset-selected firmware integration route and legal seeds; not a renewed full-default, all-isolated, handset or silicon checkpoint."
+      },
+      "measurements": {"baseline_commit": "66cfbfc9", "before_cpu_cpp_bytes": 3320638, "before_cpu_cpp_lines": 50623, "after_cpu_cpp_bytes": 3274653, "after_cpu_cpp_lines": 49963, "before_cpu_and_firmware_cpp_bytes": 3821948, "before_cpu_and_firmware_cpp_lines": 59226, "after_cpu_and_firmware_cpp_bytes": 3822648, "after_cpu_and_firmware_cpp_lines": 59248, "source_assessment": "660 lines leave the CPU directory by relocation, not deletion. Combined CPU+firmware source grows700 bytes/22 lines for explicit profile selection, coverage and valid-input checks. No net source reduction or execution-case deletion is claimed. Focused invocation wall times: baseline0.33s, corrected0.34s, relocated0.27s; these are small single samples dominated by runner/startup overhead, not a benchmark speedup."},
+      "default_checkpoint": {
+        "capture": "tmp/c54x-corpus-transfer-review/run_c54x_core_x91w7y9i",
+        "source_base_commit": "66cfbfc9",
+        "bench_patch_command": "git diff --cached --no-ext-diff --binary 66cfbfc9 -- tests/c54x tests/firmware",
+        "bench_patch_artifact": "tmp/c54x-corpus-transfer-review/rom4-context-default.patch",
+        "bench_patch_sha256": "e87d6105393ae058bd469bad5bb571278786f3ad9cd2adfb6ef54fa655f0aa2e",
+        "executable_sha256": "3f57e0ce67b28d10b8afaf622a322293bd650dfb19cb3cc24c2e94046c39ae54",
+        "acceptance_sha256": {"tools/run_c54x_core.py": "70ef9f2bc24630e9a7b2eff039f2781f7d6ed82f20424c1b22ccdd831b8e061d", "tools/c54x_test_oracles.py": "2d9180549943af352e90b9a3bce98c1696844ceec75ddf56bffbc0b32180bf2d"},
+        "required_markers": 281,
+        "native_ordered_pass_records": 287,
+        "mame_exit": 3,
+        "runner_exit": 0,
+        "wall_seconds": 988.95,
+        "comparison": "Six copied-context group records move to the separate integration profile. All other287 native ordered PASS records match the preceding checkpoint exactly. All5690 ordered opassert words match, newline-joined SHA256 2764b84dd60e9c560191bfbd638d982ca4cd2ba756fa6595ee9339d54cf6d20e.",
+        "post_capture_edits": "After this capture, select check_rom4_context_results through m_result_owner only in the rom4-context reset branch and remove its unconditional dispatcher call. The removed default call was a pure profile-name comparison returning false without emulated-state access. Existing executable selection tests plus the focused profile cover the final route; a second full-default run is not claimed.",
+        "scope": "Default-regression execution after physical integration separation and status-seed corrections, before the final pure routing cleanup. Not every isolated profile, handset acceptance, all remaining sentinel validity or silicon timing. No runtime improvement is claimed."
+      }
+    },
+    {
       "id": "mu4-worker-subset-retirement",
       "classification": "firmware_integration",
       "decision": "delete",

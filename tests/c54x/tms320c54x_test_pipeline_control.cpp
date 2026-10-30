@@ -634,97 +634,6 @@ void tms320c54x_test_state::start_pipeline_delayed_return(unsigned variant)
 }
 
 
-void tms320c54x_test_state::start_pipeline_original_context_call(unsigned variant, bool full_body)
-{
-	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-	u32 const base = BIT(variant, 0) ? 0x20000 : 0;
-	u16 const saved_status = 0x4200 | (BIT(variant, 1) ? 0x800 : 0) | (full_body && BIT(variant, 2) ? 0x100 : 0);
-	std::array<u16, 51> const main{0xeeff, 0x4a06, 0x4a07, 0xf6be, 0xf6b9,
-		0x4a08, 0x4a09, 0x4a0a, 0x4a0b, 0x4a0c, 0x4a0d, 0xea00, 0x577c, 0xf300, 0x0001, 0x4f7c, 0x487e,
-		0xf030, 0xc004, 0xf050, 0xc004, 0xfa44, 0x3d9a, 0x467f, 0xf495,
-		0x4a10, 0x4a12, 0x4a13, 0x4a0e, 0x7131, 0x0012, 0xf274, 0x3dbc, 0x770e, 0x0006,
-		0x8a0e, 0x8a13, 0x8a12, 0x8a10, 0x1036, 0xf7be, 0x8a0d, 0x8a0c, 0x8a0b,
-		0x8006, 0x8a0a, 0x8a09, 0x8a08, 0x8a07, 0x8a06, 0xfc00};
-	std::array<u16, 9> const entry{0xfd00, 0x4a07, 0xfd00, 0xf7bb, 0x7192, 0x0010, 0x1092, 0xf844, 0x3ddb};
-	std::array<u16, 7> const tail{0x8a08, 0xf030, 0x0800, 0xf495, 0xfe00, 0xfd45, 0xf6bb};
-	std::array<u16, 22> const body{0x6b82, 2, 0x4b92, 0x7182, 0x0013, 0x8b93, 0x8393, 0x8193, 0xf4ab, 0x8c93,
-		0x108a, 0x6d8a, 0xfd30, 0x8082, 0x6dea, 3, 0xf000, 4, 0x1892, 0x1a8a, 0x6d8a, 0x8082};
-	auto &program = m_cpu->space(AS_PROGRAM);
-	for (unsigned i = 0; i < 144; ++i) program.write_word(base + 0x3d73 + i, 0xf495);
-	for (unsigned i = 0; i < 32; ++i) program.write_word(base + 0x4044 + i, 0xf495);
-	for (unsigned i = 0; i < main.size(); ++i) program.write_word(base + 0x3d73 + i, main[i]);
-	for (unsigned i = 0; i < entry.size(); ++i) program.write_word(base + 0x3dbc + i, entry[i]);
-	if (full_body) for (unsigned i = 0; i < body.size(); ++i) program.write_word(base + 0x3dc5 + i, body[i]);
-	for (unsigned i = 0; i < tail.size(); ++i) program.write_word(base + 0x3ddb + i, tail[i]);
-	program.write_word(base + 0x3de2, 0xffff);
-	set_registers(*m_cpu, {
-		{cpu_regs::STATE_TCR, 0x10}, {cpu_regs::STATE_PMST, 0}, {cpu_regs::STATE_ILLEGAL, 0},
-		{cpu_regs::STATE_ST0, 0xa61b}, {cpu_regs::STATE_ST1, saved_status}, {cpu_regs::STATE_SP, 0x1000},
-		{cpu_regs::STATE_A, 0x123456789aULL}, {cpu_regs::STATE_B, 0x2233445566ULL}, {cpu_regs::STATE_AR0, 0x1357},
-		{cpu_regs::STATE_AR2, 0x2468}, {cpu_regs::STATE_AR3, 0x369c}, {cpu_regs::STATE_T, 0x8888},
-		{cpu_regs::STATE_IFR, 0}, {cpu_regs::STATE_IMR, 0},
-	});
-	auto &data = m_cpu->space(AS_DATA);
-	for (unsigned i = 0xff0; i <= 0x1000; ++i) data.write_word(i, 0xaaaa);
-	data.write_word(0x7c, 0x1357); data.write_word(0x7d, 0x2468);
-	data.write_word(0x7e, 0xc004); data.write_word(0x7f, 0xe012);
-	data.write_word(0x931, 0x510); data.write_word(0x936, 0x4044);
-	data.write_word(0x510, full_body ? BIT(variant, 3) ? 0x472 : 0x474 : 0xbeef); data.write_word(0x511, full_body ? 0 : 1);
-	if (full_body)
-	{
-		data.write_word(0x512, 0xff0f); data.write_word(0x513, 0x470);
-		data.write_word(0x514, 0xff0f); data.write_word(0x515, 0x00f0);
-		for (unsigned i = 0; i < 4; ++i) data.write_word(0x470 + i, 0x7777);
-	}
-	m_cpu->set_state_int(STATE_GENPC, base + 0x3d73); m_cpu->set_pipeline_frontend(true);
-	m_pipeline_replay = false; m_pipeline_expected_cycle = 1;
-	m_pipeline_store_writes = m_pipeline_operand_reads = m_pipeline_extensions_reads = 0;
-	m_pipeline_drained_fetches = m_vector_reads = 0;
-	m_pipeline_write_tap = data.install_write_tap(full_body ? 0xff0 : 0xff1, 0xfff, "original_context_call_stack",
-		[this, saved_status, full_body](offs_t address, u16 &word, u16) {
-			if (machine().side_effects_disabled()) return;
-			std::array<u16, 16> const expected{0xa61b, saved_status, 0x789a, 0x3456, 0x12, 0x5566, 0x3344, 0x22,
-				0x1357, 0x2468, 0x369c, 0x8888, 0x3d96, u16(saved_status & 0x900), full_body ? u16(0xff11) : u16(0x4044), 0x4044};
-			unsigned const final = full_body ? 15 : 14;
-			expect(m_pipeline_store_writes <= final && address == (m_pipeline_store_writes < final ? 0xffe - m_pipeline_store_writes : 0xfff) &&
-				word == expected[m_pipeline_store_writes], "Original context call route owns all nested saves and reserved return write"); ++m_pipeline_store_writes;
-		});
-	m_pipeline_operand_tap = data.install_read_tap(0xfff, 0xfff, "original_context_call_return",
-		[this](offs_t, u16 &word, u16) {
-			if (machine().side_effects_disabled()) return;
-			expect(word == 0x4044, "Original call route reads the reserved return after restoring context"); ++m_pipeline_operand_reads;
-		});
-	m_pipeline_fetch_tap = program.install_read_tap(base + 0x4044, base + 0x4044, "original_context_call_continuation",
-		[this](offs_t, u16 &, u16) {
-			if (machine().side_effects_disabled()) return;
-			++m_pipeline_extensions_reads;
-		});
-	if (full_body)
-	{
-		bool const matched = BIT(variant, 3);
-		m_vector_stack_tap = data.install_write_tap(0x470, 0x515, "full_context_body_writes",
-			[this, matched](offs_t address, u16 &value, u16) {
-				if (machine().side_effects_disabled()) return;
-				std::array<u16, 7> const addresses{0x512, 0x470, 0x471, 0x472, 0x473, 0x511, 0x513};
-				std::array<u16, 7> const values{0xff11, 0xff11, 0x1357, 0x2469, 6, 0x470, 0x4f4};
-				unsigned const index = m_pipeline_drained_fetches + unsigned(!matched && m_pipeline_drained_fetches >= 5);
-				expect(index < addresses.size() && address == addresses[index] && value == values[index],
-					"Outer context body publishes its counter-derived B words and retained source/store effects once");
-				++m_pipeline_drained_fetches;
-			});
-		m_vector_prefetch_tap = data.install_read_tap(0x510, 0x515, "full_context_body_reads",
-			[this, matched](offs_t address, u16 &value, u16) {
-				if (machine().side_effects_disabled()) return;
-				std::array<u16, 7> const addresses{0x510, 0x511, 0x512, 0x513, 0x513, 0x514, 0x515};
-				std::array<u16, 7> const values{u16(matched ? 0x472 : 0x474), 0, 0xff0f, 0x470, 0x470, 0xff0f, 0x00f0};
-				expect(m_vector_reads < addresses.size() && address == addresses[m_vector_reads] && value == values[m_vector_reads],
-					"Outer context body consumes each source in original order without duplicate replay reads");
-				++m_vector_reads;
-			});
-	}
-	m_phase = full_body ? 252070 : 251850; m_cpu->resume(SUSPEND_REASON_DISABLE);
-	m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-}
 
 void tms320c54x_test_state::start_pipeline_retd_data_order(unsigned variant)
 {
@@ -2031,7 +1940,7 @@ bool tms320c54x_test_state::check_pipeline_delayed_return_results()
 			m_pipeline_operand_tap.remove(); m_pipeline_fetch_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
 			if (variant < 23) { start_pipeline_delayed_return(variant + 1); return true; }
 			osd_printf_info("TMS320C54x staged delayed returns: PASS cases=24 pages=2 delay_forms=3 restore=24 xc_irq_cases=12 duplicate_stack_reads=0 third_delay_fetches=0\n");
-			start_pipeline_original_worker_roundtrip(); return true;
+			start_pipeline_addm(); return true;
 		}
 		++m_pipeline_expected_cycle; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
 	}
@@ -2043,57 +1952,6 @@ bool tms320c54x_test_state::check_pipeline_delayed_return_results()
 	return false;
 }
 
-bool tms320c54x_test_state::check_pipeline_original_context_call_results()
-{
-	[[maybe_unused]] auto &program = m_cpu->space(AS_PROGRAM);
-	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
-	if (m_phase == 251850)
-	{
-		u64 const cycle = m_cpu->pipeline_cycles(); unsigned const variant = m_pipeline_peripheral_case;
-		u16 const saved_status = BIT(variant, 1) ? 0x4a00 : 0x4200;
-		u64 const checkpoint = std::array<unsigned, 10>{6, 13, 31, 40, 51, 58, 64, 74, 79, 85}[variant / 4];
-		expect(cycle == m_pipeline_expected_cycle && !m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Original outer context call route advances without atomic fallback");
-		if (cycle == checkpoint && !m_pipeline_replay)
-		{
-			m_pipeline_register_writes = m_pipeline_store_writes;
-			m_pipeline_branch_case = m_pipeline_operand_reads; m_pipeline_stm_case = m_pipeline_extensions_reads;
-			expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save coherent outer handler at ten nested ownership boundaries");
-		}
-		if (cycle == 100)
-		{
-			{
-				auto const disable = machine().disable_side_effects();
-				expect(m_pipeline_store_writes == 15 && m_pipeline_operand_reads == 1 && m_pipeline_extensions_reads == 1 &&
-					m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x1000 && m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0xa61b &&
-					m_cpu->state_int(tms320c54x_device::STATE_ST1) == saved_status && m_cpu->state_int(tms320c54x_device::STATE_A) == 0x123456789aULL &&
-					m_cpu->state_int(tms320c54x_device::STATE_B) == 0x2233445566ULL && m_cpu->state_int(tms320c54x_device::STATE_AR0) == 0x1357 &&
-					m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x2468 && m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x369c &&
-					m_cpu->state_int(tms320c54x_device::STATE_T) == 0x8888 && m_cpu->space(AS_DATA).read_word(0xfff) == 0x4044 &&
-					m_cpu->space(AS_DATA).read_word(0x7c) == 0x1357 && m_cpu->space(AS_DATA).read_word(0x7d) == 0x2469,
-					"Original outer handler calls the skip-body worker and restores all saved context with one counter increment");
-			}
-			if (!m_pipeline_replay)
-			{
-				m_pipeline_replay = true; m_pipeline_store_writes = m_pipeline_register_writes;
-				m_pipeline_operand_reads = m_pipeline_branch_case; m_pipeline_extensions_reads = m_pipeline_stm_case;
-				expect(restore_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Restore complete context call route without duplicated saves or return fetch");
-				m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_expected_cycle = checkpoint + 1; m_phase = 251860;
-				m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-			}
-			m_pipeline_write_tap.remove(); m_pipeline_operand_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (variant < 39) { start_pipeline_original_context_call(variant + 1); return true; }
-			osd_printf_info("TMS320C54x staged original context call route: PASS cases=40 original_words=67 pages=2 saved_intm_states=2 restore=40 context_restored=1 counter_increments=1 full_isr_claim=0\n");
-			start_pipeline_addm(); return true;
-		}
-		++m_pipeline_expected_cycle; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 251860)
-	{
-		m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 251850;
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	return false;
-}
 
 bool tms320c54x_test_state::check_pipeline_retd_data_order_results()
 {
@@ -2138,62 +1996,10 @@ bool tms320c54x_test_state::check_pipeline_retd_data_order_results()
 	return false;
 }
 
-bool tms320c54x_test_state::check_pipeline_context_body_results()
+bool tms320c54x_test_state::check_pipeline_far_branch_results()
 {
 	[[maybe_unused]] auto &program = m_cpu->space(AS_PROGRAM);
 	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
-	if (m_phase == 252070)
-	{
-		u64 const cycle = m_cpu->pipeline_cycles(); unsigned const variant = m_pipeline_peripheral_case;
-		u16 const saved_status = 0x4200 | (BIT(variant, 1) ? 0x800 : 0) | (BIT(variant, 2) ? 0x100 : 0);
-		unsigned const checkpoint = std::array<unsigned, 8>{6, 13, 31, 51, 65, 75, 90, 104}[variant / 16];
-		expect(cycle == m_pipeline_expected_cycle && !m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL),
-			"Complete outer-context body route advances without replacing original instructions");
-		if (cycle == checkpoint && !m_pipeline_replay)
-		{
-			m_pipeline_register_writes = m_pipeline_store_writes; m_pipeline_branch_case = m_pipeline_operand_reads;
-			m_pipeline_stm_case = m_pipeline_extensions_reads; m_pipeline_store_case = m_pipeline_drained_fetches;
-			m_pipeline_indirect_case = m_vector_reads;
-			expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save original outer handler with active body at eight ownership boundaries");
-		}
-		if (cycle == 130)
-		{
-			{
-				auto const disable = machine().disable_side_effects();
-				expect(m_pipeline_store_writes == 16 && m_pipeline_operand_reads == 1 && m_pipeline_extensions_reads == 1 &&
-					m_pipeline_drained_fetches == (BIT(variant, 3) ? 7 : 6) && m_vector_reads == 7 &&
-					m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x1000 && m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0xa61b &&
-					m_cpu->state_int(tms320c54x_device::STATE_ST1) == saved_status && m_cpu->state_int(tms320c54x_device::STATE_A) == 0x123456789aULL &&
-					m_cpu->state_int(tms320c54x_device::STATE_B) == 0x2233445566ULL && m_cpu->state_int(tms320c54x_device::STATE_AR0) == 0x1357 &&
-					m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x2468 && m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x369c &&
-					m_cpu->state_int(tms320c54x_device::STATE_T) == 0x8888 && m_cpu->space(AS_DATA).read_word(0xfff) == 0x4044 &&
-					m_cpu->space(AS_DATA).read_word(0x7c) == 0x1357 && m_cpu->space(AS_DATA).read_word(0x7d) == 0x2469 &&
-					m_cpu->space(AS_DATA).read_word(0x511) == (BIT(variant, 3) ? 0x470 : 0) &&
-					m_cpu->space(AS_DATA).read_word(0x513) == 0x4f4,
-					"Original active-body context route restores all saved registers and keeps its exact memory effects");
-			}
-			if (!m_pipeline_replay)
-			{
-				m_pipeline_replay = true; m_pipeline_store_writes = m_pipeline_register_writes; m_pipeline_operand_reads = m_pipeline_branch_case;
-				m_pipeline_extensions_reads = m_pipeline_stm_case; m_pipeline_drained_fetches = m_pipeline_store_case; m_vector_reads = m_pipeline_indirect_case;
-				expect(restore_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Restore complete outer-context body route without repeating its work");
-				m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_expected_cycle = checkpoint + 1; m_phase = 252080;
-				m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-			}
-			m_pipeline_write_tap.remove(); m_pipeline_operand_tap.remove(); m_pipeline_fetch_tap.remove();
-			m_vector_stack_tap.remove(); m_vector_prefetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (variant < 127) { start_pipeline_original_context_call(variant + 1, true); return true; }
-			osd_printf_info("TMS320C54x staged complete MU4 context body: PASS cases=128 original_words=89 pages=2 saved_intm_states=2 sxm_states=2 cmpr_outcomes=2 restore=128 context_restored=1 counter_increments=1 full_isr_claim=0\n");
-			start_pipeline_far_branch(); return true;
-		}
-		++m_pipeline_expected_cycle;
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 252080)
-	{
-		m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 252070;
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
 	if (m_phase == 252090)
 	{
 		unsigned const variant = m_pipeline_peripheral_case;
@@ -2226,7 +2032,7 @@ bool tms320c54x_test_state::check_pipeline_context_body_results()
 			m_pipeline_operand_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
 			if (variant < 39) { start_pipeline_far_branch(variant + 1); return true; }
 			osd_printf_info("TMS320C54x staged FB: PASS cases=40 source_pages=2 target_pages=5 restore=40 duplicate_literal_fetches=0 duplicate_target_fetches=0\n");
-			start_pipeline_mu4_timer_context(); return true;
+			start_pipeline_absolute_load(); return true;
 		}
 		++m_pipeline_expected_cycle;
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;

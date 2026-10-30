@@ -210,6 +210,12 @@ private:
 	void start_interrupt_pop_edge(unsigned variant = 0);
 	void start_pipeline_pop_dagen_conflict(unsigned variant = 0);
 	void start_pipeline_mu4_prologue(unsigned variant = 0);
+	void observe_context_irq(int line);
+	bool check_rom4_context_results();
+	void record_context_case(unsigned bank, unsigned raw)
+	{
+		if (profile_is("rom4-context")) m_context_coverage.add((bank << 8) | raw);
+	}
 	void start_pipeline_dld(unsigned variant = 0);
 	void start_pipeline_immediate_add(unsigned variant = 0);
 	void start_pipeline_dst(unsigned variant = 0);
@@ -2065,7 +2071,7 @@ private:
 	bool check_pipeline_push_sp_latency_results();
 	bool check_interrupt_pop_edge_results();
 	bool check_pipeline_mmr_pop_results();
-	bool check_pipeline_mu4_prologue_results();
+	bool check_pipeline_load_add_results();
 	bool check_pipeline_dst_results();
 	bool check_pipeline_logical_immediate_results();
 	bool check_absolute_memory_dp_results();
@@ -2074,16 +2080,13 @@ private:
 	bool check_pipeline_xc_tc_results();
 	bool check_pipeline_xc_accumulator_results();
 	bool check_pipeline_delayed_return_results();
-	bool check_pipeline_original_worker_roundtrip_results();
-	bool check_pipeline_original_context_call_results();
 	bool check_addm_expected_results();
 	bool check_pipeline_data_push_results();
 	bool check_pipeline_retd_data_order_results();
 	bool check_pipeline_data_pop_results();
 	bool check_pipeline_cmpr_results();
 	bool check_pipeline_memory_logic_results();
-	bool check_pipeline_context_body_results();
-	bool check_pipeline_mu4_timer_context_results();
+	bool check_pipeline_far_branch_results();
 	bool check_pipeline_absolute_load_results();
 	bool check_pipeline_far_call_results();
 	bool check_pipeline_idle_sp_tail_results();
@@ -2223,6 +2226,7 @@ private:
 	interrupt_entry_fixture m_entry;
 	u16 m_shifted_bus_word = 0;
 	ordered_case_digest m_shifted_bus_coverage;
+	ordered_case_digest m_context_coverage;
 	ordered_case_digest m_circular_move_coverage;
 	ordered_case_digest m_parallel_coverage;
 	unsigned m_circular_move_excluded = 0;

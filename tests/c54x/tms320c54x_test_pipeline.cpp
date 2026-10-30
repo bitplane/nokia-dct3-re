@@ -278,60 +278,6 @@ void tms320c54x_test_state::start_pipeline_frame()
 	m_register_sequence->start();
 }
 
-void tms320c54x_test_state::start_pipeline_mu4_prologue(unsigned variant)
-{
-	m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
-	m_pipeline_peripheral_case = variant;
-	u32 const base = BIT(variant, 0) ? 0x20000 : 0;
-	// Original R060 aa22 skip-worker path through RET at 02:3da5.
-	static constexpr u16 prefix[] = {0xeeff, 0x4a06, 0x4a07, 0xf6be, 0xf6b9,
-		0x4a08, 0x4a09, 0x4a0a, 0x4a0b, 0x4a0c, 0x4a0d, 0xea00, 0x577c, 0xf300, 0x0001, 0x4f7c, 0x487e,
-		0xf030, 0xc004, 0xf050, 0xc004, 0xfa44, 0x3d9a, 0x467f, 0xf495};
-	static constexpr u16 tail[] = {0x1036, 0xf7be, 0x8a0d, 0x8a0c, 0x8a0b,
-		0x8006, 0x8a0a, 0x8a09, 0x8a08, 0x8a07, 0x8a06, 0xfc00};
-	auto &program = m_cpu->space(AS_PROGRAM);
-	for (unsigned i = 0; i < 32; ++i) program.write_word(base + 0x3d73 + i, i < std::size(prefix) ? prefix[i] : 0xf495);
-	for (unsigned i = 0; i < 24; ++i) program.write_word(base + 0x3d9a + i, i < std::size(tail) ? tail[i] : 0xf495);
-	for (unsigned i = 0; i < 16; ++i) program.write_word(base + 0x4044 + i, 0xf495);
-	set_registers(*m_cpu, {
-		{cpu_regs::STATE_TCR, 0x10}, {cpu_regs::STATE_PMST, 0}, {cpu_regs::STATE_ILLEGAL, 0},
-		{cpu_regs::STATE_ST0, 0xa61b}, {cpu_regs::STATE_ST1, 0x4a00}, {cpu_regs::STATE_SP, 0x1000},
-		{cpu_regs::STATE_A, 0x123456789aULL}, {cpu_regs::STATE_B, 0x2233445566ULL}, {cpu_regs::STATE_IFR, 0},
-		{cpu_regs::STATE_IMR, 0},
-	});
-	for (unsigned i = 0xff7; i <= 0xfff; ++i) m_cpu->space(AS_DATA).write_word(i, 0xaaaa);
-	m_cpu->space(AS_DATA).write_word(0x7c, 0x1357);
-	m_cpu->space(AS_DATA).write_word(0x7d, 0x2468);
-	m_cpu->space(AS_DATA).write_word(0x7e, 0x8001);
-	m_cpu->space(AS_DATA).write_word(0x7f, 0xe012);
-	m_cpu->space(AS_DATA).write_word(0x936, 0x4044);
-	m_cpu->set_state_int(STATE_GENPC, base + 0x3d73);
-	m_cpu->set_pipeline_frontend(true);
-	m_pipeline_replay = false; m_pipeline_expected_cycle = 1; m_pipeline_store_writes = 0;
-	m_pipeline_operand_reads = m_pipeline_extensions_reads = 0;
-	m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0xff7, 0xfff, "staged_mu4_context_save",
-		[this](offs_t address, u16 &value, u16) {
-			if (machine().side_effects_disabled()) return;
-			static constexpr u16 expected[] = {0xa61b, 0x4a00, 0x789a, 0x3456, 0x12, 0x5566, 0x3344, 0x22, 0x4044};
-			expect(m_pipeline_store_writes < 9 && address == (m_pipeline_store_writes < 8 ? 0xffe - m_pipeline_store_writes : 0xfff) &&
-				value == expected[m_pipeline_store_writes], "Original MU4 prologue saves status and accumulator words in stack order");
-			++m_pipeline_store_writes;
-		});
-	m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0xfff, 0xfff, "staged_mu4_reserved_return",
-		[this](offs_t, u16 &value, u16) {
-			if (machine().side_effects_disabled()) return;
-			expect(value == 0x4044 && m_cpu->pipeline_cycles() == 46, "Original RET reads the reserved slot after the older POPM ST0 increment");
-			++m_pipeline_operand_reads;
-		});
-	m_pipeline_fetch_tap = program.install_read_tap(base + 0x4044, base + 0x4044, "staged_mu4_reserved_continuation",
-		[this](offs_t, u16 &, u16) {
-			if (machine().side_effects_disabled()) return;
-			expect(m_cpu->pipeline_cycles() == 48, "Original RET reaches the reserved continuation in its current program page");
-			++m_pipeline_extensions_reads;
-		});
-	m_phase = 251470; m_cpu->resume(SUSPEND_REASON_DISABLE);
-	m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-}
 
 void tms320c54x_test_state::start_pipeline_dld(unsigned variant)
 {
@@ -1844,55 +1790,10 @@ bool tms320c54x_test_state::check_pipeline_intm_results()
 	return false;
 }
 
-bool tms320c54x_test_state::check_pipeline_mu4_prologue_results()
+bool tms320c54x_test_state::check_pipeline_load_add_results()
 {
 	[[maybe_unused]] auto &program = m_cpu->space(AS_PROGRAM);
 	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
-	if (m_phase == 251470)
-	{
-		u64 const cycle = m_cpu->pipeline_cycles();
-		u64 const checkpoint = std::array<unsigned, 3>{6, 13, 39}[m_pipeline_peripheral_case / 2];
-		expect(cycle == m_pipeline_expected_cycle && !m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Original MU4 prologue advances without atomic fallback");
-		if (cycle == checkpoint && !m_pipeline_replay)
-		{
-			expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save in-flight original MU4 context prologue");
-		}
-		if (cycle == 56)
-		{
-			{
-				auto const disable = machine().disable_side_effects();
-			expect(m_pipeline_store_writes == 9 && m_pipeline_operand_reads == 1 && m_pipeline_extensions_reads == 1 &&
-				m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x1000 &&
-				m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0xa61b && m_cpu->state_int(tms320c54x_device::STATE_ST1) == 0x4a00 &&
-				m_cpu->state_int(tms320c54x_device::STATE_A) == 0x123456789aULL &&
-				m_cpu->state_int(tms320c54x_device::STATE_B) == 0x2233445566ULL &&
-				m_cpu->space(AS_DATA).read_word(0xfff) == 0x4044 &&
-				m_cpu->space(AS_DATA).read_word(0x7c) == 0x1357 && m_cpu->space(AS_DATA).read_word(0x7d) == 0x2469,
-				"Original skip-worker path restores context and writes the reserved return slot using the pre-POPM SP sample");
-			}
-			if (!m_pipeline_replay)
-			{
-				m_pipeline_replay = true;
-				m_pipeline_store_writes = checkpoint == 6 ? 0 : checkpoint == 13 ? 5 : 8;
-				m_pipeline_operand_reads = m_pipeline_extensions_reads = 0;
-				expect(restore_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Restore overlapping original prologue sources and stack writes");
-				m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
-				m_pipeline_expected_cycle = checkpoint + 1; m_phase = 251480;
-				m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-			}
-			m_pipeline_write_tap.remove(); m_pipeline_operand_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (m_pipeline_peripheral_case < 5) { start_pipeline_mu4_prologue(m_pipeline_peripheral_case + 1); return true; }
-			osd_printf_info("TMS320C54x staged original MU4 context: PASS words=37 cases=6 context_saves=8 context_restored=1 returned=4044 restore=6 full_handler_claim=0\n");
-			start_pipeline_dld(); return true;
-		}
-		++m_pipeline_expected_cycle;
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 251480)
-	{
-		m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 251470;
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
 	if (m_phase == 251490)
 	{
 		u64 const cycle = m_cpu->pipeline_cycles();

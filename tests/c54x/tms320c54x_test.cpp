@@ -389,6 +389,7 @@ ROM_START(tms54xtra)
 	ROM_SYSTEM_BIOS(160, "pop-irq-edge", "Excluded repeated/delayed interrupt pops have no stack or acknowledgement effects")
 	ROM_SYSTEM_BIOS(161, "rmw-long", "Staged long RAM read-modify-write matrix")
 	ROM_SYSTEM_BIOS(162, "reg-banks", "Staged register arithmetic and load with producer controls")
+	ROM_SYSTEM_BIOS(163, "rom4-context", "Nokia ROM4 copied context and timer integration")
 ROM_END
 
 } // anonymous namespace

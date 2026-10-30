@@ -125,15 +125,21 @@ cursor restoration. The small SP bank retains its final register/RAM checks.
 Exact observation clocks remain model regressions, not physical timing claims.
 
 Copied MU4 context/worker programs are Nokia firmware integration, not ISA
-conformance. The isolated seven-word return-tail and standalone active-worker
-probes are retired: the retained sixteen-case call/return roundtrip executes
-the same tail with source/stack poisoning and pending IRQ, and the 128-case
-outer context executes the complete active body on both conditional outcomes.
-The outer skip-worker and skip-body paths remain because they are distinct
-branches. Literal overlap is not full coverage equivalence: separately seeded
-register patterns, local clock trajectories and standalone worker register
-results are deliberately lost. `mu4-worker-subset-retirement` records the
-retained scopes and all 58 retired execution/restore identities.
+conformance. The `rom4-context` profile owns 334 cases in six banks under
+`tests/firmware/tms320c54x_test_rom4_context.cpp`; those banks no longer execute
+again in the default suite. It needs no external ROM file. Corrected inputs
+keep ARP zero and CMPT clear at every observation; all low status sentinels,
+INTM/SXM cases, instruction words, checkpoints and result predicates remain.
+The standalone baseline, corrected and relocated executions produce identical
+native logs. Exact local clocks remain model regressions, not silicon evidence.
+
+The outer skip-worker/skip-body paths, poisoned-source call/return roundtrip,
+active body and timer/recurring-ISR banks remain distinct. The two overlapping
+smaller probes and their 58 case/restore pairs are retired with explicit loss
+of separate register patterns and local observations. The remaining original-
+idle fixture still borrows the timer image setup: shared legacy controller
+storage and other copied snippets remain to be reviewed. This relocation is
+ownership separation, not a net source-size reduction.
 
 `mapped-word`, `mapped-bitf` and `status-bitf` use the same runner with a shared
 mapped-register descriptor builder. The distinct ADD/SUB and TC reference rules
@@ -474,6 +480,7 @@ boundaries are:
 | `tests/c54x/tms320c54x_test_register_sequence.h` | CPU-only clocked register observations and snapshot continuation; no instruction arithmetic |
 | `tests/c54x/tms320c54x_test_address_mode.h` | Shared address-mode/DP inputs and observations; programming-state limitations remain explicit |
 | `tests/c54x/tms320c54x_test_stack_sequence.h` | FRAME/push and safely separated compiler-SP inputs, shared by CPU-only and default runners |
+| `tests/firmware/tms320c54x_test_rom4_context.cpp` | Copied Nokia context/worker/timer integration; separate profile, legal standard-mode status seeds |
 | `tests/c54x/tms320c54x_test_register_pairs.h` | SAT and carry/TC rotate pairs with independent expected register states |
 | `tests/c54x/tms320c54x_test_register_alu.h` | Signed40 MIN/MAX and signed17 SQUR expectations, retained inputs and explicit late operand writes |
 | `tests/c54x/tms320c54x_test_port_case.h` | Common PORTW stimulus construction; no instruction arithmetic or reset policy |
@@ -2577,17 +2584,19 @@ Repeat/interrupt composition and physical timing remain separate scopes.
 ## Core regression checkpoint
 
 The latest completed full-default capture is the `default_checkpoint` under
-`mu4-worker-subset-retirement` in `fixtures/c54x_test_reviews.json`.
-It records all 287 required markers exactly once, 293 native ordered PASS
-records, intentional MAME exit 3 and runner exit 0, in 961.74 seconds.
-Against the preceding address-mode checkpoint, two probe records retire and
-three coverage records change as planned; the other 290 records retain their
-order and text. All 5,690 asserted opcode words remain identical. This run
-also includes the legal address-mode and reduced SP banks described above.
-The review binds the result to its executable, acceptance-source hashes and
-exact bench patch over `ae988b21`; no CPU/device source changed. No runtime
-improvement or valid-program qualification of the remaining synthetic MU4
-status-register seeds is claimed.
+`rom4-context-legal-entry-and-isolation` in `fixtures/c54x_test_reviews.json`.
+It records all 281 required markers exactly once, 287 native ordered PASS
+records, intentional MAME exit 3 and runner exit 0, in 988.95 seconds.
+Six copied-context group records now belong to the separate integration
+profile; every other native PASS record and all 5,690 asserted opcode words
+match the preceding capture. The review binds its executable, acceptance
+sources and exact bench patch over `66cfbfc9`; no CPU/device source changed.
+No runtime improvement or blanket validity of other fixture inputs is claimed.
+
+This capture precedes the final router cleanup: the integration profile now
+selects its result owner at reset instead of querying it every default CPU
+clock. The existing compiled selection test and focused integration rerun
+qualify that route; the record does not claim a second full-default run.
 
 `fixtures/c54x_fidelity_checkpoint.json` remains an immutable historical
 capture: 294 then-required markers, 295 native PASS records and 1,058.73 seconds.
