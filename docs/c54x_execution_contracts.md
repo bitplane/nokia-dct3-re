@@ -2813,18 +2813,16 @@ prototype's stale-T projection, not a guaranteed hardware result for an
 invalid-latency sequence. The original ABS/EXP/two-word move/NORM prefix at
 `03:de97..de9b` has the required separation and now executes.
 
-These profiles and `exp-t` share one CPU-only fixture, without Nokia/GSM or
-private-ROM inputs. `exp-t` retains all 3,072 LDU/no-producer, accumulator,
-value, gap, status and page tuples, balanced over its four checkpoints. It
-checks Execute T publication and a separately retained LDM sample, not NORM.
-Cached descriptors and the leading-bit expectation method are unchanged;
-the legacy register-product EXP-producer bank shares that same reference.
-All 95,744 removed executions are extra checkpoint copies, not numeric or
-producer/spacing tuples. The old value-by-checkpoint Cartesian products are
-no longer claimed. A compiled census compares every descriptor with its
-retired copies, including full status/context fields, and checks each fixed
-group's replay distribution. Native acceptance requires actual successful
-restores and ordered original-key digests, separate from full-default coverage.
+`exponent_forwarding` independently owns EXP/T forwarding: 1,536 cases and
+restores retain all 16 values, both accumulators, LDU/no-producer, gaps 0/1/2
+and eight status combinations. Pages and four checkpoints are distributed,
+not fully crossed. It checks Execute T publication, exact producer and T
+reads, preserved source/flags and a separately retained LDM sample after T
+mutation. Adjacent LDM reads old T; separated LDM reads the new exponent.
+The leading-bit expectation is fixture-owned, with no CPU arithmetic helper
+or Nokia/private-ROM dependency. This is not NORM acceptance or measured
+silicon timing. NORM's remaining custom fixture is separate and still due
+for migration; its legacy descriptor census is not acceptance for this section.
 
 Staged XC accepts the twelve single signed accumulator predicates GE/LT/NE/EQ/
 GT/LE for A/B with XC1/XC2 protected spans. XC itself is a one-word opcode.

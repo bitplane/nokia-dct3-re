@@ -108,11 +108,6 @@ private:
 			osd_printf_info("TMS320C54x staged EXP NORM: PASS cases=%u restore=%u selectors=4 patterns=16 gaps=0,1,2 sxm_ovm=4 pages=2 snapshots=4 checkpoint_policy=balanced ts=Read zero_gap=projection_only data_accesses=0 silicon_phase_claim=0 coverage_fnv64=%016llx\n", count, restores, digest);
 			throw emu_fatalerror(3, "TMS320C54x isolated EXP NORM complete");
 		}
-		if (m_normalization_kind == k::exponent)
-		{
-			osd_printf_info("TMS320C54x staged EXP T: PASS cases=%u restore=%u accumulators=2 vectors=16 gaps=0,1,2 status_states=8 producers=none,LDU pages=2 snapshots=4 checkpoint_policy=balanced publish=Execute adjacent_T=old gap_T=new retained_consumer=1 flags_preserved=1 data_writes=0 norm_acceptance=0 silicon_phase_claim=0 coverage_fnv64=%016llx\n", count, restores, digest);
-			throw emu_fatalerror(3, "TMS320C54x isolated EXP T complete");
-		}
 		osd_printf_info("TMS320C54x staged NORM: PASS cases=%u restore=%u selectors=4 shifts=-16..31 patterns=8 status_states=8 pages=2 snapshots=4 checkpoint_policy=balanced ts=Read result=Execute carry_preserved=1 data_accesses=0 silicon_phase_claim=0 coverage_fnv64=%016llx\n", count, restores, digest);
 		throw emu_fatalerror(3, "TMS320C54x isolated NORM complete");
 	}
@@ -286,7 +281,6 @@ ROM_START(tms54isa)
 	ROM_SYSTEM_BIOS(17, "norm", "Retained normalization shift sampling and replay")
 	ROM_SYSTEM_BIOS(18, "norm-edge", "Recovered negative normalization-count aliases")
 	ROM_SYSTEM_BIOS(19, "exp-norm", "EXP producer and normalization T latency")
-	ROM_SYSTEM_BIOS(20, "exp-t", "Staged exponent publication and T consumer latency")
 	ROM_SYSTEM_BIOS(29, "isa-words", "Atomic instruction-word arithmetic and addressing examples")
 	ROM_SYSTEM_BIOS(30, "isa-disasm", "Debugger syntax length page wrapping and stepping contracts")
 	ROM_SYSTEM_BIOS(35, "pop-irq-edge", "Interrupt-register POPM composition admission limits")
