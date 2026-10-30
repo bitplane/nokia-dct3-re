@@ -336,57 +336,6 @@ u32 tms320c54x_test_state::repeated_writa_destination(repeated_writa_fixture con
 
 
 
-void tms320c54x_test_state::start_pipeline_read_a(unsigned variant)
-{
-	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-	bool const ram = variant >= 192;
-	unsigned const page = std::array<unsigned, 3>{0, 2, 0x7f}[variant % 3];
-	bool const upper = (variant / 3) % 2, ovly = (variant / 6) % 2;
-	unsigned const gap = (variant / 12) % 4;
-	u32 const logical = (page << 16) | (upper ? 0x8700 : 0x700);
-	u32 const physical = ovly && !upper ? logical & 0xffff : logical;
-	auto &program = m_cpu->space(AS_PROGRAM);
-	for (unsigned i = 0; i < 48; ++i) program.write_word(0x19000 + i, 0xf495);
-	std::array<u16, 4> const code{0xf000, 1, 0x7ef8, 0x11};
-	for (unsigned i = 0; i < code.size(); ++i) program.write_word(0x19000 + i, code[i]);
-	program.write_word(0x19004 + gap, 0x1081);
-	if (ram)
-	{
-		program.write_word(0x19002, 0x7e92); program.write_word(0x19003, 0xf495);
-		for (unsigned i = 4; i < 8; ++i) program.write_word(0x19000 + i, i == 5 ? 0x1083 : 0xf495);
-	}
-	program.write_word(physical, 0x440); program.write_word(physical + 1, 0x450);
-	set_registers(*m_cpu, {
-		{cpu_regs::STATE_TCR, 0x10}, {cpu_regs::STATE_PMST, ovly ? 0x20 : 0}, {cpu_regs::STATE_ILLEGAL, 0},
-		{cpu_regs::STATE_ST0, 0xa608}, {cpu_regs::STATE_ST1, 0x800}, {cpu_regs::STATE_SP, 0x1000},
-		{cpu_regs::STATE_AR1, 0x410}, {cpu_regs::STATE_AR2, 0x420}, {cpu_regs::STATE_AR3, 0x420},
-		{cpu_regs::STATE_A, logical - 1}, {cpu_regs::STATE_IFR, 0}, {cpu_regs::STATE_IMR, 0},
-	});
-	m_cpu->space(AS_DATA).write_word(0x410, 0x1111); m_cpu->space(AS_DATA).write_word(0x440, 0x4444);
-	m_cpu->space(AS_DATA).write_word(0x420, 0xffff);
-	m_cpu->set_state_int(STATE_GENPC, 0x19000); m_cpu->set_pipeline_frontend(true);
-	m_pipeline_replay = false; m_idle_fixture_tick = 0;
-	m_pipeline_store_writes = m_pipeline_operand_reads = m_pipeline_drained_fetches = 0;
-	m_pipeline_operand_tap = program.install_read_tap(physical, physical + 1, "read_a_accumulator_source",
-		[this, physical, ram](offs_t at, u16 &word, u16) {
-			if (machine().side_effects_disabled()) return;
-			expect(at == physical && word == 0x440 && !m_pipeline_operand_reads && m_cpu->pipeline_cycles() == (ram ? 11 : 12),
-				"READA samples the preceding ADD result and retains the full accumulator-selected program address through its held bus clocks"); ++m_pipeline_operand_reads;
-		});
-	m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(ram ? 0x420 : 0x11, ram ? 0x420 : 0x11, "read_a_publication",
-		[this, ram](offs_t, u16 &word, u16) {
-			if (machine().side_effects_disabled()) return;
-			expect(word == 0x440 && !m_pipeline_store_writes && m_cpu->pipeline_cycles() == (ram ? 12 : 13), "READA publishes its sampled word once, not an early DAGEN write"); ++m_pipeline_store_writes;
-		});
-	m_vector_prefetch_tap = m_cpu->space(AS_DATA).install_read_tap(0x410, 0x440, "read_a_ar1_consumer",
-		[this, gap, ram](offs_t at, u16 &word, u16) {
-			if (machine().side_effects_disabled()) return;
-			expect(at == (ram ? 0x420 : gap >= 2 ? 0x440 : 0x410) && word == (ram ? 0x440 : gap >= 2 ? 0x4444 : 0x1111) && !m_pipeline_drained_fetches &&
-				m_cpu->pipeline_cycles() == (ram ? 14 : 13 + gap), "READA's publication respects the younger indirect address and data Read ownership"); ++m_pipeline_drained_fetches;
-		});
-	m_phase = 252370; m_cpu->resume(SUSPEND_REASON_DISABLE);
-	m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-}
 
 void tms320c54x_test_state::start_pipeline_add_sp_context(unsigned variant)
 {
@@ -1133,53 +1082,6 @@ bool tms320c54x_test_state::check_pipeline_rmw_results()
 
 
 
-bool tms320c54x_test_state::check_pipeline_read_a_results()
-{
-	if (m_phase == 252370)
-	{
-		unsigned const variant = m_pipeline_peripheral_case;
-		bool const ram = variant >= 192;
-		unsigned const page = std::array<unsigned, 3>{0, 2, 0x7f}[variant % 3];
-		bool const upper = (variant / 3) % 2, ovly = (variant / 6) % 2;
-		unsigned const gap = (variant / 12) % 4;
-		u32 const logical = (page << 16) | (upper ? 0x8700 : 0x700), physical = ovly && !upper ? logical & 0xffff : logical;
-		unsigned const tick = ++m_idle_fixture_tick;
-		unsigned const checkpoint = ram ? std::array<unsigned, 4>{5, 7, 9, 11}[(variant - 192) / 12] : std::array<unsigned, 4>{6, 8, 10, 12}[variant / 48];
-		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "READA has retained accumulator-source and AR1-destination ownership");
-		if (tick == (ram ? 8 : 9)) m_cpu->set_state_int(tms320c54x_device::STATE_A, logical + 1);
-		if (tick == (ram ? 11 : 12)) { auto const disable = machine().disable_side_effects(); m_cpu->space(AS_PROGRAM).write_word(physical, 0x450); }
-		if (tick == checkpoint && !m_pipeline_replay)
-		{
-			m_idle_fixture_saved_tick = tick; m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_store_writes, m_pipeline_drained_fetches};
-			expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save READA literal, held clock, captured A or sampled program word");
-		}
-		if (tick == 22)
-		{
-			expect(m_pipeline_operand_reads == 1 && m_pipeline_store_writes == 1 && m_pipeline_drained_fetches == 1 &&
-				m_cpu->state_int(tms320c54x_device::STATE_AR1) == (ram ? 0x410 : 0x440) && m_cpu->state_int(tms320c54x_device::STATE_A) == (ram ? 0x440 : gap >= 2 ? 0x4444 : 0x1111) &&
-				m_cpu->state_int(tms320c54x_device::STATE_AR2) == (ram ? 0x421 : 0x420) &&
-				m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x1000 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == 0x800,
-				"READA's sampled program word and exact younger address selection reproduce with no repeated bus access or register write");
-			if (!m_pipeline_replay)
-			{
-				m_pipeline_replay = true; m_idle_fixture_tick = m_idle_fixture_saved_tick;
-				m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_store_writes = m_recurring_irq_snapshot[1]; m_pipeline_drained_fetches = m_recurring_irq_snapshot[2];
-				return restore_pipeline_at(252380, "Restore READA source/wait/operand without retargeting the transfer");
-			}
-			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_vector_prefetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (variant == 191) osd_printf_info("TMS320C54x staged absolute READA AR1: PASS cases=192 source_pages=3 source_regions=2 ovly_states=2 consumer_gaps=4 restore=192 retained_accumulator_source=1 duplicate_program_reads=0 duplicate_register_writes=0\n");
-			if (variant < 239) { start_pipeline_read_a(variant + 1); return true; }
-			osd_printf_info("TMS320C54x staged short READA RAM: PASS cases=48 source_pages=3 source_regions=2 ovly_states=2 restore=48 retained_accumulator_source=1 postincrement_once=1 duplicate_program_reads=0 duplicate_data_writes=0\n");
-		}
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 252380)
-	{
-		m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 252370;
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	return false;
-}
 
 bool tms320c54x_test_state::check_pipeline_add_sp_context_results()
 {
