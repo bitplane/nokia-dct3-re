@@ -88,7 +88,6 @@ void tms320c54x_test_state::machine_reset()
 	if (profile_is("reada-brc") || standard_reada_brc()) { start_reada_brc(); return; }
 	if (start_profile(*this, machine().options().bios(), {
 		{ {"st1-rules"}, [](self &test) { test.check_st1_memory_rules(); } },
-		{ {"st1-bits"}, [](self &test) { test.start_pipeline_status_bit(); } },
 		{ {"stlm-st1"}, [](self &test) { test.start_stlm_status(); } },
 		{ {"stm-st1"}, [](self &test) { test.start_stlm_status(); } },
 		{ {"stlm-st1-irq"}, [](self &test) { test.start_mvmd_status_irq(); } },

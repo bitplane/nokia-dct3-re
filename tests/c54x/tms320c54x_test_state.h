@@ -159,8 +159,6 @@ private:
 	void start_pipeline_peripheral_case(unsigned variant = 0);
 	void start_pipeline_far_return(unsigned variant = 0);
 	void start_pipeline_far_irq(unsigned variant = 0);
-	void start_pipeline_intm(unsigned variant = 0);
-	void start_pipeline_status_bit(unsigned variant = 0);
 	void start_pipeline_mu4_prologue(unsigned variant = 0);
 	void observe_context_irq(int line);
 	bool check_rom4_context_results();
@@ -1919,7 +1917,6 @@ private:
 	bool check_pipeline_immediate_store_results();
 	bool check_pipeline_far_return_results();
 	bool check_pipeline_far_irq_results();
-	bool check_pipeline_intm_results();
 	bool check_pipeline_load_add_results();
 	bool check_pipeline_logical_immediate_results();
 	bool check_pipeline_conditional_branch_results();

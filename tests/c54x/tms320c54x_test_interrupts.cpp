@@ -622,7 +622,6 @@ bool tms320c54x_test_state::check_pipeline_far_irq_results()
 			m_pipeline_operand_tap.remove(); m_pipeline_fetch_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
 			if (m_pipeline_peripheral_case < 7) { start_pipeline_far_irq(m_pipeline_peripheral_case + 1); return true; }
 			osd_printf_info("TMS320C54x staged cross-page far IRQ: PASS cases=8 masked=4 restored_vector_page=1 continuations=0700,0702 restore=8 duplicate_vectors=0 silicon_phase_claim=0\n");
-			start_pipeline_intm(); return true;
 		}
 		++m_pipeline_expected_cycle;
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;

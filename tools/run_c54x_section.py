@@ -37,6 +37,8 @@ def main():
     counts['store_compare'] = 3
     counts['modify_address'] = 96
     counts['conditional_store'] = 6
+    counts['interrupt_mask'] = 12
+    counts['status_bits'] = 128
     parser.add_argument('section', choices=[*counts, 'all'])
     parser.add_argument('--jobs', type=int, default=8)
     parser.add_argument('--negative-control', action='store_true', help='require failure of an intentionally wrong expectation')
