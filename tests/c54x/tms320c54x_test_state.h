@@ -478,8 +478,6 @@ private:
 	void start_pipeline_imr_store(unsigned variant = 0);
 	void start_shifted_store_dld(unsigned variant = 0);
 	void start_pipeline_long_accumulator_store(unsigned variant = 0);
-	void start_pipeline_long_move(unsigned variant = 0);
-	void start_pipeline_original_long_move(unsigned variant = 0);
 	void start_pipeline_tc_branch(unsigned variant = 0);
 	static std::array<u16, 2> long_rmw_expected(unsigned arithmetic, unsigned operation, u16 flags);
 	static accumulator_store_fixture peripheral_long_rmw_fixture(unsigned variant);
@@ -1933,7 +1931,7 @@ private:
 	bool check_pipeline_xmem_bit_results();
 	bool check_pipeline_port_read_results();
 	bool check_long_accumulator_store_results();
-	bool check_pipeline_long_move_results();
+	bool check_pipeline_flag_branch_results();
 	bool check_absolute_xorm_results();
 	bool check_bitfield_address_results();
 	bool check_staged_load_results();

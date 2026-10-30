@@ -5251,7 +5251,6 @@ bool tms320c54x_test_state::check_long_accumulator_store_results()
 				"Store coverage digest includes every distinct regular and shifted stimulus after replay");
 			osd_printf_info("TMS320C54x staged shifted STL/STH: PASS cases=57344 forms=7 offsets=4 selectors=4 shifts=32 sst_sxm=4 patterns=4 restore=57344 duplicate_writes=0 destination_reads=0 silicon_phase_claim=0 checkpoints=3 checkpoint_policy=balanced coverage_cases=%u coverage_restores=%u coverage_fnv64=%016llx\n",
 				m_long_store_coverage.count, m_long_store_replays, (unsigned long long)m_long_store_coverage.value);
-			start_pipeline_long_move(); return true;
 		}
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
 	}
