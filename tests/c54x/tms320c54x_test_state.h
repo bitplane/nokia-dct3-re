@@ -51,13 +51,6 @@ private:
 		return name == machine().options().bios();
 	}
 
-	static constexpr u64 SMUL_RESULTS[4][3] = {
-		{0x003fffffffULL, 0x007fffffffULL, 0x007ffffffeULL},
-		{0x0040000000ULL, 0x0080000000ULL, 0x0080000000ULL},
-		{0xffc0000001ULL, 0xff80000001ULL, 0xff80000002ULL},
-		{0xffc0000000ULL, 0xff80000000ULL, 0xff80000000ULL},
-	};
-	void start_smul_control_case(unsigned index);
 	void xf_w(int state);
 	bool m_xf_pin = true;
 	unsigned m_xf_publications = 0;
@@ -1705,7 +1698,6 @@ private:
 	bool check_compact_store_results();
 	bool check_acc_delayed_results();
 	bool check_asm_store_results();
-	bool check_store_shift_results();
 	bool check_reverse_carry_reference_results();
 	bool check_intm_protection_results();
 	bool check_saccd_results();

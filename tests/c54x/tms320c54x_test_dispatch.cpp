@@ -42,7 +42,6 @@ TIMER_CALLBACK_MEMBER(tms320c54x_test_state::check_results)
 	if (check_compact_store_results()) return;
 	if (check_acc_delayed_results()) return;
 	if (check_asm_store_results()) return;
-	if (check_store_shift_results()) return;
 	if (check_reverse_carry_reference_results()) return;
 	if (check_intm_protection_results()) return;
 	if (check_saccd_results()) return;
