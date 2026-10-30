@@ -618,9 +618,6 @@ private:
 	void check_mmr_bus();
 	void start_timer_boundary_probe(unsigned index, bool staged = false);
 	void start_intm_protection_case(unsigned index);
-	static u16 reverse_carry_reference(u16 address, u16 offset, bool subtract);
-	void start_reverse_carry_case(unsigned index);
-	void start_reverse_carry_sequence(bool subtract);
 	static constexpr u16 bio_opcodes[] = {
 		0xf802, 0xf803, 0xfa02, 0xfa03, 0xf902, 0xf903,
 		0xfc02, 0xfc03, 0xfe02, 0xfe03, 0xfd02, 0xfd03, 0xff02, 0xff03
