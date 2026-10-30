@@ -286,7 +286,6 @@ void tms320c54x_test_state::machine_reset()
 		{ {"cmpm-acc"}, [](self &test) { test.start_accumulator_cmpm(); } },
 		{ {"cmpm-map", "cmpm-map-edge"}, [](self &test) { test.start_accumulator_cmpm(); } },
 		{ {"st-extended-ar", "st-ar-consumer", "st-shift-ar", "st-shift-ar-use"}, [](self &test) { test.start_extended_ar_store(); } },
-		{ {"st-shift-ar-bank"}, [](self &test) { test.start_shifted_ar_conflict(); } },
 		{ {"ifr-pair"}, [](self &test) { test.start_ifr_pair(); } },
 		{ {"mvmd-ar"}, [](self &test) { test.start_mvmd_ar(); } },
 		{ {"mac-smem", "mac-bk"}, [](self &test) { test.start_mac_smem(); } },

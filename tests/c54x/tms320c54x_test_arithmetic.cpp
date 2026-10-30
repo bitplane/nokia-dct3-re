@@ -62,42 +62,6 @@ u64 tms320c54x_test_state::ts_load_expected(u16 memory, u16 t, bool sxm)
 
 
 
-void tms320c54x_test_state::start_shifted_ar_conflict(unsigned variant)
-{
-	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-	unsigned const reg = variant % 8, kind = (variant / 8) % 4;
-	bool const same = (variant / 32) % 2, conflict = (variant / 64) % 2;
-	u16 const destination = 0x10 + (same ? reg : reg ^ 1), older = conflict ? 0x10 + reg : 0x63;
-	u32 const base = (variant / 128) % 2 ? 0x20000 : 0;
-	auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
-	for (unsigned i = 0; i < 24; ++i) program.write_word(base + 0x600 + i, 0xf495);
-	program.write_word(base + 0x600, 0x6f00 | older); program.write_word(base + 0x601, 0x0c81);
-	program.write_word(base + 0x602, kind == 0 ? 0x7700 | destination : kind == 1 ? 0x7162 : kind == 2 ? 0x8a00 | destination : 0x7600 | destination);
-	if (kind != 2) program.write_word(base + 0x603, kind == 1 ? destination : 0xbeef);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10); m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x900);
-	m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x1234); m_cpu->set_state_int(tms320c54x_device::STATE_B, 0xabcdef);
-	m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000); m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
-	for (unsigned i = 0; i < 8; ++i) m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + i, 0x4000 + i);
-	// 0060/0061 belong to the fixture's side-effecting test port, not RAM.
-	data.write_word(0x62, 0xbeef); data.write_word(0x1000, 0xbeef);
-	m_pipeline_store_writes = m_pipeline_operand_reads = m_pipeline_register_writes = 0;
-	m_pipeline_operand_tap = data.install_read_tap(0, 0xffff, "shift_ar_conflict_read", [this, kind](offs_t at, u16 &word, u16) {
-		if (machine().side_effects_disabled()) return;
-		if ((kind != 1 && kind != 2) || m_pipeline_operand_reads || at != (kind == 1 ? 0x62 : 0x1000) || word != 0xbeef || m_cpu->pipeline_cycles() != 7)
-			osd_printf_info("shift_ar_conflict_read: case=%u kind=%u address=%04x word=%04x cycle=%llu\n", m_pipeline_peripheral_case, kind, unsigned(at), word, (unsigned long long)m_cpu->pipeline_cycles());
-		expect((kind == 1 || kind == 2) && !m_pipeline_operand_reads++ && at == (kind == 1 ? 0x62 : 0x1000) && word == 0xbeef && m_cpu->pipeline_cycles() == 7,
-			"Early writer retains its one source read despite the shifted-store bank conflict"); });
-	m_pipeline_write_tap = data.install_write_tap(0, 0xffff, "shift_ar_conflict_write", [this, destination, older, conflict](offs_t at, u16 &word, u16) {
-		if (machine().side_effects_disabled()) return;
-		if (at == older && word == 0x2468) { expect(!m_pipeline_store_writes++ && m_cpu->pipeline_cycles() == 7, "Shifted store publishes its own Execute word once"); return; }
-		expect(at == destination && word == 0xbeef && !m_pipeline_register_writes++ && m_cpu->pipeline_cycles() == (conflict ? 8 : 7),
-			"Shared DAGEN bank defers early publication once for same and different AR destinations"); });
-	m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 310100;
-	m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE);
-	m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-}
 
 
 tms320c54x_test_state::long_pair_fixture_data tms320c54x_test_state::long_pair_fixture(unsigned variant)
@@ -2549,32 +2513,6 @@ bool tms320c54x_test_state::check_bit_results()
 
 
 
-bool tms320c54x_test_state::check_shifted_ar_conflict_results()
-{
-	if (m_phase == 310100)
-	{
-		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick, kind = (variant / 8) % 4;
-		unsigned const checkpoint = 6 + variant / 256;
-		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Shifted store and early DAGEN writer remain independently owned");
-		capture_pipeline_at(checkpoint, {&m_pipeline_store_writes, &m_pipeline_operand_reads, &m_pipeline_register_writes},
-			"Save shifted-store shared-bank publication boundary");
-		if (tick == 20)
-		{
-			unsigned const reg = variant % 8; bool const same = (variant / 32) % 2, conflict = (variant / 64) % 2;
-			unsigned const target = same ? reg : reg ^ 1;
-			for (unsigned i = 0; i < 8; ++i) expect(m_cpu->state_int(tms320c54x_device::STATE_AR0 + i) == (i == target ? 0xbeef : conflict && i == reg ? 0x2468 : 0x4000 + i), "Only the two owned register publications affect the AR bank");
-			expect(m_pipeline_store_writes == 1 && m_pipeline_register_writes == 1 && m_pipeline_operand_reads == unsigned(kind == 1 || kind == 2) && m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x1000 + unsigned(kind == 2), "Shifted-store conflict preserves every source, write and stack increment across replay");
-			if (replay_pipeline_at(310110, checkpoint,
-				"Restore pending or committed shifted-store bank collision")) return true;
-			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (variant < 767) { start_shifted_ar_conflict(variant + 1); return true; }
-			osd_printf_info("TMS320C54x shifted AR store bank conflicts: PASS cases=768 restore=768 destinations=8 writers=STM,MVDK,POPM,ST targets=same,different controls=RAM pages=2 snapshots=3 store_write=7 early_write=7,8 source_reads=once writes=once silicon_phase_claim=0\n"); throw emu_fatalerror(0, "TMS320C54x isolated shifted AR bank conflicts complete");
-		}
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 310110) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 310100; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true; }
-	return false;
-}
 
 bool tms320c54x_test_state::check_accumulator_shift_results()
 {

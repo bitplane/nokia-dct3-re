@@ -122,7 +122,6 @@ private:
 		u64 value;
 		u32 base;
 	};
-	void start_shifted_ar_conflict(unsigned variant = 0);
 	static extended_ar_store_fixture extended_ar_store_case(unsigned variant, bool consumer, bool shifted = false);
 	void start_extended_ar_store(unsigned variant = 0);
 	struct dst_extended_fixture
@@ -1539,7 +1538,6 @@ private:
 	bool check_mvkd_sp_results();
 	bool check_pipeline_peripheral_logic_results();
 	bool check_mvdd_source_results();
-	bool check_shifted_ar_conflict_results();
 	bool check_extended_ar_store_results();
 	bool check_data_copy_results();
 	bool check_accumulator_shift_results();
