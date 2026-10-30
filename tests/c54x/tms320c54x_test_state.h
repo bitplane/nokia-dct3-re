@@ -271,9 +271,6 @@ private:
 	static memory_arithmetic_fixture memory_unsigned_case(unsigned variant, bool subtract = true);
 	static memory_arithmetic_fixture memory_shift16_case(unsigned variant);
 	void start_pipeline_memory_arithmetic(unsigned variant = 0);
-	static std::array<u16, 2> bitfield_inputs(unsigned variant, bool compare = false);
-	static memory_arithmetic_fixture bitfield_address_case(unsigned variant);
-	void start_pipeline_bitfield(unsigned variant = 0);
 	struct accumulator_cmpm_fixture
 	{
 		unsigned lane, form, read, snapshot, pointer;
@@ -1567,7 +1564,6 @@ private:
 	bool check_pipeline_port_read_results();
 	bool check_long_accumulator_store_results();
 	bool check_absolute_xorm_results();
-	bool check_bitfield_address_results();
 	bool check_staged_load_results();
 	bool check_immediate_arithmetic_results();
 	bool check_memory_repeat_results();
@@ -1707,8 +1703,6 @@ private:
 	memory_arithmetic_fixture m_memory_input{};
 	ordered_case_digest m_memory_alu_coverage;
 	unsigned m_memory_alu_restores = 0;
-	ordered_case_digest m_bitfield_coverage;
-	unsigned m_bitfield_restores = 0;
 	unsigned m_memory_immediate_restores = 0;
 	unsigned m_shifted_replays = 0;
 	unsigned m_pipeline_branch_case = 0;

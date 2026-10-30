@@ -474,59 +474,8 @@ void tms320c54x_test_state::start_pipeline_memory_arithmetic(unsigned variant)
 
 
 
-std::array<u16, 2> tms320c54x_test_state::bitfield_inputs(unsigned variant, bool compare)
-{
-	if (compare) return std::array<std::array<u16, 2>, 8>{{{0, 0}, {1, 1}, {0x80, 0x7f}, {0x7f, 0x7f},
-		{0x8000, 0x8000}, {0x8000, 0x7fff}, {0xffff, 0xf495}, {0xffff, 0xffff}}}[(variant / 144) % 8];
-	return std::array<std::array<u16, 2>, 8>{{{0xffff, 0}, {1, 1}, {0x80, 0x7f}, {0x7f, 0x7f},
-		{0x8000, 0x8000}, {0x8000, 0x7fff}, {0xffff, 0xf495}, {0, 0xffff}}}[(variant / 144) % 8];
-}
 
-tms320c54x_test_state::memory_arithmetic_fixture tms320c54x_test_state::bitfield_address_case(unsigned variant)
-{
-	return memory_arithmetic_case(variant % 144 + ((variant / 144) % 8) * 576 +
-		((variant / 2304) % 4) * 4608 + ((variant / 9216) % 2) * 18432);
-}
 
-void tms320c54x_test_state::start_pipeline_bitfield(unsigned variant)
-{
-	if (!variant) { m_bitfield_coverage = {}; m_bitfield_restores = 0; }
-	if (variant % 18 == 5) ++variant; // Preserve raw IDs, omitting write-only short MOD=3.
-	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-	bool const compare = profile_is("cmpm-smem");
-	auto const f = bitfield_address_case(variant); auto const input = bitfield_inputs(variant, compare);
-	bool const extended = f.form >= 14;
-	u32 const base = f.reg == 6 ? 0x20000 : 0;
-	auto &program = m_cpu->space(AS_PROGRAM);
-	for (unsigned i = 0; i < 24; ++i) program.write_word(base + 0x600 + i, 0xf495);
-	program.write_word(base + 0x600, (compare ? 0x6000 : 0x6100) | u8(f.opcode));
-	program.write_word(base + 0x601, extended ? f.literal : input[1]);
-	if (extended) program.write_word(base + 0x602, input[1]);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10); m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST0, (f.st0 & ~0x1000) | (((variant / 1152) % 2) ? 0x1000 : 0));
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST1, f.st1);
-	m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000); m_cpu->set_state_int(tms320c54x_device::STATE_BK, f.bk);
-	for (unsigned ar = 0; ar < 8; ++ar) m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + ar, 0x5007);
-	m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x123456789aULL); m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x2233445566ULL);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
-	m_cpu->space(AS_DATA).write_word(f.address, input[0]);
-	m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_cpu->set_pipeline_frontend(true);
-	m_pipeline_replay = false; m_idle_fixture_tick = 0; m_pipeline_operand_reads = m_pipeline_extensions_reads = 0;
-	m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0, 0xffff, "bitfield_sample",
-		[this, f, input](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return;
-			expect(at == f.address && word == input[0] && !m_pipeline_operand_reads && m_cpu->pipeline_cycles() == f.read_cycle + 1,
-				"BITF retains one source word through its captured address in Read"); ++m_pipeline_operand_reads; });
-	m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0, 0xffff, "bitfield_no_write",
-		[this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) expect(false, "BITF must not write its memory operand"); });
-	m_pipeline_fetch_tap = program.install_read_tap(base + 0x601, base + (extended ? 0x602 : 0x601), "bitfield_literals",
-		[this, f, input, extended](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return;
-			expect(m_pipeline_extensions_reads < (extended ? 2 : 1) && (at & 0xffff) == 0x601 + m_pipeline_extensions_reads &&
-				word == (extended && !m_pipeline_extensions_reads ? f.literal : input[1]), "BITF retains offset/address before its distinct mask literal"); ++m_pipeline_extensions_reads; });
-	m_phase = 253010; m_cpu->resume(SUSPEND_REASON_DISABLE);
-	m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-}
 
 tms320c54x_test_state::accumulator_cmpm_fixture tms320c54x_test_state::accumulator_cmpm_case(unsigned v, bool mapped, bool edge)
 {
@@ -3112,75 +3061,6 @@ bool tms320c54x_test_state::check_absolute_xorm_results()
 	return false;
 }
 
-bool tms320c54x_test_state::check_bitfield_address_results()
-{
-	if (m_phase == 253010)
-	{
-		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
-		bool const compare = profile_is("cmpm-smem");
-		auto const f = bitfield_address_case(variant); auto const input = bitfield_inputs(variant, compare);
-		unsigned const read_cycle = f.read_cycle + 1, checkpoint = std::array<unsigned, 3>{4, read_cycle - 1, read_cycle}[smem_schedule::checkpoint(variant)];
-		bool const initial_tc = (variant / 1152) % 2, result = compare ? input[0] == input[1] : bool(input[0] & input[1]);
-		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Smem test/compare has staged source and literal ownership");
-		expect(BIT(m_cpu->state_int(tms320c54x_device::STATE_ST0), 12) == (tick <= read_cycle ? initial_tc : result),
-			"Smem test/compare publishes TC only at Execute, not during Decode/address/Read");
-		if (tick == (f.form >= 14 ? 5 : 4))
-		{
-			auto const disable = machine().disable_side_effects();
-			u32 const base = f.reg == 6 ? 0x20000 : 0;
-			m_cpu->space(AS_PROGRAM).write_word(base + 0x601, 0xdead); if (f.form >= 14) m_cpu->space(AS_PROGRAM).write_word(base + 0x602, 0xdead);
-		}
-		if (tick == read_cycle - 1)
-		{
-			for (unsigned ar = 0; ar < 8; ++ar)
-				expect(m_cpu->state_int(tms320c54x_device::STATE_AR0 + ar) == (ar == f.selected ? f.next_ar : 0x5007),
-					"BITF performs its source-address modification once in Access");
-			m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + f.selected, 0x2222);
-		}
-		if (tick == read_cycle) { auto const disable = machine().disable_side_effects(); m_cpu->space(AS_DATA).write_word(f.address, 0xdead); }
-		if (tick == checkpoint && !m_pipeline_replay)
-		{
-			m_idle_fixture_saved_tick = tick; m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_extensions_reads};
-			expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save BITF during Decode, captured address or retained source");
-		}
-		if (tick == 18)
-		{
-			u16 const expected_st0 = ((f.st1 & 0x20) && f.reg && f.form >= 2 && f.form != 17 ? (f.st0 & 0x1fff) | (f.reg << 13) : f.st0) & ~0x1000;
-			expect(m_pipeline_operand_reads == 1 && m_pipeline_extensions_reads == (f.form >= 14 ? 2 : 1) &&
-				m_cpu->state_int(tms320c54x_device::STATE_ST0) == (expected_st0 | (result ? 0x1000 : 0)) && m_cpu->state_int(tms320c54x_device::STATE_ST1) == f.st1 &&
-				m_cpu->state_int(tms320c54x_device::STATE_A) == 0x123456789aULL && m_cpu->state_int(tms320c54x_device::STATE_B) == 0x2233445566ULL &&
-				m_cpu->state_int(tms320c54x_device::STATE_AR0 + f.selected) == 0x2222, "BITF changes only TC while retaining both its mask and source through replay");
-			if (!m_pipeline_replay)
-			{
-				m_pipeline_replay = true; m_idle_fixture_tick = m_idle_fixture_saved_tick;
-				m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[1];
-				expect(restore_snapshot(machine(), *m_check_timer, m_saved_pipeline) == STATERR_NONE, "Restore BITF without duplicate source reads or pointer modifications");
-				++m_bitfield_restores;
-				m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 253020; m_check_timer->enable(true); return true;
-			}
-			m_pipeline_operand_tap.remove(); m_pipeline_fetch_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			m_bitfield_coverage.add(smem_schedule::key(variant));
-			expect(m_bitfield_restores == m_bitfield_coverage.count, "Every retained test/compare input completed a real restore");
-			if (variant + 1 < smem_schedule::raw_inputs(smem_schedule::kind::test_compare)) { start_pipeline_bitfield(variant + 1); return true; }
-			expect(m_bitfield_coverage.count == smem_schedule::cases(smem_schedule::kind::test_compare), "Complete the legal test/compare source domain once");
-			if (compare)
-			{
-				osd_printf_info("TMS320C54x staged Smem CMPM: PASS cases=%u restore=%u forms=17 registers=8 compare_pairs=8 initial_tc=2 sxm_ovm=4 compatibility=2 source_reads=1 literal_fetches=1,2 duplicate_pointer_updates=0 data_writes=0 mapped_sources=excluded silicon_phase_claim=0 snapshots=3 checkpoint_policy=balanced coverage_fnv64=%016llx\n", m_bitfield_coverage.count, m_bitfield_restores, (unsigned long long)m_bitfield_coverage.value);
-				throw emu_fatalerror(0, "TMS320C54x isolated Smem CMPM complete");
-			}
-			osd_printf_info("TMS320C54x staged BITF: PASS cases=%u forms=17 registers=8 mask_pairs=8 initial_tc=2 sxm_ovm=4 compatibility=2 restore=%u duplicate_reads=0 data_writes=0 snapshots=3 checkpoint_policy=balanced coverage_fnv64=%016llx\n", m_bitfield_coverage.count, m_bitfield_restores, (unsigned long long)m_bitfield_coverage.value);
-			if (profile_is("bitf-smem")) throw emu_fatalerror(0, "TMS320C54x isolated Smem BITF complete");
-			return true;
-		}
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 253020)
-	{
-		m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 253010;
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	return false;
-}
 
 bool tms320c54x_test_state::check_immediate_arithmetic_results()
 {

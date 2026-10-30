@@ -141,6 +141,7 @@ def main():
     counts['frontend_drain'] = 6
     counts['interrupt_entry'] = 12
     counts['indexed_memory'] = 7680
+    counts['smem_test_compare'] = 4352
     parser.add_argument('section', choices=[*counts, 'all'])
     parser.add_argument('--jobs', type=int, default=8)
     parser.add_argument('--negative-control', action='store_true', help='require failure of an intentionally wrong expectation')

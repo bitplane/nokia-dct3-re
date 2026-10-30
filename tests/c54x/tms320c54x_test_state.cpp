@@ -289,7 +289,6 @@ void tms320c54x_test_state::machine_reset()
 		{ {"mvkd-peripheral"}, [](self &test) { test.start_mvkd_peripheral(); } },
 		{ {"cmpm-acc"}, [](self &test) { test.start_accumulator_cmpm(); } },
 		{ {"cmpm-map", "cmpm-map-edge"}, [](self &test) { test.start_accumulator_cmpm(); } },
-		{ {"cmpm-smem", "bitf-smem"}, [](self &test) { test.start_pipeline_bitfield(); } },
 		{ {"st-extended-ar", "st-ar-consumer", "st-shift-ar", "st-shift-ar-use"}, [](self &test) { test.start_extended_ar_store(); } },
 		{ {"st-shift-ar-bank"}, [](self &test) { test.start_shifted_ar_conflict(); } },
 		{ {"ld-ts", "ld-ts-producer"}, [](self &test) { test.start_ts_load(); } },
