@@ -113,6 +113,7 @@ struct clocked_register_case
 	bool reset_cpu_before_case = false; // Explicit cold-start contracts, not implicit predecessor cleanup.
 	std::vector<memory_word> volatile_data_reads{}; // Synthetic endpoints toggle after each side-effecting read.
 	int volatile_data_space = AS_DATA;
+	std::optional<u16> volatile_read_increment{}; // Otherwise invert after each read; explicit test stimulus, not peripheral behavior.
 };
 
 // No implicit reset: the standalone runner owns reset_* metadata.

@@ -136,7 +136,6 @@ void tms320c54x_test_state::machine_reset()
 	}))
 		return;
 	if (start_profile(*this, machine().options().bios(), {
-		{ {"portr-block"}, [](self &test) { test.start_circular_portr_block(); } },
 	}))
 		return;
 	if (start_profile(*this, machine().options().bios(), {

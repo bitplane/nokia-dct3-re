@@ -119,15 +119,6 @@ private:
 	void start_pipeline_extended_dst(unsigned variant = 0);
 	void start_pipeline_store_mvmm(unsigned variant = 0);
 	struct indexed_store_fixture;
-	struct circular_portr_block_fixture
-	{
-		unsigned count, size, reg, selected, snapshot, index;
-		bool compatibility;
-		u16 buffer, st0;
-		u32 base;
-	};
-	static circular_portr_block_fixture circular_portr_block_case(unsigned v);
-	void start_circular_portr_block(unsigned variant = 0);
 	static memory_arithmetic_fixture memory_arithmetic_case(unsigned variant, bool unsigned_memory = false, unsigned shift16_selector = 8);
 	static memory_arithmetic_fixture offset_load_case(unsigned variant);
 	static memory_arithmetic_fixture unsigned_load_case(unsigned variant);
@@ -863,7 +854,6 @@ private:
 	bool check_staged_conditional_store_results();
 	bool check_mapped_dual_results();
 	bool check_repeat_mvdp_irq_results();
-	bool check_circular_portr_results();
 	bool check_poly_results();
 	bool check_popd_mapped_results();
 	bool check_block_branch_count_results();

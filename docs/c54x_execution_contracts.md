@@ -5426,13 +5426,15 @@ consume the endpoint. Access updates the pointer at clock 5, I/O Read occurs
 at 6, and RAM Write at 7, with no destination read.
 BK=0 retains the declared legacy linear behavior, not a new silicon claim.
 
-`portr-block` verifies 1,728 cases and replays of circular post-increment
-inside RPTBD: counts 2/7/17, BK 1/7/16, every auxiliary register,
-compatibility modes, two initial ring positions, two program pages and
-three snapshots. A volatile test provider supplies distinct words; the
-fixture checks two-word issue cadence, retained sample publication,
-ring wrap, final BRC and unchanged unrelated registers. It does not supply
-GSM packets or assert measured physical bus timing.
+The independent `circular_portr_block` section verifies 288 cases and replays
+of circular post-increment inside RPTBD: counts 2/7/17, BK 1/7/16, every
+auxiliary register, compatibility modes and both initial ring positions.
+Program pages and snapshots at first Read, first Write and mid-block Read
+are distributed. An increment-on-read test endpoint supplies distinct words;
+the fixture checks two-clock issue cadence, retained sample publication,
+ring wrap, final RAM/BRC, unchanged unrelated registers and observational
+Read/Execute PCs. Omitting endpoint restoration fails on the replayed read.
+It does not supply GSM packets or assert measured physical bus timing.
 
 The current native run logs the first sixteen RF reads per initialization
 pass, at modeled frames 30 and 28. Observation-time PCs

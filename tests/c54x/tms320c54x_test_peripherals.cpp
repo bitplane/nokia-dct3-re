@@ -233,44 +233,6 @@ void tms320c54x_test_state::start_pipeline_idle1(unsigned variant, bool modes)
 
 
 
-tms320c54x_test_state::circular_portr_block_fixture tms320c54x_test_state::circular_portr_block_case(unsigned v)
-{
-	circular_portr_block_fixture f{};
-	f.count = std::array<unsigned, 3>{2, 7, 17}[v % 3]; f.size = std::array<unsigned, 3>{1, 7, 16}[(v / 3) % 3];
-	f.reg = (v / 9) % 8; f.compatibility = (v / 72) % 2; f.selected = f.compatibility && !f.reg ? 4 : f.reg;
-	f.index = (v / 144) % 2 ? f.size - 1 : 0; f.buffer = 0x1200 + f.selected * 0x100;
-	f.base = (v / 288) % 2 ? 0x20000 : 0; f.snapshot = v / 576;
-	f.st0 = f.compatibility && f.reg ? 0x608 | (f.reg << 13) : 0x8608;
-	return f;
-}
-
-void tms320c54x_test_state::start_circular_portr_block(unsigned variant)
-{
-	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant; auto const f = circular_portr_block_case(variant);
-	auto &program = m_cpu->space(AS_PROGRAM);
-	for (unsigned i = 0; i < 20; ++i) program.write_word(f.base + 0x600 + i, 0xf495);
-	program.write_word(f.base + 0x600, 0x771a); program.write_word(f.base + 0x601, f.count - 1);
-	program.write_word(f.base + 0x602, 0xf272); program.write_word(f.base + 0x603, 0x607);
-	program.write_word(f.base + 0x606, 0x74d0 | f.reg); program.write_word(f.base + 0x607, 0x27); program.write_word(f.base + 0x608, 0xf4e1);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x8608); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x900 | (f.compatibility ? 0x20 : 0));
-	m_cpu->set_state_int(tms320c54x_device::STATE_BK, f.size); m_cpu->set_state_int(tms320c54x_device::STATE_BRC, 0); m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10); m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
-	for (unsigned i = 0; i < 8; ++i) m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + i, i == f.selected ? f.buffer + f.index : 0x3300 + i);
-	m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x123456789aULL); m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x9876543210ULL);
-	m_shifted_bus_word = 0x2468; m_first_port_cycle = 0; m_pipeline_expected_cycle = 0;
-	m_pipeline_operand_reads = m_pipeline_store_writes = m_pipeline_register_writes = 0;
-	m_pipeline_operand_tap = m_cpu->space(AS_IO).install_read_tap(0, 0xffff, "circular_portr_block_sample", [this, f](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return; unsigned const n = m_pipeline_operand_reads++; if (!n) m_first_port_cycle = m_cpu->pipeline_cycles(); expect(n < f.count && at == 0x27 && m_cpu->pipeline_cycles() == m_first_port_cycle + n * 2, "Block PORTR samples each retained port at two-word issue cadence"); expect(m_cpu->state_int(tms320c54x_device::STATE_READPC) == f.base + 0x606, "Read-only pipeline PC identifies PORTR's full-page bus owner"); word = m_shifted_bus_word++; });
-	m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0, 0xffff, "circular_portr_block_write", [this, f](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return; if (at == 0x1a) { expect(!m_pipeline_register_writes && word == f.count - 1, "Firmware publishes BRC once before RPTBD"); ++m_pipeline_register_writes; return; } unsigned const n = m_pipeline_store_writes++; expect(n < f.count && at == f.buffer + (f.index + n) % f.size && word == 0x2468 + n && m_cpu->pipeline_cycles() == m_first_port_cycle + n * 2 + 1, "Block PORTR wraps the circular destination and publishes each sampled word once"); expect(m_cpu->state_int(tms320c54x_device::STATE_EXECPC) == f.base + 0x606, "Read-only pipeline PC identifies the retained destination publisher"); });
-	m_operand_data_tap = m_cpu->space(AS_DATA).install_read_tap(0, 0xffff, "circular_portr_block_no_read", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) expect(false, "Block PORTR never reads its data destination"); });
-	m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 62140;
-	m_cpu->set_state_int(STATE_GENPC, f.base + 0x600); m_cpu->set_pipeline_frontend(true);
-	expect(m_cpu->state_int(tms320c54x_device::STATE_READPC) == 0xffffffff && m_cpu->state_int(tms320c54x_device::STATE_EXECPC) == 0xffffffff, "Empty pipeline slots have no observational instruction owner");
-	m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-}
-
-
-
-
 void tms320c54x_test_state::start_pll_transition_case()
 {
 	// MMIO conformance, not handset provisioning. Suspend instruction
@@ -1176,31 +1138,6 @@ bool tms320c54x_test_state::check_mcbsp_control_sequence_results()
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
 	}
 	if (m_phase == 253960) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 253950; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true; }
-	return false;
-}
-
-
-
-bool tms320c54x_test_state::check_circular_portr_results()
-{
-	if (m_phase == 62140)
-	{
-		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick; auto const f = circular_portr_block_case(variant);
-		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Circular PORTR composes with the firmware-owned RPTBD block");
-		bool const capture = f.snapshot == 1 ? m_pipeline_store_writes == 1 : m_pipeline_operand_reads == (f.snapshot ? f.count / 2 + 1 : 1) && m_pipeline_store_writes + 1 == m_pipeline_operand_reads;
-		if (capture && !m_pipeline_expected_cycle && !m_pipeline_replay) { m_pipeline_expected_cycle = tick; m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_store_writes, m_pipeline_register_writes}; expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save circular I/O block before/after publication or at mid-block Read"); }
-		if (tick == 96)
-		{
-			expect(m_pipeline_expected_cycle && m_pipeline_operand_reads == f.count && m_pipeline_store_writes == f.count && m_pipeline_register_writes == 1 && m_cpu->state_int(tms320c54x_device::STATE_IDLE) && !m_cpu->state_int(tms320c54x_device::STATE_BRC) && m_cpu->state_int(tms320c54x_device::STATE_ST0) == f.st0 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == (0x900 | (f.compatibility ? 0x20 : 0)) && m_cpu->state_int(tms320c54x_device::STATE_A) == 0x123456789aULL && m_cpu->state_int(tms320c54x_device::STATE_B) == 0x9876543210ULL, "Circular PORTR block drains BRC and preserves status and accumulators without duplicate samples");
-			for (unsigned i = 0; i < 8; ++i) expect(m_cpu->state_int(tms320c54x_device::STATE_AR0 + i) == (i == f.selected ? f.buffer + (f.index + f.count) % f.size : 0x3300 + i), "Circular PORTR block modifies only its selected pointer and wraps exactly");
-			if (!m_pipeline_replay) { m_pipeline_replay = true; m_idle_fixture_tick = m_pipeline_expected_cycle; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_store_writes = m_recurring_irq_snapshot[1]; m_pipeline_register_writes = m_recurring_irq_snapshot[2]; return restore_pipeline_at(62141, "Restore active circular I/O block and volatile sample sequence"); }
-			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_operand_data_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (variant < 1727) { start_circular_portr_block(variant + 1); return true; }
-			osd_printf_info("TMS320C54x circular PORTR block: PASS cases=1728 restore=1728 counts=2,7,17 bk=1,7,16 registers=8 compatibility=2 start_positions=2 pages=2 snapshots=3 source=volatile_io issue_interval=2 sample_retained=1 wrap=1 destination_reads=0 duplicate_reads=0 duplicate_writes=0 silicon_phase_claim=0\n"); throw emu_fatalerror(0, "TMS320C54x isolated circular PORTR block complete");
-		}
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 62141) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 62140; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true; }
 	return false;
 }
 

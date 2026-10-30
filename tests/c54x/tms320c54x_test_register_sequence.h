@@ -83,7 +83,13 @@ public:
 			for (unsigned i=0;i<m_volatile_words.size();++i) {
 				auto const disable = m_machine.disable_side_effects();
 				require(m_cpu.space(m_input.volatile_data_space).read_word(m_input.volatile_data_reads[i].address) == m_volatile_words[i], "volatile endpoint debug peek");
-				require(m_volatile_words[i] == u16(m_input.volatile_data_reads[i].value^0xffff), "volatile source consumed once");
+				auto const &events = m_input.volatile_data_space == AS_IO && m_input.io_events ? *m_input.io_events : *m_input.data_events;
+				unsigned reads=0;
+				for (auto const &event : events) if (!event.write && event.address == m_input.volatile_data_reads[i].address) ++reads;
+				u16 const expected = m_input.volatile_read_increment ?
+					u16(m_input.volatile_data_reads[i].value + reads * *m_input.volatile_read_increment) :
+					u16(m_input.volatile_data_reads[i].value ^ (reads&1 ? 0xffff : 0));
+				require(m_volatile_words[i] == expected, "volatile source consumed exactly as traced");
 			}
 			m_observing_outputs = false;
 			require(m_program_cursor == (m_input.program_events.empty() ? m_input.retained_program_reads.size() : m_input.program_events.size()), "complete retained-program trace");
@@ -117,7 +123,8 @@ private:
 		for (unsigned i=0;i<m_input.volatile_data_reads.size();++i)
 			if (at == m_input.volatile_data_reads[i].address) {
 				word = m_volatile_words[i];
-				if (!m_machine.side_effects_disabled()) m_volatile_words[i] ^= 0xffff;
+				if (!m_machine.side_effects_disabled()) m_volatile_words[i] = m_input.volatile_read_increment ?
+					u16(m_volatile_words[i] + *m_input.volatile_read_increment) : u16(m_volatile_words[i]^0xffff);
 			}
 	}
 	void apply_actions(bool before)
