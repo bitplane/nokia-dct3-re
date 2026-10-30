@@ -1502,7 +1502,7 @@ private:
 	unsigned m_acc_branch_mapped_writes = 0;
 	u32 m_popd_write_mask = 0;
 	far_transfer_snapshot m_far_transfer;
-	std::stringstream m_near_return_saved, m_xf_saved;
+	std::stringstream m_xf_saved;
 	// Separate checkpoint lifetimes; host observations still rewind explicitly.
 	std::stringstream m_idle_nmi_saved, m_idle_timer_saved, m_idle_dma_saved;
 	std::stringstream m_timer_prescaler_saved, m_bsp_saved, m_pll_saved, m_clock_rates_saved;

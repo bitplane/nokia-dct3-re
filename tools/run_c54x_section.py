@@ -193,6 +193,7 @@ def main():
     counts['atomic_conditional_control'] = 12
     counts['atomic_far_edges'] = 23
     counts['atomic_extended_interactions'] = 3
+    counts['atomic_fast_return'] = 1
     parser.add_argument('section', choices=[*counts, 'all'])
     parser.add_argument('--jobs', type=int, default=8)
     parser.add_argument('--negative-control', action='store_true', help='require failure of an intentionally wrong expectation')
