@@ -79,7 +79,6 @@ void tms320c54x_test_state::machine_reset()
 	}))
 		return;
 	if (start_profile(*this, machine().options().bios(), {
-		{ {"shifted-alu", "shifted-bk"}, [](self &test) { test.start_pipeline_shifted_arithmetic(); } },
 		{ {"indirect-load"}, [](self &test) { test.start_pipeline_indirect_case(); } },
 	}))
 		return;

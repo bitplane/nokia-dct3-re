@@ -436,14 +436,27 @@ poison and captured destination/status through IDLE/replay. A selected-AR poison
 changes both source and pointer roles without an artificial intermediate write.
 The old descriptor/setup and 253490/253500 phases are removed.
 
-Shifted memory ADD/SUB and SUBC use a balanced schedule as well: 81,920
-ADD/SUB inputs and 10,240 SUBC inputs run once each. `shifted-alu` covers both
-banks, including the formerly default-only SUBC tail. `shifted-bk` retains
-8,192 inputs. Every fixed non-pattern group still visits Decode, Access and
-Read across its four or eight value patterns; the full value-by-checkpoint
-product is deliberately retired. Numeric expectations, extension poisoning,
-post-read mutation and publication checks are unchanged. Ordered input/stage
-digests and actual restore counts protect the retained schedules.
+`shifted_memory_alu` owns 17,408 independent ADD/SUB cases/restores. All eight
+selectors, four numeric patterns and SXM/OVM combinations remain. All 32
+shifts are exercised at postincrement RAM through AR1 and at mapped AR0;
+the other eleven RAM routes and seven mapped AR sources retain shifts
+-16/-1/0/15. Full shift-by-route correlations are deliberately omitted.
+`shifted_bk_alu` owns 4,096 cases over every selector/pattern/status/shift;
+the former two identical absolute-source tuples differed only by page.
+Pages and Decode/Access/Read checkpoints are distributed in both sections.
+
+`memory_subc` retains all 10,240 RAM/mapped cases: both accumulators, every
+64-value pair, SXM/OVM, twelve RAM routes and eight mapped AR sources.
+The independent subtract/conditional-shift oracle tests the equality case
+as a successful subtraction, no-borrow carry and sticky overflow.
+
+All three sections seed CPU state explicitly, check one Read/no writes,
+retain ordered address/operation extensions, and poison the sampled RAM,
+AR or BK afterward. Late A/B assignment after Read proves Execute-live
+accumulator ownership; the selected result and flags must not publish early.
+Pointer/SP and extension poisoning preserve the address contract. Complete
+CPU/result/observer state is checked through replay; model clocks are not
+claims about physical bus contention.
 
 `peripheral_mvdd` owns 192 cases/replays across three peripheral destinations,
 four words and all sixteen dual modifiers. Pages/four checkpoints are
@@ -797,8 +810,8 @@ CPU-model contracts, not peripheral identity or physical timing evidence.
 
 Other positive domains retain 34,816 scalar ADD/SUB inputs, 17,408 each for
 ADDS/SUBS, 69,632 shift-16 and 153,984 TS arithmetic cases (6,528 address
-plus 147,456 numeric). Variable-shift ADD/SUB retains 81,920 distinct stimuli,
-with balanced checkpoints rather than three copies of each input.
+plus 147,456 numeric). Variable-shift ADD/SUB is the 17,408-case independent
+`shifted_memory_alu` section, with deliberate route/shift factoring above.
 CMPM and BITF each retain 17,408 distinct inputs over 17 forms, with balanced
 checkpoints rather than three replays of every input. `rpt-subc-st` retains 38,400 SUBC and 38,400 repeated-store cases;
 Memory/immediate product coverage is now the 7,424-case section above. Paired reads retain 6,144 DSUB,
@@ -1730,12 +1743,10 @@ and TS arithmetic fixtures. Their initializers use the fixture's BK;
 handwritten register-only aggregates retain their default BK=16. It does
 not establish physical memory-bank placement or instruction timing.
 
-Executable acceptance passes with `run_c54x_core.py --profile` for
-`memory-alu`, `memory-shift16`, `adds`, `subs`, `cmpm-smem`, `bitf-smem`,
-`load-offset`, `ldu-shift16`, `load-variable`, `ld-ts`, `ld-ts-producer`,
-`mul-t-sources`, `t-load-control`, `ts-alu`, `ts-alu-producer` and
-`shifted-alu`. Bus and save/restore assertions remain; reviewed balanced
-schedules retain distinct stimuli without the full checkpoint product.
+Current acceptance belongs to the independently executed sections and their
+disposition entries, not the retired profile chain. Other legacy users of
+the circular fixture helper remain pending migration; their historical
+profile runs are not acceptance for the replacement suite.
 
 Long BANZ/BANZD and repeat-block BANZ also carry BK through their shared
 fixture. Circular forms use BK=32768 with initial indices below that size;

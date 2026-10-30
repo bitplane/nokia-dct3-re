@@ -392,6 +392,9 @@ def main():
     counts['memory_signed_product'] = 8704
     counts['memory_square'] = 8704
     counts['memory_load_t'] = 2176
+    counts['shifted_memory_alu'] = 17408
+    counts['shifted_bk_alu'] = 4096
+    counts['memory_subc'] = 10240
     counts['shifted_unowned'] = 20480
     counts['shifted_bsp'] = 5120
     counts['accumulator_call_frames'] = 216

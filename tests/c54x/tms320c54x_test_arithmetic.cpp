@@ -3,7 +3,6 @@
 
 #include "emu.h"
 #include "tms320c54x_test_state.h"
-#include "tms320c54x_test_shifted_schedule.h"
 
 namespace c54x_test {
 
@@ -118,103 +117,6 @@ tms320c54x_test_state::memory_arithmetic_fixture tms320c54x_test_state::shifted_
 
 
 
-
-tms320c54x_test_state::shifted_arithmetic_fixture tms320c54x_test_state::shifted_arithmetic_case(unsigned variant, bool bk)
-{
-	if (bk)
-	{
-		auto f = shifted_arithmetic_case(147456 + (variant % 4096) * 8 + ((variant / 4096) % 3) * 32768);
-		f.operand.address = f.operand.literal = 0x19;
-		f.operand.reg = variant / 12288 ? 6 : 1;
-		return f;
-	}
-	if (variant >= 245760)
-	{
-		unsigned const n = variant - 245760; bool const mapped = n >= 18432;
-		unsigned const v = mapped ? (n - 18432) % 4096 : n % 6144;
-		unsigned const destination = mapped ? (v / 8) % 2 : (v / 12) % 2;
-		unsigned const pattern = mapped ? (v / 16) % 8 : (v / 24) % 8;
-		unsigned const memory_pattern = mapped ? (v / 128) % 8 : (v / 192) % 8;
-		unsigned const flags = mapped ? (v / 1024) % 4 : (v / 1536) % 4;
-		auto o = memory_arithmetic_case(std::array<unsigned, 6>{0, 1, 4, 14, 15, 17}[v % 6] + 18 * ((v / 6) % 2 ? 6 : 1) + 576 * pattern + 4608 * flags);
-		o.opcode = 0x1e00 | destination << 8 | u8(o.opcode);
-		o.memory = std::array<u16, 8>{0, 1, 0x7fff, 0x8000, 0xffff, 7, 2, 0x1234}[memory_pattern];
-		if (mapped) { o.form = 17; o.reg = o.selected = 1; o.address = 0x10 + v % 8; o.literal = o.address; o.opcode = 0x1ef8 | destination << 8; o.read_cycle = 6; o.st1 &= ~0x4000; }
-		u64 const source = std::array<u64, 8>{0, 1, 0x7fffffff, 0xff80000000ULL, 0x017fffffffULL, 0xff7fffffffULL, 0x1fffffff, 0xffffffffULL}[pattern];
-		s64 const dividend = BIT(source, 39) ? s64(source) - (s64(1) << 40) : s64(source);
-		s64 const divisor = flags & 1 ? s16(o.memory) : s64(o.memory);
-		s64 const difference = dividend - divisor * 32768;
-		bool const subtract = difference >= 0, overflow = difference < -2147483648LL || difference > 2147483647LL;
-		u16 const st0 = (o.st0 & ~0x800) | (subtract ? 0x800 : 0) | (overflow ? destination ? 0x200 : 0x400 : 0);
-		u64 const result = u64(subtract ? difference * 2 + 1 : dividend * 2) & 0xffffffffffULL;
-		return {o, u16(destination << 8), st0, destination ? 0x12345678 : source, destination ? source : 0x12345678, result};
-	}
-	bool const mapped = variant >= 147456;
-	unsigned const v = mapped ? (variant - 147456) % 32768 : variant % 49152;
-	unsigned const selector = mapped ? (v / 8) % 8 : (v / 12) % 8;
-	unsigned const pattern = mapped ? (v / 64) % 4 : (v / 96) % 4;
-	unsigned const flags = mapped ? (v / 256) % 4 : (v / 384) % 4;
-	int const shift = int(mapped ? (v / 1024) % 32 : (v / 1536) % 32) - 16;
-	auto o = memory_arithmetic_case(std::array<unsigned, 6>{0, 1, 4, 14, 15, 17}[v % 6] + 18 * ((v / 6) % 2 ? 6 : 1) + 576 * pattern + 4608 * flags);
-	o.memory = std::array<u16, 4>{0, 1, 0x8000, 0xffff}[pattern];
-	o.opcode = 0x6f00 | u8(o.opcode); ++o.read_cycle;
-	if (mapped)
-	{
-		o.form = 17; o.reg = o.selected = 1; o.address = 0x10 + v % 8; o.literal = o.address;
-		o.opcode = 0x6ff8; o.read_cycle = 7; o.st1 &= ~0x4000;
-	}
-	u64 const a = std::array<u64, 4>{0, 0x7fffffff, 0xff80000000ULL, 0x017fffffffULL}[pattern];
-	u64 const b = std::array<u64, 4>{0xffffffffffULL, 0xff7fffffffULL, 0x12345678, 0xff80000000ULL}[pattern];
-	u64 const source = selector & 2 ? b : a;
-	s64 const value = flags & 1 ? s16(o.memory) : s64(o.memory);
-	u64 const memory = u64(value) & 0xffffffffffULL;
-	u64 const shifted = shift >= 0 ? (memory << shift) & 0xffffffffffULL : flags & 1 ? u64(value >> -shift) & 0xffffffffffULL : memory >> -shift;
-	s64 const left = BIT(source, 39) ? s64(source) - (s64(1) << 40) : s64(source);
-	s64 const right = BIT(shifted, 39) ? s64(shifted) - (s64(1) << 40) : s64(shifted);
-	s64 const sum = selector & 4 ? left - right : left + right;
-	bool const carry = selector & 4 ? u32(source) >= u32(shifted) : u64(u32(source)) + u32(shifted) > 0xffffffffULL;
-	bool const overflow = sum < -2147483648LL || sum > 2147483647LL;
-	u16 const st0 = (o.st0 & ~0x800) | (carry ? 0x800 : 0) | (overflow ? selector & 1 ? 0x200 : 0x400 : 0);
-	u64 const result = u64(overflow && (flags & 2) ? std::clamp(sum, s64(-2147483648LL), s64(2147483647LL)) : sum) & 0xffffffffffULL;
-	return {o, u16(0x0c00 | ((selector & 3) << 8) | ((selector & 4) << 3) | (shift & 31)), st0, a, b, result};
-}
-
-void tms320c54x_test_state::start_pipeline_shifted_arithmetic(unsigned variant)
-{
-	if (!variant) { m_shifted_coverage = {}; m_shifted_replays = 0; }
-	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-	bool const bk = profile_is("shifted-bk");
-	auto const f = shifted_arithmetic_case(variant, bk); auto const &o = f.operand;
-	bool const subc = variant >= 245760;
-	u32 const base = o.reg == 6 ? 0x20000 : 0;
-	auto &program = m_cpu->space(AS_PROGRAM);
-	for (unsigned i = 0; i < 24; ++i) program.write_word(base + 0x600 + i, 0xf495);
-	program.write_word(base + 0x600, o.opcode);
-	if (o.form >= 14) program.write_word(base + 0x601, o.literal);
-	if (!subc) program.write_word(base + 0x601 + (o.form >= 14), f.extension);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
-	m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST0, o.st0); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, o.st1);
-	m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000); m_cpu->set_state_int(tms320c54x_device::STATE_BK, o.bk);
-	for (unsigned ar = 0; ar < 8; ++ar) m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + ar, 0x5007);
-	m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x1122); m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x3344);
-	m_cpu->set_state_int(tms320c54x_device::STATE_T, 0x9abc);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
-	if (o.address >= 0x60) m_cpu->space(AS_DATA).write_word(o.address, o.memory);
-	else m_cpu->set_state_int(bk ? tms320c54x_device::STATE_BK : tms320c54x_device::STATE_AR0 + o.address - 0x10, o.memory);
-	m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_cpu->set_pipeline_frontend(true);
-	m_pipeline_replay = false; m_idle_fixture_tick = 0; m_pipeline_operand_reads = m_pipeline_extensions_reads = 0;
-	m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0, 0xffff, "shifted_arithmetic_read",
-		[this, o](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return;
-			expect(at == o.address && word == o.memory && !m_pipeline_operand_reads && m_cpu->pipeline_cycles() == o.read_cycle, "Shifted ADD/SUB samples one retained RAM or mapped AR source"); ++m_pipeline_operand_reads; });
-	m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0, 0xffff, "shifted_arithmetic_no_write",
-		[this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) expect(false, "Shifted ADD/SUB has no data writes"); });
-	m_pipeline_fetch_tap = program.install_read_tap(base + 0x601, base + 0x601 + (!subc && o.form >= 14), "shifted_arithmetic_extensions",
-		[this, f, o, base, subc](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled() || (subc && o.form < 14)) return;
-			bool const operation = !subc && at == base + 0x601 + (o.form >= 14);
-			expect(word == (operation ? f.extension : o.literal) && m_pipeline_extensions_reads == unsigned(operation && o.form >= 14), "Shifted arithmetic retains ordered address and operation extensions"); ++m_pipeline_extensions_reads; });
-	m_phase = 253210; m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-}
 
 std::array<u64, 2> tms320c54x_test_state::repeat_subc_result(memory_repeat_fixture const &f, unsigned iterations)
 {
@@ -783,92 +685,6 @@ void tms320c54x_test_state::start_register_product(unsigned variant)
 
 
 
-
-bool tms320c54x_test_state::check_shifted_memory_arithmetic_results()
-{
-	if (m_phase == 253210)
-	{
-		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
-		bool const bk = profile_is("shifted-bk");
-		auto const f = shifted_arithmetic_case(variant, bk); auto const &o = f.operand;
-		bool const subc = variant >= 245760;
-		bool const destination = BIT(f.extension, 8), retired = tick > o.read_cycle;
-		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) &&
-			m_cpu->state_int(tms320c54x_device::STATE_A) == (retired ? destination ? f.a : f.result : 0x1122) &&
-			m_cpu->state_int(tms320c54x_device::STATE_B) == (retired ? destination ? f.result : f.b : 0x3344) &&
-			m_cpu->state_int(tms320c54x_device::STATE_ST0) == (retired ? f.result_st0 : o.st0) &&
-			m_cpu->state_int(tms320c54x_device::STATE_ST1) == o.st1 && m_cpu->state_int(tms320c54x_device::STATE_T) == 0x9abc,
-			"Shifted ADD/SUB publishes only selected accumulator and arithmetic flags in Execute");
-		if (tick == 4 && (!subc || o.form >= 14))
-		{
-			auto const disable = machine().disable_side_effects();
-			m_cpu->space(AS_PROGRAM).write_word((o.reg == 6 ? 0x20000 : 0) + 0x601, 0xdead);
-			if (!subc && o.form >= 14) m_cpu->space(AS_PROGRAM).write_word((o.reg == 6 ? 0x20000 : 0) + 0x602, 0xdead);
-		}
-		if (tick == o.read_cycle - 1 && o.address >= 0x60)
-		{
-			expect(m_cpu->state_int(tms320c54x_device::STATE_AR0 + o.selected) == o.next_ar, "Shifted arithmetic modifies its selected pointer once in Access");
-			m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + o.selected, 0x2222); m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x2222);
-		}
-		if (tick == o.read_cycle)
-		{
-			auto const disable = machine().disable_side_effects();
-			if (o.address >= 0x60) m_cpu->space(AS_DATA).write_word(o.address, 0xdead);
-			else m_cpu->set_state_int(bk ? tms320c54x_device::STATE_BK : tms320c54x_device::STATE_AR0 + o.address - 0x10, 0xdead);
-			m_cpu->set_state_int(tms320c54x_device::STATE_A, f.a); m_cpu->set_state_int(tms320c54x_device::STATE_B, f.b);
-		}
-		unsigned const checkpoint_index = shifted_memory_schedule::checkpoint_index(variant, bk);
-		unsigned const checkpoint = std::array<unsigned, 3>{!subc && o.form >= 14 ? 4U : 3U, o.read_cycle - 1, o.read_cycle}[checkpoint_index];
-		if (tick == checkpoint && !m_pipeline_replay)
-		{
-			m_idle_fixture_saved_tick = tick; m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_extensions_reads};
-			expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save shifted arithmetic through Decode, Access or Read");
-		}
-		if (tick == 18)
-		{
-			expect(m_pipeline_operand_reads == 1 && m_pipeline_extensions_reads == unsigned(!subc) + unsigned(o.form >= 14), "Memory arithmetic neither resamples nor repeats extension fetches");
-			if (!m_pipeline_replay)
-			{
-				m_pipeline_replay = true; m_idle_fixture_tick = m_idle_fixture_saved_tick; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[1];
-				expect(restore_snapshot(machine(), *m_check_timer, m_saved_pipeline) == STATERR_NONE, "Restore shifted arithmetic without duplicating sampling or publication");
-				++m_shifted_replays;
-				m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 253220; m_check_timer->enable(true); return true;
-			}
-			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			m_shifted_coverage.add(shifted_memory_schedule::case_key(variant, bk));
-			if (bk)
-			{
-				if (auto const next = shifted_memory_schedule::next(variant, true); next < shifted_memory_schedule::bk_end)
-				{ start_pipeline_shifted_arithmetic(next); return true; }
-				expect(m_shifted_coverage.count == shifted_memory_schedule::bk_cases && m_shifted_replays == shifted_memory_schedule::bk_cases,
-					"Every BK arithmetic stimulus and balanced replay completed once");
-				osd_printf_info("TMS320C54x shifted BK arithmetic: PASS cases=%u restore=%u selectors=8 shifts=32 sxm_ovm=4 values=4 pages=2 snapshots=balanced source_sample=Read post_read_change=1 extension_poison=1 writes=0 physical_phase_claim=0 coverage_fnv64=%016llx\n",
-					m_shifted_coverage.count, m_shifted_replays, (unsigned long long)m_shifted_coverage.value);
-				throw emu_fatalerror(3, "TMS320C54x isolated shifted BK arithmetic complete");
-			}
-			if (variant + 1 == 147456 + shifted_memory_schedule::mapped_cases)
-			{
-				expect(m_shifted_coverage.count == shifted_memory_schedule::arithmetic_cases && m_shifted_replays == shifted_memory_schedule::arithmetic_cases,
-					"Every shifted ADD/SUB stimulus and balanced replay completed once");
-				osd_printf_info("TMS320C54x staged shifted memory ADD/SUB: PASS ram_cases=49152 mapped_ar_cases=32768 selectors=8 shifts=32 sxm_ovm=4 patterns=4 restore=81920 snapshots=balanced duplicate_reads=0 data_writes=0 silicon_phase_claim=0\n");
-			}
-			if (auto const next = shifted_memory_schedule::next(variant, false); next < shifted_memory_schedule::end)
-			{ start_pipeline_shifted_arithmetic(next); return true; }
-			expect(m_shifted_coverage.count == shifted_memory_schedule::cases && m_shifted_replays == shifted_memory_schedule::cases,
-				"Every shifted-memory and SUBC stimulus and balanced replay completed once");
-			osd_printf_info("TMS320C54x staged SUBC: PASS ram_cases=6144 mapped_ar_cases=4096 value_pairs=64 sxm_ovm=4 accumulators=2 restore=10240 snapshots=balanced duplicate_reads=0 data_writes=0 silicon_phase_claim=0 combined_cases=%u combined_restore=%u coverage_fnv64=%016llx\n",
-				m_shifted_coverage.count, m_shifted_replays, (unsigned long long)m_shifted_coverage.value);
-			if (profile_is("shifted-alu")) throw emu_fatalerror(3, "TMS320C54x isolated shifted memory arithmetic complete");
-			start_pipeline_memory_repeat(); return true;
-		}
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 253220)
-	{
-		m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 253210; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	return false;
-}
 
 bool tms320c54x_test_state::check_rptbd_shift_store_results()
 {

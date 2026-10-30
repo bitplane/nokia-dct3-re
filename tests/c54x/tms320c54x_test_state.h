@@ -111,14 +111,6 @@ private:
 		u16 bk;
 	};
 	static extended_banz_fixture extended_banz_case(unsigned variant);
-	struct shifted_arithmetic_fixture
-	{
-		memory_arithmetic_fixture operand;
-		u16 extension, result_st0;
-		u64 a, b, result;
-	};
-	static shifted_arithmetic_fixture shifted_arithmetic_case(unsigned variant, bool bk = false);
-	void start_pipeline_shifted_arithmetic(unsigned variant = 0);
 	struct memory_repeat_fixture
 	{
 		bool long_form, destination;
@@ -795,7 +787,6 @@ private:
 	bool check_branch_repeat_results();
 	bool check_rptbd_t_load_results();
 	bool check_staged_load_results();
-	bool check_shifted_memory_arithmetic_results();
 	bool check_memory_repeat_results();
 	bool check_asm_store_results_part2();
 	bool check_fcala_delay_results();
@@ -864,8 +855,6 @@ private:
 	unsigned m_pipeline_store_case = 0;
 	unsigned m_pipeline_store_writes = 0;
 	unsigned m_pipeline_indirect_case = 0;
-	ordered_case_digest m_shifted_coverage;
-	unsigned m_shifted_replays = 0;
 	unsigned m_pipeline_branch_case = 0;
 	unsigned m_pipeline_stm_case = 0;
 	unsigned m_pipeline_peripheral_case = 0;
