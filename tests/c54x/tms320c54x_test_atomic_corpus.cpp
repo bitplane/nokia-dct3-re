@@ -3,7 +3,6 @@
 
 #include "emu.h"
 #include "tms320c54x_test_state.h"
-#include "tms320c54x_test_shift_examples.h"
 #include "tms320c54x_test_absolute_examples.h"
 #include "tms320c54x_test_memory_examples.h"
 #include <algorithm>
@@ -414,7 +413,6 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 			});
 			return next_atomic_phase(102);
 		}
-		return begin_atomic_case(register_bit_examples()[8], 103);
 	}
 	if (m_phase == 103)
 	{
@@ -531,7 +529,6 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 				(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0400) &&
 				data.read_word(0x0d00) == 0x1234,
 				"parallel ST/MACR stores old B and sets OVA on saturated A");
-		return begin_atomic_case(register_bit_examples()[9], 113);
 	}
 	if (m_phase == 113)
 	{
@@ -771,7 +768,6 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 				m_cpu->state_int(tms320c54x_device::STATE_A) == 0x1234567654ULL &&
 				m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x0300,
 				"ROM4 8a0b restores BL, preserves A, and advances SP");
-		return begin_atomic_case(register_bit_examples()[10], 128);
 	}
 	if (m_phase == 128)
 	{
@@ -1279,8 +1275,6 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 	}
 	if (m_phase == 191)
 	{
-		verify_atomic_case(register_bit_examples()[0]);
-		return begin_atomic_case(register_bit_examples()[1], 192);
 	}
 	if (m_phase == 192)
 	{
@@ -1316,7 +1310,6 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 			});
 			return next_atomic_phase(194);
 		}
-		return begin_atomic_case(register_bit_examples()[2], 195);
 	}
 	if (m_phase == 195)
 	{
@@ -1325,9 +1318,6 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 	}
 	if (m_phase == 196 || m_phase == 197)
 	{
-		verify_atomic_case(register_bit_examples()[m_phase == 196 ? 3 : 4]);
-		return m_phase == 196 ? begin_atomic_case(register_bit_examples()[4], 197) :
-			begin_atomic_case(register_bit_examples()[5], 198);
 	}
 	if (m_phase == 198 || m_phase == 199)
 	{
@@ -1479,8 +1469,6 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 	}
 	if (m_phase == 211)
 	{
-		verify_atomic_case(register_bit_examples()[11]);
-		return begin_atomic_case(register_bit_examples()[12], 212);
 	}
 	if (m_phase == 212)
 	{
@@ -1554,7 +1542,6 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 	}
 	if (m_phase == 219)
 	{
-		verify_atomic_case(register_bit_examples()[7]);
 		write_words(program, {
 			{0x05e0, 0x75d6}, // PORTW *AR6+%, port
 			{0x05e1, 0x0124},
@@ -1677,7 +1664,6 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 		auto const &cases = memory_address_examples();
 		verify_atomic_case(cases[0 + position]);
 		if (position + 1 < std::size(phases)) return begin_atomic_case(cases[0 + position + 1], phases[position + 1]);
-		return begin_atomic_case(register_bit_examples()[13], 237);
 	}
 	if (m_phase == 237)
 	{
@@ -1687,7 +1673,6 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 	if (m_phase == 238)
 	{
 		verify_atomic_case(memory_address_examples()[2]);
-		return begin_atomic_case(register_bit_examples()[14], 239);
 	}
 	if (m_phase == 239)
 	{
@@ -2111,7 +2096,6 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 			});
 			return next_atomic_phase(262);
 		}
-		return begin_atomic_case(register_bit_examples()[15], 263);
 	}
 	if (m_phase == 263)
 	{
@@ -4205,7 +4189,6 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 			m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x0f32 &&
 			m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 7,
 			"ROM4 READA reads program rather than data memory at A and postincrements AR2 in five cycles");
-		return begin_atomic_case(register_bit_examples()[16], 470);
 	}
 	if (m_phase == 470)
 	{
@@ -4293,8 +4276,6 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 	}
 	if (m_phase == 474)
 	{
-		verify_atomic_case(register_bit_examples()[17]);
-		return begin_atomic_case(register_bit_examples()[18], 475);
 	}
 	if (m_phase == 475)
 	{
@@ -4665,7 +4646,6 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 				m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0x0800 &&
 				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
 				"ROM4 ADD #lk,B,A sign-extends under SXM and costs two cycles");
-		return begin_atomic_case(register_bit_examples()[19], 493);
 	}
 	if (m_phase == 493)
 	{

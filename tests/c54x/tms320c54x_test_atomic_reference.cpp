@@ -6,7 +6,6 @@
 #include "tms320c54x_test_product_examples.h"
 #include "tms320c54x_test_memory_examples.h"
 #include "tms320c54x_test_memory_continuations.h"
-#include "tms320c54x_test_shift_examples.h"
 #include <algorithm>
 
 namespace c54x_test {
