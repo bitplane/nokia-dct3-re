@@ -198,6 +198,8 @@ def main():
     counts['atomic_program_mapping'] = 13
     counts['coefficient_mac_literals'] = 6
     counts['atomic_memory_literals'] = 24
+    counts['atomic_double_stores'] = 8
+    counts['atomic_address_literals'] = 4
     parser.add_argument('section', choices=[*counts, 'all'])
     parser.add_argument('--jobs', type=int, default=8)
     parser.add_argument('--negative-control', action='store_true', help='require failure of an intentionally wrong expectation')
