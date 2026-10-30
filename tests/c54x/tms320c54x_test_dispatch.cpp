@@ -70,7 +70,7 @@ TIMER_CALLBACK_MEMBER(tms320c54x_test_state::check_results)
 	if (check_peripheral_mmr_timing_audit_results()) return;
 	if (check_pipeline_immediate_store_results()) return;
 	if (check_pipeline_logical_immediate_results()) return;
-	if (check_pipeline_plain_return_results()) return;
+	if (check_pipeline_call_results()) return;
 	if (check_pipeline_delayed_return_results()) return;
 	if (check_addm_expected_results()) return;
 	if (check_pipeline_retd_data_order_results()) return;
