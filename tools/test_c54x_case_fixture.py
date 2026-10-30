@@ -309,6 +309,21 @@ int main() {
         with compiled_cpp(source) as program:
             subprocess.run([str(program)], check=True, capture_output=True)
 
+    def test_reviewed_case_identities_are_required_in_order(self):
+        for profile, review in reviewed_profiles().items():
+            if not review['case_ids']:
+                continue
+            markers, ending = EXTRA_PROFILES[profile]
+            markers = [markers] if isinstance(markers, str) else list(markers)
+            cases = ['C54x ISA case: PASS id=' + name
+                     for name in reviewed_profiles()[profile]['case_ids']]
+            text = '\n'.join(cases + markers + [ending])
+            check_result(text, 3, profile=profile)
+            for changed in (cases[1:], cases + cases[:1], list(reversed(cases)),
+                            ['C54x ISA case: PASS id=unknown'] + cases[1:]):
+                with self.subTest(profile=profile, cases=changed), self.assertRaisesRegex(ValueError, 'identities'):
+                    check_result('\n'.join(changed + markers + [ending]), 3, profile=profile)
+
     def test_reviewed_ordered_coverage_is_required(self):
         for profile in ('rmw-long', 'long-mvkd', 'source-domain'):
             markers, ending = EXTRA_PROFILES[profile]
