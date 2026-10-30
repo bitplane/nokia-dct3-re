@@ -63,12 +63,6 @@ void tms320c54x_test_state::machine_reset()
 		return;
 	if (profile_is("shift-periph") || shifted_bsp_fixture() || shifted_unowned_fixture()) { start_shifted_peripheral(); return; }
 	if (start_profile(*this, machine().options().bios(), {
-		{ {"pmst-map"}, [](self &test) { test.start_pipeline_pmst(); } },
-		{ {"pmst-pop"}, [](self &test) { test.start_pipeline_pmst(); } },
-		{ {"pmst-popd"}, [](self &test) { test.start_pipeline_pmst(); } },
-		{ {"pmst-prefetch"}, [](self &test) { test.start_pipeline_pmst(); } },
-		{ {"pmst-iptr"}, [](self &test) { test.start_pipeline_pmst(); } },
-		{ {"pop-repeat"}, [](self &test) { test.start_pipeline_pmst(); } },
 		{ {"stack-irq"}, [](self &test) { test.start_stack_irq_order(); } },
 		{ {"stack-irq-return"}, [](self &test) { test.start_stack_irq_order(); } },
 		{ {"mcbsp-control"}, [](self &test) { test.start_mcbsp_control_sequence(); } },

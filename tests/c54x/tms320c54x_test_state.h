@@ -82,7 +82,6 @@ private:
 	unsigned pipeline_idle_kind(unsigned variant) const;
 	void start_pipeline_idle1(unsigned variant = 0, bool modes = false);
 	void start_pipeline_original_idle(unsigned variant = 0);
-	void start_pipeline_pmst(unsigned variant = 0);
 	void start_stack_irq_order(unsigned variant = 0);
 	struct repeated_writa_fixture
 	{
@@ -1000,7 +999,6 @@ private:
 	bool check_xc_interrupt_results();
 	bool check_repeat_endpoints_results();
 	bool check_pipeline_idle_results();
-	bool check_repeat_pop_exclusion_results();
 	bool check_instruction_observer_results();
 	bool check_block_page_results();
 	bool check_mvdd_source_results();

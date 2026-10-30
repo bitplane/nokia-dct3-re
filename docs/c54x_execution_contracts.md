@@ -1889,9 +1889,18 @@ The original wrapper uses `POPD *AR7` at logical `03:1f02`, with AR7
 to physical program `001f02`. A raw read at `031f02` returns zero and
 must not be interpreted as missing program content.
 
-`pmst-popd` passes 64 cases/restores for indirect POPD PMST: four values,
-two source pages, lower/upper targets and four snapshots. It checks one
-retained stack read, one publication and subsequent program mapping.
+`pmst_restore` owns 368 independent cases/replays: 64 STM/POPM/POPD/prefetch
+mapping cases, 48 BRC/RSA/REA pop cases and 256 interrupt-vector cases. It
+retains four values, both source pages, lower/upper target regions, all sixteen
+maskable sources and both pending-latch timings. Four checkpoints are distributed
+instead of multiplying the grid into 1,472 executions. Exact source Read and
+control Write clocks, source poisoning, program mapping, retained prefetch,
+repeat-register preservation, IRQ stack words and selected vector markers are
+checked through IDLE/replay. The IPTR fixture supplies IFR directly: it is a
+CPU-latch conformance test, not physical-pin timing or ISR-return validation.
+The prefetch case deliberately changes PMST through debugger state after the
+first Fetch; an invalid opcode in the other bank detects resampling. A wrong
+vector marker fails. All six old profiles and their shared phase machinery go.
 `repeat-pmst` adds 384 cases/restores using the same/replaced loop-context
 matrix below, with an actual PSHM/POPD PMST pair outside the loop body,
 ordered stack transactions and independently checked iteration counts.
@@ -1902,9 +1911,9 @@ words, ordered publications and actual loop iterations. Its PSHM and
 POPD sequences are separated; adjacent PSHM-to-POPD bypass is not claimed.
 Active PMST mapping changes and in-body control writes remain excluded;
 these tests do not establish interrupt composition or physical
-bus-phase timing. Existing `pmst-pop`, `pmst-prefetch`, `repeat-context`
-and `pop-repeat` profiles also pass on this source. The full default
-checkpoint below remains revision-bound, not renewed by these profiles.
+bus-phase timing. These active-loop compositions are separate from the isolated
+`pmst_restore` publication/mapping tests. Historical default checkpoints below
+remain revision-bound, not renewed by section-only migration runs.
 
 Separated POPM REA/RSA/BRC writes outside the active loop body are admitted;
 in-body writes remain excluded. A near return into the restored bounds,
