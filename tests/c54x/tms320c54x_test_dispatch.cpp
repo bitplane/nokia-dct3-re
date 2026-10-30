@@ -67,7 +67,7 @@ TIMER_CALLBACK_MEMBER(tms320c54x_test_state::check_results)
 	if (check_repeated_mvdk_results()) return;
 	if (check_sqdst_results()) return;
 	if (check_block_exit_results()) return;
-	if (check_staged_bus_stm_results()) return;
+	if (check_external_io_results()) return;
 	if (check_rom4_fr_decoder_results()) return;
 	if (check_rom4_codec_is_results()) return;
 	if (check_rom4_crc_input_results()) return;

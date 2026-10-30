@@ -392,7 +392,6 @@ private:
 	void start_bus_io_test(unsigned variant = 0);
 	void start_standard_swwsr_test();
 	void start_bus_register_test();
-	void start_atomic_io_composition(unsigned variant = 0);
 	struct popd_fixture
 	{
 		unsigned mode, count, prefix, irq, snapshot;
@@ -1010,7 +1009,7 @@ private:
 	bool check_repeated_mvdk_results();
 	bool check_sqdst_results();
 	bool check_block_exit_results();
-	bool check_staged_bus_stm_results();
+	bool check_external_io_results();
 	bool check_rom4_fr_decoder_results();
 	bool check_rom4_codec_is_results();
 	bool check_rom4_crc_input_results();

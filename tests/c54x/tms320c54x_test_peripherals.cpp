@@ -683,35 +683,6 @@ void tms320c54x_test_state::start_bus_register_test()
 	m_vector_acks = 0; m_phase = 253530; m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_usec(5));
 }
 
-void tms320c54x_test_state::start_atomic_io_composition(unsigned variant)
-{
-	m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
-	m_pipeline_peripheral_case = variant;
-	unsigned const context = variant / 8, count = (variant / 2) % 4;
-	bool const write = variant % 2;
-	auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
-	for (unsigned i = 0; i < 64; ++i) { program.write_word(0x600 + i, 0xf495); program.write_word(0x700 + i, 0xf495); program.write_word(i, 0xf495); }
-	unsigned body = 0x601;
-	if (!context) program.write_word(0x600, 0xec00 | count);
-	else if (context == 1) { program.write_word(0x600, 0xfa45); program.write_word(0x601, 0x700); body = 0x602; }
-	else program.write_word(0x600, 0xf6bb);
-	program.write_word(body, write ? 0x7591 : 0x7491); program.write_word(body + 1, 0x125);
-	m_cpu->set_pipeline_frontend(false); m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_A, 0); m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x1804); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, context == 2 ? 0x800 : 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_AR1, 0x1400); m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 1);
-	m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10); m_cpu->set_input_line(0, CLEAR_LINE); m_cpu->set_input_line(INPUT_LINE_NMI, CLEAR_LINE);
-	for (unsigned i = 0; i < 4; ++i) data.write_word(0x1400 + i, 0x1234);
-	m_cpu->space(AS_IO).write_word(0x125, 0x1234); data.write_word(0x28, 0x7000); data.write_word(0x2b, 0);
-	m_bus_ready = true; m_pipeline_operand_reads = m_pipeline_store_writes = m_vector_acks = 0;
-	m_pipeline_operand_tap = m_cpu->space(AS_IO).install_read_tap(0x125, 0x125, "atomic_composition_read",
-		[this, write](offs_t, u16 &value, u16) { if (!machine().side_effects_disabled()) { expect(!write && value == 0x1234, "Repeated waited read preserves bus value"); ++m_pipeline_operand_reads; } });
-	m_pipeline_write_tap = m_cpu->space(AS_IO).install_write_tap(0x125, 0x125, "atomic_composition_write",
-		[this, write](offs_t, u16 &value, u16) { if (!machine().side_effects_disabled()) { expect(write && value == 0x1234, "Repeated waited write preserves source value"); ++m_pipeline_store_writes; } });
-	m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 253570;
-	m_cpu->set_state_int(STATE_GENPC, 0x600); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-}
 
 tms320c54x_test_state::parallel_load_fixture tms320c54x_test_state::bsp_parallel_load_case(unsigned variant)
 {
@@ -1800,38 +1771,9 @@ bool tms320c54x_test_state::check_mvdd_peripheral_results()
 }
 
 
-bool tms320c54x_test_state::check_staged_bus_stm_results()
+bool tms320c54x_test_state::check_external_io_results()
 {
 	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
-	if (m_phase == 253570)
-	{
-		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
-		unsigned const transfers = variant / 8 ? 1 : 1 + (variant / 2) % 4;
-		bool const write = variant % 2;
-		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Atomic composition remains supported");
-		if (tick == 2) m_cpu->set_input_line(0, ASSERT_LINE);
-		if (tick == 4 && !m_pipeline_replay)
-		{
-			m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_store_writes, 0, m_vector_acks};
-			expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save waited atomic control-flow composition");
-		}
-		if (tick == 64)
-		{
-			expect(m_vector_acks == 1 && m_pipeline_operand_reads == (write ? 0 : transfers) && m_pipeline_store_writes == (write ? transfers : 0) && m_cpu->state_int(tms320c54x_device::STATE_AR1) == 0x1400 + transfers, "Atomic retirement preserves repeat count, pointer updates and guarded IRQ delivery");
-			expect(m_cpu->state_int(tms320c54x_device::STATE_RTN) == (variant / 8 == 1 ? 0x700 : 0x603), "Pending I/O retires to the original sequential or delayed continuation before IRQ entry");
-			if (!m_pipeline_replay)
-			{
-				m_pipeline_replay = true; m_idle_fixture_tick = 4; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_store_writes = m_recurring_irq_snapshot[1]; m_vector_acks = m_recurring_irq_snapshot[3];
-				return restore_pipeline_at(253580, "Replay pending atomic retirement exactly once");
-			}
-			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_input_line(0, CLEAR_LINE);
-			if (variant < 23) { start_atomic_io_composition(variant + 1); return true; }
-			osd_printf_info("TMS320C54x atomic I/O composition: PASS cases=24 restore=24 contexts=repeat,delay,INTM pointer_updates=once interrupt_after_transfer=1 physical_mapping=unvalidated\n");
-			throw emu_fatalerror(0, "TMS320C54x isolated atomic I/O composition complete");
-		}
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 253580) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 253570; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true; }
 	if (m_phase == 253550)
 	{
 		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick; auto const f = bus_io_case(variant);

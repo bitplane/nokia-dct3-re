@@ -323,6 +323,7 @@ def main():
     counts['peripheral_stm'] = 20
     counts['c5416_bus_stm'] = 12
     counts['standard_bus_stm'] = 4
+    counts['atomic_waited_io_control'] = 12
     counts['accumulator_call_frames'] = 216
     parser.add_argument('section', choices=[*counts, 'all'])
     parser.add_argument('--jobs', type=int, default=8)

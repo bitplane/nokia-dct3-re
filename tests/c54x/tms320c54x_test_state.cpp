@@ -190,7 +190,6 @@ void tms320c54x_test_state::machine_reset()
 		return;
 	if (absolute_memory_dp()) { start_pipeline_memory_dp(); return; }
 	if (start_profile(*this, machine().options().bios(), {
-		{ {"bus-io-compose"}, [](self &test) { test.start_atomic_io_composition(); } },
 	}))
 		return;
 	if (!strcmp(machine().system().name, "tms54test") && (profile_is("bus-io") || atomic_bus_io())) { start_bus_io_test(); return; }
@@ -515,7 +514,7 @@ void tms320c54x_test_state::test(machine_config &config)
 		});
 	m_cpu->set_extended_program(true);
 	if (!strcmp(config.options().bios(), "std-swwsr") || !strcmp(config.options().bios(), "std-io") || !strcmp(config.options().bios(), "std-io-atomic")) m_cpu->set_standard_swwsr(true);
-	if (!strcmp(config.options().bios(), "bus-registers") || !strcmp(config.options().bios(), "bus-io") || !strcmp(config.options().bios(), "bus-io-atomic") || !strcmp(config.options().bios(), "bus-io-compose")) m_cpu->set_c5416_bus_profile(true);
+	if (!strcmp(config.options().bios(), "bus-registers") || !strcmp(config.options().bios(), "bus-io") || !strcmp(config.options().bios(), "bus-io-atomic")) m_cpu->set_c5416_bus_profile(true);
 	m_cpu->ready_in_cb().set([this]() { return int(m_bus_ready); });
 	m_cpu->clkout_divisor_cb().set([this](u8 value) { m_bus_divisor = value; });
 	m_cpu->iack_enable_cb().set([this](int value) { m_bus_iack_enable = bool(value); });
@@ -555,7 +554,6 @@ void tms320c54x_test_state::test(machine_config &config)
 		if (m_phase == 254360) { unsigned const interrupt = m_pipeline_peripheral_case / 4096; expect(interrupt && line == (interrupt == 2 ? INPUT_LINE_NMI : 2) && !m_vector_acks, "In-block branch interrupt acknowledges its actual pending source once"); ++m_vector_acks; m_cpu->set_input_line(line, CLEAR_LINE); }
 		if (m_phase == 254200) { auto const &f = m_popd_fixture; expect(f.irq && line == (f.irq == 2 ? INPUT_LINE_NMI : 0) && !m_vector_acks && m_pipeline_store_writes == f.count + 1 && m_cpu->pipeline_cycles() > f.read_clock() + f.count + 1, "POPD acknowledges IRQ/NMI only after the last repeat iteration retires"); ++m_vector_acks; }
 		if (m_phase == 253550) { auto const f = bus_io_case(m_pipeline_peripheral_case); expect(f.interrupt && line == (f.interrupt == 2 ? INPUT_LINE_NMI : 0) && !m_vector_acks && bus_io_clock() > f.complete, "Interrupt acknowledgement cannot split the pending external transaction"); ++m_vector_acks; }
-		if (m_phase == 253570) { unsigned const transfers = m_pipeline_peripheral_case / 8 ? 1 : 1 + (m_pipeline_peripheral_case / 2) % 4; expect(line == 0 && !m_vector_acks && m_pipeline_operand_reads + m_pipeline_store_writes == transfers, "IRQ acknowledgement follows the complete guarded I/O sequence"); ++m_vector_acks; }
 		if (m_phase == 254980) { auto const f = delay_compare_case(m_pipeline_peripheral_case); expect(f.interrupt && line == (f.interrupt == 2 ? INPUT_LINE_NMI : 0) && !m_vector_acks && m_pipeline_operand_reads == (f.prefix ? 2U : 1U) && bool(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x1000) == f.final_tc && m_cpu->pipeline_cycles() > f.read, "IRQ NMI cannot enter before the complete delayed comparison publishes TC"); ++m_vector_acks; }
 		if (m_phase == 253530) { expect(line == 0 && !m_vector_acks, "Logical IRQ callback remains enabled with IACKOFF set"); ++m_vector_acks; }
 		if (m_phase == 253230)

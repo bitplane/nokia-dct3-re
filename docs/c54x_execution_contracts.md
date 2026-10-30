@@ -1964,6 +1964,17 @@ producing 384 executions. These are model capture/publication contracts;
 active interrupt composition is not qualified. The old LDU setup/result phase
 and profile are removed.
 
+### Atomic waited I/O control
+
+`atomic_waited_io_control` retains 12 independent cases/replays: four repeat
+lengths and one delayed-branch/INTM program in each transfer direction.
+Seven C5416 software waits remain configured. Physical IRQ0 is asserted
+while the protected sequence runs; its sole acknowledgement follows every
+port transaction and retains RTN 0603 (repeat/INTM) or 0700 (delay). Exact
+transfer counts/values and final pointer are replayed. The former 24 cases
+repeated unchanged delay/INTM programs four times. No silicon timing claim
+is made; its legacy setup, result branch and IRQ hook are removed.
+
 ### Immediate peripheral control writes
 
 Immediate control writes are split into `peripheral_stm` (20 cases for
