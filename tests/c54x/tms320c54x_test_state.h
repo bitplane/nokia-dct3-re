@@ -663,40 +663,6 @@ private:
 	};
 	static rptbd_shift_store_fixture rptbd_shift_store_case(unsigned v);
 	void start_rptbd_shift_store(unsigned variant = 0);
-	struct rptbd_square_fixture
-	{
-		unsigned operation, destination, pattern, flags, layout, form, count, snapshot;
-		u32 base;
-		bool memory_square = false;
-		unsigned operations() const { return layout >= 2 ? 2 : 1; }
-		unsigned slot(unsigned ordinal) const { return layout == 1 ? 1 : ordinal; }
-		unsigned target(unsigned ordinal) const { return memory_square && layout == 4 && ordinal ? 1 : destination ^ unsigned(layout == 3 && ordinal); }
-		u16 memory(unsigned ordinal) const { return std::array<u16, 8>{0, 1, 0xffff, 0x7fff, 0x8000, 0x8001, 0x1234, 0xf495}[(pattern + (form == 1 ? 0 : ordinal * 3)) % 8]; }
-		u16 address(unsigned ordinal) const { return (form ? 0x5000 : 0x1060) + (form == 1 ? 0 : ordinal); }
-		u16 opcode(unsigned slot) const { if ((layout == 0 && slot == 1) || (layout == 1 && slot == 0)) return 0xf495; unsigned const ordinal = layout >= 2 ? slot : 0; u16 const family = memory_square ? layout == 4 && ordinal ? 0x3100 : 0x2600 | (target(ordinal) << 8) : 0x3800 | (operation << 9) | (target(ordinal) << 8); return family | (form == 0 ? 0x60 + ordinal : form == 1 ? 0x85 : 0x95); }
-		u16 st0() const { return 0xa820 | (pattern & 1 ? 0x600 : 0); }
-		u16 st1() const { return 0x800 | (flags & 1 ? 0x40 : 0) | (flags & 2 ? 0x200 : 0) | (flags & 8 ? 0x100 : 0); }
-		std::array<u64, 3> result(unsigned completed) const
-		{
-			u64 const initial = std::array<u64, 8>{0, 1, 0x7fffffff, 0xff80000000ULL, 0x017fffffffULL, 0xff7fffffffULL, 0x1234567833ULL, 0x80aa001234ULL}[pattern];
-			std::array<u64, 3> out{initial, (initial ^ 0x5555555555ULL) & 0xffffffffffULL, st0()};
-			for (unsigned i = 0; i < completed; ++i)
-			{
-				unsigned const dst = target(i);
-				s64 const old = BIT(out[dst], 39) ? s64(out[dst]) - (s64(1) << 40) : s64(out[dst]);
-				s64 const value = s16(memory(i));
-				s64 product = value * value * (flags & 1 ? 2 : 1);
-				if (memory_square && layout == 4 && i) { s32 const high = (out[0] >> 16) & 0x1ffff; product = s64(high & 0x10000 ? high - 0x20000 : high) * value * (flags & 1 ? 2 : 1); }
-				s64 const sum = memory_square ? product : operation ? old - product : old + product;
-				bool const overflow = sum < -2147483648LL || sum > 2147483647LL;
-				out[2] |= overflow ? dst ? 0x200 : 0x400 : 0;
-				out[dst] = u64(overflow && (flags & 2) ? std::clamp(sum, s64(-2147483648LL), s64(2147483647LL)) : sum) & 0xffffffffffULL;
-			}
-			return out;
-		}
-	};
-	rptbd_square_fixture rptbd_square_case(unsigned v) const;
-	void start_rptbd_square(unsigned variant = 0);
 	struct memory_immediate_fixture
 	{
 		unsigned form, read, access, checkpoint, words;
@@ -2040,7 +2006,7 @@ private:
 	bool check_ldu_imr_results();
 	bool check_mvmd_status_block_results();
 	bool check_shifted_peripheral_results();
-	bool check_rptbd_square_results();
+	bool check_xc_return_results();
 	bool check_delay_copy_results();
 	bool check_staged_overflow_results();
 	bool check_mapped_dual_results();

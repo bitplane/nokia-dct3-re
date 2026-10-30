@@ -28,6 +28,7 @@ def main():
     counts['block_swap'] = 1048
     counts['block_edges'] = 16
     counts['delayed_block'] = 128
+    counts['delayed_square'] = 4992
     parser.add_argument('section', choices=[*counts, 'all'])
     parser.add_argument('--jobs', type=int, default=8)
     parser.add_argument('--negative-control', action='store_true', help='require failure of an intentionally wrong expectation')
