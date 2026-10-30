@@ -1165,7 +1165,7 @@ clocked_register_case tms320c54x_test_state::mapped_register_sequence(unsigned v
 	if (f.prefix) initial.program.push_back({f.base + 0x600, 0xe800 | u16(f.after_a)});
 	initial.program.push_back({f.base + 0x600 + f.prefix, opcode});
 	clocked_register_case test{{{0, std::move(initial)}},
-		f.read_cycle - 1 + variant / (bitfield ? (status_bitfield() ? 256 : 4608) : 2304), finish, {}, variant};
+		f.read_cycle - 1 + variant / (bitfield ? 4608 : 2304), finish, {}, variant};
 	u32 const extension = f.base + 0x601 + f.prefix;
 	if (f.absolute) test.retained_program_reads.push_back({extension, f.address});
 	if (bitfield) test.retained_program_reads.push_back({extension + unsigned(f.absolute), c.mask});
@@ -1205,25 +1205,8 @@ void tms320c54x_test_state::start_pipeline_mapped_word_arithmetic()
 	m_phase = 253430; m_register_sequence->start();
 }
 
-bool tms320c54x_test_state::status_bitfield() const
-{ return profile_is("status-bitf"); }
-
 tms320c54x_test_state::mapped_bitfield_fixture tms320c54x_test_state::mapped_bitfield_case(unsigned variant) const
 {
-	if (status_bitfield())
-	{
-		auto f = mapped_word_arithmetic_case(0);
-		f.address = 6 + variant % 2;
-		unsigned const pattern = (variant / 2) % 4;
-		f.absolute = (variant / 64) % 2;
-		f.base = (variant / 128) % 2 ? 0x20000 : 0;
-		f.prefix = 0; f.read_cycle = f.absolute ? 7 : 6;
-		f.st0 = (std::array<u16, 4>{0, 0x0800, 0xe600, 0xee00}[pattern] & ~u16(0x1000)) | (((variant / 32) % 2) ? 0x1000 : 0);
-		f.st1 = std::array<u16, 4>{0, 0x0800, 0x2000, 0x3b80}[pattern];
-		return {f, f.address == 6 ? f.st0 : f.st1,
-			std::array<u16, 4>{0, 0x0800, 0x1000, 0xffff}[(variant / 8) % 4],
-			f.st0, f.address == 6 ? tms320c54x_device::STATE_ST0 : tms320c54x_device::STATE_ST1};
-	}
 	unsigned const v = variant % 576;
 	unsigned const expanded = v < 512 ? v % 8 + ((v / 8) % 4) * 32 + ((v / 32) % 4) * 128 + ((v / 128) % 2) * 512 + (v / 256) * 1024 :
 		2048 + ((v - 512) % 4) * 4 + (((v - 512) / 4) % 2) * 16 + (((v - 512) / 8) % 2) * 32 + (((v - 512) / 16) % 2) * 64 + ((v - 512) / 32) * 128;
@@ -1241,7 +1224,7 @@ tms320c54x_test_state::mapped_bitfield_fixture tms320c54x_test_state::mapped_bit
 void tms320c54x_test_state::start_pipeline_mapped_bitfield()
 {
 	m_register_sequence = std::make_unique<register_sequence_fixture>(machine(), *m_cpu, *m_check_timer,
-		status_bitfield() ? 768 : 13824, [this](unsigned key) { return mapped_register_sequence(key, true); });
+		13824, [this](unsigned key) { return mapped_register_sequence(key, true); });
 	m_phase = 253450; m_register_sequence->start();
 }
 
@@ -2527,11 +2510,6 @@ bool tms320c54x_test_state::check_negate_results()
 			osd_printf_info("TMS320C54x staged mapped word arithmetic: PASS cases=6912 registers=AL,AH,AG,BL,BH,BG,T,TRN selectors=4 forms=direct,absolute producer_cases=768 restore=6912 reads_each=1 data_writes=0 silicon_phase_claim=0\n");
 			if (profile_is("mapped-word")) throw emu_fatalerror(0, "TMS320C54x isolated mapped word arithmetic complete");
 			start_pipeline_mapped_bitfield(); return true;
-		}
-		if (status_bitfield())
-		{
-			osd_printf_info("TMS320C54x staged status BITF: PASS cases=768 restore=768 registers=ST0,ST1 forms=direct,absolute masks=4 initial_tc=2 pages=2 snapshots=3 reads_each=1 data_writes=0 retained_source=1 silicon_phase_claim=0\n");
-			throw emu_fatalerror(0, "TMS320C54x isolated status BITF complete");
 		}
 		osd_printf_info("TMS320C54x staged mapped BITF: PASS cases=13824 registers=AL,AH,AG,BL,BH,BG,T,TRN masks=4 initial_tc=2 producer_cases=1536 restore=13824 reads_each=1 data_writes=0 silicon_phase_claim=0\n");
 		if (profile_is("mapped-bitf")) throw emu_fatalerror(0, "TMS320C54x isolated mapped BITF complete");

@@ -155,14 +155,15 @@ dispatcher; the CPU-only controller extraction remains outstanding. Legal
 standard-mode inputs keep ARP zero. These timer/interrupt observations do not
 establish physical frequencies or silicon restart latency.
 
-`mapped-word`, `mapped-bitf` and `status-bitf` use the same runner with a shared
-mapped-register descriptor builder. The distinct ADD/SUB and TC reference rules
-remain fixture-owned. All 21,504 cases retain their per-clock register predicates,
-pre-observation source mutations and three checkpoint cohorts. Contiguous
-address/mask extension words are checked in order without inventing fetch-cycle
-requirements; their observer cursor is rewound alongside the data cursor.
-Instruction completion now reaches real IDLE rather than NOP padding. The
-previously existing `mapped-word` BIOS is also exposed by the CLI profile registry.
+The independent `status_bitfield` section owns ST0/ST1 BITF sampling: 128
+register/pattern/mask/initial-TC/addressing combinations, with pages and three
+checkpoint positions distributed rather than multiplied into 768 executions.
+It checks one mapped Read, no writes, retained extension words, post-Read source
+mutation, TC publication and preservation of unrelated status/register state.
+Persistent observations apply on every clock through real IDLE and replay.
+These are model sampling contracts, not silicon timing measurements.
+The legacy `mapped-word` and `mapped-bitf` banks still await replacement; they
+no longer own a status-register profile or its setup/reference branches.
 
 `isa-words` owns fifty independently reset atomic instruction examples. The
 default suite shares the same bank through one loop, replacing five separate

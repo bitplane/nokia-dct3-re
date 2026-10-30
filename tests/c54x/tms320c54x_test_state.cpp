@@ -52,7 +52,6 @@ void tms320c54x_test_state::machine_reset()
 		{ {"serial-stm"}, [](self &test) { test.start_staged_bus_stm(); } },
 	}))
 		return;
-	if (status_bitfield()) { start_pipeline_mapped_bitfield(); return; }
 	if (start_profile(*this, machine().options().bios(), {
 		{ {"rptb-exit", "rptb-exit-delay"}, [](self &test) { test.start_block_exit(); } },
 	}))

@@ -457,7 +457,6 @@ private:
 		u16 memory, mask, st0;
 		unsigned mutation_state;
 	};
-	bool status_bitfield() const;
 	mapped_bitfield_fixture mapped_bitfield_case(unsigned variant) const;
 	void start_pipeline_mapped_bitfield();
 
