@@ -1011,7 +1011,6 @@ private:
 	void start_repeat_mvdp_irq(unsigned variant = 0);
 	void start_mvdp_pair(unsigned variant = 0);
 	void start_write_a(unsigned variant = 0);
-	void start_return_load(unsigned variant = 0);
 	struct delayed_conditional_call_fixture
 	{
 		unsigned condition, layout, checkpoint;

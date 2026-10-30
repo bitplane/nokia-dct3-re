@@ -193,7 +193,6 @@ void tms320c54x_test_state::machine_reset()
 		{ {"rpt-mvdp"}, [](self &test) { test.start_repeat_mvdp(); } },
 		{ {"rpt-mvkd"}, [](self &test) { test.start_repeat_mvkd(); } },
 		{ {"rpt-mvdp-irq"}, [](self &test) { test.start_repeat_mvdp_irq(); } },
-		{ {"ret-load"}, [](self &test) { test.start_return_load(); } },
 		{ {"conditional-cd"}, [](self &test) { test.start_delayed_conditional_call(); } },
 		{ {"tc-delay-call"}, [](self &test) { test.start_delayed_conditional_call(); } },
 		{ {"rptb-ccd"}, [](self &test) { test.start_block_conditional_call(); } },
