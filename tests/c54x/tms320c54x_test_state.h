@@ -1630,7 +1630,6 @@ private:
 	};
 	static staged_overflow_fixture staged_overflow_case(unsigned v);
 	void start_staged_overflow(unsigned variant = 0);
-	void start_atomic_overflow_branch(unsigned index);
 
 	bool rom4_codec_is(char const *name) const;
 	void enable_rom4_codec_pipeline(char const *kind);

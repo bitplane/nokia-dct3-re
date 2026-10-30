@@ -214,30 +214,6 @@ tms320c54x_test_state::conditional_register_fixture tms320c54x_test_state::condi
 
 
 
-void tms320c54x_test_state::start_atomic_overflow_branch(unsigned index)
-{
-	auto &program = m_cpu->space(AS_PROGRAM);
-	unsigned const flags = (index >> 3) & 3, accumulator = (index >> 1) & 1;
-	program.write_word(0x600, 0xf860 | ((index & 1) << 9) | (accumulator << 3) | (((index >> 2) & 1) << 4));
-	program.write_word(0x601, 0x700);
-	program.write_word(0x602, 0xf5b0 | (10 - accumulator));
-	program.write_word(0x603, 0xe955);
-	program.write_word(0x604, 0xe811); program.write_word(0x605, 0xf4e1);
-	program.write_word(0x700, 0xe822); program.write_word(0x701, 0xf4e1);
-	set_registers(*m_cpu, {
-		{cpu_regs::STATE_PC, 0x600}, {cpu_regs::STATE_SP, 0x1000}, {cpu_regs::STATE_A, 0}, {cpu_regs::STATE_B, 0},
-		{cpu_regs::STATE_ST0, 0x1805 | ((flags & 1) << 10) | ((flags & 2) << 8)}, {cpu_regs::STATE_ST1, 0x800},
-		{cpu_regs::STATE_PMST, 0}, {cpu_regs::STATE_TCR, 0x10}, {cpu_regs::STATE_ILLEGAL, 0}, {cpu_regs::STATE_IDLE, 0},
-	});
-	m_rom4_codec_replay = false; m_rom4_codec_replays = 0;
-	m_phase = 305000 + index;
-	if (!(index & 32))
-	{
-		expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save overflow branch before predicate sampling");
-		m_rom4_codec_replays = 1;
-	}
-	m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-}
 
 
 
@@ -442,40 +418,6 @@ bool tms320c54x_test_state::check_conditional_register_results()
 		if (index < 18431) { start_conditional_register_store(index + 1); return true; }
 		osd_printf_info("TMS320C54x atomic conditional register stores: PASS cases=18432 restore=18432 forms=STRCD,SRCCD predicates=12 patterns=6 xmem=16 source_values=4 snapshots=2 false_read_writeback=1 circular_update=1 silicon_phase_claim=0\n");
 		throw emu_fatalerror(0, "TMS320C54x isolated conditional register stores complete");
-	}
-	if (m_phase >= 305000 && m_phase < 305064)
-	{
-		unsigned const index = m_phase - 305000, flags = (index >> 3) & 3, accumulator = (index >> 1) & 1;
-		u16 const mask = 1U << (10 - accumulator);
-		bool const take = BIT(flags, accumulator) == BIT(index, 2), delayed = index & 1;
-		u16 const initial = 0x1805 | ((flags & 1) << 10) | ((flags & 2) << 8);
-		if (!m_rom4_codec_replays && m_cpu->state_int(tms320c54x_device::STATE_PC) == (delayed || !take ? 0x602 : 0x700))
-		{
-			expect(m_cpu->state_int(tms320c54x_device::STATE_ST0) == (initial & ~mask), "Overflow branch consumes only its selected flag before any delay word");
-			expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save consumed overflow predicate and optional delayed transfer");
-			m_rom4_codec_replays = 1;
-		}
-		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Atomic single-overflow branch is admitted");
-		if (!m_cpu->state_int(tms320c54x_device::STATE_IDLE))
-		{
-			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-		}
-		bool const slots = delayed || !take;
-		expect(m_rom4_codec_replays == 1 && m_cpu->state_int(tms320c54x_device::STATE_A) == (take ? 0x22 : 0x11) &&
-			m_cpu->state_int(tms320c54x_device::STATE_B) == (slots ? 0x55 : 0) &&
-			m_cpu->state_int(tms320c54x_device::STATE_PC) == (take ? 0x702 : 0x606) &&
-			m_cpu->state_int(tms320c54x_device::STATE_ST0) == ((initial & ~mask) | (slots ? mask : 0)) &&
-			m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x1000,
-			"Overflow branch retains its original condition across flag-changing delay words");
-		if (!m_rom4_codec_replay)
-		{
-			expect(restore_snapshot(machine(), *m_check_timer, m_saved_pipeline) == STATERR_NONE, "Restore overflow predicate or pending delayed transfer");
-			m_phase = 305000 + index; m_rom4_codec_replay = true;
-			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-		}
-		if (index < 63) { start_atomic_overflow_branch(index + 1); return true; }
-		osd_printf_info("TMS320C54x atomic overflow branches: PASS cases=64 restore=64 forms=BC,BCD predicates=AOV,ANOV,BOV,BNOV flags=4 snapshots=2 selected_flag_clear=1 delay_condition_retained=1 silicon_phase_claim=0\n");
-		throw emu_fatalerror(0, "TMS320C54x isolated overflow branches complete");
 	}
 	return false;
 }

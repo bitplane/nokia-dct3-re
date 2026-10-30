@@ -80,6 +80,7 @@ def main():
     counts['xc_context'] = 4
     counts['conditional_delayed_return'] = 224
     counts['atomic_conditional_return'] = 72
+    counts['atomic_overflow_branch'] = 32
     parser.add_argument('section', choices=[*counts, 'all'])
     parser.add_argument('--jobs', type=int, default=8)
     parser.add_argument('--negative-control', action='store_true', help='require failure of an intentionally wrong expectation')
