@@ -17,6 +17,8 @@ inline std::vector<clocked_register_case> section_cases()
 		if (ar) initial.initial.push_back({int(r::STATE_AR0) + int(ar),lhs});
 		initial.expected.push_back({r::STATE_ST0,old});
 		auto final = observation("tc-published", {{r::STATE_ST0,unsigned(0xa608 | (result ? 0x1000 : 0))},{r::STATE_ST1,0x800}});
+		final.expected.push_back({r::STATE_AR0,0x4321});
+		if (ar) final.expected.push_back({int(r::STATE_AR0) + int(ar),0x9876});
 		clocked_register_case c{{{0,std::move(initial)},{6,std::move(final)}},4 + (ar + condition + pair) % 3,10};
 		c.require_idle = false; c.check_pipeline_clock = true;
 		c.actions = {{4,{{r::STATE_AR0,0x4321}}}};

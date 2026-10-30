@@ -4597,7 +4597,6 @@ bool tms320c54x_test_state::check_banz_offset_results()
 			"BANZ/BANZD long-offset Sind tests effective address and consumes displacement before destination");
 		if (index < 95) { start_banz_offset_case(index + 1); return true; }
 		osd_printf_info("TMS320C54x BANZ offset conformance: PASS variants=96\n");
-		start_cmpr_case(0);
 		return true;
 	}
 	return false;

@@ -1716,20 +1716,6 @@ void tms320c54x_test_state::start_cmpm_offset_case(unsigned index)
 	m_check_timer->adjust(attotime::from_usec(100));
 }
 
-void tms320c54x_test_state::start_cmpr_case(unsigned index)
-{
-	unsigned const ar = index & 7, condition = (index / 8) & 3, pair = index / 32;
-	auto &program = m_cpu->space(AS_PROGRAM);
-	program.write_word(0x010980, 0xf4a8 | (condition << 8) | ar);
-	program.write_word(0x010981, 0xf4e1);
-	m_cpu->set_state_int(STATE_GENPC, 0x010980);
-	m_cpu->set_state_int(tms320c54x_device::STATE_AR0, cmpr_values[pair][1]);
-	m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + ar, cmpr_values[pair][0]);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x0aa5 | ((index & 1) ? 0x1000 : 0));
-	m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-	m_phase = 1427 + index;
-	m_check_timer->adjust(attotime::from_usec(100));
-}
 
 
 
@@ -3182,27 +3168,6 @@ bool tms320c54x_test_state::check_bit_results()
 	return false;
 }
 
-bool tms320c54x_test_state::check_cmpr_results()
-{
-	[[maybe_unused]] auto &program = m_cpu->space(AS_PROGRAM);
-	if (m_phase >= 1427 && m_phase < 1619)
-	{
-		unsigned const index = m_phase - 1427;
-		unsigned const ar = index & 7, condition = (index / 8) & 3, pair = index / 32;
-		u16 const left = cmpr_values[pair][0], right = ar ? cmpr_values[pair][1] : left;
-		bool const conditions[] = {left == right, left < right, left > right, left != right};
-		expect(m_cpu->state_int(tms320c54x_device::STATE_ST0) == (0x0aa5 | (conditions[condition] ? 0x1000 : 0)) &&
-			m_cpu->state_int(tms320c54x_device::STATE_AR0 + ar) == left &&
-			m_cpu->state_int(tms320c54x_device::STATE_AR0) == right &&
-			m_cpu->state_int(tms320c54x_device::STATE_IDLE),
-			"CMPR conditions are unsigned, cover every AR and modify only TC");
-		if (index < 191) { start_cmpr_case(index + 1); return true; }
-		osd_printf_info("TMS320C54x CMPR conformance: PASS variants=192\n");
-		m_check_timer->adjust(attotime::from_usec(100));
-		return true;
-	}
-	return false;
-}
 
 bool tms320c54x_test_state::check_cmpm_offset_results()
 {

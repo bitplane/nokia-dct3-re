@@ -649,8 +649,6 @@ private:
 	void start_compact_load_case(unsigned index);
 	void start_bitf_offset_case(unsigned index);
 	void start_cmpm_offset_case(unsigned index);
-	static constexpr u16 cmpr_values[][2] = {{0, 0}, {0, 1}, {1, 0}, {0xffff, 0x8000}, {0x8000, 0xffff}, {0xffff, 0xffff}};
-	void start_cmpr_case(unsigned index);
 	void start_banz_offset_case(unsigned index);
 	static constexpr u16 bio_opcodes[] = {
 		0xf802, 0xf803, 0xfa02, 0xfa03, 0xf902, 0xf903,
@@ -1625,7 +1623,6 @@ private:
 	bool check_bio_results();
 	bool check_bit_results();
 	bool check_banz_offset_results();
-	bool check_cmpr_results();
 	bool check_cmpm_offset_results();
 	bool check_compact_load_results();
 	bool check_software_interrupt_entry_results();
