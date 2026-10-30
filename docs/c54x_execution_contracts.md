@@ -145,13 +145,17 @@ borrow it. Shared legacy controller storage and other copied snippets remain
 to be reviewed. This relocation is
 ownership separation, not a net source-size reduction.
 
-`power-idle` separately owns the 96-case IDLE1/2/3 bank and the 48-case
-IDLE1 wake bank, with explicit immutable mode input rather than a profile-name
-test inside the loop. All 144 identities, page/wake cohorts and four snapshot
-classes remain. The selected-result-owner route keeps them out of the default
-dispatcher; the CPU-only controller extraction remains outstanding. Legal
-standard-mode inputs keep ARP zero. These timer/interrupt observations do not
-establish physical frequencies or silicon restart latency.
+`staged_idle` owns 28 independent cases covering all distinct IDLE1/2/3 wake
+combinations on both program pages. It replaces two overlapping legacy banks
+and distributes decode/asleep/pending/resumed checkpoints rather than crossing
+every checkpoint with every input. Unrelated masked requests snapshot pending.
+The sleeping pipeline freezes at its IDLE barrier without retiring younger
+words; the timer continues only in IDLE1. A speculative continuation is changed
+while asleep and must be fetched fresh after wake. IRQ/NMI service pushes the
+actual low continuation and page, executes an ISR and returns through the real
+far-return path; INTM-blocked wake instead resumes foreground without a frame.
+Exact bus events, PC page, A/B, SP, pending IFR and standard-mode status survive
+replay. Physical frequencies and silicon restart latency remain unestablished.
 
 `idle_nmi` owns twelve independent atomic-frontend cases: IDLE1/2/3 crossed
 with INTM and empty/full IMR. Each reaches idle before an NMI is asserted.

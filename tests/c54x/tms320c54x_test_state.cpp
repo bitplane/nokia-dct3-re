@@ -33,7 +33,6 @@ void tms320c54x_test_state::machine_reset()
 	m_context_coverage = {};
 	if (start_profile(*this, machine().options().bios(), {
 		{ {"rom4-context"}, [](self &test) { test.m_result_owner = &self::check_rom4_context_results; test.start_pipeline_mu4_prologue(); } },
-		{ {"power-idle"}, [](self &test) { test.m_result_owner = &self::check_pipeline_idle_results; test.start_pipeline_idle1(0, true); } },
 		{ {"pop-irq"}, [](self &test) { test.start_pipeline_mmr_pop(); } },
 		{ {"mvpd-extended"}, [](self &test) { test.start_extended_mvpd(); } },
 		{ {"mvpd-controls"}, [](self &test) { test.start_pipeline_mvpd(); } },
@@ -488,13 +487,6 @@ void tms320c54x_test_state::test(machine_config &config)
 			unsigned const last = store ? (f.long_form ? 9 : 8) + 2 * f.count : (f.long_form ? 8 : 7) + f.count;
 			expect(f.interrupt && line == (f.interrupt == 2 ? INPUT_LINE_NMI : 0) && m_cpu->pipeline_cycles() > last && m_cpu->state_int(tms320c54x_device::STATE_RC) == 0 &&
 				m_cpu->state_int(tms320c54x_device::STATE_RTN) == u16(f.body + (store ? 2 : 1)) && !m_vector_acks, "Memory repeat acknowledges its pending interrupt after the final iteration at the fresh continuation"); ++m_vector_acks;
-		}
-		if (m_phase == 252230)
-		{
-			unsigned const kind = pipeline_idle_kind(m_pipeline_peripheral_case);
-			expect(line == (kind == 5 ? INPUT_LINE_NMI : kind == 3 ? 3 : 0) && m_cpu->state_int(tms320c54x_device::STATE_RTN) == 0x601,
-				"IDLE1 wake acknowledges the actual source with its unexecuted continuation");
-			++m_vector_acks;
 		}
 		observe_context_irq(line);
 		if (m_phase == 251090)

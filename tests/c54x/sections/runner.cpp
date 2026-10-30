@@ -98,6 +98,9 @@ protected:
 	void machine_start() override
 	{
 		m_timer = timer_alloc(FUNC(section_state::tick), this);
+#ifdef C54X_SECTION_STAGED_IDLE
+		save_item(NAME(m_staged_idle_tim));
+#endif
 #ifdef C54X_SECTION_IDLE_DMA
 		save_item(NAME(m_dma_completions)); save_item(NAME(m_dma_start));
 #endif
@@ -292,6 +295,19 @@ private:
 #endif
 	TIMER_CALLBACK_MEMBER(tick)
 	{
+#ifdef C54X_SECTION_STAGED_IDLE
+		unsigned const idle_now=m_fixture->tick_count();
+		if (idle_now>=6 && idle_now<20 && m_cpu->pipeline_cycles()!=6)
+			throw emu_fatalerror("Staged IDLE must freeze its pipeline before younger words retire");
+		if (idle_now==8 || idle_now==16) {
+			auto const disable=machine().disable_side_effects();
+			u16 const counter=m_cpu->state_int(tms320c54x_device::STATE_TIM);
+			bool const shallow=m_cases.at(m_fixture->count()).states.front().observation.opcode==0xf4e1;
+			if (idle_now==8) m_staged_idle_tim=counter;
+			else if (shallow ? counter>=m_staged_idle_tim : counter!=m_staged_idle_tim)
+				throw emu_fatalerror("Staged IDLE timer must run only in IDLE1");
+		}
+#endif
 #ifdef C54X_SECTION_IDLE_DMA
 		unsigned const dma_now=m_fixture->tick_count(), dma_index=m_fixture->count();
 		if (dma_now==16) {
@@ -384,6 +400,9 @@ private:
 		throw emu_fatalerror(0, "C54x section complete");
 	}
 	required_device<tms320c54x_device> m_cpu;
+#ifdef C54X_SECTION_STAGED_IDLE
+	u16 m_staged_idle_tim=0;
+#endif
 #ifdef C54X_SECTION_IDLE_DMA
 	required_device<tms320c54x_dma_device> m_dma;
 	u32 m_dma_completions=0;

@@ -412,6 +412,7 @@ def main():
     counts['deep_idle_clocks'] = 8
     counts['bsp_interrupt'] = 9
     counts['idle_dma'] = 10
+    counts['staged_idle'] = 28
     counts['shifted_unowned'] = 20480
     counts['shifted_bsp'] = 5120
     counts['accumulator_call_frames'] = 216

@@ -61,8 +61,6 @@ private:
 	void start_pipeline_mu4_timer_context(unsigned variant = 0);
 	void start_pipeline_mu4_recurring_timer(unsigned variant = 0);
 	void start_pipeline_idle_sp_tail(unsigned variant = 0);
-	unsigned pipeline_idle_kind(unsigned variant) const;
-	void start_pipeline_idle1(unsigned variant = 0, bool modes = false);
 	void start_pipeline_original_idle(unsigned variant = 0);
 	void start_instruction_observer(unsigned variant = 0);
 	static unsigned circular_fixture_mask(u16 bk);
@@ -720,7 +718,6 @@ private:
 	bool check_clock_control_results();
 	bool check_idle_pll_results();
 	bool check_repeat_endpoints_results();
-	bool check_pipeline_idle_results();
 	bool check_instruction_observer_results();
 	bool check_block_page_results();
 	bool check_mvdd_source_results();
@@ -761,8 +758,6 @@ private:
 	required_device<tms320c54x_device> m_cpu;
 	u16 m_shifted_bus_word = 0;
 	ordered_case_digest m_context_coverage;
-	ordered_case_digest m_idle_coverage;
-	bool m_idle_mode_bank = false;
 	ordered_case_digest m_circular_move_coverage;
 	unsigned m_circular_move_excluded = 0;
 	tms320c54x_bsp_state m_shifted_bsp;
