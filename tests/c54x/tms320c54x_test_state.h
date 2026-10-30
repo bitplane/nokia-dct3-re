@@ -323,7 +323,6 @@ private:
 	void start_clkmd_rate_case();
 	void start_idle3_pll_relock_case();
 	void check_mmr_bus();
-	void start_timer_boundary_probe(unsigned index, bool staged = false);
 
 
 
@@ -835,7 +834,6 @@ private:
 	bool check_repeated_writa_results();
 	bool check_idle_nmi_result_results();
 	bool check_idle_wake_results();
-	bool check_timer_peripheral_results();
 	bool restart_pipeline_observer(unsigned phase, u64 next_cycle)
 	{
 		// This replaces the deadline with one CPU clock; timed restores keep theirs.
@@ -953,14 +951,8 @@ private:
 	u32 m_rom4_checkpoint_pc = 0;
 	std::vector<u16> m_rom4_replay_data, m_rom4_checkpoint_data;
 	emu_timer *m_check_timer = nullptr;
-	memory_passthrough_handler m_timer_probe_fetch, m_timer_probe_reload, m_timer_probe_stack, m_vector_prefetch_tap;
+	memory_passthrough_handler m_vector_prefetch_tap;
 	memory_passthrough_handler m_vector_stack_tap;
-	memory_passthrough_handler m_timer_probe_write, m_timer_probe_mask;
-	memory_passthrough_handler m_timer_probe_foreground;
-	unsigned m_timer_probe_foreground_fetches = 0;
-	u64 m_timer_probe_foreground_first_cycle = 0;
-	u64 m_timer_probe_write_cycle = 0, m_timer_probe_mask_cycle = 0;
-	unsigned m_timer_probe_writes = 0, m_timer_probe_masks = 0;
 	unsigned m_vector_reads = 0, m_vector_acks = 0;
 	std::stringstream m_saved_pipeline;
 	std::vector<std::pair<offs_t, u16>> m_observed_instructions, m_saved_observed_instructions;
@@ -997,9 +989,6 @@ private:
 	unsigned m_idle_fixture_tick = 0, m_idle_fixture_saved_tick = 0;
 	unsigned m_pipeline_repeat_count_reads = 0;
 	u64 m_recurring_irq_checkpoint_cycle = 0, m_recurring_irq_end_cycle = 0;
-	u64 m_timer_probe_reload_cycle = 0, m_timer_probe_first_entry_cycle = 0;
-	unsigned m_timer_probe_entries = 0;
-	u16 m_timer_probe_return_pc = 0;
 	memory_passthrough_handler m_repeat_boundary_tap;
 	unsigned m_repeat_boundary_requests = 0;
 	memory_passthrough_handler m_operand_data_tap;

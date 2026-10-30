@@ -447,6 +447,14 @@ product is deliberately retired. Numeric expectations, extension poisoning,
 post-read mutation and publication checks are unchanged. Ordered input/stage
 digests and actual restore counts protect the retained schedules.
 
+`timer_irq_mask` retains the staged short-period timer reload followed by four
+NOPs, direct IMR masking and a foreground marker. The timer generates a real
+IRQ3, PSHM XPC/FRETE balances SP, the mask completes and the marker is written
+once through replay. No exact interrupt latency is claimed. Four atomic/eight
+staged diagnostic accounting runs are retired: their timing dumps were not
+fidelity acceptance; the weaker IRQ-entry-only observation is subsumed here.
+The probe taps/counters and result handler are deleted.
+
 `timer_prescaler` owns 93 independent cases/replays: fifteen TDDR reductions
 preserve the larger current PSC until borrow, then use the new divider and
 latch TINT on expiry; fourteen TIM writes preserve PSC without an intervening

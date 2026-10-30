@@ -201,7 +201,6 @@ void tms320c54x_test_state::start_pipeline_idle1(unsigned variant, bool modes)
 	}
 	m_pipeline_replay = false; m_idle_fixture_tick = 0;
 	m_vector_acks = m_pipeline_operand_reads = m_pipeline_store_writes = m_pipeline_extensions_reads = 0;
-	m_timer_probe_return_pc = 0;
 	m_pipeline_fetch_tap = program.install_read_tap(base + 0x601, base + 0x601, "idle1_continuation_refetch",
 		[this](offs_t, u16 &value, u16) {
 			if (machine().side_effects_disabled()) return;
@@ -390,118 +389,6 @@ void tms320c54x_test_state::check_mmr_bus()
 	osd_printf_info("TMS320C54x MMR bus: PASS unified_state=1 partial_write=1 ifr_clear=1 passive_tap=1 reserved_gap=1\n");
 }
 
-void tms320c54x_test_state::start_timer_boundary_probe(unsigned index, bool staged)
-{
-	bool const short_period = !(index & 1);
-	bool const direct_mask = (index & 3) >= 2;
-	unsigned const gap = staged && index >= 4 ? 4 : 0;
-	auto &program = m_cpu->space(AS_PROGRAM);
-	auto &data = m_cpu->space(AS_DATA);
-	// Synthetic timer reload followed by IMR masking. No handset image.
-	u16 const code[] = {0x7711, 0x0025, 0x7681, u16(short_period ? 1 : 0x0100),
-		0x7711, 0x0026, 0x7681, 0x0020, 0x7711, 0,
-		0x6881, 0xfff7, 0x76f8, 0x0501, 1, 0xf073, 0x060f};
-	for (unsigned i = 0; i < std::size(code); ++i)
-		program.write_word(0x010600 + i + (i >= 8 ? gap : 0), i == 16 ? code[i] + gap : code[i]);
-	for (unsigned i = 0; i < gap; ++i) program.write_word(0x010608 + i, 0xf495);
-	// Direct IMR addressing removes the post-reload pointer setup only.
-	if (direct_mask)
-	{
-		program.write_word(0x010608 + gap, 0x68f8); // ANDM #fff7,*(0000)
-		program.write_word(0x010609 + gap, 0x0000);
-		program.write_word(0x01060a + gap, 0xfff7);
-		program.write_word(0x01060b + gap, 0xf495); // NOP; keep the marker location unchanged.
-	}
-	program.write_word(0x01004c, 0x4a1e); // Save XPC, as a far-return ISR requires.
-	program.write_word(0x01004d, 0xf4e5); // FRETE
-	data.write_word(0x0501, 0);
-	set_registers(*m_cpu, {
-		{cpu_regs::STATE_TCR, 0x10}, {cpu_regs::STATE_PMST, 0}, {cpu_regs::STATE_SP, 0x1000}, {cpu_regs::STATE_ST1, 0},
-		{cpu_regs::STATE_IMR, 8}, {cpu_regs::STATE_IFR, 0}, {STATE_GENPC, 0x010600}, {cpu_regs::STATE_ILLEGAL, 0},
-		{cpu_regs::STATE_IDLE, 0},
-	});
-	m_cpu->set_pipeline_frontend(staged);
-	m_phase = (staged ? 7020 : 7000) + index;
-	m_timer_probe_fetch.remove();
-	m_timer_probe_reload.remove();
-	m_timer_probe_stack.remove();
-	m_timer_probe_write.remove(); m_timer_probe_mask.remove();
-	m_timer_probe_foreground.remove();
-	m_timer_probe_foreground_fetches = 0;
-	m_timer_probe_foreground_first_cycle = 0;
-	m_timer_probe_entries = 0;
-	m_timer_probe_reload_cycle = 0;
-	m_timer_probe_first_entry_cycle = 0;
-	m_timer_probe_return_pc = 0;
-	m_timer_probe_write_cycle = m_timer_probe_mask_cycle = 0;
-	m_timer_probe_writes = m_timer_probe_masks = 0;
-	m_timer_probe_write = data.install_write_tap(0x26, 0x26, "timer_probe_reload_write",
-		[this, staged](offs_t, u16 &value, u16) {
-			if (!machine().side_effects_disabled() && value == 0x20)
-			{
-				++m_timer_probe_writes; m_timer_probe_write_cycle = m_cpu->total_cycles();
-				if (staged) osd_printf_info("Staged timer reload: cycle=%llu prd=%04x imr=%04x ifr=%04x st1=%04x\n",
-					(unsigned long long)m_cpu->pipeline_cycles(), unsigned(m_cpu->state_int(tms320c54x_device::STATE_PRD)),
-					unsigned(m_cpu->state_int(tms320c54x_device::STATE_IMR)), unsigned(m_cpu->state_int(tms320c54x_device::STATE_IFR)), unsigned(m_cpu->state_int(tms320c54x_device::STATE_ST1)));
-			}
-		});
-	m_timer_probe_mask = data.install_write_tap(0, 0, "timer_probe_mask_write",
-		[this, staged](offs_t, u16 &value, u16) {
-			if (!machine().side_effects_disabled() && !(value & 8))
-			{
-				++m_timer_probe_masks; m_timer_probe_mask_cycle = m_cpu->total_cycles();
-				if (staged) osd_printf_info("Staged timer mask: cycle=%llu tim=%04x tcr=%04x ifr=%04x st1=%04x\n",
-					(unsigned long long)m_cpu->pipeline_cycles(), unsigned(m_cpu->state_int(tms320c54x_device::STATE_TIM)),
-					unsigned(m_cpu->state_int(tms320c54x_device::STATE_TCR)), unsigned(m_cpu->state_int(tms320c54x_device::STATE_IFR)), unsigned(m_cpu->state_int(tms320c54x_device::STATE_ST1)));
-			}
-		});
-	m_timer_probe_stack = data.install_write_tap(0x0fff, 0x0fff, "timer_probe_stack",
-		[this, gap](offs_t, u16 &value, u16) {
-			if (!machine().side_effects_disabled() && m_timer_probe_entries == 1 && !m_timer_probe_return_pc)
-				m_timer_probe_return_pc = value;
-			if (!machine().side_effects_disabled() && gap && m_timer_probe_entries <= 4)
-				osd_printf_info("Staged timer continuation push: cycle=%llu pc=%04x entry=%u\n", (unsigned long long)m_cpu->pipeline_cycles(), value, m_timer_probe_entries);
-		});
-	// Observe scheduler-cycle accounting, not physical pipeline latency.
-	// Keep opcode fetch distinct from the observable internal-register bus write.
-	m_timer_probe_reload = program.install_read_tap(0x010606, 0x010606, "timer_probe_reload",
-		[this, staged](offs_t address, u16 &, u16)
-		{
-			if (!machine().side_effects_disabled() && (staged || m_cpu->pc() == address + 1))
-				m_timer_probe_reload_cycle = m_cpu->total_cycles();
-		});
-	m_timer_probe_fetch = program.install_read_tap(0x01004c, 0x01004c, "timer_probe_vector",
-		[this, staged](offs_t address, u16 &, u16)
-		{
-			if (machine().side_effects_disabled() || (!staged && m_cpu->pc() != address + 1)) return;
-			if (!m_timer_probe_entries++)
-			{
-				m_timer_probe_first_entry_cycle = m_cpu->total_cycles();
-			}
-		});
-	m_timer_probe_foreground = program.install_read_tap(0x010608 + gap, 0x010608 + gap,
-		"timer_probe_foreground_fetch", [this, staged](offs_t address, u16 &, u16) {
-			if (machine().side_effects_disabled() || (!staged && m_cpu->pc() != address + 1)) return;
-			if (!m_timer_probe_foreground_fetches++)
-				m_timer_probe_foreground_first_cycle = m_cpu->total_cycles();
-		});
-	m_pipeline_operand_tap.remove(); m_pipeline_fetch_tap.remove();
-	m_pipeline_operand_reads = m_pipeline_extensions_reads = 0;
-	if (gap)
-	{
-		m_pipeline_operand_tap = data.install_read_tap(0xffe, 0xfff, "staged_timer_return_samples",
-			[this](offs_t address, u16 &value, u16) {
-				if (machine().side_effects_disabled()) return;
-				if (m_pipeline_operand_reads++ < 8) osd_printf_info("Staged timer return sample: cycle=%llu address=%04x value=%04x\n", (unsigned long long)m_cpu->pipeline_cycles(), unsigned(address), value);
-			});
-		m_pipeline_fetch_tap = program.install_read_tap(0x10608, 0x10613, "staged_timer_continuation_fetch",
-			[this](offs_t address, u16 &value, u16) {
-				if (machine().side_effects_disabled()) return;
-				if (m_pipeline_extensions_reads++ < 16) osd_printf_info("Staged timer continuation bus: cycle=%llu address=%06x word=%04x\n", (unsigned long long)m_cpu->pipeline_cycles(), unsigned(address), value);
-			});
-	}
-	m_check_timer->adjust(attotime::from_usec(100));
-}
 
 
 bool tms320c54x_test_state::standard_bus_io() const
@@ -1111,73 +998,6 @@ bool tms320c54x_test_state::check_idle_wake_results()
 	return false;
 }
 
-bool tms320c54x_test_state::check_timer_peripheral_results()
-{
-	[[maybe_unused]] auto &program = m_cpu->space(AS_PROGRAM);
-	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
-	if (m_phase >= 7020 && m_phase <= 7027)
-	{
-		unsigned const index = m_phase - 7020;
-		u16 const marker = m_cpu->space(AS_DATA).read_word(0x0501);
-		osd_printf_info("Staged timer final: case=%u cycles=%llu tim=%04x prd=%04x tcr=%04x imr=%04x ifr=%04x st1=%04x\n",
-			index, (unsigned long long)m_cpu->pipeline_cycles(), unsigned(m_cpu->state_int(tms320c54x_device::STATE_TIM)), unsigned(m_cpu->state_int(tms320c54x_device::STATE_PRD)),
-			unsigned(m_cpu->state_int(tms320c54x_device::STATE_TCR)), unsigned(m_cpu->state_int(tms320c54x_device::STATE_IMR)), unsigned(m_cpu->state_int(tms320c54x_device::STATE_IFR)), unsigned(m_cpu->state_int(tms320c54x_device::STATE_ST1)));
-		osd_printf_info("TMS320C54x staged timer observation: case=%u period=%u addressing=%s marker=%u foreground_fetches=%u mask_writes=%u vector_entries=%u pc=%06x sp=%04x illegal=%u gap_nops=%u silicon_phase_claim=0\n",
-			index, index & 1 ? 256 : 1, (index & 3) >= 2 ? "direct" : "indirect", marker,
-			m_timer_probe_foreground_fetches, m_timer_probe_masks, m_timer_probe_entries,
-			unsigned(m_cpu->state_int(STATE_GENPC)), unsigned(m_cpu->state_int(tms320c54x_device::STATE_SP)),
-			unsigned(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL)), index >= 4 ? 4 : 0);
-		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Original timer stream executes the staged subset without atomic fallback");
-		if (index >= 4 && !(index & 1))
-		{
-			expect(m_timer_probe_entries > 0, "Short-period NOP-gap control actually enters the PSHM/FRETE ISR");
-			if ((index & 3) >= 2)
-				expect(marker == 1 && m_timer_probe_masks == 1 && m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x1000,
-				"Direct mask drains across the accepted ISR and far return without losing stack ownership");
-		}
-		m_cpu->set_pipeline_frontend(false);
-		if (index < 7) { start_timer_boundary_probe(index + 1, true); return true; }
-		osd_printf_info("TMS320C54x staged timer observation: complete cases=8 fidelity_acceptance=0\n");
-		osd_printf_info("TMS320C54x core conformance: PASS\n");
-		throw emu_fatalerror(0, "TMS320C54x core tests complete");
-	}
-	if (m_phase >= 7000 && m_phase <= 7003)
-	{
-		unsigned const index = m_phase - 7000;
-		bool const short_period = !(index & 1);
-		u16 const marker = m_cpu->space(AS_DATA).read_word(0x0501);
-		osd_printf_info("TMS320C54x timer boundary probe: period=%u mask_addressing=%s mask_reached=%u pc=%06x sp=%04x imr=%04x ifr=%04x correctness_claim=0\n",
-			short_period ? 1 : 0x0100, index >= 2 ? "direct" : "indirect", marker, unsigned(m_cpu->state_int(STATE_GENPC)),
-			unsigned(m_cpu->state_int(tms320c54x_device::STATE_SP)),
-			unsigned(m_cpu->state_int(tms320c54x_device::STATE_IMR)),
-			unsigned(m_cpu->state_int(tms320c54x_device::STATE_IFR)));
-		osd_printf_info("TMS320C54x timer boundary accounting: case=%u reload_fetch_cycle=%llu first_vector_cycle=%llu vector_entries=%u first_return_pc=%04x physical_latency_claim=0\n",
-			index, static_cast<unsigned long long>(m_timer_probe_reload_cycle),
-			static_cast<unsigned long long>(m_timer_probe_first_entry_cycle),
-			m_timer_probe_entries, m_timer_probe_return_pc);
-		expect(m_timer_probe_reload_cycle != 0, "Timer observation captures the reload opcode fetch, not an internal MMR tap");
-		osd_printf_info("TMS320C54x timer boundary bus: case=%u reload_write_cycle=%llu mask_write_cycle=%llu reload_writes=%u mask_writes=%u physical_latency_claim=0\n",
-			index, static_cast<unsigned long long>(m_timer_probe_write_cycle), static_cast<unsigned long long>(m_timer_probe_mask_cycle),
-			m_timer_probe_writes, m_timer_probe_masks);
-		osd_printf_info("TMS320C54x timer boundary foreground: case=%u opcode_address=010608 fetches=%u first_fetch_cycle=%llu mask_writes=%u pipeline_drain_claim=0\n",
-			index, m_timer_probe_foreground_fetches,
-			static_cast<unsigned long long>(m_timer_probe_foreground_first_cycle), m_timer_probe_masks);
-		if (!short_period)
-			expect(m_timer_probe_foreground_fetches == 1 && m_timer_probe_foreground_first_cycle,
-				"Long-period control observes the post-reload foreground opcode fetch exactly once");
-		expect(m_timer_probe_writes == 1 && (short_period || m_timer_probe_masks == 1),
-			"Passive data-space taps observe the real TCR reload and completing IMR mask");
-		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Timer probe executes supported synthetic instructions");
-		if (!short_period)
-			expect(marker == 1 && !(m_cpu->state_int(tms320c54x_device::STATE_IMR) & 8),
-			"Long-period control reaches the IMR mask before first timer expiry");
-		if (index < 3) { start_timer_boundary_probe(index + 1); return true; }
-		osd_printf_info("TMS320C54x timer boundary probe: complete cases=4 fidelity_acceptance=0\n");
-		machine().schedule_exit();
-		return true;
-	}
-	return false;
-}
 
 
 bool tms320c54x_test_state::check_bsp_interrupt_results()

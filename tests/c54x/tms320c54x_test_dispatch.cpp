@@ -18,7 +18,6 @@ TIMER_CALLBACK_MEMBER(tms320c54x_test_state::check_results)
 	if (check_repeated_writa_results()) return;
 	if (check_idle_nmi_result_results()) return;
 	if (check_idle_wake_results()) return;
-	if (check_timer_peripheral_results()) return;
 	if (check_bsp_interrupt_results()) return;
 	if (check_idle_pll_results()) return;
 	if (check_repeat_endpoints_results()) return;

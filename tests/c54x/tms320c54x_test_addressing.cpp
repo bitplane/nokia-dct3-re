@@ -2956,7 +2956,7 @@ bool tms320c54x_test_state::check_long_mapped_original_results()
 			if (variant<4607) { start_dst_bypass(variant+1); return true; }
 			osd_printf_info("TMS320C54x DST read bypass: PASS cases=4608 restore=4608 accumulators=2 consumers=high,low,pair modes=3 patterns=4 gaps=0,1 aliases=2 sxm=2 sst=2 pages=2 save_points=2 writes_each=2 silicon_phase_claim=0\n");
 			if (profile_is("mpy-mapped")) throw emu_fatalerror(0,"TMS320C54x isolated MPY mapped consumer complete");
-			start_timer_boundary_probe(0,true); return true;
+			throw emu_fatalerror("Legacy timer probes retired: run timer_irq_mask");
 		}
 		m_check_timer->adjust(attotime::from_ticks(1,m_cpu->clock())); return true;
 	}
