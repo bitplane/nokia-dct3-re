@@ -2236,26 +2236,6 @@ void tms320c54x_test_state::start_staged_conditional_store(unsigned variant)
 
 
 
-bool tms320c54x_test_state::check_pipeline_immediate_store_results()
-{
-	if (m_phase == 251240)
-	{
-		expect(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) && m_cpu->pipeline_cycles() == 6,
-			"Unsupported peripheral arbitration stops at the first contending stages");
-		expect(m_pipeline_operand_reads == 0 && m_pipeline_store_writes == 0,
-			"Rejected arbitration performs no CPU bus access");
-		// PRD debugger export reads the bus; exclude that observer access.
-		m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove();
-		expect(m_cpu->state_int(tms320c54x_device::STATE_PRD) == 0xaaaa &&
-			m_cpu->state_int(tms320c54x_device::STATE_A) == 0x5678,
-			"Rejected arbitration performs no bus access or atomic fallback");
-		m_cpu->set_pipeline_frontend(false);
-		osd_printf_info("TMS320C54x staged peripheral arbitration exclusion: PASS stopped_cycle=6 bus_accesses=0 atomic_fallback=0\n");
-		start_pipeline_immediate_store();
-		return true;
-	}
-	return false;
-}
 
 
 

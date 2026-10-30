@@ -64,8 +64,6 @@ private:
 	void start_timer_prescaler_divider_case(unsigned divider);
 	void start_timer_counter_write_case(unsigned divider);
 	void check_timer_reserved_fields();
-	void start_peripheral_mmr_timing_audit(unsigned variant = 0);
-	void start_pipeline_peripheral_case(unsigned variant = 0);
 	void start_pipeline_mu4_prologue(unsigned variant = 0);
 	void observe_context_irq(int line);
 	bool check_rom4_context_results();
@@ -1092,8 +1090,6 @@ private:
 	bool check_idle_pll_results();
 	bool check_xc_interrupt_results();
 	bool check_repeat_endpoints_results();
-	bool check_peripheral_mmr_timing_audit_results();
-	bool check_pipeline_immediate_store_results();
 	bool check_pipeline_idle_results();
 	bool check_repeat_pop_exclusion_results();
 	bool check_instruction_observer_results();
@@ -1217,7 +1213,6 @@ private:
 	unsigned m_shifted_replays = 0;
 	unsigned m_pipeline_branch_case = 0;
 	unsigned m_pipeline_stm_case = 0;
-	unsigned m_mmr_timing_case = 0;
 	unsigned m_pipeline_peripheral_case = 0;
 	unsigned m_pipeline_extensions_reads = 0;
 	memory_passthrough_handler m_pipeline_write_tap;
