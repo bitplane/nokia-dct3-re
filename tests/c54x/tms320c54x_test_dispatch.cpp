@@ -91,7 +91,6 @@ TIMER_CALLBACK_MEMBER(tms320c54x_test_state::check_results)
 	if (check_memory_immediate_results()) return;
 	if (check_block_branch_count_results()) return;
 	if (check_bd_long_accumulator_results()) return;
-	if (check_delay_store_results()) return;
 	if (check_block_xc_results()) return;
 	if (check_block_xc_irq_results()) return;
 	if (check_move_repeat_owner_results()) return;

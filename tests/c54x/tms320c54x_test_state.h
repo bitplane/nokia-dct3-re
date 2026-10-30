@@ -462,19 +462,6 @@ private:
 	static delay_multiply_fixture delay_square_case(unsigned variant);
 	static delay_multiply_fixture delay_memory_square_case(unsigned variant);
 	void start_delay_multiply(unsigned variant = 0);
-	struct delay_store_fixture
-	{
-		unsigned kind, operation, mode, checkpoint;
-		u16 literal, address, next_ar, value;
-		u32 base;
-		u64 a, b;
-		unsigned delay() const { return kind == 4 ? 1 : 2; }
-		unsigned literal_clock() const { return kind == 4 ? 4 : kind == 1 || kind == 2 ? 6 : 5; }
-		// SPRU131G example 7-8 holds RETD's prefetched words until its stack Read completes.
-		unsigned write_clock() const { return kind == 0 || kind == 3 ? 9 : 10; }
-	};
-	static delay_store_fixture delay_store_case(unsigned variant);
-	void start_delay_store(unsigned variant = 0);
 	void start_block_xc_irq(unsigned variant = 0);
 	struct block_xc_fixture
 	{
@@ -1480,7 +1467,6 @@ private:
 	bool check_memory_immediate_results();
 	bool check_block_branch_count_results();
 	bool check_bd_long_accumulator_results();
-	bool check_delay_store_results();
 	bool check_block_xc_results();
 	bool check_block_xc_irq_results();
 	bool check_move_repeat_owner_results();

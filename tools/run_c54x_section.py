@@ -164,6 +164,7 @@ def main():
     counts['mvmd_word_register'] = 144
     counts['push_sp_forwarding'] = 384
     counts['word_move_consumer'] = 320
+    counts['delay_store'] = 480
     parser.add_argument('section', choices=[*counts, 'all'])
     parser.add_argument('--jobs', type=int, default=8)
     parser.add_argument('--negative-control', action='store_true', help='require failure of an intentionally wrong expectation')

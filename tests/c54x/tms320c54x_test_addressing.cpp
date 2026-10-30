@@ -1327,45 +1327,7 @@ tms320c54x_test_state::delay_multiply_fixture tms320c54x_test_state::delay_memor
 
 
 
-tms320c54x_test_state::delay_store_fixture tms320c54x_test_state::delay_store_case(unsigned variant)
-{
-	unsigned const kind = variant % 5, operation = (variant / 5) % 4, form = (variant / 20) % 4;
-	u16 const literal = std::array<u16, 6>{1, 0xffff, 0xf495, 0xfc43, 0xf7d9, 0xf4e2}[(variant / 80) % 6];
-	u16 const offset = form == 3 && literal == 1 ? 0x5001 : literal;
-	int const index = ((5 + s16(offset)) % 13 + 13) % 13;
-	u16 const address = form == 3 ? offset : form == 2 ? 0x5000 + index : u16(0x5005 + s16(offset));
-	u64 const a = kind == 1 ? 0 : kind == 2 ? 1 : 0x123456789aULL, b = 0xfedcba9876ULL;
-	u64 const accumulator = operation & 1 ? b : a;
-	unsigned const write = kind == 0 || kind == 3 ? 9 : 10;
-	return {kind, operation, std::array<unsigned, 4>{0xe2, 0xea, 0xf2, 0xf8}[form],
-		std::array<unsigned, 3>{3, kind == 4 ? 4U : 5U, write - 1}[variant / 960],
-		offset, address, form == 1 || form == 2 ? address : u16(0x5005),
-		u16(accumulator >> (operation & 2 ? 16 : 0)), (variant / 480) % 2 ? 0x20000U : 0, a, b};
-}
 
-void tms320c54x_test_state::start_delay_store(unsigned variant)
-{
-	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-	auto const f = delay_store_case(variant); auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
-	for (unsigned i = 0; i < 16; ++i) program.write_word(f.base + 0x600 + i, 0xf495);
-	program.write_word(f.base + 0x600, std::array<u16, 5>{0xf273, 0xfa45, 0xfa45, 0xf274, 0xfe00}[f.kind]);
-	if (f.kind != 4) program.write_word(f.base + 0x601, 0x700);
-	program.write_word(f.base + 0x600 + f.delay(), 0x8000 | (f.operation << 8) | f.mode);
-	program.write_word(f.base + 0x601 + f.delay(), f.literal);
-	program.write_word(f.base + 0x602 + f.delay(), 0xf4e1); program.write_word(f.base + 0x700, 0xf4e1);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xa608); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x900);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
-	m_cpu->set_state_int(tms320c54x_device::STATE_A, f.a); m_cpu->set_state_int(tms320c54x_device::STATE_B, f.b);
-	m_cpu->set_state_int(tms320c54x_device::STATE_BK, 13); m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x5005); m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x3000);
-	data.write_word(0x3000, 0x700); data.write_word(f.address, 0xdead);
-	m_pipeline_operand_reads = m_pipeline_store_writes = m_pipeline_register_writes = m_pipeline_extensions_reads = m_pipeline_drained_fetches = 0;
-	m_pipeline_operand_tap = data.install_read_tap(0, 0xffff, "delay_store_read", [this, f](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return; expect(f.kind == 4 && at == 0x3000 && word == 0x700 && !m_pipeline_operand_reads++, "Only RETD reads one stack continuation; the delay store never reads its destination"); });
-	m_pipeline_write_tap = data.install_write_tap(0, 0xffff, "delay_store_write", [this, f](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return; if (at == 0x2fff) { expect(f.kind == 3 && word == 0x604 && !m_pipeline_register_writes++, "CALLD owns one separate post-delay continuation frame"); return; } bool const valid = at == f.address && word == f.value && !m_pipeline_store_writes && m_cpu->pipeline_cycles() == f.write_clock(); if (!valid) osd_printf_info("delay_store_write: case=%u replay=%u address=%04x expected=%04x word=%04x expected_word=%04x cycle=%llu expected_cycle=%u\n", m_pipeline_peripheral_case, unsigned(m_pipeline_replay), unsigned(at), f.address, word, f.value, (unsigned long long)m_cpu->pipeline_cycles(), f.write_clock()); expect(valid, "The complete two-word delay store writes its retained address exactly once"); ++m_pipeline_store_writes; });
-	m_pipeline_fetch_tap = program.install_read_tap(f.base + 0x600, f.base + 0x700, "delay_store_program", [this, f](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return; if (at == f.base + 0x601 + f.delay()) { bool const valid = word == f.literal && !m_pipeline_extensions_reads && m_cpu->pipeline_cycles() == f.literal_clock(); if (!valid) osd_printf_info("delay_store_literal: case=%u replay=%u address=%06x word=%04x expected=%04x reads=%u cycle=%llu expected_cycle=%u\n", m_pipeline_peripheral_case, unsigned(m_pipeline_replay), unsigned(at), word, f.literal, m_pipeline_extensions_reads, (unsigned long long)m_cpu->pipeline_cycles(), f.literal_clock()); expect(valid, "Delay literal belongs to its store and is fetched once"); ++m_pipeline_extensions_reads; } if (at == f.base + 0x700) ++m_pipeline_drained_fetches; });
-	m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 254480;
-	m_cpu->set_state_int(STATE_GENPC, f.base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-}
 
 
 
@@ -5687,31 +5649,6 @@ bool tms320c54x_test_state::check_popd_mapped_results()
 
 
 
-bool tms320c54x_test_state::check_delay_store_results()
-{
-	if (m_phase == 254480)
-	{
-		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick; auto const f = delay_store_case(variant);
-		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "A complete long store fits the two-word control delay");
-		if (tick == f.literal_clock()) { auto const disabled = machine().disable_side_effects(); m_cpu->space(AS_PROGRAM).write_word(f.base + 0x601 + f.delay(), 0x1234); }
-		if (tick == f.write_clock() - 1) { expect(m_cpu->state_int(tms320c54x_device::STATE_AR2) == f.next_ar, "Delay-store address modification occurs once before publication"); m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x6000); }
-		capture_pipeline_at(f.checkpoint, {&m_pipeline_operand_reads, &m_pipeline_store_writes, &m_pipeline_register_writes, &m_pipeline_extensions_reads, &m_pipeline_drained_fetches},
-			"Save control redirect and partially decoded or addressed delay store");
-		if (tick == 24)
-		{
-			expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_cpu->state_int(STATE_GENPC) == f.base + (f.kind == 2 ? 0x605 : 0x701) && m_pipeline_operand_reads == unsigned(f.kind == 4) && m_pipeline_store_writes == 1 && m_pipeline_register_writes == unsigned(f.kind == 3) && m_pipeline_extensions_reads == 1 && m_pipeline_drained_fetches == unsigned(f.kind != 2) && m_cpu->state_int(tms320c54x_device::STATE_SP) == (f.kind == 3 ? 0x2fff : f.kind == 4 ? 0x3001 : 0x3000) && m_cpu->state_int(tms320c54x_device::STATE_A) == f.a && m_cpu->state_int(tms320c54x_device::STATE_B) == f.b && m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0xa608 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == 0x900, "Delay store retires once before the correct control continuation without extra frames or status changes");
-			if (replay_pipeline_at(254490, f.checkpoint,
-				"Replay delay store without repeated literals, writes or control transfers")) return true;
-			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (variant < 2879) { start_delay_store(variant + 1); return true; }
-			osd_printf_info("TMS320C54x staged long delay store: PASS cases=2880 restore=2880 controls=BD,BCD_taken,BCD_untaken,CALLD,RETD stores=STL_A,STL_B,STH_A,STH_B forms=offset,preincrement,circular,absolute literals=6 pages=2 snapshots=3 literal_fetches=1 destination_reads=0 store_writes=1 silicon_phase_claim=0\n");
-			throw emu_fatalerror(0, "TMS320C54x isolated long delay store complete");
-		}
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 254490) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 254480; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true; }
-	return false;
-}
 
 bool tms320c54x_test_state::check_move_brc_results()
 {
