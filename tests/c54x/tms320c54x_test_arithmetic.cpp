@@ -51,14 +51,6 @@ std::array<u16, 2> tms320c54x_test_state::addm_expected(unsigned variant)
 
 
 
-u64 tms320c54x_test_state::ts_load_expected(u16 memory, u16 t, bool sxm)
-{
-	u64 bits = sxm && (memory & 0x8000) ? 0xffffff0000ULL | memory : memory;
-	int const shift = (t & 0x20) ? int(t & 0x3f) - 64 : t & 0x3f;
-	for (int i = 0; i < shift; ++i) bits = (bits * 2) & 0xffffffffffULL;
-	for (int i = 0; i < -shift; ++i) bits = (bits >> 1) | (sxm && (bits & 0x8000000000ULL) ? 0x8000000000ULL : 0);
-	return bits;
-}
 
 
 

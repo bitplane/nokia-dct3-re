@@ -112,7 +112,6 @@ private:
 		u64 source, result;
 		u16 bk = 16;
 	};
-	static u64 ts_load_expected(u16 memory, u16 t, bool sxm);
 	struct extended_ar_store_fixture
 	{
 		unsigned form, reg, selected, kind, flags, gap;
@@ -712,17 +711,6 @@ private:
 	};
 	static absolute_logic_fixture absolute_logic_case(unsigned v);
 	void start_absolute_logic(unsigned variant = 0);
-	struct t_store_fixture
-	{
-		unsigned form, reg, selected, kind, flags, layout, consumer_read, checkpoint;
-		bool consumer, compatibility, long_consumer, merge;
-		u32 base;
-		u16 mode, literal, word, memory, st0, st1, pmst, final_st0;
-		u64 value, result;
-		std::array<u16, 8> initial, final;
-	};
-	static t_store_fixture t_store_case(unsigned v, bool consumer);
-	void start_t_store(unsigned variant = 0);
 	struct delay_load_fixture
 	{
 		unsigned kind, form, ar, selected, destination, flags, read, checkpoint;
@@ -1574,7 +1562,6 @@ private:
 	bool check_software_intr_results();
 	bool check_block_branch_edge_results();
 	bool check_delay_dld_results();
-	bool check_t_store_results();
 	bool check_poll_interrupt_results();
 	bool check_delay_compare_results();
 	bool check_indexed_mar_results();

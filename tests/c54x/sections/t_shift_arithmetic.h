@@ -2,6 +2,7 @@
 // copyright-holders:Gaz
 #include "c54x_section_common.h"
 #include "tms320c54x_test_smem_address.h"
+#include "tms320c54x_test_shifted_word.h"
 namespace c54x_test {
 inline std::vector<clocked_register_case> section_cases()
 {
@@ -33,12 +34,7 @@ inline std::vector<clocked_register_case> section_cases()
 		u16 const memory = std::array<u16,4>{0,1,0x8000,0xffff}[memory_pattern], t = 0xa500 | code;
 		// STLM with no intervening word retains the earlier count: a projection, not silicon evidence.
 		unsigned const sampled_code = producer && kind == 2 && !gap ? 15 : code;
-		int const shift = sampled_code >= 32 ? int(sampled_code) - 64 : int(sampled_code);
-		s64 const number = flags & 1 ? s64(s16(memory)) : s64(memory);
-		u64 shifted = u64(number) & 0xffffffffffULL;
-		if (shift >= 0) shifted = (shifted << shift) & 0xffffffffffULL;
-		else { s64 const divisor = s64(1) << -shift;
-			shifted = flags & 1 ? u64(number / divisor - (number < 0 && number % divisor != 0)) & 0xffffffffffULL : shifted >> -shift; }
+		u64 const shifted = shifted_word40(memory,sampled_code,flags & 1);
 		u64 const a = producer && kind == 2 ? t : selector & 1 ? 0x123456789aULL : values[pattern];
 		u64 const b = selector & 1 ? values[pattern] : 0xfeabcd9876ULL;
 		u64 const left_bits = selector & 1 ? b : a;

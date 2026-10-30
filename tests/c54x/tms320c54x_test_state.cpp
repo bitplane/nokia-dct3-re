@@ -158,7 +158,6 @@ void tms320c54x_test_state::machine_reset()
 		return;
 	if (profile_is("t-load-control")) { start_pipeline_memory_multiply(165888); return; }
 	if (start_profile(*this, machine().options().bios(), {
-		{ {"st-t", "st-t-consumer"}, [](self &test) { test.start_t_store(); } },
 		{ {"rptb-single"}, [](self &test) { test.start_block_single(); } },
 		{ {"rptb-memory"}, [](self &test) { test.start_block_single(); } },
 		{ {"rptb-page"}, [](self &test) { test.start_block_page(); } },

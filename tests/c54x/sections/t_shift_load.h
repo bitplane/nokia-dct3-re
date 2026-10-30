@@ -2,6 +2,7 @@
 // copyright-holders:Gaz
 #include "c54x_section_common.h"
 #include "tms320c54x_test_smem_address.h"
+#include "tms320c54x_test_shifted_word.h"
 namespace c54x_test {
 inline std::vector<clocked_register_case> section_cases()
 {
@@ -20,14 +21,7 @@ inline std::vector<clocked_register_case> section_cases()
 		auto const f = smem_address(form,reg,cmpt,pattern,flags & 1);
 		unsigned const read = f.read + prefix;
 		u16 const memory = std::array<u16,4>{0,1,0x8000,0xffff}[pattern], t = 0xa500 | code;
-		int const shift = code >= 32 ? int(code) - 64 : int(code);
-		s64 const number = flags & 1 ? s64(s16(memory)) : s64(memory);
-		u64 result = u64(number) & 0xffffffffffULL;
-		if (shift >= 0) result = (result << shift) & 0xffffffffffULL;
-		else {
-			s64 const divisor = s64(1) << -shift;
-			result = flags & 1 ? u64(number / divisor - (number < 0 && number % divisor != 0)) & 0xffffffffffULL : result >> -shift;
-		}
+		u64 const result = shifted_word40(memory,code,flags & 1);
 		u16 const st0 = 0x1804 | (cmpt ? 0x6000 : 0) | (pattern & 1 ? 0x600 : 0);
 		u16 const addressed_st0 = cmpt && reg && form >= 2 && form != 17 ? (st0 & 0x1fff) | (reg << 13) : st0;
 		u16 const st1 = 0x800 | (flags & 1 ? 0x100 : 0) | (flags & 2 ? 0x200 : 0) | (cmpt ? 0x20 : 0) | (form == 1 ? 0x4000 : 0);

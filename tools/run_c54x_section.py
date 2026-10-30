@@ -152,6 +152,7 @@ def main():
     counts['stlm_bk_dependency'] = 64
     counts['asm_mapped'] = 2048
     counts['t_shift_arithmetic'] = 10304
+    counts['t_store'] = 2944
     parser.add_argument('section', choices=[*counts, 'all'])
     parser.add_argument('--jobs', type=int, default=8)
     parser.add_argument('--negative-control', action='store_true', help='require failure of an intentionally wrong expectation')
