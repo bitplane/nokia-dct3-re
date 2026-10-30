@@ -103,9 +103,6 @@ void tms320c54x_test_state::machine_reset()
 		{ {"conditional-cd"}, [](self &test) { test.start_delayed_conditional_call(); } },
 		{ {"tc-delay-call"}, [](self &test) { test.start_delayed_conditional_call(); } },
 		{ {"rptb-ccd"}, [](self &test) { test.start_block_conditional_call(); } },
-		{ {"repeat-context"}, [](self &test) { test.start_repeat_context(); } },
-		{ {"repeat-pmst"}, [](self &test) { test.start_repeat_context(); } },
-		{ {"repeat-popd"}, [](self &test) { test.start_repeat_context(); } },
 		{ {"rptb-bcd", "rptb-bd", "rptb-banz", "rptb-tc-delay"}, [](self &test) { test.start_block_bcd(); } },
 		{ {"fcala-delay"}, [](self &test) { test.start_fcala_delay(); } },
 	}))
@@ -398,7 +395,6 @@ void tms320c54x_test_state::expect(bool condition, const char *message)
 		};
 		switch (m_phase)
 		{
-		case 255480: case 255490: progress(m_repeat_context); break;
 		case 255820: case 255830: progress(m_fcala_delay); break;
 		case 292000: case 292010: progress(m_instruction_observer); break;
 		case 255320: case 255330: case 255331:

@@ -1576,8 +1576,9 @@ frames, retained stack operands and final register state are checked. The
 synthetic instruction program is CPU-only; this is not a complete recording
 or a claim that every original outer-loop iteration has settled.
 
-Companion isolated controls are `repeat-context`, `repeat-pmst`,
-`repeat-popd`, `repeat-rearm`, `rptb-ccd` and `rptbd-irq`.
+Companion sections are `active_repeat_context`, `active_repeat_pmst` and
+`active_repeat_popd`; remaining isolated controls include `repeat-rearm`,
+`rptb-ccd` and `rptbd-irq`.
 Their renewal is not implied by a default run; aggregate scope is maintained
 in [Core regression checkpoint](#core-regression-checkpoint).
 
@@ -2273,11 +2274,11 @@ CPU-latch conformance test, not physical-pin timing or ISR-return validation.
 The prefetch case deliberately changes PMST through debugger state after the
 first Fetch; an invalid opcode in the other bank detects resampling. A wrong
 vector marker fails. All six old profiles and their shared phase machinery go.
-`repeat-pmst` adds 384 cases/restores using the same/replaced loop-context
-matrix below, with an actual PSHM/POPD PMST pair outside the loop body,
+`active_repeat_pmst` owns32 cases/restores using the same/replaced loop-context
+inputs below, with an actual PSHM/POPD PMST pair outside the loop body,
 ordered stack transactions and independently checked iteration counts.
-The active PMST case restores unchanged PMST only. `repeat-popd` adds
-384 cases/restores for indirect REA/RSA/BRC restoration outside the loop
+The active PMST case restores unchanged PMST only. `active_repeat_popd` owns
+32 cases/restores for indirect REA/RSA/BRC restoration outside the loop
 body, using the same/replaced-context matrix and checking retained source
 words, ordered publications and actual loop iterations. Its PSHM and
 POPD sequences are separated; adjacent PSHM-to-POPD bypass is not claimed.
@@ -2290,9 +2291,12 @@ remain revision-bound, not renewed by section-only migration runs.
 Separated POPM REA/RSA/BRC writes outside the active loop body are admitted;
 in-body writes remain excluded. A near return into the restored bounds,
 or immediately after their endpoint, rebinds the retained loop bounds and
-iteration count from RSA/REA/BRC while preserving BRAF. `repeat-context`
-passes 384 cases/restores: same and replaced contexts, four counts, two
-layouts, two pages, two stack alignments and six snapshots. Ordered copies
+iteration count from RSA/REA/BRC while preserving BRAF. `active_repeat_context`
+owns32 independent cases/restores: same and replaced contexts, four counts,
+two layouts and both pages. Stack alignment and decode/save/pop/return
+checkpoints are assigned across inputs rather than multiplied. The same
+reduction applies to its PMST/POPD companions; full stack/snapshot correlation
+with every input is deliberately not retained. Ordered copies
 and actual iteration counts are checked, not just register readback. Six
 NOPs separate BRC restoration from return. Inactive-to-active BRAF changes,
 general nested/interrupt contexts and other reentry routes are unvalidated.

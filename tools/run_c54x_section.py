@@ -432,6 +432,9 @@ def main():
     counts['body_repeat_restore'] = 128
     counts['saved_repeat_restore'] = 320
     counts['stlm_repeat_restore'] = 320
+    counts['active_repeat_context'] = 32
+    counts['active_repeat_pmst'] = 32
+    counts['active_repeat_popd'] = 32
     counts['shifted_unowned'] = 20480
     counts['shifted_bsp'] = 5120
     counts['accumulator_call_frames'] = 216
