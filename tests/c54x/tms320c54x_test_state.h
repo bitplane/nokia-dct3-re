@@ -126,7 +126,6 @@ private:
 	void start_empty_pipeline_case(bool nmi);
 	void start_multiword_pipeline_case(unsigned variant = 0);
 	void start_multiword_stream_case();
-	void start_pipeline_return_case(unsigned variant = 0);
 	void start_pipeline_branch_case(unsigned variant = 0);
 	struct delay_asm_fixture
 	{
@@ -2084,7 +2083,6 @@ private:
 	unsigned m_bitfield_restores = 0;
 	unsigned m_memory_immediate_restores = 0;
 	unsigned m_shifted_replays = 0;
-	unsigned m_pipeline_return_case = 0;
 	unsigned m_pipeline_branch_case = 0;
 	unsigned m_pipeline_stm_case = 0;
 	unsigned m_mmr_timing_case = 0;

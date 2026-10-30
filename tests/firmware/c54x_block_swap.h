@@ -79,7 +79,7 @@ inline std::vector<clocked_register_case> section_cases()
 		}
 		c.states.push_back({96,std::move(final)});
 		c.actions = {{14,{},false,{},{{line,ASSERT_LINE},{line,CLEAR_LINE}}}};
-		c.irq = clocked_irq_expectation{line,14,96,3};
+		c.irqs = {{line,14,96,3}};
 		cases.push_back(std::move(c));
 	}
 	return cases;

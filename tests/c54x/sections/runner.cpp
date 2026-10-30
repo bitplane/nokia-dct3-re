@@ -25,16 +25,20 @@ protected:
 		save_item(NAME(m_irq_acks));
 		save_item(NAME(m_xf));
 		save_item(NAME(m_last_irq_case));
+		save_item(NAME(m_case_irq_cursor));
 		m_cpu->set_irq_acknowledge_callback([this](device_t &, int line) {
 			unsigned const index = m_fixture->count();
-			auto const &expected = m_cases.at(index).irq;
+			if (m_last_irq_case != index) { m_last_irq_case = index; m_case_irq_cursor = 0; }
+			auto const &sequence = m_cases.at(index).irqs;
+			if (m_case_irq_cursor >= sequence.size()) throw emu_fatalerror("Unexpected section IRQ case=%u ordinal=%u",index,m_case_irq_cursor);
+			auto const &expected = sequence[m_case_irq_cursor];
 			u64 const cycle = m_cpu->pipeline_cycles();
-			if (!expected || line != expected->line || cycle < expected->earliest || cycle > expected->latest ||
-				m_last_irq_case == index || m_fixture->data_events_seen() != expected->data_events_before ||
-				(expected->return_pc && m_cpu->state_int(tms320c54x_device::STATE_RTN) != *expected->return_pc))
+			if (line != expected.line || cycle < expected.earliest || cycle > expected.latest ||
+				m_fixture->data_events_seen() != expected.data_events_before ||
+				(expected.return_pc && m_cpu->state_int(tms320c54x_device::STATE_RTN) != *expected.return_pc))
 				throw emu_fatalerror("Section IRQ case=%u line=%d clock=%llu data_events=%u previous_case=%u",
 					index,line,(unsigned long long)cycle,m_fixture->data_events_seen(),m_last_irq_case);
-			m_last_irq_case = index; ++m_irq_acks; m_cpu->set_input_line(line, CLEAR_LINE); return 0;
+			++m_case_irq_cursor; ++m_irq_acks; m_cpu->set_input_line(line, CLEAR_LINE); return 0;
 		}, "section_irq");
 		m_cases = c54x_test::section_cases();
 		m_fixture = std::make_unique<c54x_test::register_sequence_fixture>(machine(), *m_cpu, *m_timer,
@@ -72,7 +76,7 @@ private:
 #endif
 		if (!complete) return;
 		unsigned expected_irqs = 0;
-		for (auto const &input : m_cases) expected_irqs += bool(input.irq);
+		for (auto const &input : m_cases) expected_irqs += input.irqs.size();
 		if (m_irq_acks != expected_irqs) throw emu_fatalerror("Section IRQ count mismatch: actual=%u expected=%u",m_irq_acks,expected_irqs);
 		osd_printf_info("C54x section: PASS cases=%u restores=%u\n", m_fixture->count(), m_fixture->restores());
 		throw emu_fatalerror(0, "C54x section complete");
@@ -83,6 +87,7 @@ private:
 	std::unique_ptr<c54x_test::register_sequence_fixture> m_fixture;
 	u32 m_irq_acks = 0;
 	u32 m_last_irq_case = ~u32(0);
+	u32 m_case_irq_cursor = 0;
 	bool m_xf = false;
 };
 ROM_START(tms54isa)

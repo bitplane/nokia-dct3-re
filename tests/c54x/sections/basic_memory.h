@@ -46,7 +46,7 @@ inline std::vector<clocked_register_case> section_cases()
 		}
 		c.data_events->push_back({true,0xfff,0x601,7});
 		// Vector Fetch shares clock6 with the store's Execute publication.
-		c.irq = clocked_irq_expectation{0,6,6,load ? 1U : 0U};
+		c.irqs = {{0,6,6,load ? 1U : 0U}};
 		cases.push_back(std::move(c));
 	}
 	return cases;

@@ -39,7 +39,7 @@ inline std::vector<clocked_register_case> section_cases()
 			{true,0xfff,continuation,0,false}};
 		// IACK precedes older Execute's Write tap in the same model clock;
 		// the RMW write still precedes stack publication and ISR execution.
-		c.irq = clocked_irq_expectation{0,write,isr,1,continuation};
+		c.irqs = {{0,write,isr,1,continuation}};
 		cases.push_back(std::move(c));
 	}
 	{
@@ -57,7 +57,7 @@ inline std::vector<clocked_register_case> section_cases()
 			{12,{{r::STATE_ST1,0}},false,{},{{0,ASSERT_LINE},{0,CLEAR_LINE}}}};
 		c.program_events = {{false,0x601,0,3},{false,0x602,0xfffe,4},{false,0x40,0xe955,0,false}};
 		c.data_events = std::vector<clocked_data_event>{{false,0,1,7},{true,0,0,8},{true,0xfff,0x603,0,false}};
-		c.irq = clocked_irq_expectation{0,8,8,1,0x603};
+		c.irqs = {{0,8,8,1,0x603}};
 		cases.push_back(std::move(c));
 	}
 	return cases;

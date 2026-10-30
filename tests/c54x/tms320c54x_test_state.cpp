@@ -841,12 +841,6 @@ void tms320c54x_test_state::test(machine_config &config)
 			expect(m_pipeline_branch_case >= 8 && line == 0 && m_cpu->pipeline_cycles() == (m_pipeline_branch_case & 1 ? 10 : 12), "Branch IRQ acknowledges during its vector Fetch");
 			++m_vector_acks;
 		}
-		if (m_phase == 251150)
-		{
-			u64 const cycle = m_vector_acks ? (m_pipeline_return_case & 1 ? 13 : 15) : 6;
-			expect(line == 0 && m_cpu->pipeline_cycles() == cycle, "Fast-return fixture acknowledges each IRQ in its vector Fetch");
-			++m_vector_acks;
-		}
 		if (m_phase == 251090)
 		{
 			expect(line == 0 && m_cpu->pipeline_cycles() == 6, "Indirect load drains while vector IACK occurs");

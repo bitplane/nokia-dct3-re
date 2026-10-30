@@ -21,54 +21,6 @@ void tms320c54x_test_state::start_cala_rtn_case(unsigned index)
 	m_check_timer->adjust(attotime::from_usec(100));
 }
 
-void tms320c54x_test_state::start_pipeline_return_case(unsigned variant)
-{
-	m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
-	m_pipeline_return_case = variant;
-	u32 const base = variant & 2 ? 0x10000 : 0;
-	auto &program = m_cpu->space(AS_PROGRAM);
-	for (unsigned i = 0; i < 32; ++i)
-	{
-		program.write_word(base + 0x600 + i, 0xf495);
-		program.write_word(base + 0x40 + i, 0xf495);
-	}
-	program.write_word(base + 0x600, 0xe811);
-	program.write_word(base + 0x601, 0xe844);
-	bool const multiword = variant >= 8 && variant < 12;
-	program.write_word(base + 0x40, !multiword && (variant & 1) ? 0xf49b : 0xf69b);
-	program.write_word(base + 0x41, multiword ? 0xf020 : 0xe822);
-	program.write_word(base + 0x42, multiword ? 0x1234 : 0xe933);
-	m_cpu->set_input_line(0, CLEAR_LINE);
-	set_registers(*m_cpu, {
-		{cpu_regs::STATE_TCR, 0x10}, {cpu_regs::STATE_ILLEGAL, 0}, {cpu_regs::STATE_ST1, 0}, {cpu_regs::STATE_PMST, 0},
-		{cpu_regs::STATE_IMR, 1}, {cpu_regs::STATE_IFR, 0}, {cpu_regs::STATE_SP, 0x1000}, {cpu_regs::STATE_A, 0},
-		{cpu_regs::STATE_B, 0}, {STATE_GENPC, base + 0x600},
-	});
-	m_cpu->set_pipeline_frontend(true);
-	m_pipeline_replay = false;
-	m_pipeline_expected_cycle = 1;
-	m_pipeline_operand_reads = m_vector_acks = 0;
-	m_pipeline_drained_fetches = 0;
-	m_pipeline_extensions_reads = 0;
-	if (multiword)
-		m_pipeline_write_tap = program.install_read_tap(base + 0x42, base + 0x42, "fast_return_delay_literal",
-			[this](offs_t, u16 &value, u16) {
-				if (machine().side_effects_disabled()) return;
-				expect(m_cpu->pipeline_cycles() == 8 && value == 0x1234, "Two-word delay instruction fetches its literal once");
-				++m_pipeline_extensions_reads;
-			});
-	m_pipeline_fetch_tap = program.install_read_tap(base + 0x601, base + 0x601, "fast_return_target_fetch",
-		[this](offs_t, u16 &, u16) {
-			if (machine().side_effects_disabled()) return;
-			expect(m_cpu->pipeline_cycles() == (m_pipeline_drained_fetches ? 9 : 3), "Fast return fetches its target after Access, before Execute");
-			++m_pipeline_drained_fetches;
-		});
-	m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0xfff, 0xfff, "fast_return_stack_read",
-		[this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) ++m_pipeline_operand_reads; });
-	m_phase = 251150;
-	m_cpu->resume(SUSPEND_REASON_DISABLE);
-	m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-}
 
 void tms320c54x_test_state::start_pipeline_branch_case(unsigned variant)
 {

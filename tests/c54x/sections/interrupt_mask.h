@@ -29,7 +29,7 @@ inline std::vector<clocked_register_case> section_cases()
 		if (!set) {
 			// SPRU131G INTM latency: complete follower, including all extension
 			// words and its memory write, before the vector Fetch/IACK boundary.
-			c.irq = clocked_irq_expectation{1,7 + words + adjacent,20,unsigned(words == 3)};
+			c.irqs = {{1,7 + words + adjacent,20,unsigned(words == 3)}};
 			c.program_events = {{false,0x44,0xe955,0,false}};
 		}
 		cases.push_back(std::move(c));

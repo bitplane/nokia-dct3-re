@@ -44,7 +44,7 @@ inline std::vector<clocked_register_case> section_cases()
 		else c.actions[1].values = {{r::STATE_AR1,0xffff}};
 		if (interrupt) {
 			c.actions.insert(c.actions.begin(), {3,{},false,{},{{line,ASSERT_LINE},{line,CLEAR_LINE}}});
-			c.irq = clocked_irq_expectation{line,count + 14,~0U,count + 2,0x9003};
+			c.irqs = {{line,count + 14,~0U,count + 2,0x9003}};
 		}
 		c.data_ranges = {{counter,counter},{0x420,0x430}};
 		c.data_events = std::vector<clocked_data_event>{{false,counter,u16(count),6}};

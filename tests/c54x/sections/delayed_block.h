@@ -66,7 +66,7 @@ inline std::vector<clocked_register_case> section_cases()
 			u16 const continuation = count ? late ? 0x606 : 0x604 : late ? 0x609 : 0x607;
 			c.data_events->insert(c.data_events->begin() + before,
 				{{true,0x2fff,continuation,0,false},{false,0x2fff,continuation,0,false}});
-			c.irq = clocked_irq_expectation{line,9,96,before};
+			c.irqs = {{line,9,96,before}};
 		}
 		cases.push_back(std::move(c));
 	}
