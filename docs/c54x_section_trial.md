@@ -248,6 +248,7 @@ Subsequent replacements use the same section-only workflow:
 | `atomic_extended_interactions.h` | Retain extended-A READA/WRITA, same-page near CALL/RET and physical IRQ→explicit PSHM XPC→far branch→FRETE. Explicit setup, exact data/stack/MMIO traffic, correct XPC/SP/INTM/continuations and replay; READA observes WRITA's BEEF at the same initially-zero program address. Preserve all three original program-memory assertions using default-empty expected_program checks. Program bus observer remains read-only, not exhaustive program-write checking. | Native3 cases/restores, unchanged count; build5.292s/run0.016s. Wrong program-decoy expectation is rejected. Delete phase780..783 setup/assertions; subsequent RTN/fast-return setup remains reference material. |
 | `atomic_fast_return.h` | Retain CALL→paused callee→poisoned stack→RETF, then a second real CALL overwriting RTN before restoring the first checkpoint. Explicit program/pages and stack, exact two call-frame writes/no RETF reads, old/new RTN values, SP/PC and replay. Snapshot remains after the first CALL, not a weaker fresh-case reset. | Native1 case/restore, same interaction; build5.246s/run0.014s. Delete phase783/62050..62053 setup/assertions and saved-stream member. |
 | `atomic_pending_far.h` | Retain pending FCALLD and FRETD snapshots after exactly one delay word, with original page, stack and remaining delay live. Explicit initialization, ordered stack traffic and replay after poisoning completed registers/stack. Replace the old special peripheral ADD checkpoint with one literal LD delay word and a clocked snapshot; peripheral-trigger integration is dropped, pending-transfer state is not. | Native2 cases/restores; build5.398s/run0.014s. Delete special operand callback, old setup/capture/replay, far snapshot struct/header, atomic-control source and its route category. Successor repeat-transfer setup remains reference material. |
+| `atomic_program_mapping.h` | Retain repeated extended WRITA/READA across a page boundary, OVLY common-window folding with unique upper pages, all eight immediate ARP fields and three absolute DP values. Explicit initial state, unchanged wrong-page program sentinels, ordered transfer reads/writes, final PC/status/pointers and pre-instruction replay. Program observation is read-only; final program contents independently check writes. | Native13 cases/restores, unchanged count; build5.348s/run0.019s. Delete the remaining restore source, checker declaration and dispatch call. |
 
 `python3 tools/run_c54x_section.py all` rebuilds/runs each replacement in
 sequence. Final measurements: immediate-store5.214/0.019s,
@@ -273,13 +274,11 @@ its missing continuations and old selection/oracle manifests remain reference
 debt until integration. The parallel section runner is the executable authority
 for these four replacements.
 
-The observed retirement rate is roughly500 legacy lines per quarter-hour,
-including one-time runner setup. About40k lines of legacy C++ remain across
-modules, with varying amounts that can be retained unchanged or deleted.
-Linear extrapolation is roughly20 hours, not a promise; budget15-30 hours for
-the remaining migration/integration and final validation, revising after a
-larger batch. Already structured independent cases should not be rewritten
-merely to satisfy that estimate. Full retained-suite timing is still unknown.
+The initial trial does not provide a reliable completion estimate: later
+sections vary substantially in contract recovery and removable duplication.
+The disposition table above records subsequent migrations and measurements.
+Already structured independent cases should not be rewritten merely to meet
+a size or throughput target. Full retained-suite timing is still unknown.
 
 After the case-owned IRQ expectation change, all15 migrated sections pass:
 2,842 cases/restores, including the firmware descriptor-copy section. This
