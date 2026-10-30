@@ -8,7 +8,6 @@
 #include "tms320c54x_test_memory_examples.h"
 #include "tms320c54x_test_memory_continuations.h"
 #include "tms320c54x_test_shift_examples.h"
-#include "tms320c54x_test_dual_reference.h"
 #include <algorithm>
 
 namespace c54x_test {

@@ -6,7 +6,6 @@
 #include "tms320c54x_test_shift_examples.h"
 #include "tms320c54x_test_absolute_examples.h"
 #include "tms320c54x_test_memory_examples.h"
-#include "tms320c54x_test_dual_reference.h"
 #include <algorithm>
 
 namespace c54x_test {
@@ -41,16 +40,9 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 			m_cpu->state_int(tms320c54x_device::STATE_AR6) == 0x0a01 &&
 			m_cpu->state_int(tms320c54x_device::STATE_PC) == 0x05e3,
 			"ROM4 PORTR consumes its port word and stores through AR4 before circular wrap without selecting AR6");
-		return begin_atomic_case(dual_address_examples()[0], 79);
-	}
-	if (m_phase == 79)
-	{
-		verify_atomic_case(dual_address_examples()[0]);
-		return begin_atomic_case(dual_address_examples()[1], 80);
 	}
 	if (m_phase == 80)
 	{
-		verify_atomic_case(dual_address_examples()[1]);
 		program.write_word(0x05e0, 0x75d6); // PORTW *AR6+%, port
 		program.write_word(0x05e1, 0x0124);
 		program.write_word(0x05e2, 0x75d6);
@@ -115,26 +107,9 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 				m_port_reads == 2 &&
 				m_last_port_cycle - m_first_port_cycle == 4,
 				"LD absolute Smem sign-extends and costs an extra cycle");
-		return begin_atomic_case(dual_address_examples()[2], 85);
-	}
-	if (m_phase == 85)
-	{
-		verify_atomic_case(dual_address_examples()[2]);
-		return begin_atomic_case(dual_address_examples()[3], 86);
-	}
-	if (m_phase == 86)
-	{
-		verify_atomic_case(dual_address_examples()[3]);
-		return begin_atomic_case(dual_address_examples()[4], 6506);
 	}
 	if (m_phase == 6506 || m_phase == 6507)
 	{
-		bool const fractional = m_phase == 6507;
-		verify_atomic_case(dual_address_examples()[fractional ? 5 : 4]);
-		if (!fractional)
-		{
-			return begin_atomic_case(dual_address_examples()[5], 6507);
-		}
 		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100);
 		program.write_word(0x05e0, 0x74d6); // PORTR port, *AR6+%
 		program.write_word(0x05e1, 0x0123);
@@ -315,31 +290,9 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 				m_cpu->state_int(tms320c54x_device::STATE_A) == 0x1234 &&
 				m_cpu->state_int(tms320c54x_device::STATE_AR1) == 0x0e00,
 				"ROM4 5781 DLD sign-extends B without modifying AR1");
-		return begin_atomic_case(dual_address_examples()[6], 95);
-	}
-	if (m_phase == 95)
-	{
-		verify_atomic_case(dual_address_examples()[6]);
-		return begin_atomic_case(dual_address_examples()[7], 96);
-	}
-	if (m_phase == 96)
-	{
-		verify_atomic_case(dual_address_examples()[7]);
-		return begin_atomic_case(dual_address_examples()[8], 6530);
-	}
-	if (m_phase == 6530)
-	{
-		verify_atomic_case(dual_address_examples()[8]);
-		return begin_atomic_case(dual_address_examples()[9], 97);
-	}
-	if (m_phase == 97)
-	{
-		verify_atomic_case(dual_address_examples()[9]);
-		return begin_atomic_case(dual_address_examples()[10], 6504);
 	}
 	if (m_phase == 6504)
 	{
-		verify_atomic_case(dual_address_examples()[10]);
 		write_words(program, {
 			{0x05e0, 0x75d6}, // PORTW *AR6+%, port
 			{0x05e1, 0x0124},

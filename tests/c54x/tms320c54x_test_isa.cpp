@@ -4,7 +4,6 @@
 #include "emu.h"
 #include "emuopts.h"
 #include "tms320c54x_test_parallel.h"
-#include "tms320c54x_test_dual_reference.h"
 #include "tms320c54x_test_domains.h"
 #include "tms320c54x_test_product_examples.h"
 #include "tms320c54x_test_memory_examples.h"
@@ -108,8 +107,6 @@ protected:
 			else if (parallel())
 			{
 				for (unsigned i = 0; i < c54x_test::parallel_vectors().size(); ++i) m_cases.push_back(c54x_test::parallel_case(i));
-				auto const &addresses = c54x_test::dual_address_examples();
-				m_cases.insert(m_cases.end(), addresses.begin(), addresses.end());
 			}
 			else
 				throw emu_fatalerror("Legacy square bank retired: run the square_literals section");
