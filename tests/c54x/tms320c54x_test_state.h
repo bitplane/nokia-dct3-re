@@ -1020,7 +1020,6 @@ private:
 	bool standard_reada_brc() const;
 	reada_brc_fixture reada_brc_case(unsigned v) const;
 	void start_reada_brc(unsigned variant = 0);
-	void start_mapped_read_a(unsigned variant = 0);
 	struct page_zero_stack_fixture
 	{
 		unsigned form, snapshot;
@@ -1521,7 +1520,7 @@ private:
 	bool check_ifr_pair_results();
 	bool check_poly_results();
 	bool check_delayed_far_call_results();
-	bool check_mvkd_delay_results();
+	bool check_mvdd_results();
 	bool check_absolute_logic_results();
 	bool check_popd_mapped_results();
 	bool check_accumulator_branch_results();

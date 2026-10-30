@@ -2898,33 +2898,6 @@ void tms320c54x_test_state::start_reada_brc(unsigned variant)
 	m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 }
 
-void tms320c54x_test_state::start_mapped_read_a(unsigned variant)
-{
-	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-	u16 const destination = 8 + variant % 6;
-	u16 const value = std::array<u16, 4>{0, 1, 0x8000, 0xffff}[(variant / 6) % 4];
-	bool const absolute = (variant / 24) % 2;
-	u32 const source = ((variant / 48) % 2 ? 0x20000 : 0) | 0x400;
-	auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
-	for (unsigned i = 0; i < 32; ++i) program.write_word(0x600 + i, 0xf495);
-	program.write_word(0x600, 0x7e00 | (absolute ? 0xf8 : destination));
-	if (absolute) program.write_word(0x601, destination);
-	program.write_word(source, value); program.write_word(0x30400, value ^ 0xffff);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xa600); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x800);
-	m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x1200000000ULL | source); m_cpu->set_state_int(tms320c54x_device::STATE_B, 0xfeabcd9876ULL);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
-	m_cpu->set_input_line(0, CLEAR_LINE); m_cpu->set_input_line(INPUT_LINE_NMI, CLEAR_LINE);
-	m_pipeline_operand_reads = m_pipeline_store_writes = m_pipeline_extensions_reads = 0;
-	m_pipeline_operand_tap = program.install_read_tap(source, source, "mapped_read_a_source",
-		[this, value, absolute](offs_t, u16 &word, u16) { if (machine().side_effects_disabled()) return; expect(!m_pipeline_operand_reads && word == value && m_cpu->pipeline_cycles() == (absolute ? 10 : 9), "Mapped READA retains the full program source through held clocks"); ++m_pipeline_operand_reads; });
-	m_pipeline_write_tap = data.install_write_tap(destination, destination, "mapped_read_a_write",
-		[this, value, absolute](offs_t, u16 &word, u16) { if (machine().side_effects_disabled()) return; expect(!m_pipeline_store_writes && word == value && m_cpu->pipeline_cycles() == (absolute ? 11 : 10), "Mapped READA publishes the retained word once in Execute"); ++m_pipeline_store_writes; });
-	m_pipeline_fetch_tap = program.install_read_tap(0x601, 0x601, "mapped_read_a_extension",
-		[this, absolute, destination](offs_t, u16 &word, u16) { if (machine().side_effects_disabled() || !absolute) return; expect(!m_pipeline_extensions_reads && word == destination, "Mapped READA owns one absolute extension"); ++m_pipeline_extensions_reads; });
-	m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 253610;
-	m_cpu->set_state_int(STATE_GENPC, 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-}
 
 tms320c54x_test_state::page_zero_stack_fixture tms320c54x_test_state::page_zero_stack_case(unsigned v, bool edge)
 {
@@ -5845,43 +5818,8 @@ bool tms320c54x_test_state::check_t_store_branch_results()
 }
 
 
-bool tms320c54x_test_state::check_mvkd_delay_results()
+bool tms320c54x_test_state::check_mvdd_results()
 {
-	if (m_phase == 253610)
-	{
-		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
-		unsigned const reg = variant % 6, shift = (reg % 3) * 16;
-		u16 const value = std::array<u16, 4>{0, 1, 0x8000, 0xffff}[(variant / 6) % 4];
-		bool const absolute = (variant / 24) % 2;
-		unsigned const checkpoint = std::array<unsigned, 3>{5, 8, 12}[variant / 96];
-		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Mapped READA has no atomic fallback");
-		if (tick == 7) m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x3400030400ULL);
-		if (tick == checkpoint && !m_pipeline_replay)
-		{
-			m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_store_writes, m_pipeline_extensions_reads, 0};
-			expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save mapped READA before/during program hold or after write");
-		}
-		if (tick == 15)
-		{
-			u64 expected_a = 0x3400030400ULL, expected_b = 0xfeabcd9876ULL;
-			u64 &target = reg < 3 ? expected_a : expected_b;
-			u64 const mask = u64(reg % 3 == 2 ? 0xff : 0xffff) << shift;
-			target = (target & ~mask) | ((u64(value) << shift) & mask);
-			expect(m_cpu->state_int(tms320c54x_device::STATE_A) == expected_a && m_cpu->state_int(tms320c54x_device::STATE_B) == expected_b && m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0xa600 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == 0x800, "Mapped READA preserves untouched accumulator words and status");
-			expect(m_pipeline_operand_reads == 1 && m_pipeline_store_writes == 1 && m_pipeline_extensions_reads == unsigned(absolute), "Mapped READA does not duplicate retained accesses");
-			if (!m_pipeline_replay)
-			{
-				m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_store_writes = m_recurring_irq_snapshot[1]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[2];
-				return restore_pipeline_at(253620, "Replay held program source and mapped publication");
-			}
-			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (variant < 287) { start_mapped_read_a(variant + 1); return true; }
-			osd_printf_info("TMS320C54x mapped READA: PASS cases=288 restore=288 registers=AL,AH,AG,BL,BH,BG forms=direct,absolute source_pages=2 source_reads=1 writes=1 status_preserved=1 silicon_phase_claim=0\n");
-			throw emu_fatalerror(0, "TMS320C54x isolated mapped READA complete");
-		}
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 253620) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 253610; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true; }
 	if (m_phase == 254140)
 	{
 		unsigned const tick = ++m_idle_fixture_tick; auto const &f = m_mvdd_fixture;

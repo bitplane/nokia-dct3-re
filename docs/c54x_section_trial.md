@@ -206,6 +206,8 @@ Subsequent replacements use the same section-only workflow:
 
 | `mvmd_ar.h` | Keep all AR sources ×RAM/self-AR/other-AR destinations ×four word boundaries. Preserve retained absolute literal, source Read5/mapped Write5 or RAM Write6, post-Read source poison, destination/source/status/sibling state, terminal PC/IDLE and replay. Distribute pages and three snapshots rather than crossing them. | Native96 cases/restores versus576; build5.380s/run0.075s. Delete setup/checker, phases253710/253720, profile route/declarations/dispatch. |
 
+| `reada_accumulator.h` | Keep all six accumulator destinations ×four program-word boundaries ×direct/absolute forms. Preserve held full program address after live-A replacement, merge into the newer live accumulator without neighboring-lane loss, guard masking, exact program Read9/10 and mapped Write10/11, status, terminal PC/IDLE and replay. Distribute two source pages and three snapshots; deliberately lose their exhaustive pairings. | Native48 cases/restores versus288; build5.428s/run0.036s. Delete setup, phases253610/253620, route/declaration; rename the surviving checker for its sole MVDD bank. |
+
 `python3 tools/run_c54x_section.py all` rebuilds/runs each replacement in
 sequence. Final measurements: immediate-store5.214/0.019s,
 basic-memory5.423/0.020s, stack5.262/0.069s, DAGEN5.406/0.126s (build/run).

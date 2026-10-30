@@ -158,6 +158,7 @@ def main():
     counts['mvdm_ar'] = 192
     counts['move_delay_irq'] = 768
     counts['mvmd_ar'] = 96
+    counts['reada_accumulator'] = 48
     parser.add_argument('section', choices=[*counts, 'all'])
     parser.add_argument('--jobs', type=int, default=8)
     parser.add_argument('--negative-control', action='store_true', help='require failure of an intentionally wrong expectation')

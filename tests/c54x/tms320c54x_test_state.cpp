@@ -291,7 +291,6 @@ void tms320c54x_test_state::machine_reset()
 		return;
 	if (absolute_memory_dp()) { start_pipeline_memory_dp(); return; }
 	if (start_profile(*this, machine().options().bios(), {
-		{ {"read-a-mapped"}, [](self &test) { test.start_mapped_read_a(); } },
 		{ {"bus-stm"}, [](self &test) { test.start_staged_bus_stm(); } },
 		{ {"timer-stm"}, [](self &test) { test.start_staged_bus_stm(); } },
 		{ {"pshd-mapped"}, [](self &test) { test.start_mapped_pshd(); } },
