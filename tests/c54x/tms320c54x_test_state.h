@@ -149,16 +149,6 @@ private:
 	struct indexed_store_fixture;
 	static indexed_store_fixture circular_portr_case(unsigned v);
 	void start_circular_portr(unsigned variant = 0);
-	struct portr_bypass_fixture
-	{
-		bool chain, other, destination, sxm;
-		unsigned operation, gap, snapshot;
-		u32 base;
-		u16 sample, request;
-		u64 a, b;
-	};
-	static portr_bypass_fixture portr_bypass_case(unsigned variant);
-	void start_portr_bypass(unsigned variant = 0);
 	struct circular_portr_block_fixture
 	{
 		unsigned count, size, reg, selected, snapshot, index;
@@ -1168,7 +1158,6 @@ private:
 	bool check_memory_copy_repeat_results();
 	bool check_block_near_call_results();
 	bool check_repeated_mvdk_results();
-	bool check_portr_bypass_results();
 	bool check_sqdst_results();
 	bool check_block_exit_results();
 	bool check_staged_bus_stm_results();

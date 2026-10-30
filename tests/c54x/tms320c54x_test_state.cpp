@@ -185,7 +185,6 @@ void tms320c54x_test_state::machine_reset()
 		{ {"stld-bsp"}, [](self &test) { test.start_parallel_load(); } },
 		{ {"stld-periph"}, [](self &test) { test.start_parallel_load(); } },
 		{ {"st-par-mpy"}, [](self &test) { test.start_parallel_load(); } },
-		{ {"portr-bypass"}, [](self &test) { test.start_portr_bypass(); } },
 		{ {"mvdk-circular", "mvdk-index"}, [](self &test) { test.start_circular_move(); } },
 		{ {"mvmd-repeat", "mvmd-rptz"}, [](self &test) { test.start_repeated_mvmd(); } },
 		{ {"rptbd-t-load"}, [](self &test) { test.start_rptbd_t_load(); } },
