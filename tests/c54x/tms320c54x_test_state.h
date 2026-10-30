@@ -195,8 +195,8 @@ private:
 	void start_pipeline_far_irq(unsigned variant = 0);
 	void start_pipeline_intm(unsigned variant = 0);
 	void start_pipeline_status_bit(unsigned variant = 0);
-	void start_pipeline_cpl(unsigned variant = 0);
-	void start_pipeline_dp_immediate(unsigned variant = 0);
+	void start_pipeline_cpl();
+	void start_pipeline_dp_immediate();
 	void start_pipeline_frame(unsigned variant = 0);
 	void start_pipeline_push_sp_latency(unsigned variant = 0);
 	struct irq_pop_fixture

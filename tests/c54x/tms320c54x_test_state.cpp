@@ -97,8 +97,6 @@ void tms320c54x_test_state::machine_reset()
 		return;
 	if (profile_is("shift-periph") || shifted_bsp_fixture() || shifted_unowned_fixture()) { start_shifted_peripheral(); return; }
 	if (start_profile(*this, machine().options().bios(), {
-		{ {"stlm-cpl", "stlm-cmpt"}, [](self &test) { test.start_pipeline_cpl(); } },
-		{ {"stm-cpl", "stm-cmpt"}, [](self &test) { test.start_pipeline_cpl(); } },
 		{ {"stlm-imr"}, [](self &test) { test.start_pipeline_imr_store(); } },
 		{ {"pmst-map"}, [](self &test) { test.start_pipeline_pmst(); } },
 		{ {"pmst-pop"}, [](self &test) { test.start_pipeline_pmst(); } },
@@ -137,7 +135,6 @@ void tms320c54x_test_state::machine_reset()
 		{ {"mvmd-status-irq"}, [](self &test) { test.start_mvmd_status_irq(); } },
 		{ {"mvmd-block"}, [](self &test) { test.start_mvmd_status_block(); } },
 		{ {"mvmd-status-alu"}, [](self &test) { test.start_mvmd_status_alu(); } },
-		{ {"mvmd-cpl", "mvmd-cmpt"}, [](self &test) { test.start_pipeline_cpl(); } },
 		{ {"mpy-delay", "mac-delay", "maca-delay"}, [](self &test) { test.start_delay_multiply(); } },
 		{ {"mpyr-delay"}, [](self &test) { test.start_delay_multiply(); } },
 		{ {"bd-maca-long"}, [](self &test) { test.start_delay_multiply(); } },

@@ -37,6 +37,10 @@ data oracle accidentally.
 
 ## Staged immediate status publication
 
+Addressing-mode labels below name banks in `mode-latency`, not separate
+profiles. The [fixture-validity limits](c54x_execution_contracts.md#harness-preservation-contract)
+apply to their synthetic ARP states and short-gap observations.
+
 `STM #literal,ST1` retains its second word in Decode and publishes once at
 Read, without reading the destination or applying SST saturation. The
 `stm-st1` fixture passes 18,432 cases and cleared-pipeline replays over raw
@@ -45,12 +49,11 @@ and three checkpoints. Poisoning the consumed literal cannot change the
 publication. Reserved-bit, XF and INTM handling uses the existing register
 contract; zero-write INTM clearing remains explicitly unverified.
 
-`stm-cpl` and `stm-cmpt` each pass sixteen cases plus replay for basic LD/ST
+The `stm-cpl` and `stm-cmpt` banks in `mode-latency` each retain sixteen cases plus replay for basic LD/ST
 followers: two directions and gaps 0/1/2/3. They select the new addressing
 mode after two separating instructions, matching SPRU131G tables 7-16/7-19.
-The tested SXM/ASM followers need no separating instruction. Sixteen negative
-cases plus replay reject delay, short-repeat, block-body and XC compositions
-before data effects. Other status-producer hazards, interrupt composition
+The tested SXM/ASM followers need no separating instruction.
+Other status-producer hazards, interrupt composition
 and physical bus-stage timing are not qualified by these fixtures.
 
 ## Staged accumulator-to-status publication
@@ -69,7 +72,7 @@ SXM/ASM consumers. Their Read-owned mode sample is retained across Execute
 and save/load; the long-offset load supplies its own separation. Dedicated
 ASM loads still forward with zero latency. This qualification covers the
 tested load/register-ASM families, not every arithmetic/multiply consumer.
-The `stlm-cpl` and `stlm-cmpt` profiles each check 16 cases with replay:
+The `stlm-cpl` and `stlm-cmpt` banks in `mode-latency` each check 16 cases with replay:
 basic load/store consumers retain the old addressing mode with zero to two
 NOPs and use the new mode with three (tables 7-16/7-19).
 

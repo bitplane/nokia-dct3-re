@@ -29,6 +29,7 @@ public:
 	{
 		if (m_resume) { m_resume = false; m_cpu.resume(SUSPEND_REASON_DISABLE); schedule(); return false; }
 		++m_tick;
+		if (m_input.check_pipeline_clock) require(m_cpu.pipeline_cycles() == m_tick, "pipeline advances one clock per observation");
 		apply_actions(true);
 		auto const *expected = &m_input.states.front().observation;
 		for (auto const &state : m_input.states) if (m_tick >= state.tick) expected = &state.observation;

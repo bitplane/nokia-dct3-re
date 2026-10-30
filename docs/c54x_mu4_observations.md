@@ -769,9 +769,12 @@ confirm ST1 (`0007`). The staged subset admits AL/BL to ST1 and
 publishes the retained word at the move's Read clock, rather than Execute.
 Its `mvmd-st1` fixture passes 288 cases/restores (POPM/STL producers,
 zero through two gaps, two pages, four full-word patterns), with one source
-read, one status write and no destination read. The `mvmd-cpl` fixture passes
+read, one status write and no destination read. The `mvmd-cpl` bank in `mode-latency` retains
 16 cases/restores: both CPL directions, basic LD/ST consumers and zero
 through three NOPs, checking the two-cycle consumer latency.
+These addressing-mode labels refer to banks in `mode-latency`; its
+[fixture-validity limits](c54x_execution_contracts.md#harness-preservation-contract)
+distinguish preserved model observations from valid-program conformance.
 
 The adjacent arithmetic fixture `mvmd-status-alu` passes 768 cases/restores:
 SXM-dependent indirect LD and ASM-dependent register LD, both SXM states,
@@ -1482,8 +1485,7 @@ forced to repair the continuation.
 Status acceptance
 is limited to the following
 tested consumer/composition forms, not every status-register interaction.
-The `mvmd-cmpt` fixture initially failed because indirect address selection
-and pointer modification sampled live CMPT. The correction retains CMPT
+Indirect address selection and pointer modification retain CMPT
 in the saved Decode slot, separately from the DP/CPL sample (CMPT's bit
 position overlaps DP in that packed sample). Staged short/long address
 selection and AR modifications consume the same retained mode; atomic

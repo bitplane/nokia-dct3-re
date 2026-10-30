@@ -92,6 +92,25 @@ the final arithmetic/status/source checks still occur at clock 16. This does
 not yet relocate either profile out of the legacy machine or qualify other
 memory families. Bus cycles are implementation observations, not silicon timing.
 
+`mode-latency` combines 1,152 existing address-context cases in the CPU-only
+runner: 32 RSBX/SSBX CPL/DP cases, six 16-case full-status producer/field banks,
+and 1,024 immediate-DP cases. `mvmd-cpl`, `mvmd-cmpt`, `stlm-cpl`, `stlm-cmpt`,
+`stm-cpl` and `stm-cmpt` remain descriptive case labels, not separate BIOS
+configurations. The default suite reuses the basic and immediate-DP banks.
+The original NOP streams, clock-11/10 observations and snapshots remain;
+these bounded streams do not require IDLE. Optional pipeline-clock checking
+preserves their per-clock progress check without changing other runner users.
+The family review owns the ordinal-to-old-case map and ordered coverage digest.
+
+Fixture validity is still unresolved. SPRU131G tables 7-16/7-18/7-19 supply
+the tested consumer spacing, and table 7-17 permits immediate-DP forwarding
+without separation. But page 7-61 note 3 requires ARP=0 when CMPT=0: the 48
+CMPT rows retain ARP=3 in standard mode, and the 1,024 immediate-DP rows use
+an ARP=5 preservation sentinel. Another 52 CPL/DP-bit rows assume old-mode
+results inside documented spacing hazards. Preserving those inputs proves
+refactor compatibility, not valid-program or silicon conformance. Rebuild the
+entry contexts and CMPT witness before assigning these rows that stronger scope.
+
 `mapped-word`, `mapped-bitf` and `status-bitf` use the same runner with a shared
 mapped-register descriptor builder. The distinct ADD/SUB and TC reference rules
 remain fixture-owned. All 21,504 cases retain their per-clock register predicates,
@@ -429,6 +448,7 @@ boundaries are:
 | `tests/c54x/tms320c54x_test_normalization_input.h` | Independent bit-position/leading-bit expectations, shared with legacy EXP-product controls |
 | `tests/c54x/tms320c54x_test_normalization_schedule.h` | Unique normalization/exponent inputs with balanced replay checkpoints |
 | `tests/c54x/tms320c54x_test_register_sequence.h` | CPU-only clocked register observations and snapshot continuation; no instruction arithmetic |
+| `tests/c54x/tms320c54x_test_address_mode.h` | Shared address-mode/DP inputs and observations; programming-state limitations remain explicit |
 | `tests/c54x/tms320c54x_test_register_pairs.h` | SAT and carry/TC rotate pairs with independent expected register states |
 | `tests/c54x/tms320c54x_test_register_alu.h` | Signed40 MIN/MAX and signed17 SQUR expectations, retained inputs and explicit late operand writes |
 | `tests/c54x/tms320c54x_test_port_case.h` | Common PORTW stimulus construction; no instruction arithmetic or reset policy |
@@ -2532,13 +2552,15 @@ Repeat/interrupt composition and physical timing remain separate scopes.
 ## Core regression checkpoint
 
 The current full-default capture is the `default_checkpoint` under
-`named-observer-checkpoint-service` in `fixtures/c54x_test_reviews.json`.
-It records all 289 required markers exactly once, 293 native ordered PASS
-records, intentional MAME exit 3 and runner exit 0, in 965.59 seconds.
-All ordered PASS records match the preceding `29aaf6a1` full-default capture
-byte-for-byte. The review binds the result to its executable, acceptance-source
-hashes and exact bench patch over `502df38d`; no CPU/device source changed.
-The observer-plumbing rewrite claims no runtime improvement.
+`address-mode-fixture-ownership` in `fixtures/c54x_test_reviews.json`.
+It records all 289 required markers, 295 native ordered PASS records,
+intentional MAME exit 3 and runner exit 0, in 959.15 seconds.
+The preceding 293 PASS records and all 5,690 asserted opcode words remain
+identical; two coverage records are added. The review binds the result to its
+executable, acceptance-source hashes and exact bench patch over `f6277a5e`;
+no CPU/device source changed. This establishes compatibility, not semantic
+approval of the invalid ARP contexts identified in that review. No runtime
+improvement is claimed.
 
 `fixtures/c54x_fidelity_checkpoint.json` remains an immutable historical
 capture: 294 then-required markers, 295 native PASS records and 1,058.73 seconds.

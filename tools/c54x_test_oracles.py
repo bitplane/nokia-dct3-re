@@ -402,13 +402,9 @@ EXTRA_PROFILES = {
         "TMS320C54x staged STM ST1: PASS cases=18432 restore=18432 families=raw,SXM_LD,ASM_LD,long_SXM_LD,ASM_ADD,ASM_SUB gaps=0,1,2,3 pages=2 snapshots=3 literal_reads=1 literal_poison=1 status_writes=1 destination_reads=0 short_latency=0 long_latency=0 clear_policy=legacy_unverified reset_before_restore=1 silicon_phase_claim=0",
         "Fatal error: TMS320C54x isolated STM ST1 complete",
     ),
-    "stm-cpl": (
-        "TMS320C54x staged STM CPL: PASS cases=16 restore=16 directions=2 consumers=LD,ST gaps=0,1,2,3 latency=2 interrupt_composition=unvalidated silicon_phase_claim=0",
-        "Fatal error: TMS320C54x isolated STM addressing mode complete",
-    ),
-    "stm-cmpt": (
-        "TMS320C54x staged STM CMPT: PASS cases=16 restore=16 directions=2 consumers=LD,ST gaps=0,1,2,3 latency=2 interrupt_composition=unvalidated silicon_phase_claim=0",
-        "Fatal error: TMS320C54x isolated STM addressing mode complete",
+    "mode-latency": (
+        "TMS320C54x addressing-mode banks: PASS cases=1152 restore=1152 basic=32 full_status=96 dp_forward=1024 producers=RSBX,SSBX,MVMD,STLM,STM,LD_DP gaps=0,1,2,3 finish=10,11 idle_required=0 silicon_phase_claim=0 coverage_fnv64=874b36700c614325",
+        "Fatal error: TMS320C54x isolated addressing-mode latency complete",
     ),
     "squr-smem": (
         "TMS320C54x memory SQUR: PASS cases=52224 restore=52224 forms=RAM,mapped accumulators=2 patterns=8 flags=16 t_publication=Read operand_retained=1 newer_t_preserved=1 duplicate_reads=0 data_writes=0 physical_phase_claim=0",
@@ -453,14 +449,6 @@ EXTRA_PROFILES = {
     "stlm-st1-irq": (
         "TMS320C54x staged STLM ST1 IRQ: PASS cases=576 restore=576 sources=IRQ,NMI accumulator=B gap_nops=1 intm_requests=4 memory_cannot_set_intm=1 clear_policy=legacy_unverified imr_states=2 arrivals=4,6,8 pages=2 snapshots=3 followers=STLM,STM source_reads=0 status_writes=1 accepted_frame=1 masked_frame=0 foreground_once=1 rsbx_guard_inherited=0 silicon_phase_claim=0",
         "Fatal error: TMS320C54x isolated STLM ST1 IRQ complete",
-    ),
-    "stlm-cpl": (
-        "TMS320C54x staged STLM CPL: PASS cases=16 restore=16 directions=2 consumers=LD,ST gaps=0,1,2,3 latency=3 silicon_phase_claim=0",
-        "Fatal error: TMS320C54x isolated STLM addressing mode complete",
-    ),
-    "stlm-cmpt": (
-        "TMS320C54x staged STLM CMPT: PASS cases=16 restore=16 directions=2 consumers=LD,ST gaps=0,1,2,3 latency=3 silicon_phase_claim=0",
-        "Fatal error: TMS320C54x isolated STLM addressing mode complete",
     ),
     "stlm-st1": (
         "TMS320C54x staged STLM ST1: PASS cases=18432 restore=18432 sources=A,B families=raw,SXM_LD,ASM_LD,long_SXM_LD,ASM_ADD,ASM_SUB gaps=0,1,2,3 pages=2 snapshots=3 execute_live=1 status_writes=1 destination_reads=0 short_latency=1 long_latency=0 clear_policy=legacy_unverified silicon_phase_claim=0",
@@ -1874,10 +1862,6 @@ EXTRA_PROFILES = {
         "TMS320C54x staged MVMD status IRQ: PASS cases=576 restore=576 sources=IRQ,NMI intm_requests=4 memory_cannot_set_intm=1 clear_policy=legacy_unverified imr_states=2 arrivals=4,6,8 pages=2 snapshots=3 followers=STLM,STM source_reads=1 status_writes=1 accepted_frame=1 masked_frame=0 foreground_once=1 rsbx_guard_inherited=0 silicon_phase_claim=0",
         "Fatal error: TMS320C54x isolated MVMD status IRQ complete",
     ),
-    "mvmd-cmpt": (
-        "TMS320C54x staged MVMD CMPT: PASS cases=16 restore=16 directions=2 consumers=LD,ST gaps=0,1,2,3 latency=2 pointer_updates=1 interrupt_composition=unvalidated silicon_phase_claim=0",
-        "Fatal error: TMS320C54x isolated MVMD CMPT complete",
-    ),
     "mvmd-block": (
         "TMS320C54x staged MVMD block: PASS cases=24 restore=24 counts=0,1,2,7 pages=2 snapshots=3 adjacent_rptb=1 braf_preserved=1 interrupt_composition=unvalidated silicon_phase_claim=0",
         "Fatal error: TMS320C54x isolated MVMD block complete",
@@ -1885,10 +1869,6 @@ EXTRA_PROFILES = {
     "mvmd-status-alu": (
         "TMS320C54x staged MVMD status ALU: PASS cases=768 restore=768 consumers=SXM_LD,ASM_LD sxm_states=2 asm_values=32 pages=2 snapshots=3 source_reads=1 status_writes=1 latency=0 interrupt_composition=unvalidated silicon_phase_claim=0",
         "Fatal error: TMS320C54x isolated MVMD status ALU complete",
-    ),
-    "mvmd-cpl": (
-        "TMS320C54x staged MVMD CPL: PASS cases=16 restore=16 directions=2 consumers=LD,ST gaps=0,1,2,3 latency=2 interrupt_composition=unvalidated silicon_phase_claim=0",
-        "Fatal error: TMS320C54x isolated MVMD CPL complete",
     ),
     "mvmd-st1": (
         "TMS320C54x staged MVMD ST1: PASS cases=288 restore=288 sources=AL,BL producers=POPM,STL gaps=0,1,2 pages=2 values=4 source_reads=1 status_writes=1 destination_reads=0 consumer_latency=unvalidated interrupt_composition=unvalidated silicon_phase_claim=0",

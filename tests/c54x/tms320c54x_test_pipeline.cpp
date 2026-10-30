@@ -4,6 +4,7 @@
 #include "emu.h"
 #include "tms320c54x_test_state.h"
 #include "tms320c54x_test_word_examples.h"
+#include "tms320c54x_test_address_mode.h"
 
 namespace c54x_test {
 
@@ -251,82 +252,21 @@ void tms320c54x_test_state::start_pipeline_status_bit(unsigned variant)
 	m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 }
 
-void tms320c54x_test_state::start_pipeline_cpl(unsigned variant)
+void tms320c54x_test_state::start_pipeline_cpl()
 {
-	m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
-	m_pipeline_peripheral_case = variant;
-	bool const stlm = profile_is("stlm-cpl") || profile_is("stlm-cmpt");
-	bool const stm = profile_is("stm-cpl") || profile_is("stm-cmpt");
-	bool const cmpt = profile_is("mvmd-cmpt") || profile_is("stlm-cmpt") || profile_is("stm-cmpt");
-	bool const mvmd = stm || stlm || cmpt || profile_is("mvmd-cpl");
-	bool const set = BIT(variant, 0), store = BIT(variant, 3);
-	bool const dp = BIT(variant, 4);
-	unsigned const gap = (variant / 2) % 4;
-	auto &program = m_cpu->space(AS_PROGRAM);
-	for (unsigned i = 0; i < 20; ++i) program.write_word(0x600 + i, 0xf495);
-	program.write_word(0x600, dp ? (set ? 0xf5b0 : 0xf4b0) : (set ? 0xf7be : 0xf6be));
-	program.write_word(0x601 + gap, store ? 0x8027 : 0x1027);
-	if (mvmd)
-	{
-		program.write_word(0x600, 0x730b); program.write_word(0x601, 7);
-		program.write_word(0x602 + gap, store ? 0x8027 : 0x1027);
-		if (!gap) program.write_word(0x603, 0xf495);
-		else program.write_word(0x601 + gap, 0xf495);
-		m_cpu->set_state_int(tms320c54x_device::STATE_B, set ? 0x4800 : 0x800);
-	}
-	set_registers(*m_cpu, {
-		{cpu_regs::STATE_TCR, 0x10}, {cpu_regs::STATE_PMST, 0}, {cpu_regs::STATE_ILLEGAL, 0},
-		{cpu_regs::STATE_ST0, dp && !set ? 0x0f : 0x0e}, {cpu_regs::STATE_ST1, dp || set ? 0x800 : 0x4800},
-		{cpu_regs::STATE_SP, 0x1000}, {cpu_regs::STATE_A, 0x7777}, {cpu_regs::STATE_IFR, 0}, {cpu_regs::STATE_IMR, 0},
-	});
-	m_cpu->space(AS_DATA).write_word(0x727, 0x1111);
-	m_cpu->space(AS_DATA).write_word(dp ? 0x7a7 : 0x1027, 0x2222);
-	if (cmpt)
-	{
-		program.write_word(0x602 + gap, store ? 0x8090 : 0x1090);
-	set_registers(*m_cpu, {
-		{cpu_regs::STATE_ST0, 0x6000}, {cpu_regs::STATE_ST1, set ? 0x800 : 0x820},
-		{cpu_regs::STATE_B, set ? 0x820 : 0x800}, {cpu_regs::STATE_AR0, 0x1400}, {cpu_regs::STATE_AR3, 0x1500},
-	});
-		m_cpu->space(AS_DATA).write_word(0x1400, 0x1111); m_cpu->space(AS_DATA).write_word(0x1500, 0x2222);
-	}
-	if (stlm)
-	{
-		program.write_word(0x600, 0x8907); program.write_word(0x601, 0xf495);
-		program.write_word(0x602 + gap, 0xf495);
-		program.write_word(0x601 + gap, cmpt ? (store ? 0x8090 : 0x1090) : (store ? 0x8027 : 0x1027));
-	}
-	if (stm) { program.write_word(0x600, 0x7707); program.write_word(0x601, set ? (cmpt ? 0x820 : 0x4800) : 0x800); }
-	m_cpu->set_state_int(STATE_GENPC, 0x600);
-	m_cpu->set_pipeline_frontend(true);
-	m_pipeline_replay = false; m_pipeline_expected_cycle = 1;
-	m_phase = 251350; m_cpu->resume(SUSPEND_REASON_DISABLE);
-	m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	m_register_sequence = std::make_unique<register_sequence_fixture>(machine(), *m_cpu, *m_check_timer,
+		address_mode_count(address_mode_kind::basic),
+		[](unsigned key) { return address_mode_sequence<tms320c54x_device>(key, address_mode_kind::basic); });
+	m_phase = 251350;
+	m_register_sequence->start();
 }
 
-void tms320c54x_test_state::start_pipeline_dp_immediate(unsigned variant)
+void tms320c54x_test_state::start_pipeline_dp_immediate()
 {
-	m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
-	m_pipeline_peripheral_case = variant;
-	unsigned const page = variant & 511;
-	bool const chain = BIT(variant, 9);
-	auto &program = m_cpu->space(AS_PROGRAM);
-	for (unsigned i = 0; i < 16; ++i) program.write_word(0x600 + i, 0xf495);
-	program.write_word(0x600, 0xea00 | (chain ? page ^ 1 : page));
-	if (chain) program.write_word(0x601, 0xea00 | page);
-	program.write_word(0x601 + unsigned(chain), 0x107f);
-	set_registers(*m_cpu, {
-		{cpu_regs::STATE_TCR, 0x10}, {cpu_regs::STATE_PMST, 0}, {cpu_regs::STATE_ILLEGAL, 0},
-		{cpu_regs::STATE_ST0, 0xa600 | (page ^ 1)}, {cpu_regs::STATE_ST1, 0x800}, {cpu_regs::STATE_A, 0},
-		{cpu_regs::STATE_IFR, 0}, {cpu_regs::STATE_IMR, 0},
-	});
-	m_cpu->space(AS_DATA).write_word(((page ^ 1) << 7) | 0x7f, 0x1111);
-	m_cpu->space(AS_DATA).write_word((page << 7) | 0x7f, 0x2222);
-	m_cpu->set_state_int(STATE_GENPC, 0x600);
-	m_cpu->set_pipeline_frontend(true);
-	m_pipeline_replay = false; m_pipeline_expected_cycle = 1;
-	m_phase = 251390; m_cpu->resume(SUSPEND_REASON_DISABLE);
-	m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	m_register_sequence = std::make_unique<register_sequence_fixture>(machine(), *m_cpu, *m_check_timer,
+		1024, immediate_dp_sequence<tms320c54x_device>);
+	m_phase = 251390;
+	m_register_sequence->start();
 }
 
 void tms320c54x_test_state::start_pipeline_frame(unsigned variant)
@@ -1898,115 +1838,21 @@ bool tms320c54x_test_state::check_pipeline_intm_results()
 	}
 	if (m_phase == 251350)
 	{
-		bool const stlm = profile_is("stlm-cpl") || profile_is("stlm-cmpt");
-		bool const stm = profile_is("stm-cpl") || profile_is("stm-cmpt");
-		bool const cmpt = profile_is("mvmd-cmpt") || profile_is("stlm-cmpt") || profile_is("stm-cmpt");
-		bool const mvmd = stm || stlm || cmpt || profile_is("mvmd-cpl");
-		u64 const cycle = m_cpu->pipeline_cycles();
-		unsigned const gap = (m_pipeline_peripheral_case / 2) % 4;
-		bool const set = BIT(m_pipeline_peripheral_case, 0), store = BIT(m_pipeline_peripheral_case, 3);
-		bool const dp = BIT(m_pipeline_peripheral_case, 4);
-		bool const alternate = gap >= (mvmd && !stlm ? 2 : 3) ? set : !set;
-		expect(cycle == m_pipeline_expected_cycle && !m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "CPL/DP consumer executes without unsupported direct mode");
-		if (cycle == 4 + gap && !m_pipeline_replay)
-		{
-			expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save retained Decode CPL before consumer address generation");
-		}
-		if (cycle == 11)
-		{
-			if (cmpt)
-			{
-				expect(m_cpu->state_int(tms320c54x_device::STATE_ST1) == (set ? 0x820 : 0x800) && m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0x6000 && m_cpu->state_int(tms320c54x_device::STATE_AR0) == 0x1400 + unsigned(!alternate) && m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x1500 + unsigned(alternate), "MVMD CMPT consumer updates only its latency-selected auxiliary register");
-				expect(m_cpu->state_int(tms320c54x_device::STATE_A) == (store ? 0x7777 : alternate ? 0x2222 : 0x1111) && m_cpu->space(AS_DATA).read_word(0x1400) == (store && !alternate ? 0x7777 : 0x1111) && m_cpu->space(AS_DATA).read_word(0x1500) == (store && alternate ? 0x7777 : 0x2222), "MVMD CMPT consumer samples the old mode with zero/one NOP and the new mode with two/three");
-			}
-			else
-			{
-			expect(m_cpu->state_int(tms320c54x_device::STATE_ST1) == (dp || !set ? 0x800 : 0x4800) &&
-				m_cpu->state_int(tms320c54x_device::STATE_ST0) == (dp && set ? 0x0f : 0x0e),
-				"CPL/DP producer retires independently of retained consumer status");
-			expect(m_cpu->state_int(tms320c54x_device::STATE_A) == (store ? 0x7777 : alternate ? 0x2222 : 0x1111) &&
-				m_cpu->space(AS_DATA).read_word(0x727) == (store && !alternate ? 0x7777 : 0x1111) &&
-				m_cpu->space(AS_DATA).read_word(dp ? 0x7a7 : 0x1027) == (store && alternate ? 0x7777 : 0x2222),
-				"Basic direct LD/ST respects the producer-specific CPL/DP latency");
-			}
-			if (!m_pipeline_replay)
-			{
-				m_pipeline_replay = true;
-				expect(restore_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Restore Decode-sampled direct addressing mode");
-				m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
-				m_pipeline_expected_cycle = 5 + gap; m_phase = 251360;
-				m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-			}
-			m_cpu->set_pipeline_frontend(false);
-			if (mvmd)
-			{
-				if (m_pipeline_peripheral_case < 15) { start_pipeline_cpl(m_pipeline_peripheral_case + 1); return true; }
-				if (stm)
-				{
-					osd_printf_info("TMS320C54x staged STM %s: PASS cases=16 restore=16 directions=2 consumers=LD,ST gaps=0,1,2,3 latency=2 interrupt_composition=unvalidated silicon_phase_claim=0\n", cmpt ? "CMPT" : "CPL");
-					throw emu_fatalerror(0, "TMS320C54x isolated STM addressing mode complete");
-				}
-				if (stlm)
-				{
-					osd_printf_info("TMS320C54x staged STLM %s: PASS cases=16 restore=16 directions=2 consumers=LD,ST gaps=0,1,2,3 latency=3 silicon_phase_claim=0\n", cmpt ? "CMPT" : "CPL");
-					throw emu_fatalerror(0, "TMS320C54x isolated STLM addressing mode complete");
-				}
-				if (cmpt)
-				{
-					osd_printf_info("TMS320C54x staged MVMD CMPT: PASS cases=16 restore=16 directions=2 consumers=LD,ST gaps=0,1,2,3 latency=2 pointer_updates=1 interrupt_composition=unvalidated silicon_phase_claim=0\n");
-					throw emu_fatalerror(0, "TMS320C54x isolated MVMD CMPT complete");
-				}
-				osd_printf_info("TMS320C54x staged MVMD CPL: PASS cases=16 restore=16 directions=2 consumers=LD,ST gaps=0,1,2,3 latency=2 interrupt_composition=unvalidated silicon_phase_claim=0\n");
-				throw emu_fatalerror(0, "TMS320C54x isolated MVMD CPL complete");
-			}
-			if (m_pipeline_peripheral_case < 31) { start_pipeline_cpl(m_pipeline_peripheral_case + 1); return true; }
-			osd_printf_info("TMS320C54x staged CPL/DP latency: PASS cases=32 fields=2 directions=2 consumers=LD,ST gaps=0,1,2,3 restore=32\n");
-			start_pipeline_dp_immediate(); return true;
-		}
-		++m_pipeline_expected_cycle;
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 251360)
-	{
-		m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 251350;
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
+		if (!m_register_sequence->step()) return true;
+		osd_printf_info("TMS320C54x staged CPL/DP latency: PASS cases=32 fields=2 directions=2 consumers=LD,ST gaps=0,1,2,3 restore=32\n");
+		osd_printf_info("TMS320C54x addressing-mode coverage: PASS cases=%u restore=%u coverage_fnv64=%016llx\n",
+			m_register_sequence->count(), m_register_sequence->restores(), (unsigned long long)m_register_sequence->digest());
+		m_register_sequence.reset();
+		start_pipeline_dp_immediate(); return true;
 	}
 	if (m_phase == 251390)
 	{
-		u64 const cycle = m_cpu->pipeline_cycles();
-		unsigned const page = m_pipeline_peripheral_case & 511;
-		unsigned const chain = BIT(m_pipeline_peripheral_case, 9);
-		expect(cycle == m_pipeline_expected_cycle && !m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Immediate DP stream advances without unsupported forms");
-		expect(m_cpu->state_int(tms320c54x_device::STATE_ST0) == (0xa600 | (cycle >= 6 + chain ? page : page ^ 1)) &&
-			m_cpu->state_int(tms320c54x_device::STATE_ST1) == 0x800 &&
-			m_cpu->state_int(tms320c54x_device::STATE_A) == (cycle >= 7 + chain ? 0x2222 : 0),
-			"Immediate DP forwards to adjacent LD without early ST0 commitment or unrelated status changes");
-		if (cycle == 4 + chain && !m_pipeline_replay)
-		{
-			expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save forwarded immediate DP before either instruction retires");
-		}
-		if (cycle == 10)
-		{
-			if (!m_pipeline_replay)
-			{
-				m_pipeline_replay = true;
-				expect(restore_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Restore forwarded DP with old architectural ST0");
-				m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
-				m_pipeline_expected_cycle = 5 + chain; m_phase = 251400;
-				m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-			}
-			m_cpu->set_pipeline_frontend(false);
-			if (m_pipeline_peripheral_case < 1023) { start_pipeline_dp_immediate(m_pipeline_peripheral_case + 1); return true; }
-			osd_printf_info("TMS320C54x staged immediate DP: PASS cases=1024 pages=512 nearest_producer=512 old_st0_until_execute=1 restore=1024\n");
-			start_pipeline_frame(); return true;
-		}
-		++m_pipeline_expected_cycle;
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 251400)
-	{
-		m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 251390;
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
+		if (!m_register_sequence->step()) return true;
+		osd_printf_info("TMS320C54x staged immediate DP: PASS cases=1024 pages=512 nearest_producer=512 old_st0_until_execute=1 restore=1024\n");
+		osd_printf_info("TMS320C54x immediate-DP coverage: PASS cases=%u restore=%u coverage_fnv64=%016llx\n",
+			m_register_sequence->count(), m_register_sequence->restores(), (unsigned long long)m_register_sequence->digest());
+		m_register_sequence.reset();
+		start_pipeline_frame(); return true;
 	}
 	if (m_phase == 251410)
 	{

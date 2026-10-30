@@ -8,6 +8,45 @@
   },
   "families": [
     {
+      "id": "address-mode-fixture-ownership",
+      "classification": "harness_infrastructure",
+      "decision": "merge",
+      "scope": "Source/observation preservation and CPU-only ownership; not semantic approval of every retained CMPT or short-gap stimulus.",
+      "profiles": ["mode-latency"],
+      "case_ids": [],
+      "retired_profiles": ["mvmd-cpl", "mvmd-cmpt", "stlm-cpl", "stlm-cmpt", "stm-cpl", "stm-cmpt"],
+      "profile_coverage": {
+        "mode-latency": {"cases": 1152, "fnv64": "874b36700c614325", "result_prefix": "TMS320C54x addressing-mode banks: PASS", "key": "0..31: existing default RSBX/SSBX CPL/DP cases; 32..47 MVMD CPL; 48..63 MVMD CMPT; 64..79 STLM CPL; 80..95 STLM CMPT; 96..111 STM CPL; 112..127 STM CMPT; 128..1151: existing immediate-DP key0..1023. Local legacy keys remain ordinal or (ordinal-32)%16, and ordinal-128 for immediate DP."}
+      },
+      "basis": "SPRU131G tables 7-16/7-18/7-19 define the relevant CMPT/DP/CPL consumer categories and two-/three-instruction separation; table 7-17 recommends LD #k,DP without latency. Rechecked in the collected primary PDF (SHA256 d9ea0e695859d605d1f94dabeede327c0e343099102cfd7e224f6f53375a3fa2). Address/result expectations remain fixture-owned literal arithmetic, not CPU addressing helpers. Exact publication clocks and outcomes inside forbidden spacing remain software-model observations, not measured silicon guarantees.",
+      "contracts": ["final CPL/DP/CMPT selection, load/store result, untouched alternate RAM cell and CMPT pointer updates", "all original partial initial states and final program/data images, fixed clock11/10 observations, original snapshots and NOP padding", "per-clock illegal/progress checks and immediate-DP old/new ST0 plus nearest-producer forwarding", "default continuations remain explicit; the standalone target depends only on the CPU and shared runner"],
+      "changes": ["six tiny isolated configurations merge into one shared 1152-case scope; no execution case is retired", "default-only 32-case mode and 1024-case immediate-DP banks gain independent CPU-only execution", "host setup makes runnable IDLE=0 explicit; no reset between cases or IDLE instruction is inserted", "optional generic pipeline-clock checking preserves the original clock-progress assertion; a compiled success/failure test executes its actual pre-observation code"],
+      "known_limits": [
+        "All 48 CMPT rows seed ARP=3 while CMPT is clear at entry or exit; all 1024 immediate-DP rows seed ARP=5 with CMPT clear. SPRU131G page 7-61 note3 requires ARP=0 in standard mode. These preserved synthetic sentinels are not valid-program conformance. Rebuild valid ARP contexts and the CMPT witness or retire the unsupported expectations.",
+        "The 52 short-gap CPL/DP rows project old-mode behavior inside documented separation hazards. Required spacing does not independently specify those error outcomes. They remain separately qualified model observations.",
+        "Only 28 rows currently meet both the documented entry-state constraint and required spacing. The immediate-DP forwarding rule is documented, but its unrelated ARP sentinel still needs correction. Precise publication clocks remain emulator regression contracts, not physical-pipeline evidence.",
+        "No new interrupt, peripheral, full-status-field or handset qualification is claimed."
+      ],
+      "proof": "Compiled comparison against f6277a5e reconstructs all 1152 original setup images, snapshots and per-clock observation predicates; 10826240 register/RAM mutations agree. Re-expanding the four legacy adapter replacements reconstructs the old pipeline source outside its added include. No production CPU/device or arithmetic helper changes.",
+      "verification": "Full and CPU-only builds pass. The merged profile completes all 1152 cases/restores with digest 874b36700c614325 on both executables with an empty ROM directory. CPU-only isa-parallel (60 IDs) and rotate (4608 cases/restores) controls pass. All 5079 host tests pass with one established skip, including the extended executable test of clock-check success/failure, disabled checking and replay resume. The inventory has 393 isolated profiles and 289 default requirements. Handset acceptance and the full retained isolated-profile regression are not renewed by this bounded batch.",
+      "measurements": {"baseline_commit": "f6277a5e", "before_cpp_bytes": 3339483, "before_cpp_lines": 50877, "after_cpp_bytes": 3336718, "after_cpp_lines": 50835, "source_assessment": "2765 C++ bytes and 42 lines removed including the new shared header and both adapters. Six isolated configuration names merge into one; all 1152 existing case contracts are preserved, not necessarily justified as silicon conformance. No new test module or measured runtime improvement."},
+      "default_checkpoint": {
+        "capture": "tmp/c54x-corpus-transfer-review/run_c54x_core_eq3c11g4",
+        "source_base_commit": "f6277a5e",
+        "bench_patch_command": "git diff --no-ext-diff --binary f6277a5e -- tests/c54x",
+        "bench_patch_sha256": "03d43e0318c09b3029fb95e7d796bb2a1f3e23bc8972cde7d1a7ed51c6fd5784",
+        "executable_sha256": "543520e28e49c053427e97ddd71ac23b57bf7d8abd16c0894fc733da851552a4",
+        "acceptance_sha256": {"tools/run_c54x_core.py": "70ef9f2bc24630e9a7b2eff039f2781f7d6ed82f20424c1b22ccdd831b8e061d", "tools/c54x_test_oracles.py": "07a2fda22dacda9b03a8e6f12865c991cb1e1c6bd3893b4b734e7f20ec96c51c"},
+        "required_markers": 289,
+        "native_ordered_pass_records": 295,
+        "mame_exit": 3,
+        "runner_exit": 0,
+        "wall_seconds": 959.15,
+        "comparison": "All 293 preceding native PASS records remain byte-identical and ordered; only two address-mode coverage records are added. All 5690 ordered opassert words match the preceding named-observer checkpoint, SHA256 of newline-joined words 2764b84dd60e9c560191bfbd638d982ca4cd2ba756fa6595ee9339d54cf6d20e.",
+        "scope": "Default-regression compatibility, not semantic approval of the invalid ARP stimuli, every isolated profile, handset acceptance or silicon timing. No CPU/device source changed."
+      }
+    },
+    {
       "id": "shared-dual-guard-census",
       "classification": "implementation_limit",
       "decision": "merge",

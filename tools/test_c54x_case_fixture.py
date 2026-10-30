@@ -61,30 +61,41 @@ int main() {
             subprocess.run([str(program)], check=True, capture_output=True)
 
     @unittest.skipUnless(shutil.which('c++'), 'C++ compiler required')
-    def test_clocked_actions_preserve_observation_side_and_write_order(self):
+    def test_clocked_observation_order_and_optional_pipeline_clock(self):
         case = (ROOT / 'tests/c54x/tms320c54x_test_case.h').read_text()
         runner = (ROOT / 'tests/c54x/tms320c54x_test_register_sequence.h').read_text()
         action = case[case.index('struct clocked_register_action'):case.index('struct clocked_data_event')]
         method = runner[runner.index('\tvoid apply_actions('):runner.index('\tvoid require(')]
+        clock = runner[runner.index('\tbool step()'):runner.index('\t\tapply_actions(true);')]
+        clock = clock.replace('bool step()', 'bool step_clock()') + '\t\treturn true;\n\t}\n'
         source = r'''
 #include <cassert>
+#include <stdexcept>
 #include <vector>
 #include "tests/c54x/tms320c54x_test_support.h"
 using c54x_test::register_setting;
 using c54x_test::memory_word;
 constexpr int AS_PROGRAM = 0;
+constexpr int SUSPEND_REASON_DISABLE = 0;
 ''' + action + r'''
 struct bench {
     unsigned m_tick = 5;
     bool disabled = false;
+    bool m_resume = false;
+    unsigned scheduled = 0;
+    void schedule() { ++scheduled; }
+    void require(bool ok, const char *message) { if (!ok) throw std::runtime_error(message); }
     bench &m_machine = *this;
     struct suppression { bool &flag; ~suppression() { flag = false; } };
     suppression disable_side_effects() { assert(!disabled); disabled = true; return {disabled}; }
-    struct input { std::vector<clocked_register_action> actions; } m_input{
+    struct input { std::vector<clocked_register_action> actions; bool check_pipeline_clock = false; } m_input{
         {{5, {{0, 10}, {0, 11}}, true, {{0x20, 99}}}, {5, {{0, 12}}, false, {{0x21, 98}}}, {6, {{0, 13}}, true}}};
     struct cpu {
         bool &disabled;
         std::vector<unsigned> writes{}, memory{};
+        unsigned cycles = 0, resumes = 0;
+        unsigned pipeline_cycles() const { return cycles; }
+        void resume(int reason) { assert(reason == SUSPEND_REASON_DISABLE); ++resumes; }
         void set_state_int(int index, unsigned value) { assert(index == 0); writes.push_back(value); }
         cpu &space(int index) { assert(index == AS_PROGRAM); return *this; }
         void write_word(unsigned at, unsigned value) {
@@ -92,7 +103,7 @@ struct bench {
             memory.push_back(at); memory.push_back(value);
         }
     } m_cpu{disabled};
-''' + method + r'''
+''' + method + clock + r'''
 };
 int main() {
     bench b;
@@ -101,6 +112,15 @@ int main() {
     assert(!b.disabled && (b.m_cpu.memory == std::vector<unsigned>{0x20, 99, 0x21, 98}));
     b.m_tick = 6; b.apply_actions(false); assert(b.m_cpu.writes.size() == 3);
     b.apply_actions(true); assert(b.m_cpu.writes.back() == 13);
+    b.m_input.check_pipeline_clock = true; b.m_cpu.cycles = 7;
+    assert(b.step_clock() && b.m_tick == 7);
+    bool rejected = false;
+    try { b.step_clock(); } catch (std::runtime_error const &) { rejected = true; }
+    assert(rejected && b.m_tick == 8);
+    b.m_input.check_pipeline_clock = false;
+    assert(b.step_clock() && b.m_tick == 9);
+    b.m_resume = true;
+    assert(!b.step_clock() && b.m_tick == 9 && b.m_cpu.resumes == 1 && b.scheduled == 1);
 }
 '''
         with compiled_cpp(source) as program:
