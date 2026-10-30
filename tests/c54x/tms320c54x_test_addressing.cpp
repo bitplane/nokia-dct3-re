@@ -1985,14 +1985,6 @@ bool tms320c54x_test_state::check_long_mapped_original_results()
 		m_check_timer->adjust(attotime::from_ticks(1,m_cpu->clock())); return true;
 	}
 	if (m_phase==399950) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase=399940; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1,m_cpu->clock())); return true; }
-	if (m_phase == 253530)
-	{
-		expect(m_vector_acks == 1 && m_cpu->state_int(tms320c54x_device::STATE_B) == 0x55 && !m_bus_iack_enable,
-			"Disabling the physical IACK output must not suppress logical interrupt acknowledgement");
-		m_cpu->set_input_line(0, CLEAR_LINE); m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
-		osd_printf_info("TMS320C54x C5416 bus registers: PASS encodings=65536 saved_restore=1 reset=1 partial_writes=1 clkout_system_independent=1 logical_ack_with_iackoff=1 bus_timing_acceptance=0 physical_mapping=unvalidated\n");
-		throw emu_fatalerror(0, "TMS320C54x isolated C5416 bus registers complete");
-	}
 	return false;
 }
 

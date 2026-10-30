@@ -47,6 +47,7 @@ struct clocked_register_action
 	std::optional<bool> bio_level{};
 	std::vector<memory_word> io{};
 	std::optional<bool> ready_level{};
+	std::vector<std::array<u16,3>> masked_data{}; // MMIO address, value, selected write bits.
 };
 struct clocked_line_sample { unsigned cycle; bool level; bool check_cycle = true; };
 struct clocked_data_event

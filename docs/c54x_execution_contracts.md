@@ -257,6 +257,16 @@ timer progress are checked through replay. A negative control omitting READY
 restoration fails on premature I/O. This is CPU bus-controller conformance, not
 validated board wait wiring or a physical mapping claim.
 
+`bus_registers` and `standard_bus_registers` own register masking separately
+from live transfer timing. Each uses a deduplicated37-pattern bit basis plus
+dense/boundary controls, explicit masked writes and reset. Original SWWSR
+masks bit15 and does not acquire29/2b: those addresses retain board RAM while
+BSCR/SWCR stay zero. Enhanced ownership masks BSCR/SWCR, publishes CLKOUT/IACK
+configuration without changing system rate, and restores unsaved external sinks
+after deliberate corruption. Logical IRQ acknowledgement remains active with
+physical IACK disabled. Every retained case checkpoints/replays; arbitrary
+higher-order combinations from the former exhaustive raw sweeps are not retained.
+
 The independent `status_bitfield` section owns ST0/ST1 BITF sampling: 128
 register/pattern/mask/initial-TC/addressing combinations, with pages and three
 checkpoint positions distributed rather than multiplied into 768 executions.

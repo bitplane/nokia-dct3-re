@@ -107,6 +107,10 @@ public:
 #endif
 		m_cpu->bio_in_cb().set([this]() { return m_fixture ? m_fixture->sample_bio() : 1; });
 		m_cpu->ready_in_cb().set([this]() { return m_fixture ? m_fixture->sample_ready() : 1; });
+#ifdef C54X_SECTION_BUS_REGISTERS
+		m_cpu->clkout_divisor_cb().set([this](u8 value) { m_bus_divisor=value; });
+		m_cpu->iack_enable_cb().set([this](int value) { m_bus_iack=bool(value); });
+#endif
 		m_cpu->xf_out_cb().set([this](int value) {
 			m_xf = bool(value);
 			if (m_fixture) m_fixture->observe_xf(m_xf);
@@ -382,6 +386,34 @@ private:
 #endif
 	TIMER_CALLBACK_MEMBER(tick)
 	{
+#ifdef C54X_SECTION_BUS_REGISTERS
+		unsigned const bus_now=m_fixture->tick_count();
+		auto const &bus_input=m_cases.at(m_fixture->count());
+		auto const *bus_state=&bus_input.states.front().observation;
+		for (auto const &state : bus_input.states) if (bus_now>=state.tick) bus_state=&state.observation;
+		if (bus_state->expected_data.size()==3) {
+			bool const standard=
+#ifdef C54X_SECTION_STANDARD_SWWSR
+				true;
+#else
+				false;
+#endif
+			u16 const waits=bus_state->expected_data[0].value, control=bus_state->expected_data[1].value, multiplier=bus_state->expected_data[2].value;
+			unsigned const divisor=standard ? 1 : 1+((control>>13)&3);
+			bool const iack=!standard && !(control&0x1000);
+			if ((!standard && (m_bus_divisor!=divisor || m_bus_iack!=iack)) || m_cpu->clkout_divisor()!=divisor || m_cpu->iack_output_enabled()!=iack ||
+				m_cpu->external_io_wait_states()!=((waits>>12)&7)*(standard ? 1 : 1+(multiplier&1)) || m_cpu->clock()!=13'000'000)
+				throw emu_fatalerror("Bus register case=%u tick=%u divisor=%u/%u iack=%u/%u waits=%u/%u clock=%u",m_fixture->count(),bus_now,
+					m_bus_divisor,divisor,unsigned(m_bus_iack),unsigned(iack),m_cpu->external_io_wait_states(),
+					((waits>>12)&7)*(standard ? 1 : 1+(multiplier&1)),m_cpu->clock());
+		}
+#ifdef C54X_SECTION_C5416_BUS
+		if (bus_now+1==bus_input.finish && m_fixture->restores()==m_fixture->count()) {
+			// Unsaved external sinks must be re-driven by post-load, not restored by this test.
+			m_bus_divisor=0; m_bus_iack=!m_bus_iack;
+		}
+#endif
+#endif
 #ifdef C54X_SECTION_EXTERNAL_IO_WAITS
 		unsigned const io_now=m_fixture->tick_count();
 		if (io_now+1==m_cases.at(m_fixture->count()).finish) {
@@ -505,6 +537,10 @@ private:
 		throw emu_fatalerror(0, "C54x section complete");
 	}
 	required_device<tms320c54x_device> m_cpu;
+#ifdef C54X_SECTION_BUS_REGISTERS
+	u8 m_bus_divisor=0;
+	bool m_bus_iack=false;
+#endif
 #ifdef C54X_SECTION_STAGED_IDLE
 	u16 m_staged_idle_tim=0;
 #endif

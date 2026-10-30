@@ -201,8 +201,6 @@ private:
 
 
 
-	void start_standard_swwsr_test();
-	void start_bus_register_test();
 	struct popd_fixture
 	{
 		unsigned mode, count, prefix, irq, snapshot;
@@ -797,8 +795,6 @@ private:
 	unsigned m_rom4_checks = 0;
 	bool m_irq_raised = false;
 	unsigned m_fast_stack_reads = 0;
-	u8 m_bus_divisor = 0;
-	bool m_bus_iack_enable = false;
 	unsigned m_fast_return_case = 0;
 	unsigned m_repeat_reads = 0;
 	u16 m_stack_mmr[2] = {};

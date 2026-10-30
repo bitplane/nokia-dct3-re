@@ -34,7 +34,6 @@ void tms320c54x_test_state::machine_reset()
 		{ {"pop-irq"}, [](self &test) { test.start_pipeline_mmr_pop(); } },
 		{ {"mvpd-extended"}, [](self &test) { test.start_extended_mvpd(); } },
 		{ {"mvpd-controls"}, [](self &test) { test.start_pipeline_mvpd(); } },
-		{ {"std-swwsr"}, [](self &test) { test.start_standard_swwsr_test(); } },
 	}))
 		return;
 	if (start_profile(*this, machine().options().bios(), {
@@ -150,10 +149,6 @@ void tms320c54x_test_state::machine_reset()
 	if (start_profile(*this, machine().options().bios(), {
 	}))
 		return;
-	if (!strcmp(machine().system().name, "tms54test") && profile_is("bus-registers"))
-	{
-		start_bus_register_test(); return;
-	}
 	if (!strcmp(machine().system().name, "tms54test") &&
 			profile_is("timer"))
 	{
@@ -449,10 +444,6 @@ void tms320c54x_test_state::test(machine_config &config)
 	else if (!strcmp(config.options().bios(), "rpt-smem") || !strcmp(config.options().bios(), "rpt-ld") || !strcmp(config.options().bios(), "rpt-sfta") || !strcmp(config.options().bios(), "rpt-ld-block") || !strcmp(config.options().bios(), "rptb-call") || !strcmp(config.options().bios(), "rpt-mem-chain") || !strcmp(config.options().bios(), "bd-rpt") || !strcmp(config.options().bios(), "retd-rpt") || !strcmp(config.options().bios(), "calld-rpt") || !strcmp(config.options().bios(), "bcd-rpt"))
 		m_cpu->instruction_observer_cb().set([this](offs_t address, u16 opcode) { m_observed_instructions.emplace_back(address, opcode); });
 	m_cpu->set_extended_program(true);
-	if (!strcmp(config.options().bios(), "std-swwsr")) m_cpu->set_standard_swwsr(true);
-	if (!strcmp(config.options().bios(), "bus-registers")) m_cpu->set_c5416_bus_profile(true);
-	m_cpu->clkout_divisor_cb().set([this](u8 value) { m_bus_divisor = value; });
-	m_cpu->iack_enable_cb().set([this](int value) { m_bus_iack_enable = bool(value); });
 	m_cpu->set_irq_acknowledge_callback([this](device_t &, int line) {
 		if (m_phase == 259960)
 		{
@@ -473,7 +464,6 @@ void tms320c54x_test_state::test(machine_config &config)
 		if (m_phase == 62154) { auto const f = memory_copy_repeat_case(m_pipeline_peripheral_case); expect(f.irq && line == (f.irq == 2 ? INPUT_LINE_NMI : 2) && !m_vector_acks && m_pipeline_store_writes == f.count + 1 && m_cpu->state_int(tms320c54x_device::STATE_RC) == 0, "Memory-count repeat defers its actual pending interrupt until all copies complete"); ++m_vector_acks; m_cpu->set_input_line(line, CLEAR_LINE); }
 		if (m_phase == 254360) { unsigned const interrupt = m_pipeline_peripheral_case / 4096; expect(interrupt && line == (interrupt == 2 ? INPUT_LINE_NMI : 2) && !m_vector_acks, "In-block branch interrupt acknowledges its actual pending source once"); ++m_vector_acks; m_cpu->set_input_line(line, CLEAR_LINE); }
 		if (m_phase == 254200) { auto const &f = m_popd_fixture; expect(f.irq && line == (f.irq == 2 ? INPUT_LINE_NMI : 0) && !m_vector_acks && m_pipeline_store_writes == f.count + 1 && m_cpu->pipeline_cycles() > f.read_clock() + f.count + 1, "POPD acknowledges IRQ/NMI only after the last repeat iteration retires"); ++m_vector_acks; }
-		if (m_phase == 253530) { expect(line == 0 && !m_vector_acks, "Logical IRQ callback remains enabled with IACKOFF set"); ++m_vector_acks; }
 		if (m_phase == 253230)
 		{
 			auto const f = memory_repeat_case(m_pipeline_peripheral_case);

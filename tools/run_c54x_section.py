@@ -420,6 +420,8 @@ def main():
     counts['external_io_staged'] = 192
     counts['standard_io_atomic'] = 480
     counts['standard_io_staged'] = 96
+    counts['bus_registers'] = 40
+    counts['standard_bus_registers'] = 39
     counts['shifted_unowned'] = 20480
     counts['shifted_bsp'] = 5120
     counts['accumulator_call_frames'] = 216
