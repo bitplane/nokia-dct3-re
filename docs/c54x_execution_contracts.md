@@ -1490,6 +1490,20 @@ reaches the separate FCALAD B exclusion above.
 Indexed accumulator-store/load and MAR, immediate forwarding, store-delay,
 mapped-BK and saved-repeat profiles pass as controls.
 
+### Delayed immediate far call
+
+`delayed_far_call` owns 81 cases/replays: caller and target pages 0/2/7f,
+three complete two-word delay layouts, and no interrupt/IRQ/NMI. Layouts are
+NOP+STLM BRC, a two-word STM T, and NOP+LDM AR6. The former unasserted
+mapped-XPC read probe is replaced by NOP; its visibility remains unqualified.
+Exact ordered data/program events cover both call-frame words, delay traffic,
+callee/continuation fetches, IRQ stack/RETE and FRET roundtrip. The two-word STM
+publishes between the call-frame words in this model; IRQ acceptance still
+requires the complete frame and delay traffic. The pending entry drains to the
+callee FRET boundary before stacking its continuation. These are model contracts,
+not silicon timing measurements. Three snapshots are distributed instead of
+expanding to 243 executions. The old profile, phase handlers and IRQ hook go.
+
 ### Delayed far accumulator call
 
 SPRU172C page 4-55 specifies one-word FCALAD A/B: save PC+3 then

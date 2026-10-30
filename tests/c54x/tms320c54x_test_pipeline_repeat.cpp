@@ -833,37 +833,6 @@ void tms320c54x_test_state::set_repeat_count_source(u16 address, u16 value)
 	else m_cpu->set_state_int(address == 14 ? tms320c54x_device::STATE_T : address == 15 ? tms320c54x_device::STATE_TRN : address < 24 ? tms320c54x_device::STATE_AR0 + address - 16 : address == 24 ? tms320c54x_device::STATE_SP : tms320c54x_device::STATE_BK, value);
 }
 
-void tms320c54x_test_state::start_delayed_far_call(unsigned variant)
-{
-	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-	unsigned const layout = variant % 3, caller_page = std::array<unsigned, 3>{0, 2, 0x7f}[(variant / 3) % 3], target_page = std::array<unsigned, 3>{0, 2, 0x7f}[(variant / 9) % 3];
-	u32 const caller = caller_page << 16, target = target_page << 16;
-	auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
-	for (unsigned i = 0; i < 64; ++i) { program.write_word(caller + 0x600 + i, 0xf495); program.write_word(target + 0x700 + i, 0xf495); program.write_word(caller + i, 0xf495); program.write_word(target + i, 0xf495); }
-	program.write_word(caller + 0x600, 0xfb80 | target_page); program.write_word(caller + 0x601, 0x700);
-	program.write_word(caller + 0x602, layout == 0 ? 0x481e : layout == 1 ? 0x770e : 0xf495);
-	program.write_word(caller + 0x603, layout == 0 ? 0x891a : layout == 1 ? 0x1234 : 0x4816);
-	program.write_word(caller + 0x604, 0xe955); program.write_word(target + 0x700, 0xe933); program.write_word(target + 0x703, 0xf4e4);
-	for (u32 page : {caller, target}) { program.write_word(page + 4, 0xf4eb); program.write_word(page + 0x40, 0xf4eb); }
-	set_registers(*m_cpu, {
-		{cpu_regs::STATE_IDLE, 0}, {cpu_regs::STATE_ILLEGAL, 0}, {cpu_regs::STATE_PMST, 0},
-		{cpu_regs::STATE_ST0, 0xa608}, {cpu_regs::STATE_ST1, 0}, {cpu_regs::STATE_IFR, 0}, {cpu_regs::STATE_IMR, 1},
-		{cpu_regs::STATE_SP, 0x1000}, {cpu_regs::STATE_TCR, 0x10}, {cpu_regs::STATE_A, 0}, {cpu_regs::STATE_B, 0x1234},
-		{cpu_regs::STATE_T, 0xbeef}, {cpu_regs::STATE_BRC, 0x9876}, {cpu_regs::STATE_AR6, 0x4567},
-	});
-	m_cpu->set_input_line(0, CLEAR_LINE); m_cpu->set_input_line(INPUT_LINE_NMI, CLEAR_LINE);
-	m_pipeline_store_writes = m_fast_stack_reads = m_pipeline_extensions_reads = m_pipeline_operand_reads = m_pipeline_drained_fetches = m_vector_acks = m_pipeline_register_writes = 0;
-	m_pipeline_write_tap = data.install_write_tap(0xffd, 0xfff, "delayed_far_call_stack",
-		[this, caller_page](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return; if (m_pipeline_store_writes < 2) expect(at == 0xfff - m_pipeline_store_writes && word == (m_pipeline_store_writes ? caller_page : 0x604), "FCALLD stacks the caller page and continuation after both delay words"); else expect(m_pipeline_store_writes == 2 && at == 0xffd, "Pending interrupt owns a separate stack word"); ++m_pipeline_store_writes; });
-	m_pipeline_operand_tap = data.install_read_tap(0xffd, 0xfff, "delayed_far_call_return",
-		[this, caller_page, variant](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return; bool const interrupt = (variant / 27) % 3; if (interrupt && !m_fast_stack_reads) expect(at == 0xffd, "RETE removes only the interrupt frame"); else { unsigned const part = m_fast_stack_reads - unsigned(interrupt); expect(part < 2 && at == 0xffe + part && word == (part ? 0x604 : caller_page), "FRET restores the retained caller page and post-delay PC"); } ++m_fast_stack_reads; });
-	m_pipeline_fetch_tap = program.install_read_tap(caller + 0x601, caller + 0x604, "delayed_far_call_words",
-		[this, caller, layout](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return; if (at == caller + 0x601) { expect(!m_pipeline_extensions_reads && word == 0x700, "FCALLD owns one target literal"); ++m_pipeline_extensions_reads; } else if (at == caller + 0x603 && layout == 1) { expect(!m_pipeline_operand_reads && word == 0x1234, "The complete two-word delay owns its literal"); ++m_pipeline_operand_reads; } else if (at == caller + 0x604) { expect(!m_pipeline_drained_fetches, "Post-delay continuation is fetched once after far return"); ++m_pipeline_drained_fetches; } });
-	m_vector_prefetch_tap = program.install_read_tap(target + 0x700, target + 0x700, "delayed_far_call_target",
-		[this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) { expect(!m_pipeline_register_writes, "Delayed far target is fetched once"); ++m_pipeline_register_writes; } });
-	m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 253670;
-	m_cpu->set_state_int(STATE_GENPC, caller + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-}
 
 std::array<u64,3> tms320c54x_test_state::square_repeat_step(poly_fixture const &f, std::array<u64,3> state, unsigned ordinal)
 {
@@ -1438,35 +1407,6 @@ bool tms320c54x_test_state::check_basic_repeat_results()
 }
 
 
-bool tms320c54x_test_state::check_delayed_far_call_results()
-{
-	if (m_phase == 253670)
-	{
-		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick, layout = variant % 3, caller_page = std::array<unsigned, 3>{0, 2, 0x7f}[(variant / 3) % 3], interrupt = (variant / 27) % 3;
-		unsigned const checkpoint = std::array<unsigned, 3>{6, 8, 14}[variant / 81];
-		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Delayed far call and both delay layouts remain admitted");
-		if (tick == 5 && interrupt) m_cpu->set_input_line(interrupt == 2 ? INPUT_LINE_NMI : 0, ASSERT_LINE);
-		capture_pipeline_at(checkpoint, {&m_pipeline_store_writes, &m_fast_stack_reads, &m_pipeline_extensions_reads, &m_pipeline_operand_reads, &m_pipeline_drained_fetches, &m_vector_acks, &m_pipeline_register_writes},
-			"Save delayed far call with retained frame and settled input");
-		if (tick == 50)
-		{
-			// Mapped XPC visibility during delay Read is not fixed by the instruction manual.
-			if ((layout != 0 && m_cpu->state_int(tms320c54x_device::STATE_A) != (layout == 2 ? 0x4567 : 0)) || m_cpu->state_int(tms320c54x_device::STATE_B) != 0x55 || m_cpu->state_int(tms320c54x_device::STATE_T) != (layout == 1 ? 0x1234 : 0xbeef) || m_cpu->state_int(tms320c54x_device::STATE_BRC) != (layout == 0 ? 0x1234 : 0x9876) || m_cpu->state_int(tms320c54x_device::STATE_SP) != 0x1000 || m_cpu->state_int(tms320c54x_device::STATE_XPC) != caller_page)
-				osd_printf_info("FCALLD failure: case=%u replay=%u layout=%u source_page=%u irq=%u A=%llx B=%llx T=%llx BRC=%llx SP=%llx XPC=%llx PC=%llx writes=%u reads=%u target=%u continuation=%u acks=%u\n", variant, unsigned(m_pipeline_replay), layout, caller_page, interrupt, (unsigned long long)m_cpu->state_int(tms320c54x_device::STATE_A), (unsigned long long)m_cpu->state_int(tms320c54x_device::STATE_B), (unsigned long long)m_cpu->state_int(tms320c54x_device::STATE_T), (unsigned long long)m_cpu->state_int(tms320c54x_device::STATE_BRC), (unsigned long long)m_cpu->state_int(tms320c54x_device::STATE_SP), (unsigned long long)m_cpu->state_int(tms320c54x_device::STATE_XPC), (unsigned long long)m_cpu->state_int(STATE_GENPC), m_pipeline_store_writes, m_fast_stack_reads, m_pipeline_register_writes, m_pipeline_drained_fetches, m_vector_acks);
-			expect((layout == 0 || m_cpu->state_int(tms320c54x_device::STATE_A) == (layout == 2 ? 0x4567 : 0)) && m_cpu->state_int(tms320c54x_device::STATE_B) == 0x55 && m_cpu->state_int(tms320c54x_device::STATE_T) == (layout == 1 ? 0x1234 : 0xbeef) && m_cpu->state_int(tms320c54x_device::STATE_BRC) == (layout == 0 ? 0x1234 : 0x9876) && m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x1000 && m_cpu->state_int(tms320c54x_device::STATE_XPC) == caller_page, "FCALLD executes caller-fetched delay words and returns to its stacked page and continuation");
-			expect(m_pipeline_store_writes == 2 + unsigned(bool(interrupt)) && m_fast_stack_reads == m_pipeline_store_writes && m_pipeline_extensions_reads == 1 && m_pipeline_operand_reads == unsigned(layout == 1) && m_pipeline_drained_fetches == 1 && m_pipeline_register_writes == 1 && m_vector_acks == unsigned(bool(interrupt)), "Far call, delay and IRQ frames each own exactly their accesses");
-			if (replay_pipeline_at(253680, checkpoint,
-				"Replay caller page, stacked continuation and complete delayed call")) return true;
-			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_vector_prefetch_tap.remove(); m_cpu->set_input_line(0, CLEAR_LINE); m_cpu->set_input_line(INPUT_LINE_NMI, CLEAR_LINE); m_cpu->set_pipeline_frontend(false);
-			if (variant < 242) { start_delayed_far_call(variant + 1); return true; }
-			osd_printf_info("TMS320C54x staged FCALLD: PASS cases=243 restore=243 caller_pages=3 target_pages=3 layouts=probe_XPC_STLM,STM,original_NOP_LDM sources=none,IRQ,NMI frame_words=2 complete_delays=2 return_roundtrip=1 xpc_delay_visibility=unvalidated silicon_phase_claim=0\n");
-			throw emu_fatalerror(0, "TMS320C54x isolated delayed far call complete");
-		}
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 253680) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 253670; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true; }
-	return false;
-}
 
 bool tms320c54x_test_state::check_block_branch_count_results()
 {

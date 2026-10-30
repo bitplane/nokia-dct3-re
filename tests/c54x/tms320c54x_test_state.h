@@ -655,7 +655,6 @@ private:
 	static addc_fixture mapped_logic_case(unsigned variant);
 	void start_addc(unsigned variant = 0);
 	void start_staged_bus_stm(unsigned variant = 0);
-	void start_delayed_far_call(unsigned variant = 0);
 	struct mac_smem_fixture
 	{
 		u16 opcode, memory, t, st0, st1, pmst, address, result_st0;
@@ -1029,7 +1028,6 @@ private:
 	bool check_circular_portr_results();
 	bool check_ifr_pair_results();
 	bool check_poly_results();
-	bool check_delayed_far_call_results();
 	bool check_popd_mapped_results();
 	bool check_mvdd_peripheral_results();
 	bool check_memory_immediate_results();
