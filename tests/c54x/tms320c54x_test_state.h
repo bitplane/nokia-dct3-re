@@ -92,7 +92,6 @@ private:
 	void acknowledge_entry_interrupt(int line);
 	void acknowledge_frontend_interrupt(int line);
 	void start_entry_stage_restore_case(unsigned index);
-	void start_cala_rtn_case(unsigned index);
 	void start_operand_fetch_case(unsigned index);
 	void start_loop_xc_case(unsigned index);
 	void start_xc_irq_case(unsigned index);

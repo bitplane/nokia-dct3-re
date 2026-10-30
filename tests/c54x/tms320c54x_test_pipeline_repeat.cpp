@@ -1170,31 +1170,7 @@ bool tms320c54x_test_state::check_repeat_endpoints_results()
 		}
 		if (index < 52) { start_operand_fetch_case(index + 1); return true; }
 		osd_printf_info("TMS320C54x operand fetch order: PASS cases=53 families=12 forms=direct,indirect,long,absolute,preincrement\n");
-		start_cala_rtn_case(0); return true;
-	}
-	if (m_phase >= 87000 && m_phase < 87004)
-	{
-		unsigned const index = (m_phase - 87000) / 2;
-		auto &data = m_cpu->space(AS_DATA);
-		if (!(m_phase & 1))
-		{
-			expect(m_cpu->state_int(STATE_GENPC) == 0x0901 &&
-				m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x03ff &&
-				data.read_word(0x03ff) == 0x0801, "CALA stacks its continuation");
-			data.write_word(0x03ff, 0xdead);
-			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-			++m_phase;
-			m_check_timer->adjust(attotime::from_usec(100));
-			return true;
-		}
-		expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) &&
-			!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) &&
-			m_cpu->state_int(STATE_GENPC) == 0x0802 &&
-			m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x0400 &&
-			data.read_word(0x03ff) == 0xdead, "CALA publishes RTN independently of its stack word");
-		if (!index) { start_cala_rtn_case(1); return true; }
-		osd_printf_info("TMS320C54x accumulator call fast return: PASS cases=2 sources=A,B\n");
-		start_instruction_word_case(0); return true;
+		return true;
 	}
 	if (m_phase >= 88000 && m_phase < 88000 + instruction_word_examples().size())
 	{

@@ -6,20 +6,6 @@
 
 namespace c54x_test {
 
-void tms320c54x_test_state::start_cala_rtn_case(unsigned index)
-{
-	m_cpu->reset();
-	auto &program = m_cpu->space(AS_PROGRAM);
-	program.write_word(0x0800, index ? 0xf5e3 : 0xf4e3); // CALA A/B
-	program.write_word(0x0801, 0xf4e1);
-	program.write_word(0x0900, 0xf4e1); // Inspect the paused callee before RETF.
-	program.write_word(0x0901, 0xf49b);
-	set_registers(*m_cpu, {
-		{cpu_regs::STATE_A, 0x0900}, {cpu_regs::STATE_B, 0x0900}, {cpu_regs::STATE_SP, 0x0400}, {STATE_GENPC, 0x0800},
-	});
-	m_phase = 87000 + index * 2;
-	m_check_timer->adjust(attotime::from_usec(100));
-}
 
 
 

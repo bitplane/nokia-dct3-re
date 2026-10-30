@@ -96,6 +96,7 @@ def main():
     counts['repeat_rearm'] = 10
     counts['block_repeat_control'] = 8
     counts['clock_control'] = 16
+    counts['accumulator_call'] = 2
     parser.add_argument('section', choices=[*counts, 'all'])
     parser.add_argument('--jobs', type=int, default=8)
     parser.add_argument('--negative-control', action='store_true', help='require failure of an intentionally wrong expectation')
