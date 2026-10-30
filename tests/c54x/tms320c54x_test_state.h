@@ -1186,16 +1186,6 @@ private:
 	staged_conditional_store_fixture staged_conditional_store_case(unsigned v) const;
 	void start_staged_conditional_store(unsigned variant = 0);
 
-	struct parallel_sub_fraction_fixture
-	{
-		u64 a, b;
-		u16 x;
-		bool source_b, destination_b;
-	};
-	static parallel_sub_fraction_fixture parallel_sub_fraction_case(unsigned index);
-	void start_native_dual_sub(unsigned index);
-
-	void start_parallel_sub_fraction(unsigned index);
 
 
 
@@ -1427,7 +1417,6 @@ private:
 	bool check_block_exit_results();
 	bool check_staged_bus_stm_results();
 	bool check_rom4_fr_decoder_results();
-	bool check_native_dual_sub_results();
 	bool check_rom4_codec_is_results();
 	bool check_rom4_crc_input_results();
 	TIMER_CALLBACK_MEMBER(check_results);

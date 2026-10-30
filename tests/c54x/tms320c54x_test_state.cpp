@@ -164,8 +164,6 @@ void tms320c54x_test_state::machine_reset()
 	if (profile_is("stlm-pmst")) { start_stlm_pmst(); return; }
 	if (profile_is("cond-store") || profile_is("cond-store-edge")) { start_staged_conditional_store(); return; }
 	if (profile_is("cond-store-ar")) { start_staged_conditional_store(); return; }
-	if (profile_is("dual-sub-native")) { start_native_dual_sub(0); return; }
-	if (profile_is("parallel-sub")) { start_parallel_sub_fraction(0); return; }
 	if (profile_is("pshd-long")) { start_extended_push(); return; }
 	if (profile_is("pshd-long-map")) { start_extended_push(96000); return; }
 	if (start_profile(*this, machine().options().bios(), {

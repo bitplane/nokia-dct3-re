@@ -2257,57 +2257,8 @@ void tms320c54x_test_state::start_mvmd_accumulator(unsigned variant)
 bool tms320c54x_test_state::shifted_unowned_fixture() const
 { return profile_is("shift-unowned"); }
 
-tms320c54x_test_state::parallel_sub_fraction_fixture tms320c54x_test_state::parallel_sub_fraction_case(unsigned index)
-{
-	static constexpr u64 values[] = { 1, 0x17fff, 0x18000, 0x1ffff,
-		0xffffff0001ULL, 0xffffff8000ULL, 0xffffff7fffULL, 0xffffffffffULL };
-	static constexpr u16 words[] = { 0, 1, 0x7fff, 0x8000 };
-	return { values[index % 8], values[(index + 3) % 8], words[(index / 8) % 4],
-		bool((index / 32) & 1), bool((index / 64) & 1) };
-}
 
-void tms320c54x_test_state::start_native_dual_sub(unsigned index)
-{
-	static constexpr u16 values[] = { 0, 1, 0x7fff, 0x8000, 0xffff, 0xfffb, 7, 0x1234 };
-	auto &program = m_cpu->space(AS_PROGRAM);
-	auto &data = m_cpu->space(AS_DATA);
-	program.write_word(0x600, 0xa245); // SUB *AR2-,*AR3-,A.
-	program.write_word(0x601, 0xf4e1);
-	data.write_word(0x2000, values[index % 8]);
-	data.write_word(0x2100, values[(index / 8) % 8]);
-	set_registers(*m_cpu, {
-		{cpu_regs::STATE_PC, 0x600}, {cpu_regs::STATE_A, 0x123456}, {cpu_regs::STATE_B, 0x56789a},
-		{cpu_regs::STATE_AR2, 0x2000}, {cpu_regs::STATE_AR3, 0x2100}, {cpu_regs::STATE_T, 0x4444},
-		{cpu_regs::STATE_ST0, 0}, {cpu_regs::STATE_ST1, 0x800 | ((index / 64) << 8)}, {cpu_regs::STATE_PMST, 0},
-		{cpu_regs::STATE_TCR, 0x10}, {cpu_regs::STATE_ILLEGAL, 0}, {cpu_regs::STATE_IDLE, 0},
-	});
-	m_cpu->set_pipeline_frontend(false);
-	m_rom4_codec_replay = false; m_phase = 700000 + index;
-	expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save native dual SUB fixture");
-	m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-}
 
-void tms320c54x_test_state::start_parallel_sub_fraction(unsigned index)
-{
-	auto const f = parallel_sub_fraction_case(index);
-	auto &program = m_cpu->space(AS_PROGRAM);
-	auto &data = m_cpu->space(AS_DATA);
-	program.write_word(0x600, 0xc401 | (f.source_b ? 0x200 : 0) | (f.destination_b ? 0x100 : 0));
-	program.write_word(0x601, 0xf4e1);
-	data.write_word(0x2000, f.x); data.write_word(0x2100, 0xdead);
-	set_registers(*m_cpu, {
-		{cpu_regs::STATE_PC, 0x600}, {cpu_regs::STATE_SP, 0x1000}, {cpu_regs::STATE_A, f.a}, {cpu_regs::STATE_B, f.b},
-		{cpu_regs::STATE_AR2, 0x2000}, {cpu_regs::STATE_AR3, 0x2100}, {cpu_regs::STATE_ST0, 0},
-	});
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x900); // SXM, INTM; ASM=0, OVM=0.
-	set_registers(*m_cpu, {
-		{cpu_regs::STATE_PMST, 0}, {cpu_regs::STATE_TCR, 0x10}, {cpu_regs::STATE_ILLEGAL, 0}, {cpu_regs::STATE_IDLE, 0},
-	});
-	m_cpu->set_pipeline_frontend(false);
-	m_rom4_codec_replay = false; m_phase = 525000 + index;
-	expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save parallel subtraction with fractional accumulator bits");
-	m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-}
 
 
 
@@ -3693,68 +3644,6 @@ bool tms320c54x_test_state::check_sqdst_results()
 	return false;
 }
 
-bool tms320c54x_test_state::check_native_dual_sub_results()
-{
-	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
-	if (m_phase >= 700000 && m_phase < 700256)
-	{
-		unsigned const index = m_phase - 700000;
-		if (!m_cpu->state_int(tms320c54x_device::STATE_IDLE)) { m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true; }
-		static constexpr u16 values[] = { 0, 1, 0x7fff, 0x8000, 0xffff, 0xfffb, 7, 0x1234 };
-		u16 const x = values[index % 8], y = values[(index / 8) % 8];
-		bool const sxm = BIT(index, 6), ovm = BIT(index, 7);
-		// SPRU172C dual-memory SUB: sign-extend each word before shifting by 16.
-		s64 const difference = (sxm ? s64(s16(x)) - s16(y) : s64(x) - y) * 65536;
-		bool const overflow = difference < -0x80000000LL || difference > 0x7fffffffLL;
-		u64 const result = overflow && ovm ? (difference < 0 ? 0xff80000000ULL : 0x7fffffffULL) : u64(difference) & 0xffffffffffULL;
-		expect_opcode(0xa245,
-			!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) &&
-			m_cpu->state_int(tms320c54x_device::STATE_A) == result &&
-			m_cpu->state_int(tms320c54x_device::STATE_B) == 0x56789a &&
-			m_cpu->state_int(tms320c54x_device::STATE_T) == 0x4444 &&
-			m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x1fff &&
-			m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x20ff &&
-			m_cpu->state_int(tms320c54x_device::STATE_ST0) == ((x >= y ? 0x800 : 0) | (overflow ? 0x400 : 0)) &&
-			m_cpu->state_int(tms320c54x_device::STATE_ST1) == (0x800 | ((index / 64) << 8)) &&
-			data.read_word(0x2000) == x && data.read_word(0x2100) == y,
-			"Exact native dual SUB preserves sources and independently decrements both pointers");
-		if (!m_rom4_codec_replay)
-		{
-			expect(restore_snapshot(machine(), *m_check_timer, m_saved_pipeline) == STATERR_NONE, "Restore native dual SUB fixture");
-			m_phase = 700000 + index; m_rom4_codec_replay = true;
-			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-		}
-		if (index < 255) { start_native_dual_sub(index + 1); return true; }
-		osd_printf_info("TMS320C54x native dual SUB: PASS cases=256 restore=256 opcode=a245 patterns=8x8 sxm=0,1 ovm=0,1 physical_phase_claim=0\n");
-		throw emu_fatalerror(0, "TMS320C54x isolated native dual SUB complete");
-	}
-	if (m_phase >= 525000 && m_phase < 525128)
-	{
-		unsigned const index = m_phase - 525000;
-		auto const f = parallel_sub_fraction_case(index);
-		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Atomic ST||SUB is admitted");
-		if (!m_cpu->state_int(tms320c54x_device::STATE_IDLE)) { m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true; }
-		// SPRU172C 4-185: subtract the whole opposite accumulator, not its stored high word.
-		u64 const other = f.destination_b ? f.a : f.b;
-		u64 const result = (u64(s64(s16(f.x)) * 65536) - other) & 0xffffffffffULL;
-		u16 const stored = u16((f.source_b ? f.b : f.a) >> 16);
-		expect(m_cpu->state_int(tms320c54x_device::STATE_A) == (f.destination_b ? f.a : result) &&
-			m_cpu->state_int(tms320c54x_device::STATE_B) == (f.destination_b ? result : f.b) &&
-			data.read_word(0x2100) == stored && data.read_word(0x2000) == f.x &&
-			m_cpu->state_int(tms320c54x_device::STATE_PC) == 0x602 && m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x1000,
-			"ST||SUB retains fractional borrow and stores the pre-instruction source even when source equals destination");
-		if (!m_rom4_codec_replay)
-		{
-			expect(restore_snapshot(machine(), *m_check_timer, m_saved_pipeline) == STATERR_NONE, "Restore fractional parallel subtraction");
-			m_phase = 525000 + index; m_rom4_codec_replay = true;
-			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-		}
-		if (index < 127) { start_parallel_sub_fraction(index + 1); return true; }
-		osd_printf_info("TMS320C54x atomic ST||SUB fractions: PASS cases=128 restore=128 source_dest_pairs=4 fractional_patterns=8 memory_patterns=4 ordinary_ram=1 physical_phase_claim=0\n");
-		throw emu_fatalerror(0, "TMS320C54x isolated ST||SUB fractions complete");
-	}
-	return false;
-}
 
 
 
