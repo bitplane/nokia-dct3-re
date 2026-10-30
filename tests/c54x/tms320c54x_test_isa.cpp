@@ -7,7 +7,6 @@
 #include "tms320c54x_test_parallel.h"
 #include "tms320c54x_test_dual_reference.h"
 #include "tms320c54x_test_domains.h"
-#include "tms320c54x_test_scalars.h"
 #include "tms320c54x_test_long_reference.h"
 #include "tms320c54x_test_product_examples.h"
 #include "tms320c54x_test_memory_examples.h"
@@ -109,8 +108,6 @@ protected:
 				m_cases.assign(c54x_test::near_flow_cases().begin(), c54x_test::near_flow_cases().end());
 			else if (long_reference())
 				m_cases.assign(c54x_test::long_reference_cases().begin(), c54x_test::long_reference_cases().end());
-			else if (scalars())
-				m_cases = c54x_test::scalar_vectors();
 			else if (parallel())
 			{
 				for (unsigned i = 0; i < c54x_test::parallel_vectors().size(); ++i) m_cases.push_back(c54x_test::parallel_case(i));

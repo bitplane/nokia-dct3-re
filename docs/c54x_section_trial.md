@@ -182,6 +182,8 @@ Subsequent replacements use the same section-only workflow:
 
 | `atomic_xorm.h` | Keep eight DP/CPL/indirect/circular/offset/absolute forms ×four source patterns ×four masks, exact Read-before-Write once, resolved address/pointer/SP/accumulator/T/status preservation, final PC and replay before/after transaction. Distribute ignored SXM/OVM rather than crossing them. The post-transaction snapshot is now at terminal IDLE, deliberately dropping the old pre-IDLE PC-specific checkpoint; atomic semantics only, no timing claim. | Native256 cases/restores versus1024; build5.323s/run0.108s. Delete setup/helper/fixture/checker, phases520000..521023, profile route/declarations/dispatch. |
 
+| `scalar_boundaries.h` | Retain34 literal NEG/load/ABS/saturation/shift/carry/rotate/XOR boundaries with independent explicit program, A/B, flags and memory. Preserve destination/sibling and documented flag masks; add exact memory Read/no writes, terminal PC/IDLE and replay. Remove inherited host-side continuations and artificial PORTW4 timing brackets around NEG; no timing claim. | Native34 cases/restores; build5.311s/run0.028s. Delete scalar-vector header, preparation/check/advance routing and ISA-bank inclusion. Terminal phase blocks that set up other unmigrated banks remain solely as their reference material, not as scalar tests. |
+
 `python3 tools/run_c54x_section.py all` rebuilds/runs each replacement in
 sequence. Final measurements: immediate-store5.214/0.019s,
 basic-memory5.423/0.020s, stack5.262/0.069s, DAGEN5.406/0.126s (build/run).

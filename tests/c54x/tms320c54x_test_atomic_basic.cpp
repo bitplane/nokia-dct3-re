@@ -3,7 +3,6 @@
 
 #include "emu.h"
 #include "tms320c54x_test_state.h"
-#include "tms320c54x_test_scalars.h"
 
 namespace c54x_test {
 
@@ -12,22 +11,8 @@ bool tms320c54x_test_state::check_atomic_basic_results()
 {
 	[[maybe_unused]] auto &program = m_cpu->space(AS_PROGRAM);
 	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
-	auto prepare_scalar = [&](unsigned index) {
-		auto const &test = scalar_vectors().at(index);
-		if (test.port_writes) m_port_writes = 0;
-		prepare_case(*m_cpu, test);
-	};
-	if ((m_phase >= 45 && m_phase <= 60) || (m_phase >= 67 && m_phase <= 68) ||
-		(m_phase >= 70 && m_phase <= 77) || (m_phase >= 9100 && m_phase <= 9107))
+	if (m_phase == 9107 || m_phase == 60 || m_phase == 68 || m_phase == 77)
 	{
-		unsigned const index = m_phase >= 9100 ? m_phase - 9100 : m_phase >= 70 ? m_phase - 70 + 26 :
-			m_phase >= 67 ? m_phase - 67 + 24 : m_phase - 45 + 8;
-		auto const &test = scalar_vectors().at(index);
-		if (index < 8) check_case(*m_cpu, test, m_port_writes, m_last_port_cycle - m_first_port_cycle);
-		else check_case_state(*m_cpu, test);
-		if (index < 8 || m_phase == 45 || (m_phase >= 75 && m_phase <= 77))
-			expect_opcode(test.opcode, true, "Scalar boundary reference");
-		if (profile_is("legacy-atomic")) osd_printf_info("C54x ISA case: PASS id=%s\n", test.id);
 		switch (m_phase)
 		{
 		case 9107:
@@ -80,9 +65,6 @@ bool tms320c54x_test_state::check_atomic_basic_results()
 				{cpu_regs::STATE_IDLE, 0},
 			});
 			return next_atomic_phase(78);
-		default:
-			prepare_scalar(index + 1);
-			return next_atomic_phase(m_phase + 1);
 		}
 	}
 	if (m_phase == 5)
@@ -587,8 +569,7 @@ bool tms320c54x_test_state::check_atomic_basic_results()
 				((u64(1) << 40) - 5) &&
 				!(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0800),
 				"accumulator negate result and carry");
-		prepare_scalar(0);
-		return next_atomic_phase(9100);
+		return true;
 	}
 	if (m_phase == 42)
 	{
@@ -629,8 +610,7 @@ bool tms320c54x_test_state::check_atomic_basic_results()
 				m_cpu->state_int(tms320c54x_device::STATE_A) == 1 &&
 				m_cpu->state_int(tms320c54x_device::STATE_B) == 2,
 				"CALAD delay slots and return address");
-		prepare_scalar(8);
-		return next_atomic_phase(45);
+		return true;
 	}
 	if (m_phase == 61)
 	{
@@ -740,16 +720,14 @@ bool tms320c54x_test_state::check_atomic_basic_results()
 				m_cpu->state_int(tms320c54x_device::STATE_PC) == 0x0527 &&
 				m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x0300,
 				"CALLD two-cycle and RETD three-cycle timing with balanced delayed return");
-		prepare_scalar(24);
-		return next_atomic_phase(67);
+		return true;
 	}
 	if (m_phase == 69)
 	{
 		expect(m_repeat_reads == 2 && m_last_operand_cycle - m_first_operand_cycle == 3 &&
 				m_cpu->state_int(tms320c54x_device::STATE_A) == 0x1235,
 				"long-immediate LD consumes two cycles");
-		prepare_scalar(26);
-		return next_atomic_phase(70);
+		return true;
 	}
 	return false;
 }
