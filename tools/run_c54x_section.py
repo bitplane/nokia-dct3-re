@@ -317,6 +317,7 @@ def main():
     counts['atomic_xc_interrupt'] = 8
     counts['unsigned_imr_load'] = 64
     counts['status_write_interrupt'] = 192
+    counts['unsigned_peripheral_load'] = 1536
     counts['accumulator_call_frames'] = 216
     parser.add_argument('section', choices=[*counts, 'all'])
     parser.add_argument('--jobs', type=int, default=8)

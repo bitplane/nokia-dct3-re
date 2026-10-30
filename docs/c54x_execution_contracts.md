@@ -1964,6 +1964,17 @@ producing 384 executions. These are model capture/publication contracts;
 active interrupt composition is not qualified. The old LDU setup/result phase
 and profile are removed.
 
+### Unsigned peripheral load
+
+`unsigned_peripheral_load` owns 1,536 cases/replays:
+all 64 synthetic endpoints, direct/absolute/indirect addressing, four words
+and both accumulators. Read6 (absolute Read7), zero extension despite SXM,
+preserved flags/other accumulator and retained poisoned literal/pointer are
+checked with exactly one Read and no Writes. Pages/checkpoints are distributed
+instead of multiplying to 9,216 executions. Endpoint substitution tests CPU
+bus semantics only, not actual peripheral register values. Its legacy owner
+has been removed.
+
 ### Full-status interrupt composition
 
 `status_write_interrupt` replaces both MVMD/STLM status IRQ profiles with

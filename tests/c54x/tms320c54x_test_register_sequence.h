@@ -206,7 +206,12 @@ private:
 				if (m_data_observer) m_data_observer(write, u32(at), word);
 			};
 			m_data_tap = m_cpu.space(m_input.observed_data_space).install_readwrite_tap(0, 0xffff, "register_sequence_data",
-				[access](offs_t at, u16 &word, u16) { access(false, at, word); },
+				[this,access](offs_t at, u16 &word, u16) {
+					if (!m_machine.side_effects_disabled())
+						for (auto const &endpoint : m_input.synthetic_data_reads)
+							if (at == endpoint.address) word = endpoint.value;
+					access(false, at, word);
+				},
 				[access](offs_t at, u16 &word, u16) { access(true, at, word); });
 		}
 		if (m_input.forbid_data_access)
