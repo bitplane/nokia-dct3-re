@@ -3,7 +3,6 @@
 
 #include "emu.h"
 #include "tms320c54x_test_state.h"
-#include "tms320c54x_test_absolute_examples.h"
 
 namespace c54x_test {
 
@@ -312,14 +311,9 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 			m_cpu->state_int(tms320c54x_device::STATE_AR5) == 0x0f27 &&
 			m_port_writes == 3 && m_last_port_cycle - m_first_port_cycle == 5,
 			"ROM4 PORTW emits old AR2 memory before one decrement, preserves source/unrelated pointers and costs two cycles");
-		return begin_atomic_case(memory_route_examples()[0], 337);
 	}
-	if (m_phase >= 337 && m_phase <= 340)
+	if (m_phase == 340)
 	{
-		auto const &cases = memory_route_examples();
-		unsigned const index = 0 + m_phase - 337;
-		verify_atomic_case(cases[index]);
-		if (m_phase < 340) return begin_atomic_case(cases[index + 1], m_phase + 1);
 		program.write_word(0x05e3, 0xfa4d); // BCD 05f0h, BEQ
 		program.write_word(0x05e4, 0x05f0);
 		program.write_word(0x05e5, 0xe801); // Delay slot 1
@@ -406,14 +400,9 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 				m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0f00 &&
 				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 10,
 				"long-offset RPT Smem runs MAR three times after four-cycle setup");
-		return begin_atomic_case(memory_route_examples()[4], 346);
 	}
-	if (m_phase >= 346 && m_phase <= 354)
+	if (m_phase == 354)
 	{
-		auto const &cases = memory_route_examples();
-		unsigned const index = 4 + m_phase - 346;
-		verify_atomic_case(cases[index]);
-		if (m_phase < 354) return begin_atomic_case(cases[index + 1], m_phase + 1);
 		write_words(program, {
 			{0x05e3, 0xf84e}, // BC 05f0,BGT
 			{0x05e4, 0x05f0},
@@ -485,14 +474,9 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 			});
 			return next_atomic_phase(359);
 		}
-		return begin_atomic_case(memory_route_examples()[13], 360);
 	}
-	if (m_phase >= 360 && m_phase <= 361)
+	if (m_phase == 361)
 	{
-		auto const &cases = memory_route_examples();
-		unsigned const index = 13 + m_phase - 360;
-		verify_atomic_case(cases[index]);
-		if (m_phase < 361) return begin_atomic_case(cases[index + 1], m_phase + 1);
 		program.write_word(0x05e3, 0x75ea); // PORTW *+AR2(5),0124
 		program.write_word(0x05e4, 0x0124);
 		program.write_word(0x05e5, 5);
@@ -507,13 +491,9 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 				m_port_writes == 3 && m_middle_port_value == 0xabcd &&
 				m_last_port_cycle - m_middle_port_cycle == 3,
 				"long-offset PORTW consumes port before offset and takes three cycles");
-		return begin_atomic_case(memory_route_examples()[15], 363);
 	}
 	if (m_phase == 363)
 	{
-		auto const &cases = memory_route_examples();
-		unsigned const index = 15 + m_phase - 363;
-		verify_atomic_case(cases[index]);
 		program.write_word(0x05e3, 0x7dea); // MVDP *+AR2(5),0600
 		program.write_word(0x05e4, 0x0600);
 		program.write_word(0x05e5, 5);
@@ -547,14 +527,9 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 				m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0f05 &&
 				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 9,
 				"long-offset WRITA stores the data word at A in six cycles");
-		return begin_atomic_case(memory_route_examples()[16], 366);
 	}
-	if (m_phase >= 366 && m_phase <= 367)
+	if (m_phase == 367)
 	{
-		auto const &cases = memory_route_examples();
-		unsigned const index = 16 + m_phase - 366;
-		verify_atomic_case(cases[index]);
-		if (m_phase < 367) return begin_atomic_case(cases[index + 1], m_phase + 1);
 		program.write_word(0x05e3, 0x74ea); // PORTR 0123,*+AR2(5)
 		program.write_word(0x05e4, 0x0123);
 		program.write_word(0x05e5, 5);
@@ -571,14 +546,9 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 				m_port_reads == 1 && m_port_writes == 2 &&
 				m_middle_port_cycle - m_first_port_cycle == 3,
 				"long-offset PORTR consumes port before offset and takes three cycles");
-		return begin_atomic_case(memory_route_examples()[18], 369);
 	}
-	if (m_phase >= 369 && m_phase <= 373)
+	if (m_phase == 373)
 	{
-		auto const &cases = memory_route_examples();
-		unsigned const index = 18 + m_phase - 369;
-		verify_atomic_case(cases[index]);
-		if (m_phase < 373) return begin_atomic_case(cases[index + 1], m_phase + 1);
 		program.write_word(0x05e3, 0x1080); // LD *AR0,A.
 		data.write_word(0x0f22, 0x8002);
 		m_port_writes = 0;
@@ -608,14 +578,9 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0);
 			return resume_atomic_at(0x05e0, 6592);
 		}
-		return begin_atomic_case(memory_route_examples()[23], 374);
 	}
-	if (m_phase >= 374 && m_phase <= 376)
+	if (m_phase == 376)
 	{
-		auto const &cases = memory_route_examples();
-		unsigned const index = 23 + m_phase - 374;
-		verify_atomic_case(cases[index]);
-		if (m_phase < 376) return begin_atomic_case(cases[index + 1], m_phase + 1);
 		write_words(program, {
 			{0x05e3, 0xf517}, // ADD A >> 9,B
 			{0x05e4, 0x75f8}, {0x05e5, 0x0d00}, {0x05e6, 0x0124}, {0x05e7, 0xf5e1},

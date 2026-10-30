@@ -5,7 +5,6 @@
 #include "emuopts.h"
 #include "tms320c54x_test_domains.h"
 #include "tms320c54x_test_word_examples.h"
-#include "tms320c54x_test_absolute_examples.h"
 #include "tms320c54x_test_disassembly.h"
 #include "tms320c54x_test_long_t_store.h"
 #include "tms320c54x_test_mapped_mac.h"
@@ -81,13 +80,7 @@ protected:
 		else if (m_domain) m_domains = std::make_unique<c54x_test::source_domain_fixture>(machine(), *m_cpu, *m_timer);
 		else
 		{
-			if (memory_reference())
-			{
-				for (auto const *bank : {
-					&c54x_test::memory_route_examples()})
-					m_cases.insert(m_cases.end(), bank->begin(), bank->end());
-			}
-			else if (words()) m_cases = c54x_test::instruction_word_examples();
+			if (words()) m_cases = c54x_test::instruction_word_examples();
 			else if (products()) throw emu_fatalerror("Legacy product bank retired: run atomic_product_literals");
 			else if (near_flow())
 				throw emu_fatalerror("Legacy near-flow bank retired: run the atomic_near_control section");
@@ -244,7 +237,6 @@ private:
 	bool scalars() const { return !std::strcmp(machine().options().bios(), "isa-scalars"); }
 	bool long_reference() const { return !std::strcmp(machine().options().bios(), "isa-long"); }
 	bool products() const { return !std::strcmp(machine().options().bios(), "isa-products"); }
-	bool memory_reference() const { return !std::strcmp(machine().options().bios(), "isa-memory"); }
 	bool near_flow() const { return !std::strcmp(machine().options().bios(), "isa-flow"); }
 	bool words() const { return !std::strcmp(machine().options().bios(), "isa-words"); }
 	bool disassembly() const { return !std::strcmp(machine().options().bios(), "isa-disasm"); }
@@ -325,11 +317,6 @@ private:
 			osd_printf_info("TMS320C54x generic near flow: PASS cases=%u reset_groups=%u nokia_devices=0 firmware=0\n", m_case, m_resets);
 			throw emu_fatalerror(3, "TMS320C54x isolated generic near flow complete");
 		}
-		if (memory_reference())
-		{
-			osd_printf_info("TMS320C54x generic memory examples: PASS cases=%u reset_groups=%u nokia_devices=0 firmware=0\n", m_case, m_resets);
-			throw emu_fatalerror(3, "TMS320C54x isolated generic memory examples complete");
-		}
 		if (products())
 		{
 			osd_printf_info("TMS320C54x generic product sequence: PASS cases=%u reset_groups=%u nokia_devices=0 firmware=0\n", m_case, m_resets);
@@ -386,7 +373,6 @@ ROM_START(tms54isa)
 	ROM_SYSTEM_BIOS(5, "isa-products", "Literal multiply arithmetic and DELAY continuation sequence")
 	ROM_SYSTEM_BIOS(6, "isa-flow", "Conditional delayed branch return and high-address stack examples")
 	ROM_SYSTEM_BIOS(7, "mac-map-imm", "Read-retained mapped source with Execute-live immediate MAC")
-	ROM_SYSTEM_BIOS(8, "isa-memory", "Ordered literal memory arithmetic multiply and T examples")
 	ROM_SYSTEM_BIOS(9, "mpy-dual", "Dual-memory multiply addresses and arithmetic replay")
 	ROM_SYSTEM_BIOS(10, "mpy-dual-edge", "Excluded dual-memory multiply low-page operands")
 	ROM_SYSTEM_BIOS(11, "alu-dual", "Dual-memory ADD SUB retained arithmetic replay")
