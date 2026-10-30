@@ -4721,42 +4721,6 @@ void tms320c54x_test_state::start_staged_conditional_store(unsigned variant)
 	m_cpu->set_state_int(STATE_GENPC, f.base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 }
 
-void tms320c54x_test_state::start_conditional_register_store(unsigned index)
-{
-	m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove();
-	auto const f = conditional_register_case(index);
-	auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
-	unsigned const condition = index % 12;
-	program.write_word(0x600, (f.brc ? 0x9d00 : 0x9c00) | (f.x << 4) | (condition < 6 ? condition + 2 : condition + 4));
-	program.write_word(0x601, 0xf4e1);
-	data.write_word(f.address, 0xa55a);
-	set_registers(*m_cpu, {
-		{cpu_regs::STATE_PC, 0x600}, {cpu_regs::STATE_SP, 0x1000}, {cpu_regs::STATE_A, f.a}, {cpu_regs::STATE_B, f.b},
-		{cpu_regs::STATE_T, f.brc ? 0xbeef : f.source}, {cpu_regs::STATE_BRC, f.brc ? f.source : 0x55aa},
-		{cpu_regs::STATE_AR0, 2},
-	});
-	for (unsigned ar = 2; ar < 6; ++ar) m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + ar, 0x1403 + (ar - 2) * 16);
-	set_registers(*m_cpu, {
-		{cpu_regs::STATE_BK, 4}, {cpu_regs::STATE_ST0, 0x1e05}, {cpu_regs::STATE_ST1, 0x800}, {cpu_regs::STATE_PMST, 0},
-		{cpu_regs::STATE_TCR, 0x10}, {cpu_regs::STATE_ILLEGAL, 0}, {cpu_regs::STATE_IDLE, 0},
-	});
-	m_pipeline_operand_reads = m_pipeline_store_writes = 0;
-	m_pipeline_operand_tap = data.install_read_tap(0, 0xffff, "conditional_register_read", [this, f](offs_t at, u16 &word, u16) {
-		if (machine().side_effects_disabled()) return;
-		expect(at == f.address && word == 0xa55a && !m_pipeline_operand_reads++ && !m_pipeline_store_writes, "Conditional register store reads its destination once before writing, even when false"); });
-	m_pipeline_write_tap = data.install_write_tap(0, 0xffff, "conditional_register_write", [this, f](offs_t at, u16 &word, u16) {
-		if (machine().side_effects_disabled()) return;
-		expect(at == f.address && word == (f.take ? f.source : 0xa55a) && m_pipeline_operand_reads == 1 && !m_pipeline_store_writes++, "Conditional register store writes its source or retained destination exactly once"); });
-	m_rom4_codec_replay = false; m_rom4_codec_replays = 0;
-	m_phase = 500000 + index;
-	if (index < 9216)
-	{
-		m_recurring_irq_snapshot = {0, 0};
-		expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save conditional register store before its read/write pair");
-		m_rom4_codec_replays = 1;
-	}
-	m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-}
 
 void tms320c54x_test_state::start_zero_bk_case(unsigned index)
 {

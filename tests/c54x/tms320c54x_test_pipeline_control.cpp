@@ -110,18 +110,6 @@ void tms320c54x_test_state::start_far_case(unsigned index)
 }
 
 
-tms320c54x_test_state::conditional_register_fixture tms320c54x_test_state::conditional_register_case(unsigned index)
-{
-	unsigned const condition = index % 12, pattern = (index / 12) % 6, x = (index / 72) % 16;
-	u64 const tested = std::array<u64, 6>{0, 1, 0xffffffffffULL, 0x7fffffff, 0xff80000000ULL, 0x0100000000ULL}[pattern];
-	bool const negative = pattern == 2 || pattern == 4;
-	bool const predicates[] = {!negative, negative, pattern != 0, pattern == 0, !negative && pattern != 0, negative || pattern == 0};
-	u16 const address = 0x1403 + (x & 3) * 16;
-	u16 const next = (x >> 2) == 0 ? address : (x >> 2) == 1 ? address - 1 : (x >> 2) == 2 ? address + 1 : address - 2;
-	return {bool((index / 4608) % 2), predicates[condition % 6], x,
-		std::array<u16, 4>{0, 0xffff, 0x1234, 0x8000}[(index / 1152) % 4], address, next,
-		condition < 6 ? tested : 0x23456789ULL, condition < 6 ? 0x23456789ULL : tested};
-}
 
 
 
@@ -178,44 +166,6 @@ bool tms320c54x_test_state::check_software_interrupt_entry_results()
 
 
 
-bool tms320c54x_test_state::check_conditional_register_results()
-{
-	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
-	if (m_phase >= 500000 && m_phase < 518432)
-	{
-		unsigned const index = m_phase - 500000;
-		auto const f = conditional_register_case(index);
-		if (!m_rom4_codec_replays && m_cpu->state_int(tms320c54x_device::STATE_PC) == 0x601)
-		{
-			m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_store_writes};
-			expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save conditional register store after its read/write and address update");
-			m_rom4_codec_replays = 1;
-		}
-		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Conditional register store remains admitted");
-		if (!m_cpu->state_int(tms320c54x_device::STATE_IDLE)) { m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true; }
-		auto const disable = machine().disable_side_effects();
-		expect(m_rom4_codec_replays == 1 && m_pipeline_operand_reads == 1 && m_pipeline_store_writes == 1 &&
-			data.read_word(f.address) == (f.take ? f.source : 0xa55a) && m_cpu->state_int(tms320c54x_device::STATE_PC) == 0x602 &&
-			m_cpu->state_int(tms320c54x_device::STATE_A) == f.a && m_cpu->state_int(tms320c54x_device::STATE_B) == f.b &&
-			m_cpu->state_int(tms320c54x_device::STATE_T) == (f.brc ? 0xbeef : f.source) &&
-			m_cpu->state_int(tms320c54x_device::STATE_BRC) == (f.brc ? f.source : 0x55aa) &&
-			m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0x1e05 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == 0x800,
-			"Conditional register store preserves source, predicates and status while completing one bus pair");
-		for (unsigned ar = 2; ar < 6; ++ar)
-			expect(m_cpu->state_int(tms320c54x_device::STATE_AR0 + ar) == (ar == 2 + (f.x & 3) ? f.next : 0x1403 + (ar - 2) * 16), "Conditional register store updates only its selected Xmem address, even when false");
-		if (!m_rom4_codec_replay)
-		{
-			expect(restore_snapshot(machine(), *m_check_timer, m_saved_pipeline) == STATERR_NONE, "Restore conditional register store without duplicating a completed bus transaction");
-			m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_store_writes = m_recurring_irq_snapshot[1];
-			m_phase = 500000 + index; m_rom4_codec_replay = true;
-			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-		}
-		if (index < 18431) { start_conditional_register_store(index + 1); return true; }
-		osd_printf_info("TMS320C54x atomic conditional register stores: PASS cases=18432 restore=18432 forms=STRCD,SRCCD predicates=12 patterns=6 xmem=16 source_values=4 snapshots=2 false_read_writeback=1 circular_update=1 silicon_phase_claim=0\n");
-		throw emu_fatalerror(0, "TMS320C54x isolated conditional register stores complete");
-	}
-	return false;
-}
 
 
 } // namespace c54x_test

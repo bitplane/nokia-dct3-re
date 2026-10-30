@@ -1584,15 +1584,6 @@ private:
 	};
 	staged_conditional_store_fixture staged_conditional_store_case(unsigned v) const;
 	void start_staged_conditional_store(unsigned variant = 0);
-	struct conditional_register_fixture
-	{
-		bool brc, take;
-		unsigned x;
-		u16 source, address, next;
-		u64 a, b;
-	};
-	static conditional_register_fixture conditional_register_case(unsigned index);
-	void start_conditional_register_store(unsigned index);
 
 	struct parallel_sub_fraction_fixture
 	{
@@ -1920,7 +1911,6 @@ private:
 	bool check_rom4_fr_decoder_results();
 	bool check_native_dual_sub_results();
 	bool check_atomic_xorm_results();
-	bool check_conditional_register_results();
 	bool check_rom4_codec_is_results();
 	bool check_rom4_crc_input_results();
 	TIMER_CALLBACK_MEMBER(check_results);
