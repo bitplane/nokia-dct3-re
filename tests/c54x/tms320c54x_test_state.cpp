@@ -639,10 +639,9 @@ void tms320c54x_test_state::expect(bool condition, const char *message)
 		case 292000: case 292010: progress(m_instruction_observer); break;
 		case 255320: case 255330: case 255331:
 			progress(m_rptbd); break;
-		case 251000: case 251010: case 251020: case 251030:
-			case_index = unsigned(m_frontend.memory) + unsigned(m_frontend.memory_b);
+		case 251030:
+			case_index = unsigned(m_frontend.nmi);
 			tick = m_frontend.expected_cycle;
-			replay = m_frontend.replay;
 			break;
 		}
 		osd_printf_info("c54x_failure: phase=%u case=%u tick=%u replay=%u pc=%06x rc=%04x ar1=%04x a=%010llx b=%010llx st0=%04x illegal=%u reads=%u writes=%u\n",

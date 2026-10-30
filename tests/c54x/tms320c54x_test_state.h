@@ -75,7 +75,6 @@ private:
 	void start_timer_prescaler_divider_case(unsigned divider);
 	void start_timer_counter_write_case(unsigned divider);
 	void check_timer_reserved_fields();
-	void start_pipeline_frontend_case(bool memory = false, bool memory_b = false);
 	void start_empty_pipeline_case(bool nmi);
 	void start_peripheral_mmr_timing_audit(unsigned variant = 0);
 	void start_pipeline_peripheral_case(unsigned variant = 0);

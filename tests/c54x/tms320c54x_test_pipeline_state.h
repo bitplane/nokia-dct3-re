@@ -12,11 +12,10 @@ namespace c54x_test {
 
 struct frontend_entry_fixture
 {
-	bool memory = false, memory_b = false, nmi = false, replay = false;
+	bool nmi = false;
 	u64 expected_cycle = 0;
-	unsigned operand_reads = 0, vector_reads = 0, acks = 0, drained_fetches = 0;
-	memory_passthrough_handler operand_tap, fetch_tap, vector_tap, stack_tap;
-	std::stringstream saved;
+	unsigned vector_reads = 0, acks = 0;
+	memory_passthrough_handler vector_tap;
 };
 
 struct instruction_observer_fixture
