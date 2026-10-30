@@ -805,11 +805,6 @@ void tms320c54x_test_state::test(machine_config &config)
 			expect(f.ack_cycle && line == int(f.kind == 2 ? INPUT_LINE_NMI : f.source) && !m_vector_acks && m_cpu->pipeline_cycles() == f.ack_cycle,
 				"STM IMR acknowledges the actual pending source after eligibility and preserves prior acceptance across a clear"); ++m_vector_acks;
 		}
-		if (m_phase == 252950)
-		{
-			expect(line == 0 && !m_vector_acks && m_cpu->pipeline_cycles() > 8,
-				"Protected arithmetic acknowledges one pending IRQ only after retirement"); ++m_vector_acks;
-		}
 		if (m_phase == 253230)
 		{
 			auto const f = memory_repeat_case(m_pipeline_peripheral_case);

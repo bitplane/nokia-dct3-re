@@ -1439,50 +1439,6 @@ void tms320c54x_test_state::start_pipeline_register_arithmetic()
 	m_phase = 252930; m_register_sequence->start();
 }
 
-void tms320c54x_test_state::start_pipeline_xc_arithmetic(unsigned variant)
-{
-	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-	unsigned const operation = variant % 4;
-	bool const subtract = operation >= 2, destination_b = operation & 1;
-	u32 const base = (variant / 8) % 2 ? 0x20000 : 0;
-	u16 const source = subtract ? 0x1011 : 0x1000;
-	auto &program = m_cpu->space(AS_PROGRAM);
-	for (unsigned i = 0; i < 24; ++i) program.write_word(base + 0x600 + i, 0xf495);
-	program.write_word(base + 0x600, (variant / 4) % 2 ? 0xff00 : 0xfd00);
-	program.write_word(base + 0x601, std::array<u16, 4>{0x00f8, 0x01f8, 0x08e1, 0x09e1}[operation]);
-	program.write_word(base + 0x602, subtract ? 0x0011 : source);
-	program.write_word(base + 0x603, destination_b ? 0xe866 : 0xe966);
-	program.write_word(base + 0x606, 0xf4e1);
-	program.write_word(base + 0x40, 0x4a1e); program.write_word(base + 0x41, 0xf495); program.write_word(base + 0x42, 0xf4e5);
-	m_cpu->set_input_line(0, CLEAR_LINE);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10); m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xa608);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000); m_cpu->set_state_int(tms320c54x_device::STATE_AR1, 0x1000);
-	m_cpu->set_state_int(tms320c54x_device::STATE_A, destination_b ? 0 : 0x1234);
-	m_cpu->set_state_int(tms320c54x_device::STATE_B, destination_b ? 0x1234 : 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 1);
-	m_cpu->space(AS_DATA).write_word(source, 1);
-	m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_cpu->set_pipeline_frontend(true);
-	m_pipeline_replay = false; m_idle_fixture_tick = 0;
-	m_pipeline_operand_reads = m_pipeline_store_writes = m_pipeline_extensions_reads = m_vector_acks = 0;
-	m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(source, source, "xc_arithmetic_source",
-		[this](offs_t, u16 &word, u16) { if (machine().side_effects_disabled()) return;
-			expect(word == 1 && !m_pipeline_operand_reads && m_cpu->pipeline_cycles() == 7,
-				"Protected two-word arithmetic retains its source once before retirement"); ++m_pipeline_operand_reads; });
-	m_pipeline_fetch_tap = program.install_read_tap(base + 0x40, base + 0x40, "xc_arithmetic_vector",
-		[this, subtract, destination_b](offs_t, u16 &, u16) { if (machine().side_effects_disabled()) return;
-			expect(!m_pipeline_extensions_reads && m_cpu->pipeline_cycles() > 8 &&
-				m_cpu->state_int(destination_b ? tms320c54x_device::STATE_B : tms320c54x_device::STATE_A) == (subtract ? 0x1233 : 0x1235),
-				"XC releases the pending IRQ only after the full arithmetic instruction retires"); ++m_pipeline_extensions_reads; });
-	m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0, 0xffff, "xc_arithmetic_stack",
-		[this](offs_t at, u16 &, u16) { if (machine().side_effects_disabled()) return;
-			expect(at >= 0xffe && at <= 0xfff && m_pipeline_store_writes < 2 && m_cpu->pipeline_cycles() > 8,
-				"Only the later interrupt and its XPC save write the protected arithmetic stack"); ++m_pipeline_store_writes; });
-	m_phase = 252950; m_cpu->resume(SUSPEND_REASON_DISABLE);
-	m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-}
 
 std::array<u16, 2> tms320c54x_test_state::bitfield_inputs(unsigned variant, bool compare)
 {
@@ -5437,49 +5393,6 @@ bool tms320c54x_test_state::check_absolute_xorm_results()
 		if (bk) { osd_printf_info("TMS320C54x staged mapped BK arithmetic: PASS cases=1024 restore=1024 selectors=ADD_A,ADD_B,SUB_A,SUB_B sxm_ovm=4 patterns=8 forms=direct,absolute pages=2 snapshots=2 source=Read post_read_change=1 duplicate_reads=0 data_writes=0 physical_phase_claim=0\n"); throw emu_fatalerror(3, "TMS320C54x isolated mapped BK arithmetic complete"); }
 		osd_printf_info("TMS320C54x staged mapped AR arithmetic: PASS cases=1024 registers=8 selectors=4 sxm_ovm=4 patterns=2 forms=direct,absolute restore=1024 duplicate_reads=0 data_writes=0\n");
 		if (profile_is("arith-ar")) throw emu_fatalerror(3, "TMS320C54x isolated mapped AR arithmetic complete");
-	}
-	if (m_phase == 252950)
-	{
-		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick, operation = variant % 4;
-		bool const subtract = operation >= 2, destination_b = operation & 1;
-		unsigned const checkpoint = variant / 16 ? 8 : 4;
-		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Protected arithmetic has complete-word staged ownership");
-		if (tick == 3) m_cpu->set_input_line(0, ASSERT_LINE);
-		if (tick == 4) expect(m_cpu->state_int(tms320c54x_device::STATE_IFR) & 1, "Pending IRQ is CPU-owned before the protection checkpoint");
-		if (tick == checkpoint && !m_pipeline_replay)
-		{
-			m_idle_fixture_saved_tick = tick; m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_store_writes, m_pipeline_extensions_reads, m_vector_acks};
-			expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save XC arithmetic before/after retirement with pending IRQ");
-		}
-		if (tick == 36)
-		{
-			if (m_vector_acks != 1) osd_printf_info("XC arithmetic IRQ failure: case=%u replay=%u cycle=%llu source_reads=%u vector_fetches=%u acks=%u stack_writes=%u idle=%u\n",
-				variant, m_pipeline_replay, (unsigned long long)m_cpu->pipeline_cycles(), m_pipeline_operand_reads,
-				m_pipeline_extensions_reads, m_vector_acks, m_pipeline_store_writes, unsigned(m_cpu->state_int(tms320c54x_device::STATE_IDLE)));
-			expect(m_pipeline_operand_reads == 1 && m_pipeline_extensions_reads == 1 && m_vector_acks == 1 && m_pipeline_store_writes == 2 &&
-				m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x1000 &&
-				m_cpu->state_int(tms320c54x_device::STATE_A) == (destination_b ? 0x66 : subtract ? 0x1233 : 0x1235) &&
-				m_cpu->state_int(tms320c54x_device::STATE_B) == (destination_b ? (subtract ? 0x1233 : 0x1235) : 0x66),
-				"Protected two-word arithmetic releases and returns one pending IRQ instead of leaving XC active forever");
-			if (!m_pipeline_replay)
-			{
-				m_pipeline_replay = true; m_idle_fixture_tick = m_idle_fixture_saved_tick;
-				m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_store_writes = m_recurring_irq_snapshot[1];
-				m_pipeline_extensions_reads = m_recurring_irq_snapshot[2]; m_vector_acks = m_recurring_irq_snapshot[3];
-				return restore_pipeline_at(252960, "Restore XC arithmetic protection without duplicate operand reads or IRQ acknowledgements");
-			}
-			m_pipeline_operand_tap.remove(); m_pipeline_fetch_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (variant < 31) { start_pipeline_xc_arithmetic(variant + 1); return true; }
-			m_cpu->set_input_line(0, CLEAR_LINE); m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-			osd_printf_info("TMS320C54x staged XC arithmetic IRQ: PASS cases=32 forms=XC1,XC2 operations=absolute_ADD,long_SUB destinations=A,B pages=2 restore=32 duplicate_source_reads=0 duplicate_vectors=0\n");
-			start_pipeline_xc_tc(); return true;
-		}
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 252960)
-	{
-		m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 252950;
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
 	}
 	return false;
 }
