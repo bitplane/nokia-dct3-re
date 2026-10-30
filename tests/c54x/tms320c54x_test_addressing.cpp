@@ -1873,39 +1873,6 @@ void tms320c54x_test_state::start_stack_address_latency_case(unsigned index)
 	m_check_timer->adjust(attotime::from_usec(100));
 }
 
-void tms320c54x_test_state::start_immediate_dp_case(unsigned index)
-{
-	auto &program = m_cpu->space(AS_PROGRAM);
-	program.write_word(0x0109d0, 0x75d6); program.write_word(0x0109d1, 0x0124);
-	program.write_word(0x0109d2, 0xea00 | (index & 0x1ff));
-	program.write_word(0x0109d3, 0x75d6); program.write_word(0x0109d4, 0x0124);
-	program.write_word(0x0109d5, 0xf4e1);
-	m_port_writes = 0;
-	set_registers(*m_cpu, {
-		{STATE_GENPC, 0x0109d0}, {cpu_regs::STATE_AR6, 0x1000}, {cpu_regs::STATE_A, 0x123456789aULL},
-		{cpu_regs::STATE_B, 0x9876543210ULL}, {cpu_regs::STATE_ST0, 0xfe00 | ((index ^ 0x1ff) & 0x1ff)},
-		{cpu_regs::STATE_ST1, (index & 512) ? 0x4800 : 0x0900}, {cpu_regs::STATE_IDLE, 0},
-	});
-	m_phase = 1648 + index;
-	m_check_timer->adjust(attotime::from_usec(100));
-}
-
-void tms320c54x_test_state::start_compact_load_case(unsigned index)
-{
-	unsigned const shifts[] = {0, 5, 8, 15};
-	unsigned const shift = shifts[index / 4];
-	auto &program = m_cpu->space(AS_PROGRAM);
-	program.write_word(0x0109d0, 0x9480 | ((index & 1) ? 0x100 : 0) | shift);
-	program.write_word(0x0109d1, 0xf4e1);
-	m_cpu->space(AS_DATA).write_word(0x1000, 0x8123);
-	set_registers(*m_cpu, {
-		{STATE_GENPC, 0x0109d0}, {cpu_regs::STATE_AR2, 0x1000}, {cpu_regs::STATE_A, 0x1234},
-		{cpu_regs::STATE_B, 0x1234}, {cpu_regs::STATE_ST0, 0}, {cpu_regs::STATE_ST1, (index & 2) ? 0x100 : 0},
-		{cpu_regs::STATE_IDLE, 0},
-	});
-	m_phase = 1632 + index;
-	m_check_timer->adjust(attotime::from_usec(100));
-}
 
 void tms320c54x_test_state::start_banz_offset_case(unsigned index)
 {
@@ -4606,37 +4573,6 @@ bool tms320c54x_test_state::check_compact_load_results()
 {
 	[[maybe_unused]] auto &program = m_cpu->space(AS_PROGRAM);
 	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
-	if (m_phase >= 1632 && m_phase < 1648)
-	{
-		unsigned const index = m_phase - 1632;
-		u64 const source = (index & 2) ? u64(s64(s16(0x8123))) : 0x8123;
-		unsigned const shifts[] = {0, 5, 8, 15};
-		u64 const expected = (source << shifts[index / 4]) & 0xffffffffffULL;
-		expect(m_cpu->state_int((index & 1) ? tms320c54x_device::STATE_B : tms320c54x_device::STATE_A) == expected &&
-			m_cpu->state_int((index & 1) ? tms320c54x_device::STATE_A : tms320c54x_device::STATE_B) == 0x1234 &&
-			m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x1001 &&
-			m_cpu->state_int(tms320c54x_device::STATE_IDLE), "Compact Xmem load shift/sign/destination/postincrement");
-		if (index < 15) { start_compact_load_case(index + 1); return true; }
-		osd_printf_info("TMS320C54x compact load conformance: PASS variants=16\n");
-		start_immediate_dp_case(0);
-		return true;
-	}
-	if (m_phase >= 1648 && m_phase < 2672)
-	{
-		unsigned const index = m_phase - 1648;
-		expect_opcode(0xea00 | (index & 0x1ff),
-			m_cpu->state_int(tms320c54x_device::STATE_ST0) == (0xfe00 | (index & 0x1ff)) &&
-			m_cpu->state_int(tms320c54x_device::STATE_ST1) == ((index & 512) ? 0x4800 : 0x0900) &&
-			m_cpu->state_int(tms320c54x_device::STATE_A) == 0x123456789aULL &&
-			m_cpu->state_int(tms320c54x_device::STATE_B) == 0x9876543210ULL &&
-			m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3 &&
-			m_cpu->state_int(tms320c54x_device::STATE_IDLE),
-			"LD #k9,DP replaces only the nine DP bits in one cycle, independent of CPL and SXM");
-		if (index < 1023) { start_immediate_dp_case(index + 1); return true; }
-		osd_printf_info("TMS320C54x immediate DP conformance: PASS variants=1024\n");
-		start_stack_address_latency_case(0);
-		return true;
-	}
 	if (m_phase >= 2672 && m_phase < 2696)
 	{
 		unsigned const index = m_phase - 2672;

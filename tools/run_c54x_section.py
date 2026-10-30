@@ -131,6 +131,7 @@ def main():
     counts['offset_memory_test'] = 8
     counts['mapped_word_arithmetic'] = 768
     counts['software_interrupt'] = 128
+    counts['compact_load'] = 28
     parser.add_argument('section', choices=[*counts, 'all'])
     parser.add_argument('--jobs', type=int, default=8)
     parser.add_argument('--negative-control', action='store_true', help='require failure of an intentionally wrong expectation')

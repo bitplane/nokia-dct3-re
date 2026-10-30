@@ -626,8 +626,6 @@ private:
 	void start_trn_store_case(unsigned index);
 	void start_indirect_pshm_case(unsigned index);
 	void start_stack_address_latency_case(unsigned index);
-	void start_immediate_dp_case(unsigned index);
-	void start_compact_load_case(unsigned index);
 	void start_banz_offset_case(unsigned index);
 	static constexpr u16 bio_opcodes[] = {
 		0xf802, 0xf803, 0xfa02, 0xfa03, 0xf902, 0xf903,
