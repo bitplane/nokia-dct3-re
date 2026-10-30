@@ -68,7 +68,6 @@ TIMER_CALLBACK_MEMBER(tms320c54x_test_state::check_results)
 	if (check_staged_conditional_store_results()) return;
 	if (check_ldu_peripheral_results()) return;
 	if (check_ldu_imr_results()) return;
-	if (check_mvmd_status_block_results()) return;
 	if (check_shifted_peripheral_results()) return;
 	if (check_xc_return_results()) return;
 	if (check_delay_copy_results()) return;

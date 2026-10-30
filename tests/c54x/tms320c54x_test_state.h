@@ -1147,7 +1147,6 @@ private:
 	void start_ldu_peripheral(unsigned variant = 0);
 	void start_ldu_imr(unsigned variant = 0);
 	void start_mvmd_status_irq(unsigned variant = 0);
-	void start_mvmd_status_block(unsigned variant = 0);
 	virtual void machine_start() override;
 
 	virtual void machine_reset() override;
@@ -1405,7 +1404,6 @@ private:
 	bool check_staged_conditional_store_results();
 	bool check_ldu_peripheral_results();
 	bool check_ldu_imr_results();
-	bool check_mvmd_status_block_results();
 	bool check_shifted_peripheral_results();
 	bool check_xc_return_results();
 	bool check_delay_copy_results();

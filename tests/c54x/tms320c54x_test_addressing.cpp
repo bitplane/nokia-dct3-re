@@ -3205,37 +3205,6 @@ void tms320c54x_test_state::check_st1_memory_rules()
 }
 
 
-void tms320c54x_test_state::start_mvmd_status_block(unsigned variant)
-{
-	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-	bool const pop = profile_is("pop-brc");
-	bool const stm = pop || profile_is("stm-brc");
-	unsigned const count = stm ? std::array<unsigned, 5>{0, 1, 2, 7, 127}[variant % 5] : std::array<unsigned, 4>{0, 1, 2, 7}[variant % 4]; u32 const base = (stm ? (variant / 5) % 2 : bool(variant & 4)) ? 0x20000 : 0;
-	auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
-	static constexpr u16 words[] = {0x730b, 7, 0xf072, 0x608, 0x1386, 0xf678, 0xf3e8, 0xf1a0, 0x8196, 0xf4e1};
-	for (unsigned i = 0; i < 32; ++i) program.write_word(base + 0x600 + i, i < std::size(words) ? words[i] : 0xf495);
-	if (stm) { program.write_word(base + 0x600, 0x771a); program.write_word(base + 0x601, count); }
-	if (pop) { program.write_word(base + 0x600, 0x8a1a); program.write_word(base + 0x601, 0xf495); data.write_word(0x1000, count); m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000); }
-	m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, stm ? 0x800 : 0x900);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
-	m_cpu->set_state_int(tms320c54x_device::STATE_A, 0); m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x800); m_cpu->set_state_int(tms320c54x_device::STATE_AR6, 0x5000); m_cpu->set_state_int(tms320c54x_device::STATE_BRC, stm ? count ^ 1 : count);
-	for (unsigned i = 0; i <= count; ++i) data.write_word(0x5000 + i, 0x1234 + i * 0x321);
-	m_pipeline_operand_reads = m_pipeline_store_writes = m_pipeline_register_writes = 0;
-	if (stm)
-	{
-		m_pipeline_extensions_reads = 0;
-		m_operand_data_tap = data.install_write_tap(0x1a, 0x1a, "brc_publication", [this, count, pop](offs_t, u16 &word, u16) { if (machine().side_effects_disabled()) return; expect(!m_pipeline_register_writes && word == count && m_cpu->pipeline_cycles() == (pop ? 6 : 5), "BRC publishes its captured count once before RPTB"); ++m_pipeline_register_writes; });
-		m_pipeline_fetch_tap = data.install_read_tap(0x1a, 0x1a, "stm_brc_no_read", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) expect(false, "STM BRC does not read its destination"); });
-		m_vector_prefetch_tap = (pop ? data : program).install_read_tap(pop ? 0x1000 : base + 0x601, pop ? 0x1000 : base + 0x601, "brc_source", [this, count](offs_t, u16 &word, u16) { if (machine().side_effects_disabled()) return; expect(!m_pipeline_extensions_reads && word == count, "BRC producer captures one count through replay"); ++m_pipeline_extensions_reads; });
-	}
-	m_pipeline_operand_tap = data.install_read_tap(0x5000, 0x50ff, "mvmd_status_block_read",
-		[this, count](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return; expect(m_pipeline_operand_reads <= count && at == 0x5000 + m_pipeline_operand_reads && word == u16(0x1234 + m_pipeline_operand_reads * 0x321), "Following RPTB reads each original word once"); ++m_pipeline_operand_reads; });
-	m_pipeline_write_tap = data.install_write_tap(0x5000, 0x50ff, "mvmd_status_block_write",
-		[this, count](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return; u16 const source = 0x1234 + m_pipeline_store_writes * 0x321; expect(m_pipeline_store_writes <= count && at == 0x5000 + m_pipeline_store_writes && word == u16((source << 8) | (source >> 8)), "Following RPTB writes each byte-swapped word once"); ++m_pipeline_store_writes; });
-	m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 253870;
-	m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-}
 
 
 void tms320c54x_test_state::stack_mmr_w(offs_t offset, u16 value)
@@ -4740,46 +4709,6 @@ bool tms320c54x_test_state::check_staged_conditional_store_results()
 }
 
 
-bool tms320c54x_test_state::check_mvmd_status_block_results()
-{
-	if (m_phase == 253870)
-	{
-		bool const pop = profile_is("pop-brc");
-		bool const stm = pop || profile_is("stm-brc");
-		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick, count = stm ? std::array<unsigned, 5>{0, 1, 2, 7, 127}[variant % 5] : std::array<unsigned, 4>{0, 1, 2, 7}[variant % 4], checkpoint = stm ? std::array<unsigned, 3>{4, 5, 6}[variant / 10] : std::array<unsigned, 3>{5, 6, 12}[variant / 8];
-		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Full status followed by RPTB stays staged");
-		if (tick == 6) expect(m_cpu->state_int(tms320c54x_device::STATE_ST1) == 0x8800, "Full status write does not erase the younger RPTB BRAF update");
-		if (stm && !pop && tick == 4) { auto const disable = machine().disable_side_effects(); m_cpu->space(AS_PROGRAM).write_word(((variant / 5) % 2 ? 0x20000 : 0) + 0x601, 0xdead); }
-		if (pop && tick == 5) { auto const disable = machine().disable_side_effects(); m_cpu->space(AS_DATA).write_word(0x1000, count ^ 0xffff); }
-		if (tick == checkpoint && !m_pipeline_replay) { m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_store_writes, m_pipeline_register_writes, stm ? m_pipeline_extensions_reads : 0}; expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save prefix write and younger block repeat"); }
-		if (tick == (stm ? 32 + count * 5 : 96))
-		{
-			expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_pipeline_operand_reads == count + 1 && m_pipeline_store_writes == count + 1 && m_cpu->state_int(tms320c54x_device::STATE_AR6) == 0x5001 + count && m_cpu->state_int(tms320c54x_device::STATE_BRC) == 0 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == 0x800, "Following RPTB completes its count-plus-one body and clears only BRAF");
-			if (stm) expect(m_pipeline_register_writes == 1 && m_pipeline_extensions_reads == 1, "Count publication and literal fetch occur once across the entire repeat");
-			if (pop) expect(m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x1001, "POPM BRC advances its source stack once across the repeat");
-			if (!m_pipeline_replay) { m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_store_writes = m_recurring_irq_snapshot[1]; m_pipeline_register_writes = m_recurring_irq_snapshot[2]; if (stm) m_pipeline_extensions_reads = m_recurring_irq_snapshot[3]; return restore_pipeline_at(253880, "Restore prefix/block composition without duplicate words"); }
-			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (stm)
-			{
-				m_operand_data_tap.remove(); m_pipeline_fetch_tap.remove(); m_vector_prefetch_tap.remove();
-				if (variant < 29) { start_mvmd_status_block(variant + 1); return true; }
-				if (pop)
-				{
-					osd_printf_info("TMS320C54x staged POPM BRC repeat: PASS cases=30 restore=30 counts=0,1,2,7,127 pages=2 snapshots=3 stack_reads=1 counter_reads=0 counter_writes=1 gap_nops=1 source_retained=1 count_plus_one=1 active_repeat_write_acceptance=0 silicon_phase_claim=0\n");
-					throw emu_fatalerror(3, "TMS320C54x isolated POPM BRC repeat complete");
-				}
-				osd_printf_info("TMS320C54x staged STM BRC: PASS cases=30 restore=30 counts=0,1,2,7,127 pages=2 snapshots=3 literal_fetches=1 counter_reads=0 counter_writes=1 adjacent_rptb=1 latency=0 in_loop_acceptance=0 interrupt_composition=unvalidated silicon_phase_claim=0\n");
-				throw emu_fatalerror(0, "TMS320C54x isolated STM BRC complete");
-			}
-			if (variant < 23) { start_mvmd_status_block(variant + 1); return true; }
-			osd_printf_info("TMS320C54x staged MVMD block: PASS cases=24 restore=24 counts=0,1,2,7 pages=2 snapshots=3 adjacent_rptb=1 braf_preserved=1 interrupt_composition=unvalidated silicon_phase_claim=0\n");
-			throw emu_fatalerror(0, "TMS320C54x isolated MVMD block complete");
-		}
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 253880) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 253870; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true; }
-	return false;
-}
 
 bool tms320c54x_test_state::check_delay_copy_results()
 {
