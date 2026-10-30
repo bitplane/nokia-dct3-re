@@ -45,7 +45,6 @@ TIMER_CALLBACK_MEMBER(tms320c54x_test_state::check_results)
 	if (check_rptbd_shift_store_results()) return;
 	if (check_long_mapped_original_results()) return;
 	if (check_mcbsp_control_sequence_results()) return;
-	if (check_stack_irq_order_results()) return;
 	if (check_staged_conditional_store_results()) return;
 	if (check_ldu_peripheral_results()) return;
 	if (check_ldu_imr_results()) return;

@@ -80,7 +80,6 @@ private:
 	unsigned pipeline_idle_kind(unsigned variant) const;
 	void start_pipeline_idle1(unsigned variant = 0, bool modes = false);
 	void start_pipeline_original_idle(unsigned variant = 0);
-	void start_stack_irq_order(unsigned variant = 0);
 	struct repeated_writa_fixture
 	{
 		unsigned form, setup, reg, count, words, read, write, checkpoint;
@@ -1015,7 +1014,6 @@ private:
 	bool check_rptbd_shift_store_results();
 	bool check_long_mapped_original_results();
 	bool check_mcbsp_control_sequence_results();
-	bool check_stack_irq_order_results();
 	bool check_staged_conditional_store_results();
 	bool check_ldu_peripheral_results();
 	bool check_ldu_imr_results();
@@ -1138,8 +1136,6 @@ private:
 	unsigned m_rom4_checks = 0;
 	bool m_irq_raised = false;
 	unsigned m_fast_stack_reads = 0;
-	unsigned m_stack_irq_return_reads = 0, m_stack_irq_cleanup_reads = 0;
-	std::array<unsigned, 2> m_stack_irq_read_snapshot = {};
 	u8 m_bus_divisor = 0;
 	bool m_bus_iack_enable = false;
 	bool m_bus_ready = true;

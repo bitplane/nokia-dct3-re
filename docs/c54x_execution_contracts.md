@@ -1923,6 +1923,21 @@ separate from the pipeline `interrupt_mask` section. Neither measures silicon
 interrupt timing. Both sections have explicit reset/setup and save/replay;
 their old phase-chain setup/result owners are removed.
 
+### Stack operation and interrupt entry
+
+`stack_interrupt_order` owns sixteen PSHM/PSHD/POPM-T/POPM-SP cases with
+IRQ/NMI, covering both entry-only observation and RETE/caller cleanup. Pages
+and the original three/five checkpoint positions are distributed instead of
+expanding to 128 executions. Foreground source Read is at model clock 5;
+POPM SP publishes in Read before the interrupt reserves its stack slot.
+Other foreground publications occur at 6, acknowledgement at 6, and interrupt
+frame Write at 7. Exact bus progress distinguishes these ordering boundaries.
+Returning cases consume only the interrupt frame before the caller cleans up
+its own push. Stack reservation, return PC, T, B, INTM and final stack lifecycle
+are checked through IDLE/replay. These are model timing/ownership contracts,
+not silicon measurements. The two legacy profiles and phase-specific IRQ hook
+are removed.
+
 ### Active repeat context and stack bypass
 
 The original wrapper uses `POPD *AR7` at logical `03:1f02`, with AR7
