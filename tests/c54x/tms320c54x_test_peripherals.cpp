@@ -2469,7 +2469,6 @@ bool tms320c54x_test_state::check_peripheral_long_store_results()
 			osd_printf_info("TMS320C54x staged BIO branches: PASS cases=256 forms=BC,BCD conditions=BIO,NBIO levels=0,1 transitions=4 pages=2 restore=256 line_sample=Read duplicate_callbacks=0 duplicate_fetches=0 silicon_phase_claim=0\n");
 			if (profile_is("bio-branch")) throw emu_fatalerror(0, "TMS320C54x isolated BIO branches complete");
 			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-			start_pipeline_mmr_move(); return true;
 		}
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
 	}

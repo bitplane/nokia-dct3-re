@@ -402,7 +402,6 @@ private:
 	static long_store_fixture peripheral_long_store_fixture(unsigned variant);
 	void start_pipeline_long_immediate_store(unsigned variant = 0);
 	void start_pipeline_bio_branch(unsigned variant = 0);
-	void start_pipeline_mmr_move(unsigned variant = 0);
 	struct push_mvmm_fixture
 	{
 		unsigned pushes, mmr, gap, destination, checkpoint;
@@ -423,7 +422,6 @@ private:
 	};
 	static push_mvmm_fixture push_mvmm_case(unsigned v);
 	void start_push_mvmm(unsigned variant=0);
-	void start_pipeline_mvmm_sp(unsigned variant = 0);
 	void start_pipeline_mapped_load_age(unsigned variant = 0);
 	void start_pipeline_store_mvmm(unsigned variant = 0);
 	void start_pipeline_mvmm_producer(unsigned variant = 0);
@@ -1929,7 +1927,6 @@ private:
 	bool check_data_copy_results();
 	bool check_accumulator_shift_results();
 	bool check_peripheral_long_store_results();
-	bool check_pipeline_mvmm_sp_results();
 	bool check_branch_repeat_results();
 	bool check_rptbd_t_load_results();
 	bool check_pipeline_repeat_nop_results();

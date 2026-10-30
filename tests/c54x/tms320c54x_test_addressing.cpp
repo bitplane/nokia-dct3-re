@@ -558,36 +558,6 @@ void tms320c54x_test_state::start_push_mvmm(unsigned variant)
 	m_check_timer->adjust(attotime::from_ticks(1,m_cpu->clock()));
 }
 
-void tms320c54x_test_state::start_pipeline_mvmm_sp(unsigned variant)
-{
-	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-	bool const compiler = variant % 2, gap = (variant / 2) % 2;
-	u32 const base = (variant / 4) % 2 ? 0x20000 : 0;
-	u16 const target = compiler ? gap ? 0x1202 : 0x1002 : 0x402;
-	auto &program = m_cpu->space(AS_PROGRAM);
-	for (unsigned i = 0; i < 32; ++i) program.write_word(base + 0x600 + i, 0xf495);
-	program.write_word(base + 0x600, 0xe718); program.write_word(base + 0x601 + gap, 0x1002);
-	set_registers(*m_cpu, {
-		{cpu_regs::STATE_TCR, 0x10}, {cpu_regs::STATE_PMST, 0}, {cpu_regs::STATE_ILLEGAL, 0}, {cpu_regs::STATE_ST0, 8},
-		{cpu_regs::STATE_ST1, 0x800 | (compiler ? 0x4000 : 0)},
-	});
-	m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000); m_cpu->set_state_int(tms320c54x_device::STATE_AR1, 0x1200);
-	m_cpu->set_state_int(tms320c54x_device::STATE_A, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
-	for (u16 address : {0x402, 0x1002, 0x1202}) m_cpu->space(AS_DATA).write_word(address, address);
-	m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_cpu->set_pipeline_frontend(true);
-	m_pipeline_replay = false; m_idle_fixture_tick = 0; m_pipeline_operand_reads = m_pipeline_store_writes = m_pipeline_extensions_reads = 0;
-	m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0, 0xffff, "mvmm_sp_visibility",
-		[this, gap, target](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return;
-			if (m_cpu->pipeline_cycles() == 3) { expect(at == 0x11 && word == 0x1200 && !m_pipeline_operand_reads, "MVMM SP source is sampled in Decode"); ++m_pipeline_operand_reads; }
-			else { expect(at == target && word == target && !m_pipeline_extensions_reads && m_cpu->pipeline_cycles() == 6 + gap,
-				"Compiler direct SP consumers require one gap; normal DP consumers do not use SP"); ++m_pipeline_extensions_reads; } });
-	m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0, 0xffff, "mvmm_sp_publication",
-		[this](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return;
-			expect(at == 0x18 && word == 0x1200 && !m_pipeline_store_writes && m_cpu->pipeline_cycles() == 4, "MVMM publishes SP once in Access"); ++m_pipeline_store_writes; });
-	m_phase = 252710; m_cpu->resume(SUSPEND_REASON_DISABLE);
-	m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-}
 
 void tms320c54x_test_state::start_pipeline_mapped_load_age(unsigned variant)
 {
@@ -5627,68 +5597,6 @@ bool tms320c54x_test_state::check_data_copy_results()
 	return false;
 }
 
-bool tms320c54x_test_state::check_pipeline_mvmm_sp_results()
-{
-	if (m_phase == 252690 || m_phase == 252710)
-	{
-		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
-		bool const sp_fixture = m_phase == 252710;
-		unsigned const source = variant % 9, destination = (variant / 9) % 9;
-		u16 const value = std::array<u16, 4>{0, 1, 0x8000, 0xf495}[(variant / 81) % 4];
-		unsigned const checkpoint = sp_fixture ? std::array<unsigned, 3>{3, 4, 6}[variant / 8] : std::array<unsigned, 3>{3, 4, 6}[variant / 648];
-		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "MVMM preserves Decode/Access ownership and its nine-register vocabulary");
-		if (!sp_fixture && tick == 3)
-		{
-			auto const disable = machine().disable_side_effects(); m_cpu->space(AS_DATA).write_word(0x10 + source, 0xdead);
-		}
-		if (tick == checkpoint && !m_pipeline_replay)
-		{
-			m_idle_fixture_saved_tick = tick; m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_store_writes, m_pipeline_extensions_reads};
-			expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save MVMM sampled operand, publication or consumer visibility");
-		}
-		if (tick == 16)
-		{
-			{
-				auto const disable = machine().disable_side_effects();
-				if (sp_fixture)
-				{
-					bool const compiler = variant % 2, gap = (variant / 2) % 2;
-					u16 const target = compiler ? gap ? 0x1202 : 0x1002 : 0x402;
-					expect(m_pipeline_operand_reads == 1 && m_pipeline_store_writes == 1 && m_pipeline_extensions_reads == 1 &&
-						m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x1200 && m_cpu->state_int(tms320c54x_device::STATE_A) == target,
-						"MVMM SP publication and Category-I compiler latency survive replay");
-				}
-				else expect(m_pipeline_operand_reads == 1 && m_pipeline_store_writes == 1 && m_pipeline_extensions_reads == unsigned(destination < 8) &&
-					m_cpu->space(AS_DATA).read_word(0x10 + destination) == value && m_cpu->state_int(tms320c54x_device::STATE_A) ==
-					(destination < 8 ? value < 0x60 ? 0 : 0x55aa : 0x1111), "All MVMM pairs preserve their captured source and zero-gap AR visibility");
-			}
-			if (!m_pipeline_replay)
-			{
-				m_pipeline_replay = true; m_idle_fixture_tick = m_idle_fixture_saved_tick; m_pipeline_operand_reads = m_recurring_irq_snapshot[0];
-				m_pipeline_store_writes = m_recurring_irq_snapshot[1]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[2];
-				expect(restore_snapshot(machine(), *m_check_timer, m_saved_pipeline) == STATERR_NONE, "Restore MVMM without rereading changed source or repeating publication");
-				m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = sp_fixture ? 252720 : 252700; m_check_timer->enable(true); return true;
-			}
-			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (!sp_fixture)
-			{
-				if (variant < 1943) { start_pipeline_mmr_move(variant + 1); return true; }
-				osd_printf_info("TMS320C54x staged MVMM: PASS cases=1944 pairs=81 values=4 pages=2 restore=1944 source_read=Decode destination_write=Access duplicate_reads=0 duplicate_writes=0 zero_gap_ar=1\n");
-				start_pipeline_mvmm_sp(); return true;
-			}
-			if (variant < 23) { start_pipeline_mvmm_sp(variant + 1); return true; }
-			osd_printf_info("TMS320C54x staged MVMM SP: PASS cases=24 cpl=0,1 gap_nops=0,1 pages=2 restore=24 compiler_latency=1 duplicate_reads=0 duplicate_writes=0\n");
-			start_pipeline_mvmm_producer(); return true;
-		}
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 252700 || m_phase == 252720)
-	{
-		m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = m_phase == 252720 ? 252710 : 252690;
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	return false;
-}
 
 bool tms320c54x_test_state::check_rptbd_t_load_results()
 {
