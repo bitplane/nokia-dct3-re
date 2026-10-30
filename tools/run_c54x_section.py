@@ -139,6 +139,7 @@ def main():
     counts['asm_load'] = 6144
     counts['reverse_carry'] = 2690
     counts['frontend_drain'] = 6
+    counts['interrupt_entry'] = 10
     parser.add_argument('section', choices=[*counts, 'all'])
     parser.add_argument('--jobs', type=int, default=8)
     parser.add_argument('--negative-control', action='store_true', help='require failure of an intentionally wrong expectation')

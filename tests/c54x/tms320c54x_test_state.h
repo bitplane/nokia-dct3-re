@@ -55,10 +55,7 @@ private:
 	bool m_xf_pin = true;
 	unsigned m_xf_publications = 0;
 	void start_repeat_endpoint_case(unsigned index);
-	void start_interrupt_entry_spacing_case(unsigned index);
-	void start_interrupt_acceptance_checkpoint();
 	void acknowledge_entry_interrupt(int line);
-	void start_entry_stage_restore_case(unsigned index);
 	void start_operand_fetch_case(unsigned index);
 	void start_loop_xc_case(unsigned index);
 	void start_xc_irq_case(unsigned index);
@@ -1562,7 +1559,6 @@ private:
 	bool check_idle_pll_results();
 	bool check_xc_interrupt_results();
 	bool check_repeat_endpoints_results();
-	bool check_interrupt_entry_results();
 	bool check_peripheral_mmr_timing_audit_results();
 	bool check_pipeline_immediate_store_results();
 	bool check_pipeline_idle_results();
