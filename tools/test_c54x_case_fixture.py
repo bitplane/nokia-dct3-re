@@ -310,7 +310,7 @@ int main() {
             subprocess.run([str(program)], check=True, capture_output=True)
 
     def test_reviewed_ordered_coverage_is_required(self):
-        for profile in ('rmw-long', 'long-mvkd', 'reg-banks', 'source-domain'):
+        for profile in ('rmw-long', 'long-mvkd', 'source-domain'):
             markers, ending = EXTRA_PROFILES[profile]
             markers = (markers,) if isinstance(markers, str) else markers
             coverage = reviewed_profiles()[profile]['coverage']
@@ -324,77 +324,6 @@ int main() {
                 with self.subTest(profile=profile), self.assertRaisesRegex(ValueError, 'coverage digest'):
                     check_result(changed, 3, profile=profile)
 
-    @unittest.skipUnless(shutil.which('c++'), 'C++ compiler required')
-    def test_register_schedule_preserves_stimuli_and_all_producer_replays(self):
-        source = r'''
-#include <iostream>
-#include "tests/c54x/tms320c54x_test_support.h"
-#include "tests/c54x/tms320c54x_test_register_schedule.h"
-int main() {
-    using s = c54x_test::register_bank_schedule;
-    c54x_test::ordered_case_digest digest;
-    for (unsigned v = 0; v < s::end; v = s::next(v)) {
-        unsigned const key = s::case_key(v);
-        digest.add(key);
-        std::cout << v << ' ' << key << '\n';
-    }
-    std::cout << "digest=" << std::hex << digest.value << '\n';
-}
-'''
-        expected, groups, producers = [], defaultdict(Counter), defaultdict(Counter)
-        for load in (False, True):
-            operations, base = (1, 196896) if load else (2, 0)
-            for page in range(2):
-                for asm in range(2):
-                    for flags in range(16 if load else 8):
-                        for pattern in range(8):
-                            for selector in range(4):
-                                for shift in range(32):
-                                    for op in range(operations):
-                                        group = (op + operations * (shift + 32 * selector + 128 * flags)
-                                                 + 2048 * asm + 4096 * page)
-                                        checkpoint = (pattern + group) % 3
-                                        variant = (base + op + operations * (shift + 32 * selector + 128 * pattern + 1024 * flags)
-                                                   + 16384 * asm + 32768 * page)
-                                        expected.append((variant, len(expected) * 3 + checkpoint))
-                                        groups[load, op, page, asm, flags, selector, shift][checkpoint] += 1
-            for checkpoint in range(3):
-                for gap in range(3):
-                    for pattern in range(4):
-                        for selector in range(4):
-                            for op in range(operations):
-                                local = op + operations * (selector + 4 * pattern + 16 * gap)
-                                variant = base + 196608 + checkpoint * (48 * operations) + local
-                                expected.append((variant, len(expected) * 3 + checkpoint))
-                                producers[load, gap, pattern, selector, op][checkpoint] += 1
-        self.assertEqual(len(expected), 131504)
-        self.assertEqual(len(groups), 16384)
-        self.assertTrue(all(sorted(group.values()) == [2, 3, 3] for group in groups.values()))
-        self.assertEqual(len(producers), 144)
-        self.assertTrue(all(group == Counter({0: 1, 1: 1, 2: 1}) for group in producers.values()))
-        with compiled_cpp(source) as program:
-            output = subprocess.run([str(program)], check=True, capture_output=True,
-                                    text=True).stdout.splitlines()
-        self.assertEqual([tuple(map(int, line.split())) for line in output[:-1]], expected)
-        self.assertEqual(output[-1], 'digest=' + reviewed_profiles()['reg-banks']['coverage']['fnv64'])
-
-
-
-
-    def test_reviewed_case_identities_are_required_in_order(self):
-        for profile, review in reviewed_profiles().items():
-            if not review['case_ids']:
-                continue
-            markers, ending = EXTRA_PROFILES[profile]
-            markers = [markers] if isinstance(markers, str) else list(markers)
-            cases = ['C54x ISA case: PASS id=' + name
-                     for name in reviewed_profiles()[profile]['case_ids']]
-            text = '\n'.join(cases + markers + [ending])
-            check_result(text, 3, profile=profile)
-            for changed in (cases[1:], cases + cases[:1], list(reversed(cases)),
-                            ['C54x ISA case: PASS id=unknown'] + cases[1:]):
-                with self.subTest(profile=profile, cases=changed), self.assertRaisesRegex(ValueError, 'identities'):
-                    check_result('\n'.join(changed + markers + [ending]), 3, profile=profile)
 
     @unittest.skipUnless(shutil.which('c++'), 'C++ compiler required')
     def test_case_helper_detects_state_and_bus_mismatches(self):

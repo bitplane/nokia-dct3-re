@@ -330,6 +330,8 @@ def main():
     counts['unsigned_mapped_alu'] = 16512
     counts['shift16_mapped_alu'] = 12288
     counts['logic_mapped_alu'] = 9216
+    counts['register_accumulator_arithmetic'] = 18784
+    counts['register_accumulator_load'] = 18608
     counts['accumulator_call_frames'] = 216
     parser.add_argument('section', choices=[*counts, 'all'])
     parser.add_argument('--jobs', type=int, default=8)

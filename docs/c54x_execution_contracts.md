@@ -447,13 +447,17 @@ product is deliberately retired. Numeric expectations, extension poisoning,
 post-read mutation and publication checks are unchanged. Ordered input/stage
 digests and actual restore counts protect the retained schedules.
 
-`reg-banks` isolates register arithmetic and LD. Each bank retains all 65,536
-standalone stimuli once; its 8,192 fixed non-pattern groups cover all three
-Decode/Access/Read checkpoints across eight patterns. The 288 arithmetic and
-144 load producer/checkpoint combinations remain exhaustive and unchanged.
-Together the banks execute 131,504 replays instead of 393,648. The independent
-arithmetic/shift expectations and per-cycle publication assertions are unchanged;
-the ordered digest covers standalone and producer cases in execution order.
+`register_accumulator_arithmetic` and `register_accumulator_load` own 18,784
+and 18,608 cases/replays. All immediate shifts -16..15 cross the original
+patterns, selectors and status inputs; ASM repeats the four numerical
+boundaries -16/-1/0/15 and separately checks every encoded shift/selector
+with representative patterns/flags. Every adjacent-load producer/gap/value
+remains, with distributed checkpoints instead of three copies. Pages are
+distributed. Independent bitwise 40-bit shift and integer arithmetic references
+check Execute-only publication, sticky overflow/saturation and LD carry
+preservation; exact opcode/literal fetches, literal poison and no data bus
+traffic are retained. The old 131,504-case owner, scheduler/digest and
+enumeration-only host test are removed. No physical pipeline phase is claimed.
 
 The CLI test exercises every isolated profile's machine/BIOS selection and
 result checking using simulated process output. The inventory is a structural

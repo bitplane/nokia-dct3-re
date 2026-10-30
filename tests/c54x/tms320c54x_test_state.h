@@ -174,17 +174,6 @@ private:
 	};
 	static immediate_arithmetic_fixture immediate_arithmetic_case(unsigned variant);
 	void start_pipeline_immediate_arithmetic(unsigned variant = 0);
-	struct register_arithmetic_fixture
-	{
-		unsigned selector, gap, execute_cycle;
-		bool producer;
-		u16 opcode, st0, st1, result_st0;
-		std::array<u64, 2> initial, before, after;
-		u32 base;
-	};
-	static register_arithmetic_fixture register_arithmetic_case_full(unsigned variant);
-	static register_arithmetic_fixture register_load_case(unsigned variant);
-	void start_pipeline_accumulator_arithmetic(unsigned variant = 0);
 	struct memory_multiply_fixture
 	{
 		memory_arithmetic_fixture operand;
@@ -1018,8 +1007,6 @@ private:
 	unsigned m_pipeline_store_case = 0;
 	unsigned m_pipeline_store_writes = 0;
 	unsigned m_pipeline_indirect_case = 0;
-	ordered_case_digest m_register_bank_coverage;
-	unsigned m_register_bank_replays = 0;
 	ordered_case_digest m_shifted_coverage;
 	unsigned m_shifted_replays = 0;
 	unsigned m_pipeline_branch_case = 0;

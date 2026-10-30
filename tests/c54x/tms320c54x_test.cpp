@@ -301,7 +301,6 @@ ROM_START(tms54xtra)
 	ROM_SYSTEM_BIOS(156, "power-idle", "IDLE1/2/3 timer clocks plus external and timer wake replay")
 	ROM_SYSTEM_BIOS(157, "clock-mvdk", "Retained RAM-to-CLKMD moves and peripheral access across restore")
 	ROM_SYSTEM_BIOS(158, "pop-irq", "Retained IMR/IFR stack writes and W1C acknowledgement across restore")
-	ROM_SYSTEM_BIOS(160, "reg-banks", "Staged register arithmetic and load with producer controls")
 	ROM_SYSTEM_BIOS(161, "rom4-context", "Nokia ROM4 copied context and timer integration")
 ROM_END
 

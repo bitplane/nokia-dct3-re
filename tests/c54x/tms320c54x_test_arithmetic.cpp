@@ -4,7 +4,6 @@
 #include "emu.h"
 #include "tms320c54x_test_state.h"
 #include "tms320c54x_test_shifted_schedule.h"
-#include "tms320c54x_test_register_schedule.h"
 
 namespace c54x_test {
 
@@ -295,73 +294,7 @@ void tms320c54x_test_state::start_pipeline_immediate_arithmetic(unsigned variant
 	m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 }
 
-tms320c54x_test_state::register_arithmetic_fixture tms320c54x_test_state::register_arithmetic_case_full(unsigned variant)
-{
-	bool const producer = variant >= 196608;
-	unsigned const v = producer ? (variant - 196608) % 96 : variant % 65536;
-	unsigned const operation = v % 2, selector = producer ? (v / 2) % 4 : (v / 64) % 4;
-	unsigned const pattern = producer ? (v / 8) % 4 : (v / 256) % 8;
-	unsigned const flags = producer ? 1 : (v / 2048) % 8, gap = producer ? (v / 32) % 3 : 0;
-	bool const asm_shift = !producer && (v / 16384) % 2;
-	int const shift = producer ? 0 : int((v / 2) % 32) - 16;
-	std::array<u64, 2> initial = producer ? std::array<u64, 2>{0x10, 0x20} : std::array<u64, 2>{
-		std::array<u64, 8>{0, 1, 0x7fffffff, 0xff80000000ULL, 0x017fffffffULL, 0xff7fffffffULL, 0x80aa001234ULL, 0xffffffff55ULL}[pattern],
-		std::array<u64, 8>{1, 0xffffffff, 0xff80000000ULL, 0x7fffffff, 0xff7fffffffULL, 0x017fffffffULL, 0x123456789aULL, 0x80000000}[pattern]};
-	auto before = initial;
-	if (producer) before[selector >> 1] = u64(s64(s16(std::array<u16, 4>{0, 1, 0x8000, 0xffff}[pattern]))) & 0xffffffffffULL;
-	u64 const source = before[selector >> 1];
-	u64 operand = 0;
-	for (int bit = 0; bit < 40; ++bit)
-	{
-		int const source_bit = bit - shift;
-		if ((source_bit >= 0 && source_bit < 40 && BIT(source, source_bit)) ||
-			(shift < 0 && source_bit >= 40 && (flags & 1) && BIT(source, 39))) operand |= u64(1) << bit;
-	}
-	u64 const destination = before[selector & 1];
-	s64 const left = BIT(destination, 39) ? s64(destination) - (s64(1) << 40) : s64(destination);
-	s64 const right = BIT(operand, 39) ? s64(operand) - (s64(1) << 40) : s64(operand);
-	s64 const sum = operation ? left - right : left + right;
-	bool const overflow = sum < -2147483648LL || sum > 2147483647LL;
-	bool const carry = operation ? u32(destination) >= u32(operand) : u64(u32(destination)) + u32(operand) > 0xffffffffULL;
-	u16 const st0 = 0x1804 | (flags & 4 ? 0x600 : 0);
-	u16 const st1 = 0x800 | (flags & 1 ? 0x100 : 0) | (flags & 2 ? 0x200 : 0) | (asm_shift ? shift & 31 : 0x13);
-	u16 const result_st0 = (st0 & ~0x800) | (carry ? 0x800 : 0) | (overflow ? (selector & 1 ? 0x200 : 0x400) : 0);
-	auto after = before;
-	after[selector & 1] = u64((flags & 2) && overflow ? (sum < 0 ? -2147483648LL : 2147483647LL) : sum) & 0xffffffffffULL;
-	u16 const opcode = (asm_shift ? 0xf480 | operation : 0xf400 | (operation << 5) | (shift & 31)) | ((selector >> 1) << 9) | ((selector & 1) << 8);
-	u32 const base = (producer ? selector & 1 : (v / 32768) % 2) ? 0x20000 : 0;
-	return {selector, gap, producer ? 8 + gap : 6, producer, opcode, st0, st1, result_st0, initial, before, after, base};
-}
 
-void tms320c54x_test_state::start_pipeline_accumulator_arithmetic(unsigned variant)
-{
-	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-	if (!variant) { m_register_bank_coverage = {}; m_register_bank_replays = 0; }
-	auto const f = variant >= 196896 ? register_load_case(variant - 196896) : register_arithmetic_case_full(variant);
-	u32 const opcode_pc = f.base + 0x600 + (f.producer ? 2 + f.gap : 0);
-	auto &program = m_cpu->space(AS_PROGRAM);
-	for (unsigned i = 0; i < 32; ++i) program.write_word(f.base + 0x600 + i, 0xf495);
-	if (f.producer) { program.write_word(f.base + 0x600, 0xf020 | ((f.selector >> 1) << 8)); program.write_word(f.base + 0x601, f.before[f.selector >> 1]); }
-	program.write_word(opcode_pc, f.opcode); if (f.producer) program.write_word(opcode_pc + 1, 0xf4e1);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10); m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST0, f.st0); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, f.st1);
-	m_cpu->set_state_int(tms320c54x_device::STATE_A, f.initial[0]); m_cpu->set_state_int(tms320c54x_device::STATE_B, f.initial[1]);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
-	m_cpu->set_state_int(STATE_GENPC, f.base + 0x600); m_cpu->set_pipeline_frontend(true);
-	m_pipeline_replay = false; m_idle_fixture_tick = 0; m_pipeline_extensions_reads = m_pipeline_operand_reads = 0;
-	m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0, 0xffff, "register_alu_no_read",
-		[this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) expect(false, "Register ALU does not read data memory"); });
-	m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0, 0xffff, "register_alu_no_write",
-		[this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) expect(false, "Register ALU publishes only accumulator/status"); });
-	m_pipeline_fetch_tap = program.install_read_tap(f.base + 0x600, opcode_pc, "register_alu_fetch",
-		[this, f, opcode_pc](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return;
-			if (at == opcode_pc) { expect(word == f.opcode && !m_pipeline_extensions_reads, "Register ALU fetches its one-word opcode once"); ++m_pipeline_extensions_reads; }
-			else if (f.producer && at == f.base + 0x601) { expect(word == u16(f.before[f.selector >> 1]) && !m_pipeline_operand_reads, "The preceding load retains its one literal"); ++m_pipeline_operand_reads; } });
-	m_phase = 253130; m_cpu->resume(SUSPEND_REASON_DISABLE);
-	m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-}
 
 tms320c54x_test_state::memory_multiply_fixture tms320c54x_test_state::memory_multiply_case(unsigned variant, bool square)
 {
@@ -1404,75 +1337,13 @@ bool tms320c54x_test_state::check_immediate_arithmetic_results()
 			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
 			if (variant < 27791) { start_pipeline_immediate_arithmetic(variant + 1); return true; }
 			osd_printf_info("TMS320C54x staged immediate arithmetic: PASS sub_cases=26112 add16_cases=1536 producer_cases=144 selectors=4 shifts=0..16 patterns=8 status_states=8 pages=2 restore=27792 duplicate_literals=0 data_accesses=0 silicon_phase_claim=0\n");
-			start_pipeline_accumulator_arithmetic(); return true;
+			throw emu_fatalerror("Legacy register bank retired: run register_accumulator_arithmetic and register_accumulator_load");
 		}
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
 	}
 	if (m_phase == 253120)
 	{
 		m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 253110;
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 253130)
-	{
-		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
-		bool const load = variant >= 196896;
-		unsigned const model_variant = load ? variant - 196896 : variant;
-		auto const f = load ? register_load_case(model_variant) : register_arithmetic_case_full(variant);
-		unsigned const checkpoint = (f.producer ? 5 + f.gap : 3) + register_bank_schedule::checkpoint_index(variant);
-		auto const expected = tick >= f.execute_cycle ? f.after : f.producer && tick >= 7 ? f.before : f.initial;
-		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) &&
-			m_cpu->state_int(tms320c54x_device::STATE_A) == expected[0] && m_cpu->state_int(tms320c54x_device::STATE_B) == expected[1] &&
-			m_cpu->state_int(tms320c54x_device::STATE_ST0) == (tick >= f.execute_cycle ? f.result_st0 : f.st0) && m_cpu->state_int(tms320c54x_device::STATE_ST1) == f.st1,
-			"Register ALU uses original source/destination and signed 40-bit shifts, publishing the operation's status/result only in Execute");
-		if (f.producer && tick == 4)
-		{
-			auto const disable = machine().disable_side_effects(); m_cpu->space(AS_PROGRAM).write_word(f.base + 0x601, 0xdead);
-		}
-		if (tick == checkpoint && !m_pipeline_replay)
-		{
-			m_idle_fixture_saved_tick = tick; m_recurring_irq_snapshot = {m_pipeline_extensions_reads, m_pipeline_operand_reads};
-			expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save register arithmetic in Decode, Access or Read");
-		}
-		if (tick == 18)
-		{
-			expect_opcode(f.opcode, m_pipeline_extensions_reads == 1 && m_pipeline_operand_reads == unsigned(f.producer) &&
-				m_cpu->state_int(tms320c54x_device::STATE_A) == expected[0] &&
-				m_cpu->state_int(tms320c54x_device::STATE_B) == expected[1] &&
-				m_cpu->state_int(tms320c54x_device::STATE_ST0) == f.result_st0,
-				"Register arithmetic retains its opcode and independently checked result/status");
-			if (f.producer) expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE), "Load-to-register-arithmetic producer fixture drains to IDLE");
-			if (!m_pipeline_replay)
-			{
-				m_pipeline_replay = true; m_idle_fixture_tick = m_idle_fixture_saved_tick;
-				m_pipeline_extensions_reads = m_recurring_irq_snapshot[0]; m_pipeline_operand_reads = m_recurring_irq_snapshot[1];
-				expect(restore_snapshot(machine(), *m_check_timer, m_saved_pipeline) == STATERR_NONE, "Restore register arithmetic without opcode refetch or premature publication");
-				++m_register_bank_replays;
-				m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 253140; m_check_timer->enable(true); return true;
-			}
-			m_register_bank_coverage.add(register_bank_schedule::case_key(variant));
-			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-			if (variant == 196895)
-			{
-				expect(m_register_bank_coverage.count == register_bank_schedule::arithmetic_cases && m_register_bank_replays == register_bank_schedule::arithmetic_cases,
-					"Register arithmetic counts completed standalone and producer restores");
-				osd_printf_info("TMS320C54x staged register arithmetic: PASS cases=65536 producer_cases=288 operations=ADD,SUB selectors=4 shifts=-16..15 shift_sources=opcode,ASM patterns=8 status_states=8 pages=2 restore=65824 duplicate_opcodes=0 data_accesses=0 silicon_phase_claim=0 checkpoints=3 checkpoint_policy=balanced producer_policy=exhaustive\n");
-			}
-			if (auto const next = register_bank_schedule::next(variant); next < register_bank_schedule::end)
-				{ start_pipeline_accumulator_arithmetic(next); return true; }
-			expect(m_register_bank_coverage.count == register_bank_schedule::cases && m_register_bank_replays == register_bank_schedule::cases,
-				"Register-bank digest includes both banks and every retained producer checkpoint");
-			osd_printf_info("TMS320C54x staged register LD: PASS cases=65536 producer_cases=144 selectors=4 shifts=-16..15 shift_sources=opcode,ASM patterns=8 status_states=16 pages=2 restore=65680 duplicate_opcodes=0 data_accesses=0 carry_preserved=1 silicon_phase_claim=0 checkpoints=3 checkpoint_policy=balanced producer_policy=exhaustive coverage_cases=%u coverage_restores=%u coverage_fnv64=%016llx\n",
-				m_register_bank_coverage.count, m_register_bank_replays, (unsigned long long)m_register_bank_coverage.value);
-			if (profile_is("reg-banks")) throw emu_fatalerror(3, "TMS320C54x isolated register banks complete");
-			start_pipeline_memory_multiply(); return true;
-		}
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 253140)
-	{
-		m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 253130;
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
 	}
 	if (m_phase == 253150)

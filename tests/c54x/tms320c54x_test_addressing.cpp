@@ -478,40 +478,6 @@ tms320c54x_test_state::extended_banz_fixture tms320c54x_test_state::extended_ban
 		(v / 384) % 2 ? 0x20000U : 0U, bk};
 }
 
-tms320c54x_test_state::register_arithmetic_fixture tms320c54x_test_state::register_load_case(unsigned variant)
-{
-	bool const producer = variant >= 196608;
-	unsigned const v = producer ? (variant - 196608) % 48 : variant % 65536;
-	unsigned const selector = producer ? v % 4 : (v / 32) % 4;
-	unsigned const pattern = producer ? (v / 4) % 4 : (v / 128) % 8;
-	unsigned const flags = producer ? 5 : (v / 1024) % 16, gap = producer ? (v / 16) % 3 : 0;
-	bool const asm_shift = !producer && (v / 16384) % 2;
-	int const shift = producer ? 0 : int(v % 32) - 16;
-	std::array<u64, 2> initial = producer ? std::array<u64, 2>{0x10, 0x20} : std::array<u64, 2>{
-		std::array<u64, 8>{0, 1, 0x7fffffff, 0xff80000000ULL, 0x017fffffffULL, 0xff7fffffffULL, 0x80aa001234ULL, 0xffffffff55ULL}[pattern],
-		std::array<u64, 8>{1, 0xffffffff, 0xff80000000ULL, 0x7fffffff, 0xff7fffffffULL, 0x017fffffffULL, 0x123456789aULL, 0x80000000}[pattern]};
-	auto before = initial;
-	if (producer) before[selector >> 1] = u64(s64(s16(std::array<u16, 4>{0, 1, 0x8000, 0xffff}[pattern]))) & 0xffffffffffULL;
-	u64 const source = before[selector >> 1];
-	u64 result = 0;
-	for (int bit = 0; bit < 40; ++bit)
-	{
-		int const source_bit = bit - shift;
-		if ((source_bit >= 0 && source_bit < 40 && BIT(source, source_bit)) ||
-			(shift < 0 && source_bit >= 40 && (flags & 1) && BIT(source, 39))) result |= u64(1) << bit;
-	}
-	s64 const signed_source = BIT(source, 39) ? s64(source) - (s64(1) << 40) : s64(source);
-	s64 const full = shift >= 0 ? signed_source * (s64(1) << shift) : 0;
-	bool const overflow = shift >= 0 && (full < -2147483648LL || full > 2147483647LL);
-	if (overflow && (flags & 2)) result = full < 0 ? 0xff80000000ULL : 0x7fffffff;
-	u16 const st0 = 0x1004 | (flags & 4 ? 0x800 : 0) | (flags & 8 ? 0x600 : 0);
-	u16 const st1 = 0x800 | (flags & 1 ? 0x100 : 0) | (flags & 2 ? 0x200 : 0) | (asm_shift ? shift & 31 : 0x13);
-	u16 const result_st0 = st0 | (overflow ? (selector & 1 ? 0x200 : 0x400) : 0);
-	auto after = before; after[selector & 1] = result;
-	u16 const opcode = (asm_shift ? 0xf482 : 0xf440 | (shift & 31)) | ((selector >> 1) << 9) | ((selector & 1) << 8);
-	u32 const base = (producer ? selector & 1 : (v / 32768) % 2) ? 0x20000 : 0;
-	return {selector, gap, producer ? 8 + gap : 6, producer, opcode, st0, st1, result_st0, initial, before, after, base};
-}
 
 
 
