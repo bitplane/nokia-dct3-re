@@ -639,10 +639,6 @@ void tms320c54x_test_state::expect(bool condition, const char *message)
 		case 292000: case 292010: progress(m_instruction_observer); break;
 		case 255320: case 255330: case 255331:
 			progress(m_rptbd); break;
-		case 251030:
-			case_index = unsigned(m_frontend.nmi);
-			tick = m_frontend.expected_cycle;
-			break;
 		}
 		osd_printf_info("c54x_failure: phase=%u case=%u tick=%u replay=%u pc=%06x rc=%04x ar1=%04x a=%010llx b=%010llx st0=%04x illegal=%u reads=%u writes=%u\n",
 			m_phase, case_index, tick, unsigned(replay), unsigned(m_cpu->state_int(STATE_GENPC)),
@@ -788,13 +784,6 @@ void tms320c54x_test_state::test(machine_config &config)
 				"Direct store retires during vector Fetch/IACK");
 			++m_vector_acks;
 		}
-		if (m_phase == 251040)
-		{
-			expect(line == 0 && m_cpu->pipeline_cycles() == 7,
-				"Two-word instruction completes Decode before interrupt IACK");
-			++m_vector_acks;
-		}
-		acknowledge_frontend_interrupt(line);
 		acknowledge_entry_interrupt(line);
 		return 0;
 	}, "vector_acknowledge");

@@ -58,7 +58,6 @@ private:
 	void start_interrupt_entry_spacing_case(unsigned index);
 	void start_interrupt_acceptance_checkpoint();
 	void acknowledge_entry_interrupt(int line);
-	void acknowledge_frontend_interrupt(int line);
 	void start_entry_stage_restore_case(unsigned index);
 	void start_operand_fetch_case(unsigned index);
 	void start_loop_xc_case(unsigned index);
@@ -75,7 +74,6 @@ private:
 	void start_timer_prescaler_divider_case(unsigned divider);
 	void start_timer_counter_write_case(unsigned divider);
 	void check_timer_reserved_fields();
-	void start_empty_pipeline_case(bool nmi);
 	void start_peripheral_mmr_timing_audit(unsigned variant = 0);
 	void start_pipeline_peripheral_case(unsigned variant = 0);
 	void start_pipeline_mu4_prologue(unsigned variant = 0);
@@ -1565,7 +1563,6 @@ private:
 	bool check_xc_interrupt_results();
 	bool check_repeat_endpoints_results();
 	bool check_interrupt_entry_results();
-	bool check_pipeline_frontend_results();
 	bool check_peripheral_mmr_timing_audit_results();
 	bool check_pipeline_immediate_store_results();
 	bool check_pipeline_idle_results();
@@ -1742,7 +1739,6 @@ private:
 	unsigned m_pipeline_register_writes = 0;
 	memory_passthrough_handler m_pipeline_operand_tap;
 	bool m_pipeline_replay = false;
-	frontend_entry_fixture m_frontend;
 	instruction_observer_fixture m_instruction_observer;
 	rptbd_observations m_rptbd_counts, m_rptbd_saved_counts;
 	replay_fixture<saved_repeat_observations> m_saved_irq_repeat, m_body_irq_repeat;

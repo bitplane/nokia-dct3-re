@@ -36,6 +36,25 @@ inline std::vector<clocked_register_case> section_cases()
 	unsupported.require_idle = false;
 	unsupported.forbid_data_access = true;
 	cases.push_back(std::move(unsupported));
+	for (bool nmi : {false,true}) {
+		u16 const vector = nmi ? 4 : 0x40;
+		int const line = nmi ? INPUT_LINE_NMI : 0;
+		auto initial = initial_case("empty-frontend-interrupt", {0xe811});
+		for (unsigned at = vector; at < vector + 16; ++at) initial.program.push_back({at,u16(at == vector ? 0xe955 : 0xf495)});
+		initial.data = {{0xfff,0xbeef}};
+		initial.initial.insert(initial.initial.end(),{{r::STATE_ST1,nmi ? 0x800U : 0U},{r::STATE_IMR,nmi ? 0U : 1U},{r::STATE_IFR,nmi ? 2U : 0U}});
+		clocked_register_case c{{{0,std::move(initial)}},2,8};
+		c.initial_input_lines = {{line,ASSERT_LINE},{line,CLEAR_LINE}};
+		for (unsigned tick = 1; tick <= 8; ++tick) c.states.push_back({tick,observation("unexecuted-first-word-is-return-PC", {
+			{r::STATE_A,0},{r::STATE_B,tick < 8 ? 0U : 0x55U},{r::STATE_SP,tick < 3 ? 0x1000U : 0xfffU}},
+			{{0xfff,u16(tick < 5 ? 0xbeef : 0x600)}})});
+		c.states.back().observation.expected.push_back({r::STATE_IFR,nmi ? 2U : 0U});
+		c.irqs = {{line,4,4,0,0x600}};
+		c.program_events = {{false,vector,0xe955,4}};
+		c.data_events = std::vector<clocked_data_event>{{true,0xfff,0x600,5}};
+		c.require_idle = false; c.check_pipeline_clock = true;
+		cases.push_back(std::move(c));
+	}
 	return cases;
 }
 }

@@ -78,6 +78,7 @@ struct clocked_register_case
 	std::vector<std::array<u32,2>> data_ranges{}; // Empty means the whole data bus.
 	std::vector<clocked_irq_expectation> irqs{};
 	bool pipeline_frontend = true;
+	std::vector<register_setting> initial_input_lines{};
 };
 
 // No implicit reset: the standalone runner owns reset_* metadata.

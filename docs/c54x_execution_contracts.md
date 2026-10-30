@@ -511,7 +511,7 @@ boundaries are:
 | `tests/c54x/tms320c54x_test_pipeline.cpp` | Dependency, status and data-path compositions and their sequenced continuations |
 | `tests/c54x/tms320c54x_test_pipeline_control.cpp` | Branch, call, return and conditional-control compositions and continuations |
 | `tests/c54x/tms320c54x_test_pipeline_repeat.cpp` | Repeat/block-control compositions and continuations |
-| `tests/c54x/tms320c54x_test_frontend.cpp` | Decoded/empty frontend entry, flush timing and acknowledgement ownership |
+| `tests/c54x/sections/frontend_drain.h` | Decoded/empty frontend entry, flush timing and case-owned acknowledgement checks |
 | `tests/c54x/tms320c54x_test_observer.cpp` | Instruction identity, ordinary-read exclusion and XC annulment observations |
 | `tests/c54x/tms320c54x_test_block_repeat.cpp` | Delayed-block-repeat layout, exclusions, IRQ acknowledgement and replay |
 | `tests/c54x/tms320c54x_test_pipeline_state.h` | Family-owned frontend, observer and delayed-block-repeat storage |

@@ -10,14 +10,6 @@
 
 namespace c54x_test {
 
-struct frontend_entry_fixture
-{
-	bool nmi = false;
-	u64 expected_cycle = 0;
-	unsigned vector_reads = 0, acks = 0;
-	memory_passthrough_handler vector_tap;
-};
-
 struct instruction_observer_fixture
 {
 	unsigned variant = 0, tick = 0;
