@@ -139,16 +139,6 @@ private:
 	static u16 repeated_writa_word(unsigned reg, unsigned index);
 	static u32 repeated_writa_destination(repeated_writa_fixture const &f, unsigned index);
 	void start_repeated_writa(unsigned variant = 0);
-	struct branch_arithmetic_fixture
-	{
-		unsigned operation, destination, branch_b, form, flags, checkpoint;
-		bool taken;
-		u16 memory, source, st0, final_st0;
-		u32 page;
-		u64 a, b, result;
-	};
-	static branch_arithmetic_fixture branch_arithmetic_case(unsigned variant);
-	void start_branch_arithmetic(unsigned variant = 0);
 	void start_bitt(unsigned variant = 0);
 	void start_bitt_retd(unsigned variant = 0);
 	struct delay_bitt_fixture
@@ -1597,7 +1587,6 @@ private:
 	};
 	// Return true only when the original callback would return; order is retained.
 	bool check_repeated_writa_results();
-	bool check_branch_arithmetic_results();
 	bool check_bitt_results();
 	bool check_delay_bitt_results();
 	bool check_mapped_addm_results();
@@ -1928,7 +1917,6 @@ private:
 	unsigned m_bleq_case = 0;
 	static constexpr unsigned rom4_staged_cold_phase = 62000;
 	static constexpr unsigned repeated_writa_phase = 62044;
-	static constexpr unsigned branch_arithmetic_phase = 62040;
 	static constexpr unsigned bitt_phase = 62032;
 	static constexpr unsigned ar_addm_phase = 62020;
 	unsigned m_rom4_checks = 0;

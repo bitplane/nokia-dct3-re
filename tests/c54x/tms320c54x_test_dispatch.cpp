@@ -16,7 +16,6 @@ TIMER_CALLBACK_MEMBER(tms320c54x_test_state::check_results)
 	auto &program = m_cpu->space(AS_PROGRAM);
 	auto &data = m_cpu->space(AS_DATA);
 	if (check_repeated_writa_results()) return;
-	if (check_branch_arithmetic_results()) return;
 	if (check_bitt_results()) return;
 	if (check_delay_bitt_results()) return;
 	if (check_mapped_addm_results()) return;

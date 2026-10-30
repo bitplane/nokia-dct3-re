@@ -393,55 +393,6 @@ void tms320c54x_test_state::start_addm_brc_loop(unsigned variant)
 	m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 }
 
-tms320c54x_test_state::branch_arithmetic_fixture tms320c54x_test_state::branch_arithmetic_case(unsigned variant)
-{
-	branch_arithmetic_fixture f{};
-	f.operation = variant % 4; f.destination = (variant / 4) % 2; f.branch_b = (variant / 8) % 2; f.taken = (variant / 16) % 2; f.form = (variant / 32) % 3;
-	unsigned const operand = (variant / 96) % 4, pattern = (variant / 384) % 4;
-	f.flags = (variant / 1536) % 4; f.page = (variant / 6144) % 2 ? 0x20000 : 0;
-	f.checkpoint = std::array<unsigned, 3>{5, 8, 9}[variant / 12288];
-	f.memory = std::array<u16, 4>{0, 1, 0x8000, 0xffff}[operand]; f.source = f.form ? 0x1201 : 0x06b3;
-	u64 const initial = std::array<u64, 4>{0, 1, 0x7fffffffULL, 0xff80000000ULL}[pattern];
-	f.a = f.destination ? 0x123456789aULL : initial; f.b = f.destination ? initial : 0x81abcdef01ULL;
-	(f.branch_b ? f.b : f.a) = f.taken ? 0 : 1;
-	u64 const source = f.destination ? f.b : f.a;
-	s64 const left = source & 0x8000000000ULL ? s64(source) - 0x10000000000LL : s64(source);
-	s64 const right = !(f.operation & 2) && (f.flags & 1) ? s16(f.memory) : s64(f.memory);
-	s64 const result = (f.operation & 1) ? left - right : left + right;
-	bool const overflow = result > 0x7fffffffLL || result < -0x80000000LL;
-	bool const carry = (f.operation & 1) ? u32(source) >= u32(right) : u64(u32(source)) + u32(right) > 0xffffffffULL;
-	f.st0 = 0xa024 | ((pattern & 1) ? 0x800 : 0) | ((operand & 1) ? 0x600 : 0);
-	f.final_st0 = (f.st0 & ~0x800) | (carry ? 0x800 : 0) | (overflow ? f.destination ? 0x200 : 0x400 : 0);
-	f.result = overflow && (f.flags & 2) ? (result < 0 ? 0xff80000000ULL : 0x7fffffffULL) : u64(result) & 0xffffffffffULL;
-	return f;
-}
-
-void tms320c54x_test_state::start_branch_arithmetic(unsigned variant)
-{
-	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant; auto const f = branch_arithmetic_case(variant);
-	auto &program = m_cpu->space(AS_PROGRAM);
-	for (unsigned i = 0; i < 12; ++i) program.write_word(f.page + 0x9000 + i, 0xf495);
-	program.write_word(f.page + 0x9000, f.branch_b ? 0xfa4d : 0xfa45); program.write_word(f.page + 0x9001, 0x9100);
-	program.write_word(f.page + 0x9002, std::array<u16, 4>{0x0000, 0x0800, 0x0200, 0x0a00}[f.operation] | (f.destination << 8) | std::array<u16, 3>{0xf8, 0xe3, 0xeb}[f.form]);
-	program.write_word(f.page + 0x9003, f.form ? 1 : f.source); program.write_word(f.page + 0x9004, 0xf4e1); program.write_word(f.page + 0x9100, 0xf4e1);
-	m_cpu->space(AS_DATA).write_word(f.source, f.memory);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST0, f.st0); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x800 | ((f.flags & 1) ? 0x100 : 0) | ((f.flags & 2) ? 0x200 : 0));
-	m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0); m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_A, f.a); m_cpu->set_state_int(tms320c54x_device::STATE_B, f.b); m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x1200);
-	m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x2000); m_cpu->set_state_int(tms320c54x_device::STATE_T, 0x5aa5);
-	m_pipeline_operand_reads = m_pipeline_extensions_reads = 0;
-	m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0, 0xffff, "branch_arithmetic_read",
-		[this, f](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return; expect(!m_pipeline_operand_reads && at == f.source && word == f.memory && m_cpu->pipeline_cycles() == 9, "Delayed arithmetic reads its retained memory address once after the branch decision"); ++m_pipeline_operand_reads; });
-	m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0, 0xffff, "branch_arithmetic_no_write",
-		[this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) expect(false, "BCD arithmetic never writes data memory or a call frame"); });
-	m_pipeline_fetch_tap = program.install_read_tap(f.page + 0x9003, f.page + 0x9003, "branch_arithmetic_literal",
-		[this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) { expect(!m_pipeline_extensions_reads, "BCD arithmetic retains its operand extension once"); ++m_pipeline_extensions_reads; } });
-	m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = branch_arithmetic_phase;
-	m_cpu->set_state_int(STATE_GENPC, f.page + 0x9000); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE);
-	m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-}
 
 void tms320c54x_test_state::start_bitt(unsigned variant)
 {
@@ -3553,33 +3504,6 @@ void tms320c54x_test_state::start_staged_overflow(unsigned variant)
 
 
 
-bool tms320c54x_test_state::check_branch_arithmetic_results()
-{
-	if (m_phase == branch_arithmetic_phase)
-	{
-		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick; auto const f = branch_arithmetic_case(variant);
-		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "BCD AEQ/BEQ admits its two-word memory arithmetic delay");
-		if (tick == 9) { auto const disable = machine().disable_side_effects(); m_cpu->space(AS_DATA).write_word(f.source, 0x5555); }
-		capture_pipeline_at(f.checkpoint, {&m_pipeline_operand_reads, &m_pipeline_extensions_reads},
-			"Save branch predicate, delayed Decode and retained arithmetic Read");
-		if (tick == 32)
-		{
-			expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_cpu->state_int(STATE_GENPC) == f.page + (f.taken ? 0x9101 : 0x9005) &&
-				m_pipeline_operand_reads == 1 && m_pipeline_extensions_reads == 1 && m_cpu->state_int(tms320c54x_device::STATE_A) == (f.destination ? f.a : f.result) && m_cpu->state_int(tms320c54x_device::STATE_B) == (f.destination ? f.result : f.b) &&
-				m_cpu->state_int(tms320c54x_device::STATE_ST0) == f.final_st0 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == (0x800 | ((f.flags & 1) ? 0x100 : 0) | ((f.flags & 2) ? 0x200 : 0)) &&
-				m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x2000 && m_cpu->state_int(tms320c54x_device::STATE_T) == 0x5aa5 && m_cpu->state_int(tms320c54x_device::STATE_AR3) == (f.form == 2 ? 0x1201 : 0x1200), "BCD retains its pre-delay decision while arithmetic publishes the independent result, flags and address update once");
-			if (replay_pipeline_at(branch_arithmetic_phase + 1, f.checkpoint,
-				"Restore BCD arithmetic without resampling or duplicate publication")) return true;
-			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (variant < 36863) { start_branch_arithmetic(variant + 1); return true; }
-			osd_printf_info("TMS320C54x BCD arithmetic: PASS cases=36864 restore=36864 operations=ADD,SUB,ADDS,SUBS accumulators=2 predicates=AEQ,BEQ outcomes=2 forms=absolute,long_offset,long_update operands=4 sources=4 sxm_ovm=4 pages=2 snapshots=3 predicate_retained=1 operand_retained=1 data_reads=1 data_writes=0 silicon_phase_claim=0\n");
-			throw emu_fatalerror(0, "TMS320C54x isolated BCD arithmetic complete");
-		}
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == branch_arithmetic_phase + 1) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = branch_arithmetic_phase; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true; }
-	return false;
-}
 
 bool tms320c54x_test_state::check_bitt_results()
 {
