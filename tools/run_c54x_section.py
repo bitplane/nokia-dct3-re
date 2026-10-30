@@ -66,7 +66,7 @@ def main():
     counts['xc_condition'] = 44
     counts['plain_branch'] = 16
     counts['conditional_delay'] = 32
-    counts['plain_return'] = 12
+    counts['plain_return'] = 16
     counts['call'] = 44
     counts['delayed_return'] = 8
     parser.add_argument('section', choices=[*counts, 'all'])
