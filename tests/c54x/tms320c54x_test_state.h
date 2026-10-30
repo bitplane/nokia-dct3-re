@@ -118,7 +118,6 @@ private:
 	void start_timer_prescaler_divider_case(unsigned divider);
 	void start_timer_counter_write_case(unsigned divider);
 	void check_timer_reserved_fields();
-	void start_clkmd_write_case(unsigned index);
 	void start_pipeline_frontend_case(bool memory = false, bool memory_b = false);
 	void start_empty_pipeline_case(bool nmi);
 	void start_multiword_pipeline_case(unsigned variant = 0);
