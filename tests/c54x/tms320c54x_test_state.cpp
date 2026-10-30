@@ -402,10 +402,6 @@ void tms320c54x_test_state::machine_reset()
 	{
 		start_pipeline_rmw_forward(); return;
 	}
-	if (!strcmp(machine().system().name, "tms54test") && profile_is("rptb"))
-	{
-		start_pipeline_rptb(); return;
-	}
 	if (!strcmp(machine().system().name, "tms54test") &&
 			profile_is("timer"))
 	{

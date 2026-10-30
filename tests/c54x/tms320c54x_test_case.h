@@ -43,7 +43,7 @@ struct clocked_register_action
 	std::vector<register_setting> input_lines{};
 	std::vector<memory_word> data{};
 };
-struct clocked_data_event { bool write; std::uint32_t address; u16 value; unsigned cycle; };
+struct clocked_data_event { bool write; std::uint32_t address; u16 value; unsigned cycle; bool check_cycle = true; };
 struct clocked_irq_expectation
 {
 	int line;
@@ -56,7 +56,7 @@ inline bool accept_data_event(std::vector<clocked_data_event> const &events, uns
 	if (cursor >= events.size()) return false;
 	auto const &expected = events[cursor];
 	if (actual.write != expected.write || actual.address != expected.address ||
-		actual.value != expected.value || actual.cycle != expected.cycle) return false;
+		actual.value != expected.value || (expected.check_cycle && actual.cycle != expected.cycle)) return false;
 	++cursor;
 	return true;
 }

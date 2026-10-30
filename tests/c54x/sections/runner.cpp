@@ -73,7 +73,7 @@ private:
 		if (!complete) return;
 		unsigned expected_irqs = 0;
 		for (auto const &input : m_cases) expected_irqs += bool(input.irq);
-		if (m_irq_acks != expected_irqs) throw emu_fatalerror("Section IRQ count mismatch");
+		if (m_irq_acks != expected_irqs) throw emu_fatalerror("Section IRQ count mismatch: actual=%u expected=%u",m_irq_acks,expected_irqs);
 		osd_printf_info("C54x section: PASS cases=%u restores=%u\n", m_fixture->count(), m_fixture->restores());
 		throw emu_fatalerror(0, "C54x section complete");
 	}

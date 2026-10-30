@@ -1192,13 +1192,6 @@ void tms320c54x_test_state::start_pipeline_memory_repeat(unsigned variant)
 }
 
 
-u16 tms320c54x_test_state::swap_body_source(unsigned variant)
-{
-	static constexpr u16 values[] = {0, 1, 0xff, 0x100, 0x101, 0x7f80, 0x8000, 0xffff,
-		0x1234, 0xabcd, 0x5500, 0x00aa, 0xff00, 0x00ff, 0x8080, 0x7fff};
-	return values[variant & 15];
-}
-
 tms320c54x_test_state::extended_push_fixture tms320c54x_test_state::extended_push_case(unsigned v)
 {
 	extended_push_fixture f{}; f.mapped = v >= 96000;

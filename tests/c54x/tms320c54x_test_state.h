@@ -607,10 +607,6 @@ private:
 	};
 	static banzd_fixture banzd_case(unsigned variant);
 	void start_pipeline_banzd(unsigned variant = 0);
-	static u16 swap_body_source(unsigned variant);
-	static unsigned rptb_count(unsigned variant);
-	static u16 rptb_source(unsigned variant, unsigned index);
-	void start_pipeline_rptb(unsigned variant = 0);
 	static unsigned rptbd_seed(unsigned v);
 	static unsigned rptbd_count(unsigned v);
 	static unsigned rptbd_layout(unsigned v);
@@ -710,7 +706,6 @@ private:
 	rptbd_square_fixture rptbd_square_case(unsigned v) const;
 	void start_rptbd_square(unsigned variant = 0);
 	void start_rptbd(unsigned variant = 0);
-	void start_pipeline_rptb_edge(unsigned variant = 0);
 	struct memory_immediate_fixture
 	{
 		unsigned form, read, access, checkpoint, words;
@@ -2040,7 +2035,7 @@ private:
 	bool check_basic_repeat_results();
 	bool check_rptbd_shift_store_results();
 	bool check_rptbd_layout_results();
-	bool check_block_repeat_forwarding_results();
+	bool check_ram_forwarding_results();
 	bool check_negate_results();
 	bool check_long_mapped_original_results();
 	bool check_mcbsp_control_sequence_results();

@@ -250,40 +250,6 @@ void tms320c54x_test_state::start_pipeline_repeat_nop(unsigned variant)
 	m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 }
 
-void tms320c54x_test_state::start_pipeline_rptb(unsigned variant)
-{
-	bool const irq = variant >= 6144;
-	unsigned const flags = irq ? 0 : (variant >> 7) & 15;
-	u32 const base = (irq ? (variant - 6144) & 2 : variant & 64) ? 0x20000 : 0;
-	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-	m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove();
-	static constexpr u16 words[] = {0xf072, 0x0606, 0x1386, 0xf678, 0xf3e8, 0xf1a0, 0x8196, 0xf4e1};
-	for (unsigned i = 0; i < 24; ++i) m_cpu->space(AS_PROGRAM).write_word(base + 0x600 + i, i < std::size(words) ? words[i] : 0xf495);
-	for (unsigned i = 0; i <= rptb_count(variant); ++i) m_cpu->space(AS_DATA).write_word(0x5000 + i, rptb_source(variant, i));
-	m_cpu->set_state_int(tms320c54x_device::STATE_BRC, rptb_count(variant));
-	m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000);
-	m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
-	m_cpu->set_input_line(2, CLEAR_LINE); m_cpu->set_input_line(INPUT_LINE_NMI, CLEAR_LINE);
-	if (irq) m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IMR, irq ? 4 : 0);
-	u16 const vector = (variant - 6144) & 1 ? 0x0004 : 0x0048;
-	m_cpu->space(AS_PROGRAM).write_word(base | vector, 0xf495); m_cpu->space(AS_PROGRAM).write_word((base | vector) + 1, 0xf4eb);
-	m_pipeline_extensions_reads = 0;
-	m_vector_prefetch_tap = m_cpu->space(AS_PROGRAM).install_read_tap(base | vector, base | vector, "rptb_vector",
-		[this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) ++m_pipeline_extensions_reads; });
-	m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0x5000, 0x50ff, "rptb_body_read",
-		[this, variant, irq](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return;
-			unsigned const index = m_pipeline_operand_reads;
-			expect(index <= rptb_count(variant) && at == 0x5000 + index && word == rptb_source(variant, index) &&
-				(irq || m_cpu->pipeline_cycles() == 9 + index * 5), "RPTB reads each successive source once with zero-overhead body spacing"); ++m_pipeline_operand_reads;
-			if (irq && index == 1) m_cpu->set_input_line((variant - 6144) & 1 ? INPUT_LINE_NMI : 2, ASSERT_LINE); });
-	m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0x5000, 0x50ff, "rptb_body_write",
-		[this, variant, irq](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return;
-			unsigned const index = m_pipeline_store_writes; u16 const source = rptb_source(variant, index);
-			expect(index <= rptb_count(variant) && at == 0x5000 + index && word == u16((source << 8) | (source >> 8)) &&
-				(irq || m_cpu->pipeline_cycles() == 14 + index * 5), "RPTB writes each transformed word once through interrupt and restore"); ++m_pipeline_store_writes; });
-	m_phase = 253350; m_cpu->resume(SUSPEND_REASON_DISABLE);
-}
 
 unsigned tms320c54x_test_state::rptbd_seed(unsigned v)
 { return v < 512 ? v : (v - 512) % 16 + (((v - 512) / 16) % 2) * 64; }
@@ -390,28 +356,6 @@ void tms320c54x_test_state::start_rptbd_square(unsigned variant)
 	m_cpu->set_state_int(STATE_GENPC, f.base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 }
 
-void tms320c54x_test_state::start_pipeline_rptb_edge(unsigned variant)
-{
-	start_pipeline_rptb(variant & 8 ? 64 : 0);
-	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-	m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_vector_prefetch_tap.remove();
-	unsigned const kind = variant & 7; u32 const base = variant & 8 ? 0x20000 : 0;
-	u16 const op = std::array<u16, 8>{0x6d96, 0xf020, 0xf272, 0xf073, 0x891a, 0xf020, 0x76f8, 0x8186}[kind];
-	u16 const end = kind == 1 || kind == 2 || kind == 3 || kind == 6 ? 0x603 : 0x602;
-	m_cpu->space(AS_PROGRAM).write_word(base + 0x600, 0xf072);
-	m_cpu->space(AS_PROGRAM).write_word(base + 0x601, end);
-	m_cpu->space(AS_PROGRAM).write_word(base + 0x602, op);
-	m_cpu->space(AS_PROGRAM).write_word(base + 0x603, kind == 1 || kind == 5 ? 0x1234 : kind == 6 ? 0x5000 : kind == 3 ? 0x602 : kind == 2 ? 0x604 : 0xf4e1);
-	m_cpu->space(AS_PROGRAM).write_word(base + 0x604, kind == 6 ? 0xbeef : 0xf4e1);
-	m_cpu->set_state_int(tms320c54x_device::STATE_BRC, 3);
-	m_cpu->set_state_int(tms320c54x_device::STATE_AR6, kind == 7 ? 0x1a : 0x5000);
-	m_pipeline_extensions_reads = 0;
-	m_pipeline_fetch_tap = m_cpu->space(AS_PROGRAM).install_read_tap(base + 0x603, base + 0x603, "rptb_edge_literal",
-		[this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) ++m_pipeline_extensions_reads; });
-	m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0, 0xffff, "rptb_edge_no_writes",
-		[this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) ++m_pipeline_store_writes; });
-	m_phase = 253370; m_cpu->resume(SUSPEND_REASON_DISABLE);
-}
 
 unsigned tms320c54x_test_state::block_branch_count(unsigned variant)
 { return std::array<unsigned, 4>{0, 1, 2, 7}[variant % 4]; }

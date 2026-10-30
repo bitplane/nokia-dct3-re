@@ -151,6 +151,7 @@ int main() {
         source = r'''
 #include <cassert>
 #include <cstdint>
+#include <optional>
 #include <vector>
 using u16 = std::uint16_t; using u32 = std::uint32_t;
 ''' + header[begin:end] + r'''
@@ -174,6 +175,9 @@ int main() {
     assert(accept_data_event(events, cursor, events[1]) && cursor == events.size());
     cursor = 0;
     assert(!accept_data_event({}, cursor, events[0]) && cursor == 0);
+    events[0].check_cycle = false;
+    assert(!accept_data_event(events, cursor, {false, 0x10, 0xabcc, 99}));
+    assert(accept_data_event(events, cursor, {false, 0x10, 0xabcd, 99}));
 }
 '''
         with compiled_cpp(source) as program:

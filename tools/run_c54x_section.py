@@ -25,6 +25,8 @@ def main():
     counts['stlm_peripheral'] = 64
     counts['stlm_register'] = 896
     counts['byte_swap'] = 512
+    counts['block_swap'] = 1048
+    counts['block_edges'] = 16
     parser.add_argument('section', choices=[*counts, 'all'])
     parser.add_argument('--jobs', type=int, default=8)
     parser.add_argument('--negative-control', action='store_true', help='require failure of an intentionally wrong expectation')
@@ -43,7 +45,7 @@ def main():
         copy_changed(source, overlay / source.name)
     copy_changed(sections / 'runner.cpp', overlay / 'tms320c54x_test_isa.cpp')
     copy_changed(sections / 'common.h', overlay / 'c54x_section_common.h')
-    selected_source = ROOT / ('tests/firmware/c54x_' + args.section + '.h') if args.section in ('descriptor_copy', 'byte_swap') else sections / (args.section + '.h')
+    selected_source = ROOT / ('tests/firmware/c54x_' + args.section + '.h') if args.section in ('descriptor_copy', 'byte_swap', 'block_swap') else sections / (args.section + '.h')
     copy_changed(selected_source, overlay / 'c54x_section_selected.h')
     if args.negative_control:
         selected = overlay / 'c54x_section_selected.h'
