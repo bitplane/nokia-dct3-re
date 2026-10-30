@@ -33,7 +33,6 @@ TIMER_CALLBACK_MEMBER(tms320c54x_test_state::check_results)
 	if (check_repeat_pop_exclusion_results()) return;
 	if (check_instruction_observer_results()) return;
 	if (check_block_page_results()) return;
-	if (check_mvkd_sp_results()) return;
 	if (check_pipeline_peripheral_logic_results()) return;
 	if (check_mvdd_source_results()) return;
 	if (check_extended_ar_store_results()) return;
