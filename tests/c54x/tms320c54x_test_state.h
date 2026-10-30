@@ -626,7 +626,6 @@ private:
 	static u16 reverse_carry_reference(u16 address, u16 offset, bool subtract);
 	void start_reverse_carry_case(unsigned index);
 	void start_reverse_carry_sequence(bool subtract);
-	void start_shifted_high_store_case(unsigned index);
 	void start_asm_store_case(unsigned index);
 	void start_compact_store_case(unsigned index);
 	void start_software_interrupt_case(unsigned index, bool trap = false);
@@ -1527,9 +1526,7 @@ private:
 	// Return true only when the original callback would return; order is retained.
 	bool check_repeated_writa_results();
 	bool check_idle_nmi_result_results();
-	bool check_shifted_high_store_results();
 	bool check_idle_wake_results();
-	bool check_rounded_multiply_results();
 	bool check_stopped_timer_reload_results();
 	bool check_atomic_program_results();
 	bool restart_pipeline_observer(unsigned phase, u64 next_cycle)

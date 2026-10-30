@@ -124,6 +124,7 @@ def main():
     counts['rounded_load'] = 64
     counts['accumulator_field_store'] = 144
     counts['store_double_load'] = 192
+    counts['shifted_high_store'] = 128
     parser.add_argument('section', choices=[*counts, 'all'])
     parser.add_argument('--jobs', type=int, default=8)
     parser.add_argument('--negative-control', action='store_true', help='require failure of an intentionally wrong expectation')

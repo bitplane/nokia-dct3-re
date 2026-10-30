@@ -1433,7 +1433,6 @@ bool tms320c54x_test_state::check_idle_nmi_result_results()
 		osd_printf_info("TMS320C54x NMI idle wake: PASS cases=12 cycle_accuracy_claim=0\n");
 		osd_printf_info("TMS320C54x NMI pending restore: PASS cases=12 held_line_cases=12 timing_claim=0\n");
 		check_control_disassembler();
-		start_shifted_high_store_case(0);
 		return true;
 	}
 	return false;
