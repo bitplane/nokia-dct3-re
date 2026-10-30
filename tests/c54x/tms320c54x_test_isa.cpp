@@ -6,7 +6,6 @@
 #include "tms320c54x_test_parallel.h"
 #include "tms320c54x_test_dual_reference.h"
 #include "tms320c54x_test_domains.h"
-#include "tms320c54x_test_long_reference.h"
 #include "tms320c54x_test_product_examples.h"
 #include "tms320c54x_test_memory_examples.h"
 #include "tms320c54x_test_memory_continuations.h"
@@ -105,7 +104,7 @@ protected:
 			else if (near_flow())
 				throw emu_fatalerror("Legacy near-flow bank retired: run the atomic_near_control section");
 			else if (long_reference())
-				m_cases.assign(c54x_test::long_reference_cases().begin(), c54x_test::long_reference_cases().end());
+				throw emu_fatalerror("Legacy long bank retired: run the long_literals section");
 			else if (parallel())
 			{
 				for (unsigned i = 0; i < c54x_test::parallel_vectors().size(); ++i) m_cases.push_back(c54x_test::parallel_case(i));

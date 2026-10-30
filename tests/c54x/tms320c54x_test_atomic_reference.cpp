@@ -4,7 +4,6 @@
 #include "emu.h"
 #include "tms320c54x_test_state.h"
 #include "tms320c54x_test_parallel.h"
-#include "tms320c54x_test_long_reference.h"
 #include "tms320c54x_test_product_examples.h"
 #include "tms320c54x_test_memory_examples.h"
 #include "tms320c54x_test_memory_continuations.h"
@@ -19,60 +18,6 @@ bool tms320c54x_test_state::check_atomic_reference_results()
 {
 	[[maybe_unused]] auto &program = m_cpu->space(AS_PROGRAM);
 	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
-	if ((m_phase >= 554 && m_phase <= 562) || m_phase == 9211 || m_phase == 9212)
-	{
-		unsigned const index = m_phase >= 9211 ? m_phase - 9211 + 9 : m_phase - 554;
-		auto const &test = long_reference_cases()[index];
-		check_case(*m_cpu, test, m_port_writes, m_last_port_cycle - m_first_port_cycle);
-		expect_opcode(test.opcode, true, "TI long-word arithmetic reference");
-		if (index + 1 < 11)
-		{
-			return begin_atomic_case(long_reference_cases()[index + 1], index < 8 ? m_phase + 1 : 9211 + index - 8);
-		}
-		write_words(program, {
-			{0x05e0, 0x75f8}, {0x05e1, 0x0d00}, {0x05e2, 0x0124},
-			{0x05e3, 0x5086}, // DADD *AR6,A.
-			{0x05e4, 0x75f8}, {0x05e5, 0x0d00}, {0x05e6, 0x0124}, {0x05e7, 0xf5e1},
-		});
-		data.write_word(0x0f92, 1);
-		data.write_word(0x0f93, 0xffff);
-		m_port_writes = 0;
-		set_registers(*m_cpu, {
-			{cpu_regs::STATE_A, 0x10000}, {cpu_regs::STATE_B, 0x76543210}, {cpu_regs::STATE_AR6, 0x0f92},
-			{cpu_regs::STATE_PC, 0x05e0}, {cpu_regs::STATE_IDLE, 0},
-		});
-		return next_atomic_phase(9252);
-	}
-	if (m_phase == 9252)
-	{
-		expect_opcode(0x5086,
-			m_cpu->state_int(tms320c54x_device::STATE_A) == 0x2ffff &&
-			m_cpu->state_int(tms320c54x_device::STATE_B) == 0x76543210 &&
-			m_cpu->state_int(tms320c54x_device::STATE_AR6) == 0x0f92 &&
-			m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x0f90 &&
-			m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0 &&
-			m_cpu->state_int(tms320c54x_device::STATE_ST1) == 0x0100 &&
-			data.read_word(0x0f92) == 1 && data.read_word(0x0f93) == 0xffff &&
-			data.read_word(0x0f90) == 2 && data.read_word(0x0f91) == 3 &&
-			m_cpu->state_int(tms320c54x_device::STATE_PC) == 0x05e8 &&
-			m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
-			"ROM4 DADD through stationary AR6 preserves B/status/source/pointers in one cycle with independent absolute port markers");
-		program.write_word(0x05e0, 0x75d6);
-		program.write_word(0x05e1, 0x0124);
-		return begin_atomic_case(long_reference_cases()[11], 563);
-	}
-	if (m_phase >= 563 && m_phase <= 569)
-	{
-		unsigned const index = m_phase - 563 + 11;
-		auto const &test = long_reference_cases()[index];
-		check_case(*m_cpu, test, m_port_writes, m_last_port_cycle - m_first_port_cycle);
-		expect_opcode(test.opcode, true, "TI T-based long-word arithmetic reference");
-		if (m_phase < 569)
-		{
-			return begin_atomic_case(long_reference_cases()[index + 1], m_phase + 1);
-		}
-		return begin_atomic_case(memory_examples()[0], 570);
-	}
 	static constexpr unsigned memory_phases[] = {
 		570, 571, 572, 573, 574, 575, 576, 577, 578, 579, 580, 581, 582, 583, 584, 585, 586,
 		9200, 9201, 9202, 9203, 9204, 587, 588, 589, 590, 591, 592, 593, 594, 595, 596, 597,
@@ -89,110 +34,6 @@ bool tms320c54x_test_state::check_atomic_reference_results()
 		{
 			return begin_atomic_case(memory_examples()[index + 1], memory_phases[index + 1]);
 		}
-		program.write_word(0x05e2, 0x5283); // DADD *AR3,B,A
-		data.write_word(0x0f90, 1);
-		data.write_word(0x0f91, 0xffff);
-		m_port_writes = 0;
-		set_registers(*m_cpu, {
-			{cpu_regs::STATE_A, 0x1234}, {cpu_regs::STATE_B, 0x30002}, {cpu_regs::STATE_ST0, 0},
-			{cpu_regs::STATE_ST1, 0x0100}, {cpu_regs::STATE_AR3, 0x0f90}, {cpu_regs::STATE_PC, 0x05e0},
-			{cpu_regs::STATE_IDLE, 0},
-		});
-		return next_atomic_phase(602);
-	}
-	if ((m_phase >= 602 && m_phase <= 605) || m_phase == 9213 || m_phase == 9214)
-	{
-		struct dadd_case { u16 opcode, st1; u64 a_after, b_after; };
-		static constexpr dadd_case cases[] = {
-			{ 0x5283, 0x0100, 0x50001, 0x30002 },
-			{ 0x5383, 0x0100, 0x1234,  0x50001 },
-			{ 0x5283, 0x0180, 0x40001, 0x30002 },
-			{ 0x5383, 0x0180, 0x1234,  0x40001 },
-			{ 0x5385, 0x0100, 0x1234,  0x50001 },
-			{ 0x5385, 0x0180, 0x1234,  0x40001 }
-		};
-		const unsigned index = m_phase >= 9213 ? m_phase - 9213 + 4 : m_phase - 602;
-		const dadd_case &row = cases[index];
-		expect_opcode(row.opcode,
-			m_cpu->state_int(tms320c54x_device::STATE_A) == row.a_after &&
-			m_cpu->state_int(tms320c54x_device::STATE_B) == row.b_after &&
-			m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x0f90 &&
-			(index < 4 || (m_cpu->state_int(tms320c54x_device::STATE_AR5) == 0x0f92 &&
-				m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0 &&
-				m_cpu->state_int(tms320c54x_device::STATE_ST1) == row.st1 &&
-				data.read_word(0x0f92) == 1 && data.read_word(0x0f93) == 0xffff &&
-				data.read_word(0x0f90) == 7 && data.read_word(0x0f91) == 8)) &&
-			m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
-			"DADD B-source routing and C16 carry isolation with one-cycle DARAM timing");
-		if (index + 1 < std::size(cases))
-		{
-			const dadd_case &next = cases[index + 1];
-			program.write_word(0x05e2, next.opcode);
-			if (index >= 3)
-			{
-				write_words(data, {
-					{0x0f90, 7}, {0x0f91, 8}, {0x0f92, 1}, {0x0f93, 0xffff},
-				});
-				m_cpu->set_state_int(tms320c54x_device::STATE_AR5, 0x0f92);
-			}
-			m_port_writes = 0;
-			set_registers(*m_cpu, {
-				{cpu_regs::STATE_A, 0x1234}, {cpu_regs::STATE_B, 0x30002}, {cpu_regs::STATE_ST0, 0},
-				{cpu_regs::STATE_ST1, next.st1}, {cpu_regs::STATE_AR3, 0x0f90}, {cpu_regs::STATE_PC, 0x05e0},
-				{cpu_regs::STATE_IDLE, 0},
-			});
-			return next_atomic_phase(index < 3 ? m_phase + 1 : 9213 + index - 3);
-		}
-		program.write_word(0x05e2, 0x5583); // DSUB *AR3,B
-		data.write_word(0x0f90, 1);
-		data.write_word(0x0f91, 0xffff);
-		m_port_writes = 0;
-		set_registers(*m_cpu, {
-			{cpu_regs::STATE_A, 0x1234}, {cpu_regs::STATE_B, 0x20001}, {cpu_regs::STATE_T, 2}, {cpu_regs::STATE_ST0, 0},
-			{cpu_regs::STATE_ST1, 0x0100}, {cpu_regs::STATE_AR3, 0x0f90}, {cpu_regs::STATE_PC, 0x05e0},
-			{cpu_regs::STATE_IDLE, 0},
-		});
-		return next_atomic_phase(606);
-	}
-	if (m_phase >= 606 && m_phase <= 613)
-	{
-		struct long_b_case { u16 opcode, high, low, st1; u64 b_before, b_after; };
-		static constexpr long_b_case cases[] = {
-			{ 0x5583, 1, 0xffff, 0x0100, 0x20001, 2 },
-			{ 0x5583, 1, 0xffff, 0x0180, 0x20001, 0x10002 },
-			{ 0x5983, 2, 1,      0x0100, 0x1ffff, 2 },
-			{ 0x5983, 2, 1,      0x0180, 0x1ffff, 0x10002 },
-			{ 0x5d83, 1, 1,      0x0100, 0x5678,  0xfffffeffff },
-			{ 0x5d83, 1, 1,      0x0180, 0x5678,  0xffffffffff },
-			{ 0x5f83, 1, 1,      0x0100, 0x5678,  0xfffffeffff },
-			{ 0x5f83, 1, 1,      0x0180, 0x5678,  0xffffff0003 }
-		};
-		const unsigned index = m_phase - 606;
-		const long_b_case &row = cases[index];
-		expect_opcode(row.opcode,
-			m_cpu->state_int(tms320c54x_device::STATE_A) == 0x1234 &&
-			m_cpu->state_int(tms320c54x_device::STATE_B) == row.b_after &&
-			m_cpu->state_int(tms320c54x_device::STATE_T) == 2 &&
-			m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x0f90 &&
-			m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
-			"B long-arithmetic C16 mode and one-cycle DARAM timing");
-		if (m_phase < 613)
-		{
-			const long_b_case &next = cases[index + 1];
-			program.write_word(0x05e2, next.opcode);
-			data.write_word(0x0f90, next.high);
-			data.write_word(0x0f91, next.low);
-			m_port_writes = 0;
-			set_registers(*m_cpu, {
-				{cpu_regs::STATE_A, 0x1234}, {cpu_regs::STATE_B, next.b_before}, {cpu_regs::STATE_T, 2},
-				{cpu_regs::STATE_ST0, 0}, {cpu_regs::STATE_ST1, next.st1}, {cpu_regs::STATE_AR3, 0x0f90},
-				{cpu_regs::STATE_PC, 0x05e0}, {cpu_regs::STATE_IDLE, 0},
-			});
-			++m_phase;
-			m_check_timer->adjust(attotime::from_usec(100));
-			return true;
-		}
-		return begin_atomic_case(dual_reference_cases().front(), 614);
 	}
 	if (m_phase >= 614 && m_phase <= 652)
 	{
