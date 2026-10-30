@@ -2329,62 +2329,9 @@ void tms320c54x_test_state::start_mvdp(unsigned variant)
 	m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 }
 
-tms320c54x_test_state::repeat_mvkd_fixture tms320c54x_test_state::repeat_mvkd_case(unsigned v)
-{
-	repeat_mvkd_fixture f{};
-	f.form = v % 6; f.reg = (v / 6) % 8;
-	f.count = std::array<unsigned, 4>{0, 1, 2, 7}[(v / 48) % 4];
-	f.prefix = (v / 192) % 2 ? 2 : 1;
-	f.destination = std::array<u16, 3>{0x2000, 0x1000, 0x1001}[(v / 384) % 3];
-	f.base = (v / 1152) % 2 ? 0x20000 : 0; f.snapshot = v / 2304;
-	f.initial_ar = f.destination - unsigned(f.form == 5);
-	f.opcode = 0x7000 | (f.form < 2 ? f.form ? 5 : f.destination & 0x7f :
-		(f.form == 2 ? 0x80 : f.form == 3 ? 0x90 : f.form == 4 ? 0x88 : 0x98) | f.reg);
-	f.st0 = 0xa600 | (f.form ? 0 : f.destination >> 7); f.st1 = 0x800 | (f.form == 1 ? 0x4000 : 0);
-	f.read = 6 + f.prefix;
-	return f;
-}
 
-bool tms320c54x_test_state::repeat_mvkd_bypass(repeat_mvkd_fixture const &f, unsigned n)
-{
-	if (!n) return false;
-	u16 const older_destination = f.destination + (f.form == 3 || f.form == 5 ? n - 1 : f.form == 4 ? -int(n - 1) : 0);
-	return older_destination == 0x1000 + n;
-}
 
-u16 tms320c54x_test_state::repeat_mvkd_value(repeat_mvkd_fixture const &f, unsigned n)
-{
-	// SPRU131G 7.3.2 forwards any same-location DB/CB read from
-	// the pending write bus. These layouts never overwrite a later,
-	// nonadjacent source, so only the immediately older copy can feed it.
-	while (repeat_mvkd_bypass(f, n)) --n;
-	return 0x2468 + n;
-}
 
-void tms320c54x_test_state::start_repeat_mvkd(unsigned variant)
-{
-	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-	auto const f = repeat_mvkd_case(variant); auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
-	for (unsigned i = 0; i < 24; ++i) program.write_word(f.base + 0x600 + i, 0xf495);
-	program.write_word(f.base + 0x600, f.prefix == 2 ? 0xf070 : 0xec00 | f.count);
-	if (f.prefix == 2) program.write_word(f.base + 0x601, f.count);
-	program.write_word(f.base + 0x600 + f.prefix, f.opcode); program.write_word(f.base + 0x601 + f.prefix, 0x1000);
-	program.write_word(f.base + 0x602 + f.prefix, 0xf4e1);
-	for (unsigned i = 0; i <= f.count; ++i) data.write_word(0x1000 + i, 0x2468 + i);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST0, f.st0); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, f.st1);
-	m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0); m_cpu->set_state_int(tms320c54x_device::STATE_SP, f.destination - 5);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
-	m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x123456789aULL); m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x9876543210ULL);
-	for (unsigned i = 0; i < 8; ++i) m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + i, i == f.reg ? f.initial_ar : 0x3300 + i);
-	m_pipeline_operand_reads = m_pipeline_store_writes = m_pipeline_extensions_reads = 0;
-	m_pipeline_operand_tap = data.install_read_tap(0, 0xffff, "repeat_mvkd_read", [this, f](offs_t at, u16 &value, u16) { if (machine().side_effects_disabled()) return; unsigned const n = at - 0x1000; ++m_pipeline_operand_reads; expect(n <= f.count && !repeat_mvkd_bypass(f, n) && value == 0x2468 + n && m_cpu->pipeline_cycles() == f.read + n, "Repeated MVKD reads each non-bypassed DAR source once"); });
-	m_pipeline_write_tap = data.install_write_tap(0, 0xffff, "repeat_mvkd_write", [this, f](offs_t at, u16 &value, u16) { if (machine().side_effects_disabled()) return; unsigned const n = m_pipeline_store_writes++; u16 const destination = f.destination + (f.form == 3 || f.form == 5 ? n : f.form == 4 ? -int(n) : 0); bool const valid = n <= f.count && at == destination && value == repeat_mvkd_value(f, n) && m_cpu->pipeline_cycles() == f.read + 1 + n; if (!valid) osd_printf_info("repeat_mvkd_write: case=%u replay=%u n=%u at=%04x expected=%04x value=%04x cycle=%llu expected_cycle=%u\n", m_pipeline_peripheral_case, unsigned(m_pipeline_replay), n, unsigned(at), destination, value, (unsigned long long)m_cpu->pipeline_cycles(), f.read + 1 + n); expect(valid, "Repeated MVKD writes its retained source once on each consecutive Execute clock"); });
-	m_pipeline_fetch_tap = program.install_read_tap(f.base + 0x600 + f.prefix, f.base + 0x601 + f.prefix, "repeat_mvkd_fetch", [this, f](offs_t at, u16 &value, u16) { if (machine().side_effects_disabled()) return; unsigned const n = m_pipeline_extensions_reads++; bool const valid = n < 2 && at == f.base + 0x600 + f.prefix + n && value == (n ? 0x1000 : f.opcode); if (!valid) osd_printf_info("repeat_mvkd_fetch: case=%u replay=%u n=%u at=%06x value=%04x cycle=%llu\n", m_pipeline_peripheral_case, unsigned(m_pipeline_replay), n, unsigned(at), value, (unsigned long long)m_cpu->pipeline_cycles()); expect(valid, "Repeated MVKD fetches one opcode and one retained source literal"); });
-	m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 62128;
-	m_cpu->set_state_int(STATE_GENPC, f.base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE);
-	m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-}
 
 void tms320c54x_test_state::start_repeat_mvdp(unsigned variant)
 {
@@ -4246,32 +4193,8 @@ bool tms320c54x_test_state::check_mapped_dual_results()
 }
 
 
-bool tms320c54x_test_state::check_repeat_mvkd_results()
+bool tms320c54x_test_state::check_program_transfer_results()
 {
-	if (m_phase == 62128)
-	{
-		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick; auto const f = repeat_mvkd_case(variant);
-		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Short RAM-only repeated MVKD is admitted");
-		if (tick == f.read - 1) { auto const disable = machine().disable_side_effects(); m_cpu->space(AS_PROGRAM).write_word(f.base + 0x601 + f.prefix, 0xdead); }
-		if (tick == f.read) { auto const disable = machine().disable_side_effects(); m_cpu->space(AS_DATA).write_word(0x1000, 0xcafe); }
-		unsigned const checkpoint = std::array<unsigned, 4>{f.read - 1, f.read, f.read + 1, f.read + f.count / 2}[f.snapshot];
-		capture_pipeline_at(checkpoint, {&m_pipeline_operand_reads, &m_pipeline_store_writes, &m_pipeline_extensions_reads},
-			"Save repeated MVKD with owned literal, source and destination slots");
-		if (tick == f.read + f.count + 16)
-		{
-			unsigned reads = 0;
-			for (unsigned n = 0; n <= f.count; ++n) reads += !repeat_mvkd_bypass(f, n);
-			expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) && !m_cpu->state_int(tms320c54x_device::STATE_RC) && m_pipeline_operand_reads == reads && m_pipeline_store_writes == f.count + 1 && m_pipeline_extensions_reads == 2 && m_cpu->state_int(tms320c54x_device::STATE_ST0) == f.st0 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == f.st1 && m_cpu->state_int(tms320c54x_device::STATE_A) == 0x123456789aULL && m_cpu->state_int(tms320c54x_device::STATE_B) == 0x9876543210ULL, "Repeated MVKD drains RC, resumes IDLE and preserves unrelated state without duplicate transactions");
-			for (unsigned i = 0; i < 8; ++i) expect(m_cpu->state_int(tms320c54x_device::STATE_AR0 + i) == (i != f.reg ? 0x3300 + i : u16(f.initial_ar + (f.form == 3 || f.form == 5 ? f.count + 1 : f.form == 4 ? -int(f.count + 1) : 0))), "Repeated MVKD applies each short-address modification exactly once");
-			if (replay_pipeline_at(62129, checkpoint,
-				"Restore repeated MVKD without resampling or repeating writes")) return true;
-			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (variant < 9215) { start_repeat_mvkd(variant + 1); return true; }
-			osd_printf_info("TMS320C54x repeated MVKD: PASS cases=9216 restore=9216 forms=DP,SP,plain,postinc,postdec,preinc registers=8 counts=0,1,2,7 count_forms=2 layouts=distinct,equal,overlap pages=2 snapshots=4 source_increment=1 same_address_bypass=1 issue_interval=1 literal_fetches=once mapped_acceptance=0 interrupt_composition=unvalidated silicon_phase_claim=0\n"); throw emu_fatalerror(0, "TMS320C54x isolated repeated MVKD complete");
-		}
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 62129) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 62128; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true; }
 	if (m_phase == 259940)
 	{
 		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;

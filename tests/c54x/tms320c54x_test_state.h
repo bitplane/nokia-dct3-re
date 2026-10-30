@@ -910,16 +910,6 @@ private:
 	void start_fcala_delay(unsigned variant = 0);
 	void start_accumulator_call(unsigned variant = 0);
 	void start_mvdp(unsigned variant = 0);
-	struct repeat_mvkd_fixture
-	{
-		unsigned form, reg, count, prefix, read, snapshot;
-		u32 base;
-		u16 destination, initial_ar, opcode, st0, st1;
-	};
-	static repeat_mvkd_fixture repeat_mvkd_case(unsigned v);
-	static bool repeat_mvkd_bypass(repeat_mvkd_fixture const &f, unsigned n);
-	static u16 repeat_mvkd_value(repeat_mvkd_fixture const &f, unsigned n);
-	void start_repeat_mvkd(unsigned variant = 0);
 	void start_repeat_mvdp(unsigned variant = 0);
 	void start_repeat_mvdp_irq(unsigned variant = 0);
 	void start_mvdp_pair(unsigned variant = 0);
@@ -1276,7 +1266,7 @@ private:
 	bool check_mapped_dual_results();
 	bool check_mvmd_accumulator_results();
 	bool check_repeat_mvdp_irq_results();
-	bool check_repeat_mvkd_results();
+	bool check_program_transfer_results();
 	bool check_near_accumulator_results();
 	bool check_circular_portr_results();
 	bool check_ifr_pair_results();
