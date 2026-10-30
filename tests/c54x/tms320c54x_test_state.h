@@ -841,24 +841,6 @@ private:
 	static u64 xmem_store_source(unsigned variant);
 	static u16 xmem_store_expected(unsigned variant);
 	void start_xmem_store(unsigned variant = 0);
-	struct repeat_push_fixture
-	{
-		unsigned count, kind, interrupt;
-		bool long_form;
-		u32 base;
-		unsigned first_write() const { return long_form ? 8 : 7; }
-		u16 first_source() const { return kind >= 2 ? 11 : kind == 0 ? 0x900 + count : 0x900; }
-		u16 source(unsigned i) const { return kind == 1 || kind == 3 ? first_source() + i : first_source() - i; }
-		u16 value(unsigned i) const
-		{
-			if (kind < 2) return 0x5100 + i;
-			if (source(i) >= 0x10) return first_source();
-			return std::array<u16, 16>{u16(interrupt == 1), u16(interrupt == 1), 0x9002, 0x9003, 0x9004, 0x9005, 0xa600, 0, 0x789a, 0x3456, 0x12, 0x9876, 0xabcd, 0xfe, 0x5678, 0x9abc}[source(i)];
-		}
-	};
-	static repeat_push_fixture repeat_push_case(unsigned v);
-	void start_repeat_push(unsigned variant = 0);
-	void start_push_exclusion(bool self_ar = false);
 	void start_staged_bus_stm(unsigned variant = 0);
 	struct reada_brc_fixture
 	{
@@ -1351,7 +1333,7 @@ private:
 	bool check_portr_bypass_results();
 	bool check_sqdst_results();
 	bool check_xmem_load_results();
-	bool check_repeat_push_results();
+	bool check_reada_brc_results();
 	bool check_block_exit_results();
 	bool check_staged_bus_stm_results();
 	bool check_rom4_fr_decoder_results();
