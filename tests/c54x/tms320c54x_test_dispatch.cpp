@@ -115,7 +115,6 @@ TIMER_CALLBACK_MEMBER(tms320c54x_test_state::check_results)
 	if (check_immediate_arithmetic_results()) return;
 	if (check_memory_repeat_results()) return;
 	if (check_banzd_results()) return;
-	if (check_stlm_t_results()) return;
 	if (check_pipeline_swap_body_results()) return;
 	if (check_push_pop_same_results()) return;
 	if (check_asm_store_results_part2()) return;

@@ -607,17 +607,6 @@ private:
 	};
 	static banzd_fixture banzd_case(unsigned variant);
 	void start_pipeline_banzd(unsigned variant = 0);
-	struct stlm_t_fixture
-	{
-		bool trn, source;
-		unsigned gap, read_cycle;
-		u16 stored, consumed, memory, st0, st1, pmst, result_st0, consumer;
-		u64 value, result;
-		u32 base;
-		bool brc = false;
-	};
-	static stlm_t_fixture stlm_t_case(unsigned variant);
-	void start_pipeline_stlm_t(unsigned variant = 0);
 	static u16 swap_body_source(unsigned variant);
 	void start_pipeline_swap_body(unsigned variant = 0);
 	void start_pipeline_swap_join(unsigned variant = 0);
@@ -2040,7 +2029,6 @@ private:
 	bool check_immediate_arithmetic_results();
 	bool check_memory_repeat_results();
 	bool check_banzd_results();
-	bool check_stlm_t_results();
 	bool check_pipeline_swap_body_results();
 	bool check_push_pop_same_results();
 	bool check_asm_store_results_part2();

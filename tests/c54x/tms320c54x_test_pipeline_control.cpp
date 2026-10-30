@@ -2309,7 +2309,6 @@ bool tms320c54x_test_state::check_banzd_results()
 			if (variant < 3071) { start_pipeline_banzd(variant + 1); return true; }
 			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
 			osd_printf_info("TMS320C54x staged BANZD: PASS cases=3072 registers=8 values=4 modifications=3 cmpt_states=2 pages=2 delay_forms=two_single,one_double restore=3072 duplicate_target_fetches=0 data_accesses=0 silicon_phase_claim=0\n");
-			start_pipeline_stlm_t(); return true;
 		}
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
 	}

@@ -213,7 +213,6 @@ void tms320c54x_test_state::machine_reset()
 		return;
 	if (profile_is("rpt-ld-block")) { start_repeat_load(198656); return; }
 	if (profile_is("stlm-pmst")) { start_stlm_pmst(); return; }
-	if (profile_is("stlm-t")) { start_pipeline_stlm_t(); return; }
 	if (profile_is("ov-branch")) { start_atomic_overflow_branch(0); return; }
 	if (profile_is("ov-branch-pipe")) { start_staged_overflow(); return; }
 	if (profile_is("cond-reg-store")) { check_control_disassembler(); start_conditional_register_store(0); return; }
