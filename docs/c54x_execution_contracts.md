@@ -638,7 +638,7 @@ legacy cases independent.
 `begin_atomic_case` likewise retains predecessor state; reset-only metadata
 belongs to the standalone runner, not the legacy case-start helper.
 
-Register-only logic/CMPL (`reg-logic`), SFTA/SFTL (`reg-shifts`), NEG and ABS
+Register-only logic/CMPL (`register_logic`), SFTA/SFTL (`accumulator_shifts`), `negate` and `absolute`
 share the clocked CPU-only runner and independent integer case builders.
 Logic currently retains its numeric/status/page tuples with balanced replay
 points. Shifts select3,840 cases: every shift/pattern/selector with baseline
@@ -648,9 +648,12 @@ NEG/ABS select400 cases each:128 numeric
 pattern/selector/OVM combinations,240 additional status checks at zero and
 overflow, and32 adjacent-producer cases. Second-page replication and the
 remaining numeric/status cross-products are retired, not claimed equivalent.
-The host census checks selected identities, zero/overflow status coverage and checkpoint classes; the
-review ledger owns exact keys and digests. Redundant default adapters have
-been retired; standalone profiles own these banks. A real final IDLE replaces unobserved padding, not a
+The domains now use explicit loops rather than opaque legacy case-number
+decoding. All3,104 logic,3,840 shift and400+400 NEG/ABS inputs remain.
+Exact single opcode fetch, Execute-only publication, no data accesses,
+adjacent producer state and replay are checked natively. Legacy profile/result
+plumbing and the enumeration-only host census are removed. Checkpoints are
+distributed, not multiplied. A real final IDLE replaces unobserved padding, not a
 consumer interaction. Repeat, IRQ and memory-operand compositions stay separate.
 The basis is [TI SPRU172C](https://www.ti.com/lit/ug/spru172c/spru172c.pdf);
 publication clocks and the documented left-carry policy are not silicon measurements.

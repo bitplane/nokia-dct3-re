@@ -339,6 +339,10 @@ def main():
     counts['timer_prescaler'] = 93
     counts['timer_irq_mask'] = 1
     counts['peripheral_mvdd'] = 192
+    counts['register_logic'] = 3104
+    counts['accumulator_shifts'] = 3840
+    counts['negate'] = 400
+    counts['absolute'] = 400
     counts['accumulator_call_frames'] = 216
     parser.add_argument('section', choices=[*counts, 'all'])
     parser.add_argument('--jobs', type=int, default=8)

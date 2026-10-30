@@ -14,7 +14,6 @@
 #include "tms320c54x_test_stack_sequence.h"
 #include "tms320c54x_test_register_pairs.h"
 #include "tms320c54x_test_register_alu.h"
-#include "tms320c54x_test_register_unary.h"
 #include "tms320c54x_test_composition_limits.h"
 #include <cstring>
 
@@ -32,13 +31,12 @@ public:
 		m_normalization_kind = c54x_test::select_normalization(config.options().bios());
 		m_register_pair_kind = c54x_test::select_register_pair(config.options().bios());
 		m_register_alu_kind = c54x_test::select_register_alu(config.options().bios());
-		m_register_unary_kind = c54x_test::select_register_unary(config.options().bios());
 		m_long_t_store_kind = c54x_test::select_long_t_store(config.options().bios());
 		m_address_modes = !std::strcmp(config.options().bios(), "mode-latency");
 		m_stack_sequences = !std::strcmp(config.options().bios(), "stack-sp");
 		m_composition_limit = c54x_test::select_composition_limit(config.options().bios());
 		m_extended_program = m_long_t_store_kind != c54x_test::long_t_store_kind::none || !std::strcmp(config.options().bios(), "isa-disasm") || m_domain || bool(m_dual_mode) ||
-			m_normalization_kind != c54x_test::normalization_kind::none || m_register_pair_kind != c54x_test::register_pair_kind::none || m_register_alu_kind != c54x_test::register_alu_kind::none || m_register_unary_kind != c54x_test::register_unary_kind::none || m_composition_limit != c54x_test::composition_limit::none;
+			m_normalization_kind != c54x_test::normalization_kind::none || m_register_pair_kind != c54x_test::register_pair_kind::none || m_register_alu_kind != c54x_test::register_alu_kind::none || m_composition_limit != c54x_test::composition_limit::none;
 		TMS320C54X(config, m_cpu, 13'000'000);
 		m_cpu->set_extended_program(m_extended_program);
 		m_cpu->set_addrmap(AS_PROGRAM, &c54x_isa_test_state::program_map);
@@ -63,10 +61,6 @@ protected:
 			m_register_sequence = std::make_unique<c54x_test::register_sequence_fixture>(machine(), *m_cpu, *m_timer,
 				c54x_test::long_t_store_count(m_long_t_store_kind),
 				[this](unsigned key) { return c54x_test::long_t_store_sequence<tms320c54x_device>(key, m_long_t_store_kind); });
-		else if (m_register_unary_kind != c54x_test::register_unary_kind::none)
-			m_register_sequence = std::make_unique<c54x_test::register_sequence_fixture>(machine(), *m_cpu, *m_timer,
-				c54x_test::register_unary_count(m_register_unary_kind),
-				[this](unsigned key) { return c54x_test::register_unary_case<tms320c54x_device>(key, m_register_unary_kind); });
 		else if (m_register_pair_kind != c54x_test::register_pair_kind::none || m_register_alu_kind != c54x_test::register_alu_kind::none)
 			m_register_sequence = std::make_unique<c54x_test::register_sequence_fixture>(machine(), *m_cpu, *m_timer,
 				m_register_pair_kind != c54x_test::register_pair_kind::none ? c54x_test::register_pair_count(m_register_pair_kind) : c54x_test::register_alu_count(m_register_alu_kind),
@@ -144,15 +138,6 @@ private:
 			}
 			osd_printf_info("TMS320C54x extended T/TRN stores: PASS cases=6144 restore=6144 forms=absolute,offset,premod,circular registers=8 compatibility=2 sources=T,TRN values=4 endpoints=RAM,peripheral pages=2 snapshots=3 destination=Read source=Execute literal_retained=1 pointer_updates=once destination_reads=0 writes=1 peripheral_extra_clock=1 silicon_phase_claim=0\n");
 			throw emu_fatalerror(3, "TMS320C54x isolated extended T/TRN stores complete");
-		}
-		if (m_register_unary_kind != c54x_test::register_unary_kind::none)
-		{
-			osd_printf_info("%s\n", c54x_test::register_unary_result(m_register_unary_kind, m_register_sequence->count(),
-				m_register_sequence->restores(), m_register_sequence->digest()).c_str());
-			char const *name = m_register_unary_kind == c54x_test::register_unary_kind::logic ? "register logic" :
-				m_register_unary_kind == c54x_test::register_unary_kind::shift ? "accumulator shifts" :
-				m_register_unary_kind == c54x_test::register_unary_kind::absolute ? "ABS" : "NEG";
-			throw emu_fatalerror(3, "TMS320C54x isolated %s complete", name);
 		}
 		if (m_register_alu_kind == c54x_test::register_alu_kind::minmax)
 		{
@@ -340,7 +325,6 @@ private:
 	c54x_test::normalization_kind m_normalization_kind = c54x_test::normalization_kind::none;
 	c54x_test::register_pair_kind m_register_pair_kind = c54x_test::register_pair_kind::none;
 	c54x_test::register_alu_kind m_register_alu_kind = c54x_test::register_alu_kind::none;
-	c54x_test::register_unary_kind m_register_unary_kind = c54x_test::register_unary_kind::none;
 	c54x_test::long_t_store_kind m_long_t_store_kind = c54x_test::long_t_store_kind::none;
 	bool m_address_modes = false;
 	bool m_stack_sequences = false;
@@ -376,10 +360,6 @@ ROM_START(tms54isa)
 	ROM_SYSTEM_BIOS(22, "rotate", "Staged accumulator rotates and carry forwarding")
 	ROM_SYSTEM_BIOS(23, "minmax", "Signed accumulator MAX MIN Execute ownership and replay")
 	ROM_SYSTEM_BIOS(24, "squr", "Accumulator square with signed 17-bit operand")
-	ROM_SYSTEM_BIOS(25, "reg-logic", "Register logic and complement without memory access")
-	ROM_SYSTEM_BIOS(26, "reg-shifts", "Arithmetic and logical accumulator shifts")
-	ROM_SYSTEM_BIOS(27, "negate", "Accumulator negate with producer and replay")
-	ROM_SYSTEM_BIOS(28, "absolute", "Accumulator absolute value with producer and replay")
 	ROM_SYSTEM_BIOS(29, "isa-words", "Atomic instruction-word arithmetic and addressing examples")
 	ROM_SYSTEM_BIOS(30, "isa-disasm", "Debugger syntax length page wrapping and stepping contracts")
 	ROM_SYSTEM_BIOS(31, "st-t-long", "Long-address T/TRN stores and retained Execute source")
