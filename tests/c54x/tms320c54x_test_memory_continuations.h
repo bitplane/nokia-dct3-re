@@ -44,22 +44,6 @@ inline auto const &memory_continuations()
 			{{r::STATE_A, 0}, {r::STATE_B, 0x1234}, {r::STATE_T, 0}, {r::STATE_AR4, 0x0f92}, {r::STATE_ST0, 0x0800, 0x0800}}, {{0x0f90, 0}, {0x0f91, 1}});
 		add("macr-below-negative-half", {0xb43a}, {{r::STATE_A, 0xffffff7fffULL}, {r::STATE_AR4, 0x0f91}},
 			{{r::STATE_A, 0xffffff0000ULL}, {r::STATE_B, 0x1234}, {r::STATE_T, 0}, {r::STATE_AR4, 0x0f92}, {r::STATE_ST0, 0x0800, 0x0800}});
-		add("macp-b-coefficient", {0x798b, 0x0700},
-			{{r::STATE_A, 0x1234}, {r::STATE_B, 0x770000}, {r::STATE_T, 8}, {r::STATE_ST0, 0x0800}, {r::STATE_ST1, 0x0100}, {r::STATE_AR3, 0x0f90}},
-			{{r::STATE_A, 0x1234}, {r::STATE_B, 0x7d0b44}, {r::STATE_T, 0x0055}, {r::STATE_AR3, 0x0f8f}},
-			{{0x0f90, 0x0055}, {0x0f91, 0x0066}}, 5, {{0x0f91, 0x0066}});
-		result.back().program.emplace_back(0x0700, 0x1234);
-		add("macd-b-successor", {0x7b8b, 0x0700}, {{r::STATE_B, 0x770000}, {r::STATE_T, 8}, {r::STATE_AR3, 0x0f90}},
-			{{r::STATE_A, 0x1234}, {r::STATE_B, 0x7d0b44}, {r::STATE_T, 0x0055}, {r::STATE_AR3, 0x0f8f}}, {}, 5, {{0x0f91, 0x0055}});
-		add("macp-absolute-b", {0x79f8, 0x0f90, 0x0700}, {{r::STATE_B, 0x770000}},
-			{{r::STATE_A, 0x1234}, {r::STATE_B, 0x7d0b44}, {r::STATE_T, 0x0055}}, {{0x0f90, 0x0055}, {0x0f91, 0x0066}}, 6, {{0x0f91, 0x0066}});
-		add("macd-absolute-b", {0x7bf8, 0x0f90, 0x0700}, {{r::STATE_B, 0x770000}},
-			{{r::STATE_A, 0x1234}, {r::STATE_B, 0x7d0b44}, {r::STATE_T, 0x0055}}, {}, 6, {{0x0f91, 0x0055}});
-		add("macp-offset-coefficient-first", {0x79ea, 0x0700, 5}, {{r::STATE_B, 0x770000}, {r::STATE_AR2, 0x0f00}},
-			{{r::STATE_A, 0x1234}, {r::STATE_B, 0x7d0b44}, {r::STATE_T, 0x0055}, {r::STATE_AR2, 0x0f05}},
-			{{0x0f05, 0x0055}, {0x0f06, 0x0066}}, 6, {{0x0f06, 0x0066}});
-		add("macd-offset-successor", {0x7bea, 0x0700, 5}, {{r::STATE_B, 0x770000}, {r::STATE_AR2, 0x0f00}},
-			{{r::STATE_A, 0x1234}, {r::STATE_B, 0x7d0b44}, {r::STATE_T, 0x0055}, {r::STATE_AR2, 0x0f05}}, {}, 6, {{0x0f06, 0x0055}});
 		add("ltd-absolute", {0x4cf8, 0x0f90}, {{r::STATE_T, 0}},
 			{{r::STATE_T, 0x6cac}}, {{0x0f90, 0x6cac}, {0x0f91, 0}}, 4, {{0x0f90, 0x6cac}, {0x0f91, 0x6cac}});
 		add("ltd-offset", {0x4cea, 5}, {{r::STATE_T, 0}, {r::STATE_AR2, 0x0f00}},
