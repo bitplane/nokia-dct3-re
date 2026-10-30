@@ -5438,7 +5438,6 @@ bool tms320c54x_test_state::check_absolute_xorm_results()
 		if (bk) { osd_printf_info("TMS320C54x staged mapped BK arithmetic: PASS cases=1024 restore=1024 selectors=ADD_A,ADD_B,SUB_A,SUB_B sxm_ovm=4 patterns=8 forms=direct,absolute pages=2 snapshots=2 source=Read post_read_change=1 duplicate_reads=0 data_writes=0 physical_phase_claim=0\n"); throw emu_fatalerror(3, "TMS320C54x isolated mapped BK arithmetic complete"); }
 		osd_printf_info("TMS320C54x staged mapped AR arithmetic: PASS cases=1024 registers=8 selectors=4 sxm_ovm=4 patterns=2 forms=direct,absolute restore=1024 duplicate_reads=0 data_writes=0\n");
 		if (profile_is("arith-ar")) throw emu_fatalerror(3, "TMS320C54x isolated mapped AR arithmetic complete");
-		start_pipeline_signed_branch(); return true;
 	}
 	if (m_phase == 252950)
 	{

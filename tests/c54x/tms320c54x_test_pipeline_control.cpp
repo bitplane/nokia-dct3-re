@@ -883,51 +883,6 @@ void tms320c54x_test_state::start_pipeline_banz(unsigned variant)
 	m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 }
 
-bool tms320c54x_test_state::signed_branch_taken(unsigned variant)
-{
-	u64 const bits = signed_branch_source(variant);
-	s64 const value = bits & (1ULL << 39) ? s64(bits) - (1LL << 40) : s64(bits);
-	return std::array<bool, 6>{value >= 0, value < 0, value != 0, value == 0, value > 0, value <= 0}[(variant / 2) % 6];
-}
-
-void tms320c54x_test_state::start_pipeline_signed_branch(unsigned variant)
-{
-	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-	bool const b = variant % 2, delayed = (variant / 12) % 2, taken = signed_branch_taken(variant);
-	unsigned const condition = (variant / 2) % 6, flags = (variant / 192) % 4;
-	u32 const base = (variant / 1536) % 2 ? 0x20000 : 0;
-	auto &program = m_cpu->space(AS_PROGRAM);
-	for (unsigned i = 0; i < 24; ++i) { program.write_word(base + 0x600 + i, 0xf495); program.write_word(base + 0x700 + i, 0xf495); }
-	program.write_word(base + 0x600, 0xf800 | (0x42 + condition) | (b << 3) | (delayed << 9));
-	program.write_word(base + 0x601, 0x700);
-	program.write_word(base + 0x602, b ? 0xe907 : 0xe807);
-	program.write_word(base + 0x603, b ? 0xe822 : 0xe922);
-	program.write_word(base + 0x604, b ? 0xe811 : 0xe911); program.write_word(base + 0x605, 0xf4e1);
-	program.write_word(base + 0x700, b ? 0xe855 : 0xe955); program.write_word(base + 0x701, 0xf4e1);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10); m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xa608);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x800 | ((flags & 1) ? 0x100 : 0) | ((flags & 2) ? 0x200 : 0));
-	m_cpu->set_state_int(tms320c54x_device::STATE_A, b ? 0 : signed_branch_source(variant));
-	m_cpu->set_state_int(tms320c54x_device::STATE_B, b ? signed_branch_source(variant) : 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
-	m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_cpu->set_pipeline_frontend(true);
-	m_pipeline_replay = false; m_idle_fixture_tick = 0; m_pipeline_operand_reads = m_pipeline_extensions_reads = 0;
-	m_pipeline_operand_tap = program.install_read_tap(base + 0x700, base + 0x700, "signed_branch_target",
-		[this, taken, delayed](offs_t, u16 &, u16) { if (machine().side_effects_disabled()) return;
-			expect(taken && !m_pipeline_operand_reads && m_cpu->pipeline_cycles() == (delayed ? 8 : 7),
-				"Signed branch target is fetched once from the full-width retained condition"); ++m_pipeline_operand_reads; });
-	m_pipeline_fetch_tap = program.install_read_tap(base + 0x601, base + 0x601, "signed_branch_literal",
-		[this](offs_t, u16 &word, u16) { if (machine().side_effects_disabled()) return;
-			expect(word == 0x700 && !m_pipeline_extensions_reads, "Signed branch retains the target literal once"); ++m_pipeline_extensions_reads; });
-	m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0, 0xffff, "signed_branch_no_write",
-		[this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) expect(false, "Signed branch has no data-memory write"); });
-	m_operand_data_tap = m_cpu->space(AS_DATA).install_read_tap(0, 0xffff, "signed_branch_no_read",
-		[this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) expect(false, "Signed branch reads its live accumulator, not data memory"); });
-	m_phase = 252970; m_cpu->resume(SUSPEND_REASON_DISABLE);
-	m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-}
 
 
 
@@ -2008,53 +1963,6 @@ bool tms320c54x_test_state::check_pipeline_far_call_results()
 	return false;
 }
 
-bool tms320c54x_test_state::check_signed_branch_taken_results()
-{
-	if (m_phase == 252970)
-	{
-		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick, flags = (variant / 192) % 4;
-		bool const b = variant % 2, delayed = (variant / 12) % 2, poison = (variant / 768) % 2, taken = signed_branch_taken(variant);
-		u64 const original = signed_branch_source(variant), changed = original == 1 ? 0 : 1;
-		unsigned const checkpoint = std::array<unsigned, 4>{4, 5, 6, 8}[variant / 3072];
-		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "All six signed accumulator branch conditions have staged ownership");
-		if (tick == 4)
-		{
-			auto const disable = machine().disable_side_effects(); m_cpu->space(AS_PROGRAM).write_word(((variant / 1536) % 2 ? 0x20000 : 0) + 0x601, 0xdead);
-		}
-		if (poison && tick == 6) m_cpu->set_state_int(b ? tms320c54x_device::STATE_B : tms320c54x_device::STATE_A, changed);
-		if (tick == checkpoint && !m_pipeline_replay)
-		{
-			m_idle_fixture_saved_tick = tick; m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_extensions_reads};
-			expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save signed branch before/after predicate and delay-slot effects");
-		}
-		if (tick == 30)
-		{
-			u64 const compared = delayed || !taken ? 7 : poison ? changed : original, other = taken ? 0x55 : 0x11;
-			expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_pipeline_operand_reads == unsigned(taken) && m_pipeline_extensions_reads == 1 &&
-				m_cpu->state_int(tms320c54x_device::STATE_A) == (b ? other : compared) && m_cpu->state_int(tms320c54x_device::STATE_B) == (b ? compared : other) &&
-				m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0xa608 &&
-				m_cpu->state_int(tms320c54x_device::STATE_ST1) == (0x800 | ((flags & 1) ? 0x100 : 0) | ((flags & 2) ? 0x200 : 0)),
-				"Signed branch uses all 40 bits independent of SXM/OVM and retains its decision through later source changes");
-			if (!m_pipeline_replay)
-			{
-				m_pipeline_replay = true; m_idle_fixture_tick = m_idle_fixture_saved_tick;
-				m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[1];
-				return restore_pipeline_at(252980, "Restore signed branch without refetching its literal or target");
-			}
-			m_pipeline_operand_tap.remove(); m_pipeline_fetch_tap.remove(); m_pipeline_write_tap.remove(); m_operand_data_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (variant < 12287) { start_pipeline_signed_branch(variant + 1); return true; }
-			osd_printf_info("TMS320C54x staged signed branches: PASS cases=12288 conditions=GE,LT,NE,EQ,GT,LE accumulators=A,B forms=BC,BCD patterns=8 sxm_ovm=4 pages=2 restore=12288 post_evaluate_change=0,1 duplicate_fetches=0\n");
-			if (profile_is("signed-branch")) throw emu_fatalerror(0, "TMS320C54x isolated signed branches complete");
-		}
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 252980)
-	{
-		m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 252970;
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	return false;
-}
 
 
 

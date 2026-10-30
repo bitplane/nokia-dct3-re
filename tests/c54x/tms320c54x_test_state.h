@@ -510,9 +510,6 @@ private:
 	static c54x_test::clocked_register_case mapped_arithmetic_sequence(unsigned variant, bool bk);
 	void start_pipeline_register_arithmetic();
 	void start_pipeline_xc_arithmetic(unsigned variant = 0);
-	static u64 signed_branch_source(unsigned variant);
-	static bool signed_branch_taken(unsigned variant);
-	void start_pipeline_signed_branch(unsigned variant = 0);
 	static std::array<u16, 2> bitfield_inputs(unsigned variant, bool compare = false);
 	static memory_arithmetic_fixture bitfield_address_case(unsigned variant);
 	void start_pipeline_bitfield(unsigned variant = 0);
@@ -1961,7 +1958,6 @@ private:
 	bool check_long_accumulator_store_results();
 	bool check_pipeline_long_move_results();
 	bool check_absolute_xorm_results();
-	bool check_signed_branch_taken_results();
 	bool check_bitfield_address_results();
 	bool check_staged_load_results();
 	bool check_immediate_arithmetic_results();

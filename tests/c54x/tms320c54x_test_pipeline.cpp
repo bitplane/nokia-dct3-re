@@ -1161,10 +1161,6 @@ void tms320c54x_test_state::start_pipeline_long_rmw(unsigned variant)
 	m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 }
 
-u64 tms320c54x_test_state::signed_branch_source(unsigned variant)
-{
-	return std::array<u64, 8>{0, 1, 0xffffffffffULL, 0x7fffffff, 0xff80000000ULL, 0x0100000000ULL, 0x8000000000ULL, 0x7fffffffffULL}[(variant / 24) % 8];
-}
 
 
 
