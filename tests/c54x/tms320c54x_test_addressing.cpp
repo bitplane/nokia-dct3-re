@@ -1797,55 +1797,6 @@ void tms320c54x_test_state::start_compact_store_case(unsigned index)
 	m_check_timer->adjust(attotime::from_usec(100));
 }
 
-void tms320c54x_test_state::start_trn_store_case(unsigned index)
-{
-	static constexpr u16 values[] = {0, 0xffff, 0x8001, 0x1234};
-	auto &program = m_cpu->space(AS_PROGRAM);
-	unsigned const mode = index % 3;
-	program.write_word(0x05e0, 0x760f); // ST #lk, TRN via its MMR.
-	program.write_word(0x05e1, values[index / 3]);
-	program.write_word(0x05e2, 0x480f); // LDM TRN,A.
-	program.write_word(0x05e3, 0x75d6);
-	program.write_word(0x05e4, 0x0124);
-	program.write_word(0x05e5, mode == 0 ? 0x8d45 : mode == 1 ? 0x8dd2 : 0x8df8);
-	unsigned next = 0x05e6;
-	if (mode == 2) program.write_word(next++, 0x0f67);
-	program.write_word(next++, 0x75d6);
-	program.write_word(next++, 0x0124);
-	program.write_word(next, 0xf4e1);
-	m_cpu->space(AS_DATA).write_word(mode == 0 ? 0x0045 : 0x0f67, 0xdead);
-	set_registers(*m_cpu, {
-		{cpu_regs::STATE_TRN, 0xabcd}, {cpu_regs::STATE_T, 0x9876}, {cpu_regs::STATE_B, 0x12345678},
-		{cpu_regs::STATE_ST0, 0}, {cpu_regs::STATE_ST1, 0x0900}, {cpu_regs::STATE_BK, 8}, {cpu_regs::STATE_AR2, 0x0f67},
-		{cpu_regs::STATE_AR6, 0x1100}, {STATE_GENPC, 0x05e0}, {cpu_regs::STATE_IDLE, 0},
-	});
-	m_port_writes = 0;
-	m_phase = 93000 + index;
-	m_check_timer->adjust(attotime::from_usec(100));
-}
-
-void tms320c54x_test_state::start_indirect_pshm_case(unsigned index)
-{
-	static constexpr u16 opcodes[] = {0x4a0f, 0x4a82, 0x4a8a, 0x4ac0};
-	auto &program = m_cpu->space(AS_PROGRAM);
-	program.write_word(0x05e0, 0x75d6);
-	program.write_word(0x05e1, 0x0124);
-	program.write_word(0x05e2, opcodes[index % 4]);
-	program.write_word(0x05e3, 0x75d6);
-	program.write_word(0x05e4, 0x0124);
-	program.write_word(0x05e5, 0xf4e1);
-	m_cpu->set_state_int(tms320c54x_device::STATE_TRN, index < 4 ? 0x1234 : 0x8001);
-	m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x01ff); // DP must not select an MMR page.
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x4900); // CPL must not select a stack-relative MMR.
-	set_registers(*m_cpu, {
-		{cpu_regs::STATE_AR0, 0x0f0f}, {cpu_regs::STATE_AR2, 0x0f0f}, {cpu_regs::STATE_AR6, 0x1100},
-		{cpu_regs::STATE_BK, 16}, {STATE_GENPC, 0x05e0}, {cpu_regs::STATE_IDLE, 0},
-	});
-	m_port_writes = 0;
-	m_phase = 94000 + index;
-	m_check_timer->adjust(attotime::from_usec(100));
-}
 
 
 
@@ -4545,51 +4496,6 @@ bool tms320c54x_test_state::check_banz_offset_results()
 }
 
 
-bool tms320c54x_test_state::check_trn_store_results()
-{
-	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
-	if (m_phase >= 93000 && m_phase < 93012)
-	{
-		static constexpr u16 values[] = {0, 0xffff, 0x8001, 0x1234};
-		unsigned const index = m_phase - 93000, mode = index % 3;
-		u16 const expected = values[index / 3];
-		expect_opcode(mode == 0 ? 0x8d45 : mode == 1 ? 0x8dd2 : 0x8df8,
-			data.read_word(mode == 0 ? 0x0045 : 0x0f67) == expected &&
-			m_cpu->state_int(tms320c54x_device::STATE_TRN) == expected &&
-			m_cpu->state_int(tms320c54x_device::STATE_A) == expected &&
-			m_cpu->state_int(tms320c54x_device::STATE_B) == 0x12345678 &&
-			m_cpu->state_int(tms320c54x_device::STATE_T) == 0x9876 &&
-			m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0 &&
-			m_cpu->state_int(tms320c54x_device::STATE_ST1) == 0x0900 &&
-			m_cpu->state_int(tms320c54x_device::STATE_AR2) == (mode == 1 ? 0x0f60 : 0x0f67) &&
-			m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == (mode == 1 ? 3 : 4),
-			"ST TRN uses writable/readable MMR state, preserves flags and supports circular/absolute stores");
-		if (index < 11) { start_trn_store_case(index + 1); return true; }
-		osd_printf_info("TMS320C54x TRN store conformance: PASS variants=12\n");
-		start_indirect_pshm_case(0);
-		return true;
-	}
-	if (m_phase >= 94000 && m_phase < 94008)
-	{
-		unsigned const index = m_phase - 94000, mode = index % 4;
-		static constexpr u16 opcodes[] = {0x4a0f, 0x4a82, 0x4a8a, 0x4ac0};
-		u16 const value = index < 4 ? 0x1234 : 0x8001;
-		expect_opcode(opcodes[mode],
-			m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x0fff &&
-			data.read_word(0x0fff) == value &&
-			m_cpu->state_int(tms320c54x_device::STATE_TRN) == value &&
-			m_cpu->state_int(tms320c54x_device::STATE_AR2) == (mode == 1 ? 0x0f : mode == 2 ? 0x0e : 0x0f0f) &&
-			m_cpu->state_int(tms320c54x_device::STATE_AR0) == (mode == 3 ? 0x0e : 0x0f0f) &&
-			m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0x01ff &&
-			m_cpu->state_int(tms320c54x_device::STATE_ST1) == 0x4900 &&
-			m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
-			"PSHM uses page-zero MMR addressing independent of DP/CPL with indirect AR updates in one cycle");
-		if (index < 7) { start_indirect_pshm_case(index + 1); return true; }
-		osd_printf_info("TMS320C54x indirect PSHM conformance: PASS variants=8\n");
-		return true;
-	}
-	return false;
-}
 
 bool tms320c54x_test_state::check_compact_store_results()
 {
