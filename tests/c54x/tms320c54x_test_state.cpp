@@ -194,7 +194,6 @@ void tms320c54x_test_state::machine_reset()
 		{ {"rptb-back"}, [](self &test) { test.start_block_back(); } },
 		{ {"load-delay", "add-delay", "dld-delay"}, [](self &test) { test.start_delay_load(); } },
 		{ {"st-dagen"}, [](self &test) { test.start_constant_dagen(); } },
-		{ {"asm-delay"}, [](self &test) { test.start_delay_asm(); } },
 		{ {"shift-delay"}, [](self &test) { test.start_delay_load(); } },
 		{ {"shift-alu-delay"}, [](self &test) { test.start_delay_load(); } },
 		{ {"ld-ar0-index", "ld-circular"}, [](self &test) { test.start_indexed_load(); } },

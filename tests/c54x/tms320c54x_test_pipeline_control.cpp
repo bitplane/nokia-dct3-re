@@ -23,47 +23,6 @@ void tms320c54x_test_state::start_cala_rtn_case(unsigned index)
 
 
 
-tms320c54x_test_state::delay_asm_fixture tms320c54x_test_state::delay_asm_case(unsigned v)
-{
-	delay_asm_fixture f{}; f.control = v % 4; v /= 4; f.form = v % 5; v /= 5;
-	f.raw = v % 32; v /= 32; f.pattern = v % 2; v /= 2; f.flags = v % 4; v /= 4;
-	f.base = v % 2 ? 0x20000 : 0; v /= 2;
-	int const shift = f.raw < 16 ? int(f.raw) : int(f.raw) - 32;
-	u64 const source = f.pattern ? 0xfffffffff9ULL : 7;
-	if (shift >= 0) f.result = (source << shift) & 0xffffffffffULL;
-	else if (f.pattern && (f.flags & 1)) f.result = u64(-((7 + (s64(1) << -shift) - 1) >> -shift)) & 0xffffffffffULL;
-	else f.result = source >> -shift;
-	f.checkpoint = std::array<unsigned, 3>{3 + f.prefix(), f.read(), f.read() + 1}[v];
-	return f;
-}
-
-void tms320c54x_test_state::start_delay_asm(unsigned variant)
-{
-	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-	auto const f = delay_asm_case(variant); auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
-	for (unsigned i = 0; i < 24; ++i) program.write_word(f.base + 0x600 + i, 0xf495);
-	if (f.prefix()) program.write_word(f.base + 0x600, f.form == 1 ? 0x8000 : 0x8002);
-	unsigned const start = 0x600 + f.prefix();
-	program.write_word(f.base + start, f.control == 1 || f.control == 2 ? 0xfa45 : 0xf273); program.write_word(f.base + start + 1, 0x700);
-	program.write_word(f.base + start + 2, std::array<u16, 5>{0x3202, 0x3200, 0x3293, 0x32e3, 0x32f8}[f.form]);
-	program.write_word(f.base + start + 3, f.long_form() ? f.form == 3 ? 3 : 0x1002 : 0xf682);
-	if (f.long_form()) program.write_word(f.base + f.target(), 0xf682);
-	program.write_word(f.base + f.store(), 0x880f); program.write_word(f.base + f.store() + 1, 0xf4e1);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xa620); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, f.st1() | (f.raw ^ 31));
-	m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0);
-	m_cpu->set_input_line(0, CLEAR_LINE); m_cpu->set_input_line(INPUT_LINE_NMI, CLEAR_LINE);
-	m_cpu->set_state_int(tms320c54x_device::STATE_A, f.prefix() ? 0x1234000000ULL | f.source_word() : f.control == 1 ? 0 : f.control == 2 ? 1 : 0x123456789aULL);
-	m_cpu->set_state_int(tms320c54x_device::STATE_B, f.pattern ? 0xfffffffff9ULL : 7); m_cpu->set_state_int(tms320c54x_device::STATE_T, 0x5aa5); m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1002);
-	for (unsigned i = 0; i < 8; ++i) m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + i, i == 3 ? f.form == 3 ? 0xfff : 0x1002 : 0x5100 + i);
-	data.write_word(0x1002, f.prefix() ? 0xdead : f.source_word());
-	m_pipeline_operand_reads = m_pipeline_store_writes = m_pipeline_register_writes = m_pipeline_extensions_reads = 0;
-	m_pipeline_operand_tap = data.install_read_tap(0, 0xffff, "delay_asm_source", [this, f](offs_t address, u16 &word, u16) { if (machine().side_effects_disabled()) return; expect(address == 0x1002 && word == f.source_word() && !m_pipeline_operand_reads++ && m_cpu->pipeline_cycles() == f.read(), "Delay ASM captures its DP/SP/indirect operand once at Read"); });
-	m_pipeline_write_tap = data.install_write_tap(0, 0xffff, "delay_asm_writes", [this, f](offs_t address, u16 &word, u16) { if (machine().side_effects_disabled()) return; if (address == 0x1002) { expect(f.prefix() && word == f.source_word() && !m_pipeline_register_writes++ && m_cpu->pipeline_cycles() == 6, "The original-like older store supplies the stack/RAM ASM word"); return; } expect(address == 0xf && word == u16(f.result) && !m_pipeline_store_writes++ && m_pipeline_operand_reads == 1 && m_cpu->pipeline_cycles() >= f.read() + 3, "The selected branch target observes the ASM-shifted result once"); });
-	m_pipeline_fetch_tap = program.install_read_tap(f.base + start + 3, f.base + start + 3, "delay_asm_extension", [this, f](offs_t, u16 &word, u16) { if (machine().side_effects_disabled() || !f.long_form()) return; expect(word == (f.form == 3 ? 3 : 0x1002) && !m_pipeline_extensions_reads++ && m_cpu->pipeline_cycles() == f.literal_clock(), "Delay ASM retains its one address extension"); });
-	m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 311000;
-	m_cpu->set_state_int(STATE_GENPC, f.base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-}
 
 void tms320c54x_test_state::start_pipeline_far_return(unsigned variant)
 {

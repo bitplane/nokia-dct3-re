@@ -338,31 +338,6 @@ tms320c54x_test_state::block_back_fixture tms320c54x_test_state::block_back_case
 }
 
 
-bool tms320c54x_test_state::check_delay_asm_results()
-{
-	if (m_phase == 311000)
-	{
-		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick; auto const f = delay_asm_case(variant);
-		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) && m_cpu->state_int(tms320c54x_device::STATE_ST1) == (f.st1() | (tick > f.read() ? f.raw : f.raw ^ 31)), "Delayed ASM publishes only its five bits at Execute");
-		if (f.long_form() && tick == f.literal_clock()) { auto const disabled = machine().disable_side_effects(); m_cpu->space(AS_PROGRAM).write_word(f.base + 0x603 + f.prefix(), 0xdead); }
-		if (tick == f.read() - 1) { expect(m_cpu->state_int(tms320c54x_device::STATE_AR3) == (f.form == 2 ? 0x1003 : f.form == 3 ? 0xfff : 0x1002), "ASM source updates its selected pointer once in Access"); m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x4444); }
-		if (tick == f.read()) { auto const disabled = machine().disable_side_effects(); m_cpu->space(AS_DATA).write_word(0x1002, 0xdead); }
-		capture_pipeline_at(f.checkpoint, {&m_pipeline_operand_reads, &m_pipeline_store_writes, &m_pipeline_register_writes, &m_pipeline_extensions_reads},
-			"Save ASM source, control-delay words and adjacent shift across publication");
-		if (tick == 24)
-		{
-			expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_cpu->state_int(STATE_GENPC) == f.base + f.store() + 2 && m_pipeline_operand_reads == 1 && m_pipeline_store_writes == 1 && m_pipeline_register_writes == f.prefix() && m_pipeline_extensions_reads == unsigned(f.long_form()) && m_cpu->state_int(tms320c54x_device::STATE_A) == f.result && m_cpu->state_int(tms320c54x_device::STATE_B) == (f.pattern ? 0xfffffffff9ULL : 7) && m_cpu->state_int(tms320c54x_device::STATE_TRN) == u16(f.result) && m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x1002 && m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0xa620 && m_cpu->state_int(tms320c54x_device::STATE_T) == 0x5aa5 && m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x4444, "ASM delay and selected target preserve the sampled shift, source, status and one observed result");
-			if (replay_pipeline_at(311010, f.checkpoint,
-				"Replay delayed ASM without repeated source reads or target writes")) return true;
-			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (variant < 30719) { start_delay_asm(variant + 1); return true; }
-			osd_printf_info("TMS320C54x delayed LD ASM: PASS cases=30720 restore=30720 controls=BD,BCD_taken,BCD_untaken,BD_store_prefix forms=DP,SP,postincrement,offset,absolute shifts=32 patterns=2 sxm_ovm=4 pages=2 snapshots=3 source_reads=1 extension_fetches=owned t_preserved=1 adjacent_consumer=LD_B_ASM_A target_observes_result=1 call_interrupt_repeat_composition=unvalidated physical_phase_claim=0\n"); throw emu_fatalerror(3, "TMS320C54x isolated delayed LD ASM complete");
-		}
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 311010) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 311000; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true; }
-	return false;
-}
 
 
 

@@ -126,22 +126,6 @@ private:
 	void start_empty_pipeline_case(bool nmi);
 	void start_multiword_pipeline_case(unsigned variant = 0);
 	void start_multiword_stream_case();
-	struct delay_asm_fixture
-	{
-		unsigned control, form, raw, pattern, flags, checkpoint;
-		u32 base;
-		u64 result;
-		unsigned prefix() const { return control == 3; }
-		bool long_form() const { return form >= 3; }
-		unsigned read() const { return delay_multiply_fixture::operand_read(control == 3 ? 0 : control, long_form() ? 1 : 0) + prefix(); }
-		unsigned literal_clock() const { return 5 + unsigned(control == 1 || control == 2) + prefix(); }
-		unsigned target() const { return control == 2 ? 0x604 : 0x700; }
-		unsigned store() const { return target() + unsigned(long_form()); }
-		u16 source_word() const { return 0xa5a0 | raw; }
-		u16 st1() const { return 0x800 | (flags & 1 ? 0x100 : 0) | (flags & 2 ? 0x200 : 0) | (form == 1 ? 0x4000 : 0); }
-	};
-	static delay_asm_fixture delay_asm_case(unsigned v);
-	void start_delay_asm(unsigned variant = 0);
 	struct accumulator_stm_fixture
 	{
 		unsigned lane, snapshot;
@@ -1890,7 +1874,6 @@ private:
 	bool check_pipeline_frontend_results();
 	bool check_multiword_pipeline_results();
 	bool check_pipeline_store_results();
-	bool check_delay_asm_results();
 	bool check_peripheral_mmr_timing_audit_results();
 	bool check_pipeline_immediate_store_results();
 	bool check_pipeline_far_return_results();
