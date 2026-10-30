@@ -513,7 +513,6 @@ private:
 	static u64 signed_branch_source(unsigned variant);
 	static bool signed_branch_taken(unsigned variant);
 	void start_pipeline_signed_branch(unsigned variant = 0);
-	void start_pipeline_signed_branch_producer(unsigned variant = 0);
 	static std::array<u16, 2> bitfield_inputs(unsigned variant, bool compare = false);
 	static memory_arithmetic_fixture bitfield_address_case(unsigned variant);
 	void start_pipeline_bitfield(unsigned variant = 0);

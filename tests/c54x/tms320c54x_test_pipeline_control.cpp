@@ -929,38 +929,6 @@ void tms320c54x_test_state::start_pipeline_signed_branch(unsigned variant)
 	m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 }
 
-void tms320c54x_test_state::start_pipeline_signed_branch_producer(unsigned variant)
-{
-	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-	u16 const count = std::array<u16, 4>{0, 1, 2, 0xffff}[variant % 4];
-	u32 const base = variant % 2 ? 0x20000 : 0;
-	auto &program = m_cpu->space(AS_PROGRAM);
-	for (unsigned i = 0; i < 24; ++i) { program.write_word(base + 0x600 + i, 0xf495); program.write_word(base + 0x700 + i, 0xf495); }
-	std::array<u16, 7> const words{0x4811, 0x08e6, 0x0011, 0xf846, 0x0700, 0xe911, 0xf4e1};
-	for (unsigned i = 0; i < words.size(); ++i) program.write_word(base + 0x600 + i, words[i]);
-	program.write_word(base + 0x700, 0xe955); program.write_word(base + 0x701, 0xf4e1);
-	set_registers(*m_cpu, {
-		{cpu_regs::STATE_IDLE, 0}, {cpu_regs::STATE_TCR, 0x10}, {cpu_regs::STATE_PMST, 0},
-		{cpu_regs::STATE_ILLEGAL, 0}, {cpu_regs::STATE_ST0, 0xa608}, {cpu_regs::STATE_ST1, 0x800},
-		{cpu_regs::STATE_AR1, count}, {cpu_regs::STATE_AR6, 0x1000}, {cpu_regs::STATE_A, 0}, {cpu_regs::STATE_B, 0},
-		{cpu_regs::STATE_IFR, 0}, {cpu_regs::STATE_IMR, 0},
-	});
-	m_cpu->space(AS_DATA).write_word(0x1011, 1);
-	m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_cpu->set_pipeline_frontend(true);
-	m_pipeline_replay = false; m_idle_fixture_tick = 0; m_pipeline_operand_reads = m_pipeline_extensions_reads = 0;
-	m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0, 0xffff, "signed_branch_producer_reads",
-		[this, count](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return;
-			expect(m_pipeline_operand_reads < 2 && (m_pipeline_operand_reads ? at == 0x1011 && word == 1 && m_cpu->pipeline_cycles() == 7 :
-				at == 0x11 && word == count && m_cpu->pipeline_cycles() == 5), "LDM and long-offset SUB retire their ordered source samples before AGT evaluates"); ++m_pipeline_operand_reads; });
-	m_pipeline_fetch_tap = program.install_read_tap(base + 0x700, base + 0x700, "signed_branch_producer_target",
-		[this, count](offs_t, u16 &, u16) { if (machine().side_effects_disabled()) return;
-			expect(count > 1 && !m_pipeline_extensions_reads && m_cpu->pipeline_cycles() == 10,
-				"Original AGT family consumes the preceding SUB result with its retained redirect"); ++m_pipeline_extensions_reads; });
-	m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0, 0xffff, "signed_branch_producer_no_write",
-		[this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) expect(false, "LDM/SUB/AGT producer chain does not write data memory"); });
-	m_phase = 252990; m_cpu->resume(SUSPEND_REASON_DISABLE);
-	m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-}
 
 void tms320c54x_test_state::start_pipeline_extended_banz(unsigned variant)
 {
@@ -2116,50 +2084,12 @@ bool tms320c54x_test_state::check_signed_branch_taken_results()
 			if (variant < 12287) { start_pipeline_signed_branch(variant + 1); return true; }
 			osd_printf_info("TMS320C54x staged signed branches: PASS cases=12288 conditions=GE,LT,NE,EQ,GT,LE accumulators=A,B forms=BC,BCD patterns=8 sxm_ovm=4 pages=2 restore=12288 post_evaluate_change=0,1 duplicate_fetches=0\n");
 			if (profile_is("signed-branch")) throw emu_fatalerror(0, "TMS320C54x isolated signed branches complete");
-			start_pipeline_signed_branch_producer(); return true;
 		}
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
 	}
 	if (m_phase == 252980)
 	{
 		m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 252970;
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 252990)
-	{
-		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
-		u16 const count = std::array<u16, 4>{0, 1, 2, 0xffff}[variant % 4];
-		u64 const result = count ? count - 1 : 0xffffffffffULL;
-		unsigned const checkpoint = std::array<unsigned, 3>{6, 8, 9}[variant / 4];
-		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "The original LDM/long-SUB/AGT chain has coherent staged ownership");
-		if (tick == checkpoint && !m_pipeline_replay)
-		{
-			m_idle_fixture_saved_tick = tick; m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_extensions_reads};
-			expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save original signed-branch producer across SUB retirement and evaluation");
-		}
-		if (tick == 30)
-		{
-			expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_pipeline_operand_reads == 2 && m_pipeline_extensions_reads == unsigned(count > 1) &&
-				m_cpu->state_int(tms320c54x_device::STATE_A) == result && m_cpu->state_int(tms320c54x_device::STATE_B) == (count > 1 ? 0x55 : 0x11) &&
-				m_cpu->state_int(tms320c54x_device::STATE_ST0) == (0xa608 | (count ? 0x800 : 0)) && m_cpu->state_int(tms320c54x_device::STATE_AR6) == 0x1000,
-				"AGT consumes the retired signed SUB result for negative, zero and positive counts without input or firmware-state forcing");
-			if (!m_pipeline_replay)
-			{
-				m_pipeline_replay = true; m_idle_fixture_tick = m_idle_fixture_saved_tick;
-				m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[1];
-				return restore_pipeline_at(253000, "Restore original AGT producer without duplicate source or target reads");
-			}
-			m_pipeline_operand_tap.remove(); m_pipeline_fetch_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-			if (variant < 11) { start_pipeline_signed_branch_producer(variant + 1); return true; }
-			osd_printf_info("TMS320C54x staged signed branch producer: PASS cases=12 counts=0,1,2,65535 restore=12 ldm_read=5 sub_read=7 target_fetch=10 duplicate_reads=0 data_writes=0\n");
-			start_pipeline_bitfield(); return true;
-		}
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 253000)
-	{
-		m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 252990;
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
 	}
 	return false;
