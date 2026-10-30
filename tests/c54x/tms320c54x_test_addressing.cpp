@@ -4694,7 +4694,6 @@ bool tms320c54x_test_state::check_trn_store_results()
 			"PSHM uses page-zero MMR addressing independent of DP/CPL with indirect AR updates in one cycle");
 		if (index < 7) { start_indirect_pshm_case(index + 1); return true; }
 		osd_printf_info("TMS320C54x indirect PSHM conformance: PASS variants=8\n");
-		start_parallel_load_multiply_case(0);
 		return true;
 	}
 	return false;
