@@ -4,8 +4,6 @@
 #include "emu.h"
 #include "tms320c54x_test_state.h"
 #include "tms320c54x_test_word_examples.h"
-#include "tms320c54x_test_address_mode.h"
-#include "tms320c54x_test_stack_sequence.h"
 
 namespace c54x_test {
 
@@ -251,31 +249,6 @@ void tms320c54x_test_state::start_pipeline_status_bit(unsigned variant)
 	m_pipeline_replay = false; m_pipeline_expected_cycle = 1;
 	m_phase = 251330; m_cpu->resume(SUSPEND_REASON_DISABLE);
 	m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-}
-
-void tms320c54x_test_state::start_pipeline_cpl()
-{
-	m_register_sequence = std::make_unique<register_sequence_fixture>(machine(), *m_cpu, *m_check_timer,
-		address_mode_count(address_mode_kind::basic),
-		[](unsigned key) { return address_mode_sequence<tms320c54x_device>(address_mode_key(key, address_mode_kind::basic), address_mode_kind::basic); });
-	m_phase = 251350;
-	m_register_sequence->start();
-}
-
-void tms320c54x_test_state::start_pipeline_dp_immediate()
-{
-	m_register_sequence = std::make_unique<register_sequence_fixture>(machine(), *m_cpu, *m_check_timer,
-		1024, immediate_dp_sequence<tms320c54x_device>);
-	m_phase = 251390;
-	m_register_sequence->start();
-}
-
-void tms320c54x_test_state::start_pipeline_frame()
-{
-	m_register_sequence = std::make_unique<register_sequence_fixture>(machine(), *m_cpu, *m_check_timer,
-		768, frame_sequence<tms320c54x_device>);
-	m_phase = 251410;
-	m_register_sequence->start();
 }
 
 
@@ -1726,7 +1699,7 @@ bool tms320c54x_test_state::check_pipeline_intm_results()
 			if (m_pipeline_peripheral_case < 127) { start_pipeline_status_bit(m_pipeline_peripheral_case + 1); return true; }
 			osd_printf_info("TMS320C54x staged status bits: PASS cases=128 registers=2 bits=16 operations=2 initial_patterns=2 restore=128 xf_output=1 reserved_st1_bit10=0\n");
 			if (profile_is("st1-bits")) throw emu_fatalerror(0, "TMS320C54x isolated status bits complete");
-			start_pipeline_cpl(); return true;
+			start_pipeline_mmr_pop(); return true;
 		}
 		++m_pipeline_expected_cycle;
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
@@ -1735,31 +1708,6 @@ bool tms320c54x_test_state::check_pipeline_intm_results()
 	{
 		m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 251330;
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 251350)
-	{
-		if (!m_register_sequence->step()) return true;
-		osd_printf_info("TMS320C54x staged CPL/DP latency: PASS cases=8 fields=2 directions=2 consumers=LD,ST gaps=3 restore=8\n");
-		osd_printf_info("TMS320C54x addressing-mode coverage: PASS cases=%u restore=%u coverage_fnv64=%016llx\n",
-			m_register_sequence->count(), m_register_sequence->restores(), (unsigned long long)m_register_sequence->digest());
-		m_register_sequence.reset();
-		start_pipeline_dp_immediate(); return true;
-	}
-	if (m_phase == 251390)
-	{
-		if (!m_register_sequence->step()) return true;
-		osd_printf_info("TMS320C54x staged immediate DP: PASS cases=1024 pages=512 nearest_producer=512 old_st0_until_execute=1 restore=1024\n");
-		osd_printf_info("TMS320C54x immediate-DP coverage: PASS cases=%u restore=%u coverage_fnv64=%016llx\n",
-			m_register_sequence->count(), m_register_sequence->restores(), (unsigned long long)m_register_sequence->digest());
-		m_register_sequence.reset();
-		start_pipeline_frame(); return true;
-	}
-	if (m_phase == 251410)
-	{
-		if (!m_register_sequence->step()) return true;
-		osd_printf_info("TMS320C54x staged FRAME: PASS offsets=256 restore=768 adjacent_push=768 duplicate_writes=0 silicon_phase_claim=0\n");
-		m_register_sequence.reset();
-		start_pipeline_push_sp_latency(); return true;
 	}
 	return false;
 }

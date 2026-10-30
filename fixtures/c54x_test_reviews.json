@@ -8,6 +8,28 @@
   },
   "families": [
     {
+      "id": "address-stack-default-duplicate-retirement",
+      "classification": "harness_infrastructure",
+      "decision": "merge",
+      "profiles": [],
+      "case_ids": [],
+      "source": "tests/c54x/tms320c54x_test_address_mode.h; tests/c54x/tms320c54x_test_stack_sequence.h",
+      "basis": "The four default adapters called the same typed case builders as retained CPU-only mode-latency and stack-sp profiles. No expectation, stimulus, checkpoint or bus predicate is removed from those builders. Retire duplicated execution, not the contracts.",
+      "identity_map": {
+        "basic_cpl_dp": "Eight legacy address_mode_key(i,basic) cases equal mode-latency ordinals0..7, including their original identities.",
+        "immediate_dp": "Legacy keys0..1023 equal mode-latency ordinals48..1071; only identity is namespaced to raw+128.",
+        "frame": "Legacy keys0..767 equal stack-sp ordinals0..767 with unchanged identities.",
+        "compiler_sp": "Legacy indices0..5 equal stack-sp ordinals768..773; identities change from raw {2,3,10,11,14,15} to raw+768."
+      },
+      "coverage_change": "Remove 1806 duplicated live/replay cases, four result requirements, two coverage summary records, four start methods and their phase dispatch. All 1806 cases remain in the retained isolated suite. Default now goes directly from status-bit completion to MMR POPM.",
+      "validation": "Full MAME build and 49 focused host tests pass. Native mode-latency1072, stack-sp774, st1-bits128 and pop-irq192 pass. Full reduced-default continuation remains pending the next broad checkpoint; focused profiles do not prove its cross-family context.",
+      "limits": [
+        "The default run alone no longer covers these banks; full retained CPU regression must include mode-latency and stack-sp.",
+        "Incidental cross-family context from status bits through these banks to MMR POPM is retired, not claimed equivalent. Native default continuation must still pass.",
+        "Earlier full-default checkpoints qualify their recorded population, not this reduced default."
+      ]
+    },
+    {
       "id": "explicit-one-clock-observer-restarts",
       "classification": "harness_infrastructure",
       "decision": "rewrite",

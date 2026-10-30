@@ -3,7 +3,6 @@
 
 #include "emu.h"
 #include "tms320c54x_test_state.h"
-#include "tms320c54x_test_stack_sequence.h"
 #include "tms320c54x_test_memory_immediate_schedule.h"
 #include "tms320c54x_test_circular_move_schedule.h"
 #include "tms320c54x_test_parallel_schedule.h"
@@ -318,14 +317,6 @@ void tms320c54x_test_state::start_pipeline_xpc_push(unsigned variant)
 		});
 	m_phase = 251270; m_cpu->resume(SUSPEND_REASON_DISABLE);
 	m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-}
-
-void tms320c54x_test_state::start_pipeline_push_sp_latency()
-{
-	m_register_sequence = std::make_unique<register_sequence_fixture>(machine(), *m_cpu, *m_check_timer,
-		6, stack_sp_sequence<tms320c54x_device>);
-	m_phase = 251430;
-	m_register_sequence->start();
 }
 
 void tms320c54x_test_state::start_pipeline_mmr_pop(unsigned variant)
@@ -6568,15 +6559,6 @@ bool tms320c54x_test_state::check_pipeline_immediate_store_results()
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
 	}
 	return false;
-}
-
-bool tms320c54x_test_state::check_pipeline_push_sp_latency_results()
-{
-	if (m_phase != 251430) return false;
-	if (!m_register_sequence->step()) return true;
-	osd_printf_info("TMS320C54x staged stack SP latency: PASS cases=6 producers=PSHM,POPM consumers=LD,ST gap_nops=1 restore=6\n");
-	m_register_sequence.reset();
-	start_pipeline_mmr_pop(); return true;
 }
 
 bool tms320c54x_test_state::check_pipeline_mmr_pop_results()

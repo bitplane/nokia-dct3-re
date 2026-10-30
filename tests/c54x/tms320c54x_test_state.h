@@ -195,10 +195,6 @@ private:
 	void start_pipeline_far_irq(unsigned variant = 0);
 	void start_pipeline_intm(unsigned variant = 0);
 	void start_pipeline_status_bit(unsigned variant = 0);
-	void start_pipeline_cpl();
-	void start_pipeline_dp_immediate();
-	void start_pipeline_frame();
-	void start_pipeline_push_sp_latency();
 	struct irq_pop_fixture
 	{
 		u16 destination, value, pending, mask;
@@ -2068,7 +2064,6 @@ private:
 	bool check_pipeline_far_return_results();
 	bool check_pipeline_far_irq_results();
 	bool check_pipeline_intm_results();
-	bool check_pipeline_push_sp_latency_results();
 	bool check_pipeline_mmr_pop_results();
 	bool check_pipeline_load_add_results();
 	bool check_pipeline_dst_results();
