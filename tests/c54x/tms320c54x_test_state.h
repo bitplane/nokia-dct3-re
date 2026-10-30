@@ -221,14 +221,6 @@ private:
 	};
 	static delay_bitt_fixture delay_bitt_case(unsigned v);
 	void start_delay_bitt(unsigned variant = 0);
-	struct repeat_store_case
-	{
-		unsigned form, mode, reg, count, setup, pattern, flags, checkpoint;
-		u32 base;
-	};
-	static repeat_store_case repeat_store_fixture(unsigned variant);
-	static u64 repeat_store_value(unsigned pattern);
-	void start_repeat_store(unsigned variant = 0);
 	void start_rptz(unsigned variant = 0);
 	void start_ar_addm_load(unsigned variant = 0);
 	void start_instruction_observer(unsigned variant = 0);
@@ -1660,7 +1652,6 @@ private:
 	bool check_branch_arithmetic_results();
 	bool check_bitt_results();
 	bool check_delay_bitt_results();
-	bool check_repeat_store_results();
 	bool check_rptz_results();
 	bool check_mapped_addm_results();
 	bool check_shifted_store_dld_results();
@@ -1999,7 +1990,6 @@ private:
 	static constexpr unsigned repeated_writa_phase = 62044;
 	static constexpr unsigned branch_arithmetic_phase = 62040;
 	static constexpr unsigned bitt_phase = 62032;
-	static constexpr unsigned repeat_store_phase = 62028;
 	static constexpr unsigned rptz_phase = 62026;
 	static constexpr unsigned ar_addm_phase = 62020;
 	unsigned m_rom4_checks = 0;
