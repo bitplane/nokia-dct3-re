@@ -250,6 +250,7 @@ def main():
     counts['atomic_status_xf'] = 8
     counts['atomic_single_slot_conditions'] = 8
     counts['atomic_memory_pairs'] = 13
+    counts['atomic_memory_address_literals'] = 28
     parser.add_argument('section', choices=[*counts, 'all'])
     parser.add_argument('--jobs', type=int, default=8)
     parser.add_argument('--negative-control', action='store_true', help='require failure of an intentionally wrong expectation')

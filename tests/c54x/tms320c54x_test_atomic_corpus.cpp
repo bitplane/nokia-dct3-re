@@ -670,31 +670,8 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 				(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0c00) == 0x0400,
 				"ADDM SXM-clear 16-bit wrap does not carry out of the 32-bit ALU");
 	}
-	if (m_phase == 235)
-		return begin_atomic_case(memory_address_examples()[0], 236);
-	if (m_phase == 236 || m_phase == 6584)
-	{
-		static constexpr unsigned phases[] = {236, 6584};
-		unsigned const position = std::find(std::begin(phases), std::end(phases), m_phase) - std::begin(phases);
-		auto const &cases = memory_address_examples();
-		verify_atomic_case(cases[0 + position]);
-		if (position + 1 < std::size(phases)) return begin_atomic_case(cases[0 + position + 1], phases[position + 1]);
-	}
-	if (m_phase == 237)
-	{
-		return begin_atomic_case(memory_address_examples()[2], 238);
-	}
-	if (m_phase == 238)
-	{
-		verify_atomic_case(memory_address_examples()[2]);
-	}
-	if (m_phase == 239)
-	{
-		return begin_atomic_case(memory_address_examples()[3], 240);
-	}
 	if (m_phase == 240)
 	{
-		verify_atomic_case(memory_address_examples()[3]);
 		write_words(program, {
 			{0x05e0, 0x75d6}, {0x05e1, 0x0124},
 			{0x05e2, 0xfc30}, // RC TC, false
@@ -731,15 +708,9 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 		expect_opcode(0xfc30, m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x0301 &&
 				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 7,
 				"ROM4 RC TC true pops its target and costs five cycles");
-		return begin_atomic_case(memory_address_examples()[4], 243);
 	}
-	if (m_phase == 243 || m_phase == 244 || m_phase == 245)
+	if (m_phase == 245)
 	{
-		static constexpr unsigned phases[] = {243, 244, 245};
-		unsigned const position = std::find(std::begin(phases), std::end(phases), m_phase) - std::begin(phases);
-		auto const &cases = memory_address_examples();
-		verify_atomic_case(cases[4 + position]);
-		if (position + 1 < std::size(phases)) return begin_atomic_case(cases[4 + position + 1], phases[position + 1]);
 		write_words(program, {
 			{0x05e0, 0x75d6}, {0x05e1, 0x0124},
 			{0x05e2, 0xfe00}, // RETD
@@ -764,11 +735,6 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 				"ROM4 RETD executes two delay words before return and costs three cycles");
 		expect_opcode(0xe802, m_cpu->state_int(tms320c54x_device::STATE_A) == 2,
 				"ROM4 LD #2,A executes as the second RETD delay word");
-		return begin_atomic_case(memory_address_examples()[7], 247);
-	}
-	if (m_phase == 247)
-	{
-		verify_atomic_case(memory_address_examples()[7]);
 	}
 	if (m_phase == 6545 || m_phase == 6546)
 	{
@@ -934,11 +900,9 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 				m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0f20 &&
 				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 9,
 				"ROM4 RPT #5 runs its one-cycle ADD body six times after one-cycle setup");
-		return begin_atomic_case(memory_address_examples()[8], 265);
 	}
 	if (m_phase == 265)
 	{
-		verify_atomic_case(memory_address_examples()[8]);
 		write_words(program, {
 			{0x05e2, 0x7593}, // PORTW *AR3+,PA
 			{0x05e3, 0x0124}, {0x05e4, 0x75d6}, {0x05e5, 0x0124}, {0x05e6, 0xf5e1},
@@ -992,15 +956,9 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 		expect_opcode(0xfc20, m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x0301 &&
 				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 7,
 				"ROM4 RC NTC true pops its target and costs five cycles");
-		return begin_atomic_case(memory_address_examples()[9], 269);
 	}
-	if (m_phase == 269 || m_phase == 270)
+	if (m_phase == 270)
 	{
-		static constexpr unsigned phases[] = {269, 270};
-		unsigned const position = std::find(std::begin(phases), std::end(phases), m_phase) - std::begin(phases);
-		auto const &cases = memory_address_examples();
-		verify_atomic_case(cases[9 + position]);
-		if (position + 1 < std::size(phases)) return begin_atomic_case(cases[9 + position + 1], phases[position + 1]);
 		write_words(program, {
 			{0x05e0, 0x75d6}, {0x05e1, 0x0124},
 			{0x05e2, 0xfc45}, // RC AEQ, false with nonzero guard byte
@@ -1035,15 +993,9 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 		expect_opcode(0xfc45, m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x0301 &&
 				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 7,
 				"ROM4 RC AEQ true pops its target and costs five cycles");
-		return begin_atomic_case(memory_address_examples()[11], 273);
 	}
-	if (m_phase == 273 || m_phase == 274)
+	if (m_phase == 274)
 	{
-		static constexpr unsigned phases[] = {273, 274};
-		unsigned const position = std::find(std::begin(phases), std::end(phases), m_phase) - std::begin(phases);
-		auto const &cases = memory_address_examples();
-		verify_atomic_case(cases[11 + position]);
-		if (position + 1 < std::size(phases)) return begin_atomic_case(cases[11 + position + 1], phases[position + 1]);
 		write_words(program, {
 			{0x05e0, 0x75d6}, {0x05e1, 0x0124},
 			{0x05e2, 0xf846}, // BC 05f0,AGT
@@ -1073,15 +1025,9 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 		expect_opcode(0xf84d, m_port_writes == 2 &&
 				m_last_port_cycle - m_first_port_cycle == 5,
 				"ROM4 BC BEQ checks B's guard byte and costs three cycles false");
-		return begin_atomic_case(memory_address_examples()[13], 277);
 	}
-	if (m_phase == 277 || m_phase == 278)
+	if (m_phase == 278)
 	{
-		static constexpr unsigned phases[] = {277, 278};
-		unsigned const position = std::find(std::begin(phases), std::end(phases), m_phase) - std::begin(phases);
-		auto const &cases = memory_address_examples();
-		verify_atomic_case(cases[13 + position]);
-		if (position + 1 < std::size(phases)) return begin_atomic_case(cases[13 + position + 1], phases[position + 1]);
 		write_words(program, {
 			{0x05e3, 0x7482}, // PORTR PA,*AR2
 			{0x05e4, 0x0123}, {0x05e5, 0x7482}, {0x05e6, 0x0123}, {0x05e7, 0xf5e1},
@@ -1126,11 +1072,9 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 			m_cpu->state_int(tms320c54x_device::STATE_PC) == 0x05e8 &&
 			m_port_reads == 2 && m_port_writes == 1 && m_last_port_cycle - m_first_port_cycle == 2,
 			"ROM4 PORTR selects stationary AR3, preserves neighbors/pointers/accumulators/status and consumes the port extension in two cycles");
-		return begin_atomic_case(memory_address_examples()[15], 280);
 	}
 	if (m_phase == 280)
 	{
-		verify_atomic_case(memory_address_examples()[15]);
 		m_phase = 9215;
 	}
 	if (m_phase >= 9215 && m_phase <= 9219)
@@ -1249,15 +1193,9 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 			});
 			return next_atomic_phase(m_phase == 6520 ? 6531 : m_phase == 6531 ? 6532 : 6563);
 		}
-		return begin_atomic_case(memory_address_examples()[16], 283);
 	}
-	if (m_phase == 283 || m_phase == 284 || m_phase == 6521)
+	if (m_phase == 6521)
 	{
-		static constexpr unsigned phases[] = {283, 284, 6521};
-		unsigned const position = std::find(std::begin(phases), std::end(phases), m_phase) - std::begin(phases);
-		auto const &cases = memory_address_examples();
-		verify_atomic_case(cases[16 + position]);
-		if (position + 1 < std::size(phases)) return begin_atomic_case(cases[16 + position + 1], phases[position + 1]);
 		write_words(program, {
 			{0x05e2, 0x7194}, // MVDK *AR4+,dmad
 			{0x05e3, 0x0f22}, {0x05e4, 0x75d6}, {0x05e5, 0x0124}, {0x05e6, 0xf5e1},
@@ -1356,15 +1294,9 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 				m_cpu->state_int(tms320c54x_device::STATE_AR4) == 0 &&
 				m_last_port_cycle - m_first_port_cycle == 7,
 				"ROM4 BANZD *AR0- tests ARP-selected AR4 before delayed branch");
-		return begin_atomic_case(memory_address_examples()[19], 289);
 	}
-	if (m_phase == 289 || m_phase == 290 || m_phase == 6573 || m_phase == 6574 || m_phase == 291 || m_phase == 292 || m_phase == 6537 || m_phase == 293 || m_phase == 294)
+	if (m_phase == 294)
 	{
-		static constexpr unsigned phases[] = {289, 290, 6573, 6574, 291, 292, 6537, 293, 294};
-		unsigned const position = std::find(std::begin(phases), std::end(phases), m_phase) - std::begin(phases);
-		auto const &cases = memory_address_examples();
-		verify_atomic_case(cases[19 + position]);
-		if (position + 1 < std::size(phases)) return begin_atomic_case(cases[19 + position + 1], phases[position + 1]);
 		program.write_word(0x05e3, 0x6c8b); // BANZ 05eb,*AR3-
 		write_words(program, {
 			{0x05e4, 0x05eb}, {0x05e5, 0x75f8}, {0x05e6, 0x0d00}, {0x05e7, 0x0124}, {0x05e8, 0xf5e1}, {0x05eb, 0x75f8},
