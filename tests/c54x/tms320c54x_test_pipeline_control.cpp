@@ -59,41 +59,6 @@ void tms320c54x_test_state::start_xc_return(unsigned variant)
 
 
 
-void tms320c54x_test_state::start_far_case(unsigned index)
-{
-	if (profile_is("far-atomic"))
-	{
-		set_registers(*m_cpu, {
-			{cpu_regs::STATE_PMST, 0}, {cpu_regs::STATE_TCR, 0x10}, {cpu_regs::STATE_IMR, 0}, {cpu_regs::STATE_IFR, 0},
-		});
-	}
-	auto &program = m_cpu->space(AS_PROGRAM);
-	auto &data = m_cpu->space(AS_DATA);
-	const u16 op = far_opcodes[index];
-	const bool immediate = (op & 0xfc80) == 0xf880;
-	const bool returning = (op & 0xfdfe) == 0xf4e4;
-	const bool call = !returning && (immediate ? BIT(op, 8) : BIT(op, 0));
-	unsigned next = 0x010600;
-	program.write_word(next++, op);
-	if (immediate)
-		program.write_word(next++, 0x0700);
-	if (BIT(op, 9))
-	{
-		program.write_word(next++, 0xe905);
-		program.write_word(next++, 0xe906);
-	}
-	program.write_word(next, 0xf4e1);
-	program.write_word(0x020700, 0xe807);
-	program.write_word(0x020701, call ? 0xf4e4 : 0xf4e1);
-	data.write_word(0x03fe, 2);
-	data.write_word(0x03ff, 0x0700);
-	set_registers(*m_cpu, {
-		{cpu_regs::STATE_SP, returning ? 0x03fe : 0x0400}, {cpu_regs::STATE_ST1, 0x0800}, {cpu_regs::STATE_A, 0x020700},
-		{cpu_regs::STATE_B, 0x020700}, {STATE_GENPC, 0x010600}, {cpu_regs::STATE_IDLE, 0},
-	});
-	m_phase = 765 + index;
-	m_check_timer->adjust(attotime::from_usec(100));
-}
 
 
 

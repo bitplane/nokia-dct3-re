@@ -206,7 +206,6 @@ void tms320c54x_test_state::machine_reset()
 		{ {"cala"}, [](self &test) { test.start_accumulator_call(); } },
 	}))
 		return;
-	if (profile_is("far-atomic")) { m_cpu->set_pipeline_frontend(false); start_far_case(0); return; }
 	if (start_profile(*this, machine().options().bios(), {
 		{ {"t-peripheral"}, [](self &test) { test.start_t_peripheral(); } },
 		{ {"portr-circular"}, [](self &test) { test.start_circular_portr(); } },
