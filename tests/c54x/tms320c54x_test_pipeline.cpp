@@ -256,7 +256,7 @@ void tms320c54x_test_state::start_pipeline_cpl()
 {
 	m_register_sequence = std::make_unique<register_sequence_fixture>(machine(), *m_cpu, *m_check_timer,
 		address_mode_count(address_mode_kind::basic),
-		[](unsigned key) { return address_mode_sequence<tms320c54x_device>(key, address_mode_kind::basic); });
+		[](unsigned key) { return address_mode_sequence<tms320c54x_device>(address_mode_key(key, address_mode_kind::basic), address_mode_kind::basic); });
 	m_phase = 251350;
 	m_register_sequence->start();
 }
@@ -1839,7 +1839,7 @@ bool tms320c54x_test_state::check_pipeline_intm_results()
 	if (m_phase == 251350)
 	{
 		if (!m_register_sequence->step()) return true;
-		osd_printf_info("TMS320C54x staged CPL/DP latency: PASS cases=32 fields=2 directions=2 consumers=LD,ST gaps=0,1,2,3 restore=32\n");
+		osd_printf_info("TMS320C54x staged CPL/DP latency: PASS cases=8 fields=2 directions=2 consumers=LD,ST gaps=3 restore=8\n");
 		osd_printf_info("TMS320C54x addressing-mode coverage: PASS cases=%u restore=%u coverage_fnv64=%016llx\n",
 			m_register_sequence->count(), m_register_sequence->restores(), (unsigned long long)m_register_sequence->digest());
 		m_register_sequence.reset();

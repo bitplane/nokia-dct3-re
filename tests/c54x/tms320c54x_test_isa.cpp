@@ -61,7 +61,7 @@ protected:
 		if (disassembly()) return;
 		if (m_address_modes)
 			m_register_sequence = std::make_unique<c54x_test::register_sequence_fixture>(machine(), *m_cpu, *m_timer,
-				1152, c54x_test::address_mode_bank_case<tms320c54x_device>);
+				1072, c54x_test::address_mode_bank_case<tms320c54x_device>);
 		else if (m_long_t_store_kind != c54x_test::long_t_store_kind::none)
 			m_register_sequence = std::make_unique<c54x_test::register_sequence_fixture>(machine(), *m_cpu, *m_timer,
 				c54x_test::long_t_store_count(m_long_t_store_kind),
@@ -140,7 +140,7 @@ private:
 	{
 		if (m_address_modes)
 		{
-			osd_printf_info("TMS320C54x addressing-mode banks: PASS cases=%u restore=%u basic=32 full_status=96 dp_forward=1024 producers=RSBX,SSBX,MVMD,STLM,STM,LD_DP gaps=0,1,2,3 finish=10,11 idle_required=0 silicon_phase_claim=0 coverage_fnv64=%016llx\n",
+			osd_printf_info("TMS320C54x addressing-mode banks: PASS cases=%u restore=%u basic=8 full_status=40 dp_forward=1024 producers=RSBX,SSBX,MVMD,STLM,STM,LD_DP gaps=2,3 arp_initial=0 finish=10,11 idle_required=0 silicon_phase_claim=0 coverage_fnv64=%016llx\n",
 				m_register_sequence->count(), m_register_sequence->restores(), (unsigned long long)m_register_sequence->digest());
 			throw emu_fatalerror(3, "TMS320C54x isolated addressing-mode latency complete");
 		}

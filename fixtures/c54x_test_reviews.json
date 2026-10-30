@@ -8,11 +8,26 @@
   },
   "families": [
     {
+      "id": "address-mode-valid-programs",
+      "classification": "architectural_interaction",
+      "decision": "rewrite",
+      "profiles": ["mode-latency"],
+      "case_ids": [],
+      "profile_coverage": {
+        "mode-latency": {"cases": 1072, "fnv64": "43ec4ed518af0ee5", "result_prefix": "TMS320C54x addressing-mode banks: PASS", "key": "Retain raw identities: basic 6,7,14,15,22,23,30,31; each full-status bank retains gap2/3 for MVMD/STM or gap3 for STLM, both directions and load/store. Bank origin 32+(bank-1)*16 is unchanged. Immediate-DP identities128..1151 retain all pages and both nearest-producer chains."}
+      },
+      "basis": "TI SPRU131G tables7-16/18/19 require Category-I consumer separation2 for MVMD/STM and3 for STLM/RSBX/SSBX. No independent reference specifies the old-mode result inside shorter gaps. Section5.5 and page7-61 note3 require ARP=0 in standard mode; encoded ARF=3 uses AR3 in both modes but updates ARP only in compatibility mode. Table7-17 and table7-3 row11 permit immediate-DP forwarding with no latency. Collected PDF SHA256 d9ea0e695859d605d1f94dabeede327c0e343099102cfd7e224f6f53375a3fa2.",
+      "changes": ["retire80 short-gap executions/restores:52 CPL/DP and28 CMPT; no claim to preserve their unsupported error outcomes", "rewrite20 retained CMPT witnesses: initial ARP0, explicit *AR3+ consumer, AR3 increments once, AR0 untouched, final ARP3 only when CMPT remains set", "clear ARP5 from all1024 immediate-DP sentinels, preserving the unrelated overflow bits and all page/chain identities", "retain28 already-valid CPL/DP cases unchanged; default basic continuation reduces32 to8; fixed publication clocks remain model/replay checks, not silicon timing"],
+      "known_limits": ["no unsafe-gap behavior or nonzero-ARP standard-mode preservation qualification", "compatibility-mode *AR0 selection is not exercised by this transition family; the legal ARF3 witness tests mode-dependent ARP publication instead", "no Nokia firmware, interrupts, peripheral or physical-clock qualification"],
+      "verification": "Full and CPU-only builds and both native mode-latency executions pass all1072 cases/restores with the independently enumerated digest43ec4ed518af0ee5. A compiled CPU-free audit checks all entry ARP fields, Category-I separations, unique raw identities and the twenty mode-dependent ARP/pointer expectations. All5079 host tests pass with one established skip (61.400 seconds); the393-profile/289-default inventory passes. The initial wrapper correctly rejected superseded1152-case metadata. No production CPU/device changes. Full-default, retained isolated-suite and handset acceptance are not renewed by this focused batch.",
+      "measurements": {"baseline_commit": "9505cdb7", "before_cpp_bytes": 3336718, "before_cpp_lines": 50835, "after_cpp_bytes": 3337361, "after_cpp_lines": 50854, "source_assessment": "643 bytes and19 C++ lines added for explicit retained-key mapping and bounds failure. This batch retires80 unsupported case/restore pairs and replaces invalid witnesses; it is not a source-size or measured runtime reduction."}
+    },
+    {
       "id": "address-mode-fixture-ownership",
       "classification": "harness_infrastructure",
       "decision": "merge",
       "scope": "Source/observation preservation and CPU-only ownership; not semantic approval of every retained CMPT or short-gap stimulus.",
-      "profiles": ["mode-latency"],
+      "profiles": [],
       "case_ids": [],
       "retired_profiles": ["mvmd-cpl", "mvmd-cmpt", "stlm-cpl", "stlm-cmpt", "stm-cpl", "stm-cmpt"],
       "profile_coverage": {

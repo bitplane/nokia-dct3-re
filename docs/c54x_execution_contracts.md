@@ -92,8 +92,8 @@ the final arithmetic/status/source checks still occur at clock 16. This does
 not yet relocate either profile out of the legacy machine or qualify other
 memory families. Bus cycles are implementation observations, not silicon timing.
 
-`mode-latency` combines 1,152 existing address-context cases in the CPU-only
-runner: 32 RSBX/SSBX CPL/DP cases, six 16-case full-status producer/field banks,
+`mode-latency` combines 1,072 address-context cases in the CPU-only runner:
+eight RSBX/SSBX CPL/DP cases, forty full-status producer/field cases,
 and 1,024 immediate-DP cases. `mvmd-cpl`, `mvmd-cmpt`, `stlm-cpl`, `stlm-cmpt`,
 `stm-cpl` and `stm-cmpt` remain descriptive case labels, not separate BIOS
 configurations. The default suite reuses the basic and immediate-DP banks.
@@ -102,14 +102,16 @@ these bounded streams do not require IDLE. Optional pipeline-clock checking
 preserves their per-clock progress check without changing other runner users.
 The family review owns the ordinal-to-old-case map and ordered coverage digest.
 
-Fixture validity is still unresolved. SPRU131G tables 7-16/7-18/7-19 supply
-the tested consumer spacing, and table 7-17 permits immediate-DP forwarding
-without separation. But page 7-61 note 3 requires ARP=0 when CMPT=0: the 48
-CMPT rows retain ARP=3 in standard mode, and the 1,024 immediate-DP rows use
-an ARP=5 preservation sentinel. Another 52 CPL/DP-bit rows assume old-mode
-results inside documented spacing hazards. Preserving those inputs proves
-refactor compatibility, not valid-program or silicon conformance. Rebuild the
-entry contexts and CMPT witness before assigning these rows that stronger scope.
+SPRU131G tables 7-16/7-18/7-19 supply the required consumer spacing: two NOPs
+after MVMD/STM and three after STLM/RSBX/SSBX for these Category-I forms.
+Eighty shorter-gap cases are retired because the manual does not specify their
+assumed old-mode outcomes. All retained inputs start with ARP=0, as required
+in standard mode. The twenty CMPT cases use explicit `*AR3+`: both modes use
+AR3, but only compatibility mode publishes ARP=3 (section 5.5). This replaces
+the invalid nonzero-ARP standard-mode witness rather than preserving its result.
+Immediate-DP cases keep their overflow sentinel without setting ARP; table
+7-17 permits their adjacent DP consumer. Exact clock-10/11 observations remain
+software-model/replay checks, not measured silicon phase guarantees.
 
 `mapped-word`, `mapped-bitf` and `status-bitf` use the same runner with a shared
 mapped-register descriptor builder. The distinct ADD/SUB and TC reference rules
@@ -2551,7 +2553,7 @@ Repeat/interrupt composition and physical timing remain separate scopes.
 
 ## Core regression checkpoint
 
-The current full-default capture is the `default_checkpoint` under
+The latest completed full-default capture is the `default_checkpoint` under
 `address-mode-fixture-ownership` in `fixtures/c54x_test_reviews.json`.
 It records all 289 required markers, 295 native ordered PASS records,
 intentional MAME exit 3 and runner exit 0, in 959.15 seconds.
@@ -2561,6 +2563,11 @@ executable, acceptance-source hashes and exact bench patch over `f6277a5e`;
 no CPU/device source changed. This establishes compatibility, not semantic
 approval of the invalid ARP contexts identified in that review. No runtime
 improvement is claimed.
+
+That capture predates the `address-mode-valid-programs` review: the default
+CPL/DP continuation now runs eight safely separated cases instead of thirty-two,
+and immediate-DP inputs now clear ARP. The shared standalone bank qualifies
+those changed inputs; it does not renew the full-default capture.
 
 `fixtures/c54x_fidelity_checkpoint.json` remains an immutable historical
 capture: 294 then-required markers, 295 native PASS records and 1,058.73 seconds.

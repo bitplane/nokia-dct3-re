@@ -40,7 +40,7 @@
       "TMS320C54x staged cross-page far IRQ: PASS cases=8 masked=4 restored_vector_page=1 continuations=0700,0702 restore=8 duplicate_vectors=0 silicon_phase_claim=0",
       "TMS320C54x staged INTM protection: PASS cases=12 follower_words=1,2,3 adjacent=6 restore=12 duplicate_vectors=0",
       "TMS320C54x staged status bits: PASS cases=128 registers=2 bits=16 operations=2 initial_patterns=2 restore=128 xf_output=1 reserved_st1_bit10=0",
-      "TMS320C54x staged CPL/DP latency: PASS cases=32 fields=2 directions=2 consumers=LD,ST gaps=0,1,2,3 restore=32",
+      "TMS320C54x staged CPL/DP latency: PASS cases=8 fields=2 directions=2 consumers=LD,ST gaps=3 restore=8",
       "TMS320C54x staged immediate DP: PASS cases=1024 pages=512 nearest_producer=512 old_st0_until_execute=1 restore=1024",
       "TMS320C54x staged FRAME: PASS offsets=256 restore=768 adjacent_push=768 duplicate_writes=0 silicon_phase_claim=0",
       "TMS320C54x staged stack SP latency: PASS cases=16 producers=PSHM,POPM consumers=LD,ST gap_nops=0,1 restore=16",
@@ -2810,7 +2810,7 @@
       "TMS320C54x active repeat POPD context: PASS cases=384 restore=384 contexts=same,replaced counts=0,1,2,7 layouts=2 pages=2 stack_alignments=2 snapshots=6 control_order=REA,RSA,BRC source_retained=1 publications=once actual_iterations=1 interrupt_composition=unvalidated physical_phase_claim=0\n": 1,
       "TMS320C54x active repeat context: PASS cases=384 restore=384 modes=same,replaced counts=0,1,2,7 layouts=2 pages=2 stack_alignments=2 snapshots=6 control_order=REA,RSA,BRC source_reads=once publications=once source_mutation_after_read=1 ordered_copies=1 balanced_frames=1 brc_gap_words=6 interrupt_composition=unvalidated physical_phase_claim=0\n": 1,
       "TMS320C54x active repeat restore: PASS iterations=65536 pending_irq=1 save_replay=1 live_and_replay=2 transport=0\n": 1,
-      "TMS320C54x addressing-mode banks: PASS cases=%u restore=%u basic=32 full_status=96 dp_forward=1024 producers=RSBX,SSBX,MVMD,STLM,STM,LD_DP gaps=0,1,2,3 finish=10,11 idle_required=0 silicon_phase_claim=0 coverage_fnv64=%016llx\n": 1,
+      "TMS320C54x addressing-mode banks: PASS cases=%u restore=%u basic=8 full_status=40 dp_forward=1024 producers=RSBX,SSBX,MVMD,STLM,STM,LD_DP gaps=2,3 arp_initial=0 finish=10,11 idle_required=0 silicon_phase_claim=0 coverage_fnv64=%016llx\n": 1,
       "TMS320C54x addressing-mode coverage: PASS cases=%u restore=%u coverage_fnv64=%016llx\n": 1,
       "TMS320C54x adjacent PSHM POPM: PASS cases=2048 restore=2048 sources=8 destinations=T,AR3,BK,SP patterns=4 pages=2 stack_alignments=2 snapshots=4 source_reads=1 stack_reads=1 stack_writes=1 register_writes=1 source_mutation_after_read=1 stack_mutation_after_read=1 logical_bypass=1 interrupt_composition=unvalidated physical_phase_claim=0\n": 1,
       "TMS320C54x adjacent block rearm: PASS cases=64 restore=64 first_counts=0,1,3,7 second_counts=0,2 pages=2 snapshots=4 brc_publications=1 actual_iterations=1 write_owner=Access interrupt_composition=unvalidated physical_phase_claim=0\n": 1,
@@ -3041,7 +3041,7 @@
       "TMS320C54x staged CLKMD MVDK: PASS cases=72 restore=72 forms=direct,indirect,absolute patterns=4 pages=2 snapshots=3 source_reads=1 destination_writes=1 peripheral_extra_clock=1 retained_source=1 retained_literals=1 read_owner=Address observer_scope=bus_only debug_excluded=1 pll_reference=unconfigured physical_clock_claim=0\n": 1,
       "TMS320C54x staged CLKMD STM: PASS cases=12 restore=12 literal_fetches=1 writes=1 destination_reads=0 publish_clock=8 pll_reference=unconfigured physical_clock_claim=0\n": 1,
       "TMS320C54x staged CMPR: PASS cases=435 conditions=4 auxiliary_registers=8 unsigned_pairs=4 producer_latency_cases=48 producers=STM,MVDK,POPM,STL original_store_sequences=3 restore=435\n": 1,
-      "TMS320C54x staged CPL/DP latency: PASS cases=32 fields=2 directions=2 consumers=LD,ST gaps=0,1,2,3 restore=32\n": 1,
+      "TMS320C54x staged CPL/DP latency: PASS cases=8 fields=2 directions=2 consumers=LD,ST gaps=3 restore=8\n": 1,
       "TMS320C54x staged DADD: PASS cases=12288 address_forms=8 selectors=4 patterns=8 c16=0,1 sxm=0,1 ovm=0,1 parity=0,1 restore=12288 duplicate_reads=0 memory_writes=0 silicon_phase_claim=0\n": 1,
       "TMS320C54x staged DAGEN immediate: PASS cases=12 targets=AR,SP,BK write=5 conflicting_write=7 deferred_restore=3 committed_restore=6 duplicate_writes=0\n": 1,
       "TMS320C54x staged DELAY: PASS cases=15360 restore=15360 forms=DP,SP,indirect,postdecrement,postincrement registers=8 patterns=8 sxm_ovm=4 compatibility=2 pages=2 snapshots=3 reads=1 writes=1 source=Read destination=Execute physical_phase_claim=0\n": 1,
@@ -7661,21 +7661,22 @@
       "machine": "tms54isa",
       "reported_fields": [
         {
-          "basic": "32",
-          "cases": "1152",
-          "coverage_fnv64": "874b36700c614325",
+          "arp_initial": "0",
+          "basic": "8",
+          "cases": "1072",
+          "coverage_fnv64": "43ec4ed518af0ee5",
           "dp_forward": "1024",
           "finish": "10,11",
-          "full_status": "96",
-          "gaps": "0,1,2,3",
+          "full_status": "40",
+          "gaps": "2,3",
           "idle_required": "0",
           "producers": "RSBX,SSBX,MVMD,STLM,STM,LD_DP",
-          "restore": "1152",
+          "restore": "1072",
           "silicon_phase_claim": "0"
         }
       ],
       "required": [
-        "TMS320C54x addressing-mode banks: PASS cases=1152 restore=1152 basic=32 full_status=96 dp_forward=1024 producers=RSBX,SSBX,MVMD,STLM,STM,LD_DP gaps=0,1,2,3 finish=10,11 idle_required=0 silicon_phase_claim=0 coverage_fnv64=874b36700c614325"
+        "TMS320C54x addressing-mode banks: PASS cases=1072 restore=1072 basic=8 full_status=40 dp_forward=1024 producers=RSBX,SSBX,MVMD,STLM,STM,LD_DP gaps=2,3 arp_initial=0 finish=10,11 idle_required=0 silicon_phase_claim=0 coverage_fnv64=43ec4ed518af0ee5"
       ]
     },
     "move-brc": {
@@ -14976,16 +14977,15 @@
     },
     "mode-latency": {
       "case_ids": [],
-      "classification": "harness_infrastructure",
+      "classification": "architectural_interaction",
       "coverage": {
-        "cases": 1152,
-        "fnv64": "874b36700c614325",
-        "key": "0..31: existing default RSBX/SSBX CPL/DP cases; 32..47 MVMD CPL; 48..63 MVMD CMPT; 64..79 STLM CPL; 80..95 STLM CMPT; 96..111 STM CPL; 112..127 STM CMPT; 128..1151: existing immediate-DP key0..1023. Local legacy keys remain ordinal or (ordinal-32)%16, and ordinal-128 for immediate DP.",
+        "cases": 1072,
+        "fnv64": "43ec4ed518af0ee5",
+        "key": "Retain raw identities: basic 6,7,14,15,22,23,30,31; each full-status bank retains gap2/3 for MVMD/STM or gap3 for STLM, both directions and load/store. Bank origin 32+(bank-1)*16 is unchanged. Immediate-DP identities128..1151 retain all pages and both nearest-producer chains.",
         "result_prefix": "TMS320C54x addressing-mode banks: PASS"
       },
-      "decision": "merge",
-      "family": "address-mode-fixture-ownership",
-      "scope": "Source/observation preservation and CPU-only ownership; not semantic approval of every retained CMPT or short-gap stimulus."
+      "decision": "rewrite",
+      "family": "address-mode-valid-programs"
     },
     "mpy-dual": {
       "case_ids": [],

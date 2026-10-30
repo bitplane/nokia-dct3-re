@@ -48,7 +48,7 @@ REQUIRED = [
     "TMS320C54x staged cross-page far IRQ: PASS cases=8 masked=4 restored_vector_page=1 continuations=0700,0702 restore=8 duplicate_vectors=0 silicon_phase_claim=0",
     "TMS320C54x staged INTM protection: PASS cases=12 follower_words=1,2,3 adjacent=6 restore=12 duplicate_vectors=0",
     "TMS320C54x staged status bits: PASS cases=128 registers=2 bits=16 operations=2 initial_patterns=2 restore=128 xf_output=1 reserved_st1_bit10=0",
-    "TMS320C54x staged CPL/DP latency: PASS cases=32 fields=2 directions=2 consumers=LD,ST gaps=0,1,2,3 restore=32",
+    "TMS320C54x staged CPL/DP latency: PASS cases=8 fields=2 directions=2 consumers=LD,ST gaps=3 restore=8",
     "TMS320C54x staged immediate DP: PASS cases=1024 pages=512 nearest_producer=512 old_st0_until_execute=1 restore=1024",
     "TMS320C54x staged FRAME: PASS offsets=256 restore=768 adjacent_push=768 duplicate_writes=0 silicon_phase_claim=0",
     "TMS320C54x staged stack SP latency: PASS cases=16 producers=PSHM,POPM consumers=LD,ST gap_nops=0,1 restore=16",
@@ -403,7 +403,7 @@ EXTRA_PROFILES = {
         "Fatal error: TMS320C54x isolated STM ST1 complete",
     ),
     "mode-latency": (
-        "TMS320C54x addressing-mode banks: PASS cases=1152 restore=1152 basic=32 full_status=96 dp_forward=1024 producers=RSBX,SSBX,MVMD,STLM,STM,LD_DP gaps=0,1,2,3 finish=10,11 idle_required=0 silicon_phase_claim=0 coverage_fnv64=874b36700c614325",
+        "TMS320C54x addressing-mode banks: PASS cases=1072 restore=1072 basic=8 full_status=40 dp_forward=1024 producers=RSBX,SSBX,MVMD,STLM,STM,LD_DP gaps=2,3 arp_initial=0 finish=10,11 idle_required=0 silicon_phase_claim=0 coverage_fnv64=43ec4ed518af0ee5",
         "Fatal error: TMS320C54x isolated addressing-mode latency complete",
     ),
     "squr-smem": (
