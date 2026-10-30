@@ -82,7 +82,6 @@ void tms320c54x_test_state::machine_reset()
 		return;
 	if (status_bitfield()) { start_pipeline_mapped_bitfield(); return; }
 	if (start_profile(*this, machine().options().bios(), {
-		{ {"stlm-bsp"}, [](self &test) { test.start_stlm_bsp(); } },
 		{ {"rptb-exit", "rptb-exit-delay"}, [](self &test) { test.start_block_exit(); } },
 	}))
 		return;

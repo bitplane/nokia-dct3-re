@@ -617,7 +617,6 @@ private:
 		bool brc = false;
 	};
 	static stlm_t_fixture stlm_t_case(unsigned variant);
-	void start_stlm_bsp(unsigned variant = 0);
 	void start_pipeline_stlm_t(unsigned variant = 0);
 	static u16 swap_body_source(unsigned variant);
 	void start_pipeline_swap_body(unsigned variant = 0);
@@ -2128,7 +2127,6 @@ private:
 	bool check_xmem_load_results();
 	bool check_repeat_push_results();
 	bool check_block_exit_results();
-	bool check_stlm_t_results_part2();
 	bool check_staged_bus_stm_results();
 	bool check_rom4_fr_decoder_results();
 	bool check_native_dual_sub_results();

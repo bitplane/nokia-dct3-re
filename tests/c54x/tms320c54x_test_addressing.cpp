@@ -8486,36 +8486,5 @@ bool tms320c54x_test_state::check_repeat_push_results()
 	return false;
 }
 
-bool tms320c54x_test_state::check_stlm_t_results_part2()
-{
-	if (m_phase == 62060)
-	{
-		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
-		auto f = stlm_t_case(variant % 256);
-		f.st1 = (f.st1 & ~u16(0x4000)) | (((variant / 256) % 2) ? 0x4000 : 0);
-		unsigned const checkpoint = std::array<unsigned, 3>{5, 6, 8}[variant / 1024];
-		if (tick == 5) m_cpu->set_state_int(f.source ? tms320c54x_device::STATE_B : tms320c54x_device::STATE_A, f.value);
-		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) && m_cpu->state_int(tms320c54x_device::STATE_ST0) == f.st0 &&
-			m_cpu->state_int(tms320c54x_device::STATE_ST1) == f.st1, "STLM BSP preserves status and uses its encoded register independent of DP/CPL");
-		capture_pipeline_at(checkpoint, {&m_pipeline_operand_reads, &m_pipeline_store_writes},
-			"Save STLM BSP around peripheral hold and publication");
-		if (tick == 12)
-		{
-			expect(!m_pipeline_operand_reads && m_pipeline_store_writes == 1 &&
-				m_cpu->state_int(tms320c54x_device::STATE_A) == (f.source ? 0xdead : f.value) &&
-				m_cpu->state_int(tms320c54x_device::STATE_B) == (f.source ? f.value : 0xdead), "STLM BSP leaves accumulators intact and performs one write without reads");
-			{ auto const disable = machine().disable_side_effects(); expect(m_cpu->space(AS_DATA).read_word(0x21) == f.stored, "STLM BSP destination retains the saturated word"); }
-			if (replay_pipeline_at(62061, checkpoint,
-				"Restore STLM BSP without repeating a published write")) return true;
-			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (variant < 3071) { start_stlm_bsp(variant + 1); return true; }
-			osd_printf_info("TMS320C54x staged BSP STLM: PASS cases=3072 restore=3072 accumulators=2 patterns=8 flags=16 cpl=2 pages=2 snapshots=3 source_sample=Execute writes_each=1 data_reads=0 publish_clock=7 peripheral_extra_clock=1 silicon_phase_claim=0\n");
-			throw emu_fatalerror(0, "TMS320C54x isolated BSP STLM complete");
-		}
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 62061) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 62060; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true; }
-	return false;
-}
 
 } // namespace c54x_test

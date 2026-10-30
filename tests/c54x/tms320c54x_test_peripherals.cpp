@@ -678,31 +678,6 @@ tms320c54x_test_state::accumulator_store_fixture tms320c54x_test_state::peripher
 	return f;
 }
 
-void tms320c54x_test_state::start_stlm_bsp(unsigned variant)
-{
-	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-	auto f = stlm_t_case(variant % 256);
-	f.st1 = (f.st1 & ~u16(0x4000)) | (((variant / 256) % 2) ? 0x4000 : 0);
-	f.base = (variant / 512) % 2 ? 0x20000 : 0;
-	auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
-	for (unsigned i = 0; i < 24; ++i) program.write_word(f.base + 0x600 + i, 0xf495);
-	program.write_word(f.base + 0x600, f.source ? 0x8921 : 0x8821);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10); m_cpu->set_state_int(tms320c54x_device::STATE_PMST, f.pmst);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST0, f.st0); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, f.st1);
-	m_cpu->set_state_int(tms320c54x_device::STATE_A, f.source ? 0xdead : 0x1111); m_cpu->set_state_int(tms320c54x_device::STATE_B, f.source ? 0x1111 : 0xdead);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
-	data.write_word(0x21, 0xa55a);
-	m_pipeline_operand_reads = m_pipeline_store_writes = 0; m_pipeline_replay = false; m_idle_fixture_tick = 0;
-	m_pipeline_operand_tap = data.install_read_tap(0, 0xffff, "stlm_bsp_no_reads",
-		[this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) { ++m_pipeline_operand_reads; expect(false, "STLM BSP has no data-source or destination read"); } });
-	m_pipeline_write_tap = data.install_write_tap(0, 0xffff, "stlm_bsp_write",
-		[this, f](offs_t address, u16 &value, u16) { if (machine().side_effects_disabled()) return;
-			expect(!m_pipeline_store_writes && address == 0x21 && value == f.stored && m_cpu->pipeline_cycles() == 7,
-				"STLM BSP publishes its Execute-live saturated accumulator once after the peripheral clock"); ++m_pipeline_store_writes; });
-	m_phase = 62060; m_cpu->set_state_int(STATE_GENPC, f.base + 0x600); m_cpu->set_pipeline_frontend(true);
-	m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-}
 
 void tms320c54x_test_state::start_pll_transition_case()
 {

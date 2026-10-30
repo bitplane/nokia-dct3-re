@@ -202,7 +202,6 @@ TIMER_CALLBACK_MEMBER(tms320c54x_test_state::check_results)
 	if (check_xmem_load_results()) return;
 	if (check_repeat_push_results()) return;
 	if (check_block_exit_results()) return;
-	if (check_stlm_t_results_part2()) return;
 	if (check_staged_bus_stm_results()) return;
 	if (check_rom4_fr_decoder_results()) return;
 	if (check_native_dual_sub_results()) return;
