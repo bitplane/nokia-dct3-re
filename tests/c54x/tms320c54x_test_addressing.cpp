@@ -808,66 +808,6 @@ void tms320c54x_test_state::start_mvdd_source(unsigned variant)
 }
 
 
-tms320c54x_test_state::mvdk_producer_fixture tms320c54x_test_state::mvdk_producer_case(unsigned v, bool accumulator_destination)
-{
-	unsigned const group = accumulator_destination ? v / 5184 : 0; v %= 5184;
-	mvdk_producer_fixture f{};
-	f.source = 8 + v % 6; f.form = (v / 6) % 3; f.producer = (v / 18) % 3;
-	f.prefix = 1 + (v / 54) % 2; f.destination = (v / 108) % 2 ? 0x6000 : 0x13;
-	if (accumulator_destination) f.destination = 8 + 2 * group + (v / 108) % 2;
-	f.value = std::array<u16, 4>{0, 1, 0x8000, 0xffff}[(v / 216) % 4];
-	f.base = (v / 864) % 2 ? 0x20000 : 0; f.access = 5 + f.prefix + unsigned(f.form == 2);
-	f.checkpoint = f.access - 1 + v / 1728;
-	unsigned const part = (f.source - 8) % 3;
-	u64 const initial = f.source >= 0x0b ? 0xfedcba9876ULL : 0x123456789aULL;
-	// The adjacent short-form LD case is an Access-owned projection, not
-	// a guaranteed result for firmware violating the manual's latency rule.
-	// A long source-address word or NOP supplies the required separation.
-	f.expected = f.producer == 2 ? (f.access == 6 ? u16(initial >> (16 * part)) : part ? 0 : u8(f.value)) : part == 2 ? u8(f.value) : f.value;
-	return f;
-}
-
-void tms320c54x_test_state::start_mvdk_producer(unsigned variant)
-{
-	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-	auto const f = mvdk_producer_case(variant, profile_is("mvdk-acc-prod")); bool const b = f.source >= 0x0b;
-	auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
-	for (unsigned i = 0; i < 20; ++i) program.write_word(f.base + 0x600 + i, 0xf495);
-	program.write_word(f.base + 0x600, f.producer == 0 ? (b ? 0x8000 : 0x8100) | f.source : f.producer == 1 ? 0x8a00 | f.source : (b ? 0xe900 : 0xe800) | u8(f.value));
-	program.write_word(f.base + 0x600 + f.prefix, f.form == 0 ? 0x7100 | f.source : f.form == 1 ? 0x7186 : 0x71f8);
-	program.write_word(f.base + 0x601 + f.prefix, f.form == 2 ? f.source : f.destination);
-	if (f.form == 2) program.write_word(f.base + 0x602 + f.prefix, f.destination);
-	program.write_word(f.base + 0x600 + f.prefix + (f.form == 2 ? 3 : 2), 0xf4e1);
-	m_cpu->set_pipeline_frontend(false);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0); m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xa600); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x900); m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x3000);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
-	m_cpu->set_state_int(tms320c54x_device::STATE_A, f.producer == 0 && b ? f.value : 0x123456789aULL);
-	m_cpu->set_state_int(tms320c54x_device::STATE_B, f.producer == 0 && !b ? f.value : 0xfedcba9876ULL);
-	m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x1403); m_cpu->set_state_int(tms320c54x_device::STATE_AR6, f.source);
-	data.write_word(0x3000, f.value);
-	m_pipeline_operand_reads = m_pipeline_store_writes = m_pipeline_register_writes = m_fast_stack_reads = m_pipeline_extensions_reads = 0;
-	m_pipeline_operand_tap = data.install_read_tap(0, 0xffff, "mvdk_producer_source",
-		[this, f](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return;
-			if (at == 0x3000) { expect(f.producer == 1 && !m_fast_stack_reads && word == f.value && m_cpu->pipeline_cycles() == 5, "POPM captures one producer stack word"); ++m_fast_stack_reads; return; }
-			expect(at == f.source && word == f.expected && !m_pipeline_operand_reads && m_pipeline_register_writes == unsigned(f.producer != 2) && m_cpu->pipeline_cycles() == f.access, "MVDK distinguishes direct ALU latency from mapped producer no-conflict ordering"); ++m_pipeline_operand_reads; });
-	m_pipeline_write_tap = data.install_write_tap(0, 0xffff, "mvdk_producer_writes",
-		[this, f](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return;
-			if (f.producer != 2 && !m_pipeline_register_writes && at == f.source) { expect(word == f.value && m_cpu->pipeline_cycles() == 6, "Mapped accumulator producer publishes once at Execute"); ++m_pipeline_register_writes; return; }
-			expect(at == f.destination && word == f.expected && !m_pipeline_store_writes && m_pipeline_operand_reads == 1 && m_cpu->pipeline_cycles() == f.access + unsigned(f.destination < 0x10 || f.destination >= 0x60), "MVDK publishes its retained mapped word once without an extra producer delay"); ++m_pipeline_store_writes; });
-	m_pipeline_fetch_tap = program.install_read_tap(f.base + 0x601 + f.prefix, f.base + f.prefix + (f.form == 2 ? 0x602 : 0x601), "mvdk_producer_literals",
-		[this, f](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return; unsigned const i = m_pipeline_extensions_reads++;
-			expect(i < (f.form == 2 ? 2U : 1U) && at == f.base + 0x601 + f.prefix + i && word == (f.form == 2 && !i ? f.source : f.destination), "Producer-composed MVDK retains ordered literals"); });
-	m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 255380;
-	m_cpu->set_state_int(STATE_GENPC, f.base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-}
-
-
-
-
-
-
-
 void tms320c54x_test_state::check_st1_memory_rules()
 {
 	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); auto &data = m_cpu->space(AS_DATA);
@@ -1201,43 +1141,6 @@ bool tms320c54x_test_state::check_rptbd_t_load_results()
 	return false;
 }
 
-
-bool tms320c54x_test_state::check_mvdk_producer_results()
-{
-	if (m_phase == 255380)
-	{
-		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
-		bool const accumulator_destination = profile_is("mvdk-acc-prod");
-		auto const f = mvdk_producer_case(variant, accumulator_destination);
-		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Producer-composed MVDK stays within supported forms");
-		if (tick == 3 + f.prefix) { auto const disable = machine().disable_side_effects(); m_cpu->space(AS_PROGRAM).write_word(f.base + 0x601 + f.prefix, 0xdead); }
-		if (tick == 4 + f.prefix && f.form == 2) { auto const disable = machine().disable_side_effects(); m_cpu->space(AS_PROGRAM).write_word(f.base + 0x602 + f.prefix, 0xdead); }
-		if (tick == f.access) { auto const disable = machine().disable_side_effects(); m_cpu->space(AS_DATA).write_word(f.source, 0xdead); }
-		capture_pipeline_at(f.checkpoint, {&m_pipeline_operand_reads, &m_pipeline_store_writes, &m_pipeline_register_writes, &m_fast_stack_reads, &m_pipeline_extensions_reads},
-			"Save MVDK producer publication and retained source ownership");
-		if (tick == 24)
-		{
-			{ auto const disable = machine().disable_side_effects();
-				expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_cpu->state_int(STATE_GENPC) == f.base + 0x600 + f.prefix + (f.form == 2 ? 4 : 3) &&
-					m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0xa600 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == 0x900 && m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x3000 + unsigned(f.producer == 1) &&
-					m_pipeline_operand_reads == 1 && m_pipeline_store_writes == 1 && m_pipeline_register_writes == unsigned(f.producer != 2) && m_fast_stack_reads == unsigned(f.producer == 1) &&
-					m_pipeline_extensions_reads == (f.form == 2 ? 2U : 1U) && m_cpu->space(AS_DATA).read_word(f.destination) == (f.expected & (f.destination == 0xa || f.destination == 0xd ? 0xff : 0xffff)), "Producer-composed MVDK preserves the captured word and balances all transactions"); }
-			if (replay_pipeline_at(255390, f.checkpoint,
-				"Restore mapped producer without repeating or resampling the move")) return true;
-			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (variant < (accumulator_destination ? 15551U : 5183U)) { start_mvdk_producer(variant + 1); return true; }
-			if (accumulator_destination)
-			{
-				osd_printf_info("TMS320C54x MVDK accumulator producers: PASS cases=15552 restore=15552 sources=AL,AH,AG,BL,BH,BG destinations=AL,AH,AG,BL,BH,BG forms=3 producers=STL,POPM,LD gaps=0,1 patterns=4 pages=2 snapshots=3 source_reads=1 destination_writes=1 mapped_no_conflict=1 direct_ld_gap0=projection_only guard_width=8 physical_phase_claim=0\n"); throw emu_fatalerror(0, "TMS320C54x isolated MVDK accumulator producers complete");
-			}
-			osd_printf_info("TMS320C54x mapped MVDK producers: PASS cases=5184 restore=5184 sources=AL,AH,AG,BL,BH,BG forms=3 producers=STL,POPM,LD gaps=0,1 destinations=AR3,RAM patterns=4 pages=2 snapshots=3 source_reads=1 destination_writes=1 direct_alu_latency=retained direct_ld_gap0=projection_only mapped_no_conflict=1 physical_phase_claim=0\n");
-			throw emu_fatalerror(0, "TMS320C54x isolated mapped MVDK producers complete");
-		}
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 255390) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 255380; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true; }
-	return false;
-}
 
 bool tms320c54x_test_state::check_long_mapped_original_results()
 {

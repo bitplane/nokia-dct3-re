@@ -2428,9 +2428,15 @@ CLKMD's extra publication clock and readback normalization, without a
 configured PLL reference or physical clock claim. Guard words use eight bits; the indirect
 AR6-source self-alias uses its actual address value. Replacing fetched
 literals and changing the source after Access cannot change the retained
-transfer. `mvdk-producer` passes 5,184 cases/restores across six accumulator
-words, three forms, STL/POPM/direct LD, gaps 0/1, AR3/RAM, four input
-patterns, two pages and three snapshots. LD's immediate is eight bits.
+transfer. `mapped_mvdk_producer` passes 864 independent cases/restores across
+six accumulator words, three forms, STL/POPM/direct LD, gaps 0/1, AR3/RAM
+and four input patterns. `accumulator_mvdk_producer` adds 2,592 cases with
+all six accumulator destinations. Pages and three snapshots are distributed,
+not multiplied. Exact ordered bus events include POPM's stack read and the
+producer's mapped publication before MVDK capture. Post-capture source and
+literal poisoning must not change the result. A changed expected capture
+word is rejected. The legacy factory/setup/checker/routes are deleted.
+LD's immediate is eight bits.
 The unseparated short-form direct-LD case checks an Access-owned pipeline
 projection, not a guaranteed silicon result for violating the latency rule.
 STLM-to-accumulator sources, general producer/interrupt/repeat compositions

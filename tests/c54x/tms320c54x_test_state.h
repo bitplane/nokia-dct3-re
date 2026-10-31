@@ -187,14 +187,6 @@ private:
 	};
 	static mvdd_source_fixture mvdd_source_case(unsigned variant, bool repeated);
 	void start_mvdd_source(unsigned variant = 0);
-	struct mvdk_producer_fixture
-	{
-		u16 source, destination, value, expected;
-		unsigned form, producer, prefix, access, checkpoint;
-		u32 base;
-	};
-	static mvdk_producer_fixture mvdk_producer_case(unsigned v, bool accumulator_destination = false);
-	void start_mvdk_producer(unsigned variant = 0);
 	void check_st1_memory_rules();
 	virtual void machine_start() override;
 
@@ -355,7 +347,6 @@ private:
 	bool check_instruction_observer_results();
 	bool check_mvdd_source_results();
 	bool check_rptbd_t_load_results();
-	bool check_mvdk_producer_results();
 	bool check_long_mapped_original_results();
 	bool check_staged_conditional_store_results();
 	bool check_mapped_dual_results();
