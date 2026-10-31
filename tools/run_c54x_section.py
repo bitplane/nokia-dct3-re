@@ -454,6 +454,9 @@ def main():
     counts['conditional_delay_repeat'] = 1440
     counts['block_delay_repeat'] = 120
     counts['delay_repeat_limits'] = 36
+    counts['delayed_conditional_call'] = 384
+    counts['tc_delayed_call'] = 256
+    counts['block_conditional_call'] = 256
     counts['block_delayed_exit'] = 1568
     counts['block_delayed_far_call'] = 576
     counts['shifted_unowned'] = 20480

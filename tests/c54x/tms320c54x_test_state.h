@@ -292,34 +292,6 @@ private:
 	void start_register_product(unsigned variant = 0);
 	void start_repeat_mvdp(unsigned variant = 0);
 	void start_repeat_mvdp_irq(unsigned variant = 0);
-	struct delayed_conditional_call_fixture
-	{
-		unsigned condition, layout, checkpoint;
-		bool b, taken;
-		bool tc=false, initial_tc=false;
-		u32 base;
-		u64 initial, changed;
-		u16 literal;
-		u16 opcode() const { return tc ? 0xfb20+(condition ? 0x10 : 0) : 0xfb42+condition+(b ? 8 : 0); }
-		u16 status(bool final=false) const { return 0xa608|(tc && (initial_tc!=final) ? 0x1000 : 0); }
-		u16 delay(unsigned i) const
-		{
-			if(tc) return i==layout ? (initial_tc ? 0xf4bc : 0xf5bc) : 0x6d95;
-			return !i ? layout ? (b ? 0xf120 : 0xf020) : (b ? 0xf793 : 0xf493) : layout ? literal : 0x6d95;
-		}
-	};
-	static delayed_conditional_call_fixture delayed_conditional_call_case(unsigned v, bool tc=false);
-	void start_delayed_conditional_call(unsigned variant = 0);
-	struct block_conditional_call_fixture
-	{
-		unsigned count, checkpoint;
-		bool b, equal, zero, endpoint, long_delay;
-		u32 base;
-		u16 end() const { return endpoint ? 0x609 : 0x60b; }
-		bool taken() const { return equal == zero; }
-	};
-	static block_conditional_call_fixture block_conditional_call_case(unsigned v);
-	void start_block_conditional_call(unsigned variant = 0);
 	static u16 block_bcd_source(unsigned variant, unsigned iteration);
 	static bool block_bcd_taken(unsigned variant, u16 word);
 	static extended_banz_fixture block_banz_case(unsigned v);
@@ -530,7 +502,6 @@ private:
 	bool check_rptbd_t_load_results();
 	bool check_memory_repeat_results();
 	bool check_asm_store_results_part2();
-	bool check_delayed_call_replay_results();
 	bool check_mvdk_producer_results();
 	bool check_mvdk_mapped_results();
 	bool check_rptbd_shift_store_results();

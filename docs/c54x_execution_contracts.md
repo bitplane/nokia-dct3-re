@@ -1578,7 +1578,7 @@ or a claim that every original outer-loop iteration has settled.
 
 Companion sections are `active_repeat_context`, `active_repeat_pmst` and
 `active_repeat_popd`; remaining isolated controls include `repeat-rearm`,
-`rptb-ccd` and `rptbd-irq`.
+`block_conditional_call` and `rptbd-irq`.
 Their renewal is not implied by a default run; aggregate scope is maintained
 in [Core regression checkpoint](#core-regression-checkpoint).
 
@@ -2345,9 +2345,11 @@ the existing delayed-branch flow executes the two delay words on either
 path without adding the nondelayed CC model's held clock. No new CPU save
 fields are introduced. Physical phase timing is not independently measured.
 
-`conditional-cd` passes 1,920 cases/restores across 12 signed accumulator
+`delayed_conditional_call` owns 384 independent cases/restores across 12 signed accumulator
 conditions, eight 40-bit patterns, two delay layouts (two single-word
-instructions or one two-word instruction), two pages and five snapshots.
+instructions or one two-word instruction) and two pages; five snapshots
+are distributed. Exact target/delay fetches and the taken frame Write7
+are checked against the model, not a silicon timing measurement.
 Delay instructions change the tested accumulator without changing the
 retained decision. Fetched target/delay words and sampled return frames
 are replaced afterward to detect rereads. Both paths execute delay work
@@ -2363,11 +2365,13 @@ rebuilds discarded fetch predictions. Returning after REA wraps to RSA only
 while the outer block remains active; the final iteration falls through.
 Neither the stack frame nor firmware RAM is patched to select that path.
 
-`rptb-ccd` passes 1,024 cases/restores across counts 0/1/2/7, AEQ/ANEQ/
+`block_conditional_call` owns 256 independent cases/restores across counts 0/1/2/7, AEQ/ANEQ/
 BEQ/BNEQ, both outcomes, middle/endpoint placement, both delay layouts,
-two pages and four snapshots. Every iteration performs one ordered RAM
+two pages; four snapshots are distributed. Every iteration performs one ordered RAM
 copy and the expected delay/callee/suffix work, with balanced `PC+4` frames
-and final BRC/BRAF/RSA/REA checks. Interrupt composition, nested loop-control
+and final BRC/BRAF/RSA/REA checks. The source sequence is now an arithmetic
+progression rather than the old XOR pattern. Every return pop poisons real
+stack RAM; an untouched destination tail guards extra stores. Interrupt composition, nested loop-control
 changes in callees, other conditional-call families and physical timing
 remain unvalidated. Nondelayed CC/RC, RPTB, RPTBD IRQ/NMI, in-block far
 calls, backward branches and inner single repeats retain their focused
@@ -5568,10 +5572,10 @@ SP nor stack memory. This fixture does not establish measured silicon
 pipeline phases.
 
 Delayed CCD TC/NTC (`fb30`/`fb20`) uses the same retained Read decision and
-the existing delayed-call PC+4 frame. `tc-delay-call` passes 1,280 cases
+the existing delayed-call PC+4 frame. `tc_delayed_call` owns 256 independent cases
 and cleared-pipeline replays: both predicates and initial TC values, eight
 unrelated accumulator patterns in either accumulator, two delay layouts,
-two pages and five snapshots across decision/frame/delay/return state.
+two pages; five snapshots are distributed across decision/frame/delay/return state.
 An organic SSBX/RSBX in either delay slot flips TC after evaluation; it
 cannot change whether the call owns a frame or reaches its retained target.
 Target/delay words and the return frame are poisoned after their samples.

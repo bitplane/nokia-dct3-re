@@ -90,9 +90,6 @@ void tms320c54x_test_state::machine_reset()
 		{ {"popd-edges"}, [](self &test) { test.start_popd_edges(); } },
 		{ {"popd-ram"}, [](self &test) { test.start_pipeline_data_pop(); } },
 		{ {"rpt-mvdp-irq"}, [](self &test) { test.start_repeat_mvdp_irq(); } },
-		{ {"conditional-cd"}, [](self &test) { test.start_delayed_conditional_call(); } },
-		{ {"tc-delay-call"}, [](self &test) { test.start_delayed_conditional_call(); } },
-		{ {"rptb-ccd"}, [](self &test) { test.start_block_conditional_call(); } },
 		{ {"rptb-bcd", "rptb-bd", "rptb-banz", "rptb-tc-delay"}, [](self &test) { test.start_block_bcd(); } },
 	}))
 		return;
