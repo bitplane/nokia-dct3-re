@@ -10,7 +10,7 @@ describes the current source layout within that target.
 Its [machine-composition source map](upstream_architecture.md#machine-composition)
 defines the shared board state/product data and the separate research
 configuration module. The C54x bench has its own
-[compiled contract-family modules](c54x_execution_contracts.md#harness-preservation-contract),
+[compiled contract-family modules](c54x_execution_contracts.md#harness-contract),
 not hardware behavior embedded in handset configuration.
 
 The generic GSM-FR codec and receive-side bad-frame substitution live in

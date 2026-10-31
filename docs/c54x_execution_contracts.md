@@ -797,7 +797,7 @@ not execution timing or completion of the remaining source/RMW audit.
 `tools/run_c54x_core.py --mame mame/mame --rompath mame/roms --profile xorm
 --output-root tmp` runs this matrix before its separate 1,024 XORM execution
 and restoration cases. Accepted evidence: `tmp/run_c54x_core_45tucxku`.
-The [full-core checkpoint](#core-regression-checkpoint) covers the current
+The [full-core checkpoint](#retained-suite-acceptance) covers the current
 source-admission guards; optional profiles retain their separate scopes below.
 
 ### Operand-domain acceptance
@@ -984,7 +984,7 @@ After the guard, `delay-copy` and `delay-copy-ctrl` pass 15,360 and 73,728
 legal cases/restores. Native 5110 save/load and the 30-second RF boundary
 remain unchanged (20,280 frames, 648,032 reads, 1,537 port-32 writes);
 the default 3210 semantic acceptance also passes. The
-[core checkpoint](#core-regression-checkpoint) additionally qualifies the
+[core checkpoint](#retained-suite-acceptance) additionally qualifies the
 complete default suite with these source guards and corrected fixtures.
 
 `atomic_operand_order` checks 46 independently reset instruction/form cases.
@@ -1342,7 +1342,7 @@ writes alone do not prove complete recording, and five seconds without
 an instruction exclusion does not validate audio or handset boot.
 
 Validated instruction and composition boundaries are collected below;
-aggregate coverage is in [Core regression checkpoint](#core-regression-checkpoint).
+aggregate coverage is in [Core regression checkpoint](#retained-suite-acceptance).
 Original-firmware probes are observation-only. Execute-entry evidence is
 distinct from merely moving a Decode stop, and neither establishes complete
 recording, validated audio or handset boot.
@@ -1351,7 +1351,7 @@ recording, validated audio or handset boot.
 
 Fixture counts below describe focused acceptance. Shared broad-run scope,
 tooling totals and native handset restoration are centralized in the
-[core regression checkpoint](#core-regression-checkpoint).
+[core regression checkpoint](#retained-suite-acceptance).
 
 ### Direct interrupt return to a restored block repeat
 
@@ -1577,7 +1577,7 @@ Companion sections are `active_repeat_context`, `active_repeat_pmst` and
 `active_repeat_popd`; remaining isolated controls include `repeat-rearm`,
 `block_conditional_call` and `rptbd-irq`.
 Their renewal is not implied by a default run; aggregate scope is maintained
-in [Core regression checkpoint](#core-regression-checkpoint).
+in [Core regression checkpoint](#retained-suite-acceptance).
 
 ### Accumulator SQUR
 
@@ -2499,7 +2499,7 @@ RPTB (6,168 cases/restores plus 16 edge cases), backward in-block branches,
 in-block far calls, delayed LD (`delayed_load`) and the native 5110
 save-state control pass on this implementation. These focused profiles retain
 their own scope; current default-suite coverage is recorded in the
-[core checkpoint](#core-regression-checkpoint).
+[core checkpoint](#retained-suite-acceptance).
 
 `rptbd-irq` passes 768 cases/restores across four counts, all four delay
 layouts, two pages, IRQ2/NMI, arrivals during the delay span or at the first
@@ -2513,7 +2513,7 @@ replay. Other arrival clocks, nested interrupts, instruction-produced BRC
 latency matrices and measured physical timing remain unvalidated. No CPU
 behavior change was needed for this additional interrupt acceptance.
 
-The [core regression checkpoint](#core-regression-checkpoint) distinguishes
+The [core regression checkpoint](#retained-suite-acceptance) distinguishes
 default-suite coverage from isolated-profile coverage. Instruction contracts
 below retain their focused acceptance and explicit limits; none establishes
 complete native audio or every composition of supported instructions.

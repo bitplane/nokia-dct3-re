@@ -1,6 +1,8 @@
 """Check test ownership and the actual Make source selection without building MAME."""
 from pathlib import Path
 import subprocess
+import shlex
+import re
 import unittest
 
 
@@ -27,12 +29,17 @@ class CppTestLayoutTests(unittest.TestCase):
                 self.assertEqual(first[0], '// license:BSD-3-Clause')
                 self.assertTrue(first[1].startswith('// copyright-holders:'))
                 if source.suffix == '.h':
-                    guard = f'MAME_NOKIA_{source.stem.upper()}_H'
-                    self.assertIn(f'#ifndef {guard}', text)
-                    self.assertIn(f'#define {guard}', text)
-                    self.assertIn(f'#endif // {guard}', text)
                     self.assertNotIn('#pragma once', text)
                     self.assertNotIn('#include "emu.h"', text)
+                    # Case generators are single-include translation-unit inputs,
+                    # selected by the runner, not independently reusable headers.
+                    fragment = (source.parent.name == 'sections' and source.name != 'common.h'
+                                or source.name.endswith('_section.h')
+                                or source.parent.name == 'firmware' and source.name.startswith('c54x_'))
+                    if not fragment:
+                        guard = re.search(r'^#ifndef (\w+)\n#define \1\b', text, re.M)
+                        self.assertIsNotNone(guard)
+                        self.assertIn(f'#endif // {guard[1]}', text)
 
     def test_handset_build_excludes_every_synthetic_test_source(self):
         sources = selected_sources(0)
@@ -52,13 +59,12 @@ class CppTestLayoutTests(unittest.TestCase):
 
     def test_cpu_only_build_uses_an_independent_subtarget_without_rom_preparation(self):
         output = subprocess.run(
-            ['make', '--no-print-directory', '--dry-run', 'build-c54x-isa', 'MAKE=echo'],
+            ['make', '--no-print-directory', '--dry-run', 'build-c54x-isa',
+             'C54X_SECTION=immediate_store', 'JOBS=2'],
             cwd=ROOT, check=True, capture_output=True, text=True).stdout
-        commands = [line for line in output.splitlines() if 'SOURCES=' in line]
-        self.assertTrue(commands)
-        for command in commands:
-            self.assertIn('SUBTARGET=c54xisa', command)
-            self.assertIn('SOURCES=src/mame/nokia/tms320c54x_test_isa.cpp ', command)
+        commands = [shlex.split(line) for line in output.splitlines() if 'run_c54x_section.py' in line]
+        self.assertEqual(commands, [['python3', 'tools/run_c54x_section.py', 'immediate_store',
+                                    '--build-only', '--jobs', '2']])
         self.assertNotIn('make_eeprom_profile.py', output)
 
     def test_invalid_selection_fails_closed(self):

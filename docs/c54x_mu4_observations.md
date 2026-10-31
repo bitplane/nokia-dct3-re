@@ -773,7 +773,7 @@ read, one status write and no destination read. The `mvmd-cpl` bank in `mode-lat
 16 cases/restores: both CPL directions, basic LD/ST consumers and zero
 through three NOPs, checking the two-cycle consumer latency.
 These addressing-mode labels refer to banks in `mode-latency`; its
-[fixture-validity limits](c54x_execution_contracts.md#harness-preservation-contract)
+[fixture-validity limits](c54x_execution_contracts.md#harness-contract)
 distinguish preserved model observations from valid-program conformance.
 
 The adjacent arithmetic fixture `mvmd-status-alu` passes 768 cases/restores:
@@ -939,7 +939,7 @@ the same vector marker, so this checks IPTR, not vector OVLY bank ownership.
 The ISR does not return. A further mapping change between ISR Prefetch and
 Fetch, other interrupt sources and full return composition remain separate
 acceptance work. Broad regression coverage is indexed in
-[Core regression checkpoint](c54x_execution_contracts.md#core-regression-checkpoint); current resident
+[Core regression checkpoint](c54x_execution_contracts.md#retained-suite-acceptance); current resident
 execution is described separately in [Current boundary](5510_bringup.md#current-boundary).
 
 The `pop-repeat` prototype admits direct POPM BRC/RSA/REA only
@@ -990,7 +990,7 @@ One register read and no writes are observed. This is raw mapped-register
 read acceptance, not a claim about every ST1 producer latency or peripheral
 source. The existing 384-case IMR unsigned-read control also passes.
 Broad regression and native 5110 save-state coverage are indexed in
-[Core regression checkpoint](c54x_execution_contracts.md#core-regression-checkpoint), rather than
+[Core regression checkpoint](c54x_execution_contracts.md#retained-suite-acceptance), rather than
 inherited from the chronology of these individual instruction admissions.
 
 Short direct CMPM now shares the retained BITF/absolute-CMPM path for RAM
@@ -1305,7 +1305,7 @@ The POPD checkpoint `862b0ce1` passed twelve isolated profiles: the four POPD
 profiles, POPM BRC/repeat controls, PMST pop/prefetch controls, both stack-IRQ
 controls and PSHD/MVDD repeats, plus native 5110 save-state restoration.
 The shared broad acceptance is recorded in the
-[core regression checkpoint](c54x_execution_contracts.md#core-regression-checkpoint).
+[core regression checkpoint](c54x_execution_contracts.md#retained-suite-acceptance).
 
 Nondelayed BACC/FBACC A/B share the retained Class 30 transfer boundary
 with CALA/FCALA, but allocate no stack words and leave RTN unchanged.

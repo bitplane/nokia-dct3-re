@@ -23,12 +23,16 @@ the separate acquired-ROM `cold-pipeline` result also passes.
 Affected handset gates pass:3210 v6.00/v5.01 Phone book menus, native5110
 Phone book menu, and3310/3330/3410/5210 frontiers with their existing stable
 frame hashes. These do not renew unrelated model, codec, RF or call workflows.
-An additional39 device-boundary/profile/patch tests pass; source-string checks
+The full host suite passes 5,037 tests in 52.828s with one skip; loopback
+WebSocket/SIP fixtures require local socket permission. Additional
+device-boundary/profile/patch tests pass; source-string checks
 for deleted legacy diagnostic messages are retired, not behavioral coverage.
 
 Compared with the trial baseline `0ab50f98`, combined CPU/firmware C++ sources
-are 52,063 ->34,419 lines and 3,388,653 ->2,093,122 bytes, including replacement
-helpers and relocated firmware (17,644 fewer lines; relocation is not deletion).
+are 52,063 ->34,422 lines and 3,388,653 ->2,093,361 bytes, including replacement
+helpers and relocated firmware (17,641 fewer lines; relocation is not deletion).
+Final header-only guard/comment edits pass 6,708 affected cases/restores and
+the full host suite, without changing CPU or case semantics.
 Tooling/manifests are additional, separately reduced source, not hidden C++.
 
 ## Execution
@@ -58,36 +62,18 @@ and phase handoffs in deleted legacy modules, not CPU behavior. Section replay
 and bus-event checks replace those execution contracts; the catalogue checks
 source registration, not internal C++ naming.
 
-| Pass | Replacement | Retired source | Validation |
-| --- | --- | --- | --- |
-| 1 | `immediate_store.h`: eight direct/indirect/absolute/peripheral literal-store checkpoints | Legacy immediate-store start and phases251250/251260 | Native eight cases/restores; build5.083s, run0.016s |
-| 2 | `basic_memory.h`: twelve stores and six indirect loads, captured address, IRQ drain and store observation API | Two starts and phases251070..251100 | Native18 cases/restores; build5.246s, run0.021s |
-| 3 | `stack.h`:84 PSHM and57 ordinary POPM checkpoints; literal source expectations | PSHM start/phase handlers; ordinary branch removed from shared POPM reference | Final native141 cases/restores; build5.262s, run0.069s |
-| 4 | `dagen.h`:240 constant-DAGEN,12 STM-arbitration and40 repeated-write rejection cases | Constant-DAGEN fixture/starts/results and STM start/results | Native292 cases/restores; build5.398s, run0.126s |
+## Disposition
 
-The pilot retains opcode-shaped literals, pointer updates, exact data writes
-and before/after-write replay. Clock assertions describe the current pipeline
-model, not measured silicon timing. Final layout is undecided; these files
-are independently executable migration sections, not a mandatory file count.
-
-Stack coverage keeps three replay boundaries and both XPC pages. It retires
-redundant ordinary-page replication and PSHM reserved-gap cases;
-special IMR/IFR POPM remains in the unmigrated reference. Ordinary POPM also
-checks XF output against its architectural ST1 bit on every observation.
-
-DAGEN retains every target, value pattern, address form and older-store class
-but distributes replay/gap choices instead of multiplying them by pages and
-all snapshot points. It retains literal poisoning and complete bus events.
-Standard-mode ARP is corrected to zero. Same-clock DAGEN/RAM event order is
-an observed model regression, not a silicon ordering claim. Repeated-write
-rejection is an implementation limit. Its40 cases retire duplicate page runs.
-
-## Pass 5: trial result
-
-Subsequent replacements use the same section-only workflow:
+Clock assertions describe the software model, not measured silicon timing.
+Page/checkpoint distributions deliberately replace Cartesian replication;
+the table records lost correlations and retained interaction contracts.
+Each section remains independently executable, with no shared phase chain.
 
 | Section | Contract and deliberate reduction | Validation |
 | --- | --- | --- |
+| `immediate_store`, `basic_memory` | Retain literal-store8 and ordinary store/load18 cases, explicit captured addresses, exact writes, IRQ drain and before/after-access replay. Store IRQ acknowledges in the same clock before the Write callback; load IRQ acknowledges after its earlier Read. Preserve that distinction through case-owned bus-progress expectations rather than opcode logic in the IRQ runner. | Complete catalogue regression and section restores pass. |
+| `stack` | Retain84 PSHM and57 ordinary POPM cases, three replay boundaries, both XPC pages and XF/ST1 agreement at every observation. Retire redundant ordinary-page replication and PSHM reserved-gap cases. IMR/IFR cases have separate section ownership. |141 cases/restores pass. |
+| `dagen` | Retain240 constant initialization,12 older-store arbitration and40 repeated-write rejection cases. Preserve target/value/address/store classes, literal poison and complete bus events; distribute gaps/pages/checkpoints and correct standard-mode ARP to zero. Same-clock order is a model projection; rejection is an implementation limit. |292 cases/restores pass. |
 | Legacy profile tooling | Retire generic BIOS flags, ordered-default transcript oracles, review/digest JSON and frozen source inventories for deleted modules. `run_c54x_core.py` now owns only surviving `rom4-context`/`cold-pipeline` firmware results; generic acceptance uses the section catalogue. Preserve exact result/completion, exit status, validity/BIOS failure rejection and process accounting. Move NSE-2 focused controls to explicit observer/port-read sections. | Twenty targeted host tests pass in 0.842s. Observer24 and port-read832 cases/restores pass; builds6.025/6.233s, runs0.050/0.341s. No claim of executing the moved firmware adapter or complete CPU scope. |
 | Orphan selection / firmware replay helpers | Delete unused `start_profile` and tests of deleted atomic-restart/counted-checkpoint machinery. Retain stimulus batch order/width checks with the generic case helper; move the surviving timed-restore scheduling test to a firmware-named module and read the firmware-owned header. This retains timer cancellation, stream restoration, suspension and continuation ordering, including restore failure; it does not assert CPU snapshot correctness by itself. | Ten affected host tests pass in 1.105s; no MAME or CPU source change. |
 | Host case-fixture checks | Retain five executable helper checks: port layout, action/observation order, ordered bus-event matching, snapshot stream handling, and mismatch rejection. Remove two synthetic transcript checks tied to retired profile IDs/digests; they do not validate the replacement sections. Repair stale mock types and report compiler diagnostics directly. | Five helper tests plus three catalogue tests pass in 0.827s; no MAME rebuild. |
@@ -567,43 +553,3 @@ Subsequent replacements use the same section-only workflow:
 | `shifted_memory_alu.h`, `shifted_bk_alu.h`, `memory_subc.h` | 31744 cases replace100352 runs. Keep all selectors/patterns/SXM-OVM and explicit late A/B operands. Full32 shifts at postincrement AR1 RAM, AR0 and BK; other routes retain -16/-1/0/15, deliberately losing interior-shift/route correlations. Drop BK's duplicate absolute-source page tuple. Preserve all10240 SUBC input pairs/routes. One Read/no writes, ordered poisoned extensions, pointer/SP and post-Read RAM/AR/BK mutation, exact Execute flags/results and replay; pages/checkpoints distributed. | Native17408+4096+10240 cases/restores; builds6.025/6.135/6.149s, runs6.841/1.654/4.098s. Wrong SUBC equality predicate fails at case0. Delete factory/setup/descriptor, phases253210/253220, counters/route, legacy schedule header and its85-line mirrored host census. Physical bus timing and full route/shift interactions are not claimed. |
 | `atomic_compatibility_memory.h` | Retain nine MAR/load ARP-alias, ADDM saturation/wrap/carry, compatibility ANDM/ORM and signedness-independent XOR examples. Explicit pointers/status/decoys; fixed arithmetic/flags, exact RAM bus for unmarked cases, original port intervals for marked ADDM/XOR, pre-operation or after-marker replay. Five ADDM vectors remain distinct; no execution-count reduction claimed. | Native9 cases/restores; build5.582s/run0.017s; wrong expectation rejected. Delete212..215 and219..225 setup/checks; retire their route range. |
 | `scalar_offset_load.h`, `scalar_unsigned_load.h`, `scalar_shift16_load.h`, `scalar_variable_load.h` | 45824 cases replace226176 runs. Keep all admitted fixed-load forms/registers/destinations/patterns/status/compatibility and mapped-AR direct/absolute/offset reads. Explicit AR7 alias constraint. All32 variable shifts at postincrement AR1; other33 routes keep -16/-1/0/15, deliberately losing interior-shift correlations. Retain Read/Execute boundaries, ARP/pointers, ordered poisoned literals, pre-Read pointer/SP/BK poison, post-Read RAM/AR poison, flags/results and replay. Pages/checkpoints distributed. | Native4224+18176+18176+5248 cases/restores; builds6.0..6.5s/runs1.683/7.171/7.320/2.075s. Wrong shift16 amount fails at case8. Delete four factory layers/setup, phases253050/253060, declarations/dispatch and three profile entry routes. Physical timing is not claimed. |
-
-`python3 tools/run_c54x_section.py all` rebuilds/runs each replacement in
-sequence. Final measurements: immediate-store5.214/0.019s,
-basic-memory5.423/0.020s, stack5.262/0.069s, DAGEN5.406/0.126s (build/run).
-All459 cases and459 restores pass. Total build21.305s; execution0.234s.
-An intentionally wrong immediate-store expectation is rejected, with no PASS
-record (negative-control build5.065s/run0.015s). No legacy/default, handset
-or full tool-suite execution was used for this trial.
-
-Elapsed hands-on trial time was approximately16 minutes including tooling,
-failed incremental attempts, review and commits. Each rebuild compiled one
-test-driver source, reusing the CPU/framework objects. This is a warm-cache
-measurement, not a clean-machine build claim.
-
-Compared with `0ab50f98`, the largest file shrank10,551 ->10,046 lines.
-Combined CPU and relocated C++ sources, including the new section files and
-runner, shrank52,063 ->51,888 lines (175 net), and3,388,653 ->3,371,823 bytes.
-The new Python runner adds80 lines: net reduction across C++ plus that tool
-is95 lines. Four selected legacy populations totalled4,270 executions;
-replacements retain459, removing3,811 executions, not distinct contracts.
-The legacy suite is intentionally not executable as a whole during migration;
-its missing continuations and old selection/oracle manifests remain reference
-debt until integration. The parallel section runner is the executable authority
-for these four replacements.
-
-The initial trial does not provide a reliable completion estimate: later
-sections vary substantially in contract recovery and removable duplication.
-The disposition table above records subsequent migrations and measurements.
-Already structured independent cases should not be rewritten merely to meet
-a size or throughput target. Current full retained-suite timing is recorded
-in the validation checkpoint above; the numbers here describe only the pilot.
-
-The following is the early pilot checkpoint, not the current migration total.
-After the case-owned IRQ expectation change, all15 migrated sections pass:
-2,842 cases/restores, including the firmware descriptor-copy section. This
-is a migrated-section checkpoint, not full CPU or handset acceptance.
-The basic store IRQ acknowledges in the same clock before its Write tap;
-the basic load acknowledges after its earlier Read. Case-owned bus-progress
-expectations preserve that distinction without putting opcode logic in the
-IRQ runner. Snapshot registration restores the IRQ count/last-case observer.

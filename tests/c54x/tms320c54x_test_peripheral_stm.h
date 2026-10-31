@@ -1,5 +1,7 @@
 // license:BSD-3-Clause
 // copyright-holders:Gaz
+#ifndef MAME_NOKIA_TMS320C54X_TEST_PERIPHERAL_STM_H
+#define MAME_NOKIA_TMS320C54X_TEST_PERIPHERAL_STM_H
 #include "c54x_section_common.h"
 namespace c54x_test {
 inline std::vector<clocked_register_case> peripheral_stm_cases(unsigned profile)
@@ -39,3 +41,4 @@ inline std::vector<clocked_register_case> peripheral_stm_cases(unsigned profile)
 	return cases;
 }
 }
+#endif // MAME_NOKIA_TMS320C54X_TEST_PERIPHERAL_STM_H

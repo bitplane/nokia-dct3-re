@@ -32,4 +32,4 @@ inline smem_address_example smem_address(unsigned form, unsigned reg, bool cmpt,
 	return {selected,form >= 14 ? 6U : 5U,mode,bk,address,next,form == 17 ? address : u16(offset)};
 }
 }
-#endif
+#endif // C54X_TEST_SMEM_ADDRESS_H

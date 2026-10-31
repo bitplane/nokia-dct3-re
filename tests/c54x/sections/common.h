@@ -26,4 +26,4 @@ inline instruction_case observation(char const *name, std::initializer_list<regi
 	return c;
 }
 }
-#endif
+#endif // C54X_SECTION_COMMON_H

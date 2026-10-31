@@ -38,7 +38,7 @@ data oracle accidentally.
 ## Staged immediate status publication
 
 Addressing-mode labels below name banks in `mode-latency`, not separate
-profiles. The [fixture-validity limits](c54x_execution_contracts.md#harness-preservation-contract)
+profiles. The [fixture-validity limits](c54x_execution_contracts.md#harness-contract)
 apply to their synthetic ARP states and short-gap observations.
 
 `STM #literal,ST1` retains its second word in Decode and publishes once at
@@ -280,7 +280,7 @@ Resident loading remains exact;
 see [5510 bring-up](5510_bringup.md) for the bounded scope and frame-provenance
 question. Suite version, profile counts, runner scopes and native 5110
 restoration coverage have one authoritative home in the
-[core regression checkpoint](c54x_execution_contracts.md#core-regression-checkpoint).
+[core regression checkpoint](c54x_execution_contracts.md#retained-suite-acceptance).
 These checks establish the declared execution models, not full MU4 boot,
 the physical DA150 map or native speech.
 
@@ -2469,7 +2469,7 @@ see the [delayed accumulator-call contract](c54x_execution_contracts.md#delayed-
 Serial output does not prove audio or full board boot.
 Resident program/data memory still matches exactly. Shared regression and
 native 5110 restoration coverage are indexed in the
-[core regression checkpoint](c54x_execution_contracts.md#core-regression-checkpoint).
+[core regression checkpoint](c54x_execution_contracts.md#retained-suite-acceptance).
 Excluded instruction and producer/interrupt compositions remain unaccepted.
 Mapped ADD/SUB has 6,912 replay cases for AL/AH/AG,
 BL/BH/BG and T/TRN, direct/absolute forms, destination aliases and retained

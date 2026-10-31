@@ -15,4 +15,4 @@ inline u64 shifted_word40(u16 word, unsigned code, bool sxm)
 	return sxm ? u64(number / divisor - (number < 0 && number % divisor != 0)) & 0xffffffffffULL : bits >> -shift;
 }
 }
-#endif
+#endif // C54X_TEST_SHIFTED_WORD_H
