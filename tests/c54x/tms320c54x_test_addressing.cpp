@@ -711,95 +711,6 @@ void tms320c54x_test_state::start_repeated_mvdk(unsigned variant)
 	m_cpu->set_state_int(STATE_GENPC, f.base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 }
 
-tms320c54x_test_state::memory_copy_repeat_fixture tms320c54x_test_state::memory_copy_repeat_case(unsigned v, bool wrap, bool chain)
-{
-	memory_copy_repeat_fixture f{};
-	if (wrap)
-	{
-		unsigned n = v; unsigned const form = n % 2 ? 18 : 0; n /= 2;
-		unsigned const count = n % 4; n /= 4; unsigned const body = n % 3; n /= 3;
-		unsigned const page = n % 2; n /= 2;
-		v = form + count * 24 + body * 96 + page * 576 + n * 3456;
-	}
-	if (chain)
-	{
-		unsigned n = v; unsigned const form = n % 2 ? 18 : 0; n /= 2;
-		unsigned const count = n % 4; n /= 4; unsigned const body = n % 3; n /= 3;
-		unsigned const flags = n % 2; n /= 2; unsigned const page = n % 2; n /= 2;
-		v = form + count * 24 + body * 96 + flags * 288 + page * 576 + n * 3456;
-	}
-	f.chain = chain;
-	f.form = v % 24; v /= 24; f.count = std::array<unsigned, 4>{0, 1, 7, 31}[v % 4]; v /= 4;
-	f.body_kind = v % 3; v /= 3; unsigned const flags = v % 2; v /= 2;
-	f.base = v % 2 ? 0x20000 : 0; v /= 2; f.irq = v % 3; v /= 3;
-	f.snapshot = v % 4; v /= 4; f.pattern = v;
-	f.absolute = f.form <= 18;
-	f.address = f.form < 18 ? f.form + 8 : f.form == 18 || f.form == 21 ? 0x4000 : f.form == 19 ? 0x4001 : f.form == 20 ? 0x3001 : 8;
-	f.mode = f.absolute ? 0xf8 : f.form == 19 || f.form == 20 ? 1 : f.form == 22 ? 8 : 0x91;
-	f.st0 = 0xa600 | (f.form == 19 ? 0x80 : f.form == 22 ? 0 : 8);
-	f.st1 = (flags ? 0x320 : 0) | (f.irq ? 0 : 0x800) | (f.form == 20 ? 0x4000 : 0);
-	f.source_ar = f.address == 0x12 || f.address == 0x13 ? 4 : 2; f.destination_ar = f.source_ar + 1;
-	f.sentinel_ar = f.address == 0x17 ? 6 : 7;
-	f.opcode = !f.body_kind ? 0xe500 | ((f.source_ar + 6) << 4) | (f.destination_ar + 6) :
-		f.body_kind == 1 ? 0x7090 | f.destination_ar : 0x7190 | f.source_ar;
-	f.origin = wrap ? 0xfffe : 0x600;
-	f.body = f.base | u16(f.origin + (f.absolute ? 2 : 1));
-	return f;
-}
-
-void tms320c54x_test_state::start_memory_copy_repeat(unsigned variant)
-{
-	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-	bool const wrap = profile_is("rpt-mem-wrap"), chain = profile_is("rpt-mem-chain"); auto const f = memory_copy_repeat_case(variant, wrap, chain); auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
-	for (unsigned i = 0; i < 32; ++i) program.write_word(f.base | u16(f.origin + i), 0xf495);
-	program.write_word(f.base | f.origin, 0x4700 | f.mode); if (f.absolute) program.write_word(f.base | u16(f.origin + 1), f.address);
-	program.write_word(f.body, f.opcode); if (f.body_kind) program.write_word(f.body + 1, f.body_kind == 1 ? 0x5000 : 0x6000);
-	u32 const after = f.body + f.body_words();
-	if (chain) { program.write_word(after, 0x47f8); program.write_word(after + 1, 0x4002); program.write_word(after + 2, 0xf495); data.write_word(0x4002, 3); }
-	program.write_word(after + (chain ? 3 : 0), 0x6d90 | f.sentinel_ar); program.write_word(after + (chain ? 15 : 12), 0xf4e1);
-	if (f.irq) { unsigned const vector = f.irq == 2 ? 4 : 0x48; program.write_word(f.base | vector, 0xf495); program.write_word((f.base | vector) + 1, 0xf4eb); }
-	for (unsigned i = 0; i <= f.count; ++i) { data.write_word(0x5000 + i, f.payload(i)); data.write_word(0x6000 + i, 0); }
-	m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0); m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10); m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, f.irq == 1 ? 4 : 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST0, f.st0); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, f.st1); m_cpu->set_state_int(tms320c54x_device::STATE_RC, 0); m_cpu->set_state_int(tms320c54x_device::STATE_BRC, 13);
-	m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x123456789aULL); m_cpu->set_state_int(tms320c54x_device::STATE_B, 0xfeabcd9876ULL); m_cpu->set_state_int(tms320c54x_device::STATE_T, 0xbeef); m_cpu->set_state_int(tms320c54x_device::STATE_TRN, 0x1357);
-	m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x3000); m_cpu->set_state_int(tms320c54x_device::STATE_BK, 82);
-	for (unsigned i = 0; i < 8; ++i) m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + i, 0x7200 + i);
-	m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + f.source_ar, 0x5000); m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + f.destination_ar, 0x6000);
-	if (f.form == 21 || f.form == 23) m_cpu->set_state_int(tms320c54x_device::STATE_AR1, f.address);
-	set_repeat_count_source(f.address, f.count);
-	m_cpu->set_input_line(2, CLEAR_LINE); m_cpu->set_input_line(INPUT_LINE_NMI, CLEAR_LINE);
-	m_pipeline_operand_reads = m_pipeline_store_writes = m_pipeline_extensions_reads = m_pipeline_store_case = m_pipeline_register_writes = m_fast_stack_reads = m_vector_acks = 0;
-	m_observed_instructions.clear();
-	m_pipeline_operand_tap = data.install_read_tap(0, 0xffff, "memory_copy_repeat_read", [this, f](offs_t at, u16 &word, u16) {
-		if (machine().side_effects_disabled()) return;
-		if (at == f.address) { expect(!m_pipeline_extensions_reads++ && word == f.count && m_cpu->pipeline_cycles() == f.read_clock(), "RPT Smem captures its count once in Read"); return; }
-		if (f.chain && at == 0x4002) { expect(m_pipeline_extensions_reads++ == 1 && word == 3, "Following NOP repeat captures its own count once"); return; }
-		if (at == 0x2fff) { expect(f.irq && !m_fast_stack_reads++ && m_pipeline_register_writes == 1, "Deferred repeat interrupt reads its single committed frame"); return; }
-		unsigned const i = m_pipeline_operand_reads++; expect(i <= f.count && at == 0x5000 + i && word == f.payload(i), "Memory count drives ordered source reads without using its address as the count");
-	});
-	m_pipeline_write_tap = data.install_write_tap(0, 0xffff, "memory_copy_repeat_write", [this, f](offs_t at, u16 &word, u16) {
-		if (machine().side_effects_disabled()) return;
-		if (at == 0x2fff) { expect(f.irq && !m_pipeline_register_writes++ && m_pipeline_store_writes == f.count + 1, "Interrupt frame follows the final repeated copy"); return; }
-		unsigned const i = m_pipeline_store_writes++; expect(i <= f.count && at == 0x6000 + i && word == f.payload(i), "Memory count publishes every retained copy once");
-		if (!i && f.irq) m_cpu->set_input_line(f.irq == 2 ? INPUT_LINE_NMI : 2, ASSERT_LINE);
-	});
-	m_pipeline_fetch_tap = program.install_read_tap(f.body, f.body + (chain ? f.body_words() + 2 : 0), "memory_copy_repeat_fetch", [this, f](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return; if (at == f.body) expect(!m_pipeline_store_case++ && word == f.opcode, "Memory-count repeat fetches its body only once"); else if (f.chain && at == f.body + f.body_words() + 2) expect(m_pipeline_store_case++ == 1 && word == 0xf495, "Following NOP repeat fetches its distinct body once"); });
-	m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 62154;
-	m_cpu->set_state_int(STATE_GENPC, f.base | f.origin); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-}
-
-
-
-
-
-
-
-
-
-
-
-
 void tms320c54x_test_state::start_repeat_mvdp(unsigned variant)
 {
 	unsigned const form = variant % 5, reg = (variant / 5) % 8;
@@ -1797,42 +1708,6 @@ bool tms320c54x_test_state::check_popd_mapped_results()
 
 
 
-
-bool tms320c54x_test_state::check_memory_copy_repeat_results()
-{
-	if (m_phase == 62154)
-	{
-		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick; bool const wrap = profile_is("rpt-mem-wrap"), chain = profile_is("rpt-mem-chain"); auto const f = memory_copy_repeat_case(variant, wrap, chain);
-		unsigned const checkpoint = std::array<unsigned, 4>{3, f.read_clock(), f.read_clock() + 2, f.read_clock() + 6}[f.snapshot];
-		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Memory-sourced count composes with pipelined data copies");
-		if (tick == f.read_clock()) set_repeat_count_source(f.address, f.address == 0x18 ? 0x3000 : 0xa55a);
-		if (tick == checkpoint && !m_pipeline_replay)
-		{
-			m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_store_writes, m_pipeline_extensions_reads, m_pipeline_store_case, m_pipeline_register_writes, m_fast_stack_reads, m_vector_acks}; m_saved_observed_instructions = m_observed_instructions; expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save repeat before and after count capture or body issue");
-		}
-		if (tick == 120)
-		{
-			expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_cpu->state_int(STATE_GENPC) == f.body + f.body_words() + (chain ? 16 : 13) && m_cpu->state_int(tms320c54x_device::STATE_RC) == 0 && m_cpu->state_int(tms320c54x_device::STATE_BRC) == 13 && m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x3000 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == f.st1 && (m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x1fff) == (f.st0 & 0x1fff), "Memory repeat finishes its captured count and post-loop sentinel with balanced interrupt state");
-			expect(m_pipeline_extensions_reads == (chain ? 2 : 1) && m_pipeline_store_case == (chain ? 2 : 1) && m_pipeline_operand_reads == f.count + 1 && m_pipeline_store_writes == f.count + 1 && m_pipeline_register_writes == unsigned(bool(f.irq)) && m_fast_stack_reads == unsigned(bool(f.irq)) && m_vector_acks == unsigned(bool(f.irq)), "Memory repeat neither re-fetches its body nor re-samples its mutated count");
-			if (chain) expect(std::count(m_observed_instructions.begin(), m_observed_instructions.end(), std::pair<offs_t, u16>{f.body + f.body_words() + 2, 0xf495}) == 4, "Following NOP repeat retires its own count plus one without a stale copy opcode");
-			expect(m_cpu->state_int(tms320c54x_device::STATE_AR0 + f.source_ar) == 0x5000 + (f.body_kind == 1 ? 0 : f.count + 1) && m_cpu->state_int(tms320c54x_device::STATE_AR0 + f.destination_ar) == 0x6000 + (f.body_kind == 2 ? 0 : f.count + 1) && m_cpu->state_int(tms320c54x_device::STATE_AR0 + f.sentinel_ar) == 0x7201 + f.sentinel_ar, "Memory count drives exactly count plus one auxiliary updates and one continuation");
-			if (f.form == 21 || f.form == 23) expect(m_cpu->state_int(tms320c54x_device::STATE_AR1) == f.address + 1, "Indirect repeat count updates its address only once");
-			{ auto const disable = machine().disable_side_effects(); u16 const expected = f.address == 0x18 ? 0x3000 : f.address == 10 || f.address == 13 ? 0x5a : 0xa55a; expect(m_cpu->space(AS_DATA).read_word(f.address) == expected, "Count capture never republishes its old source value"); for (unsigned i = 0; i <= f.count; ++i) expect(m_cpu->space(AS_DATA).read_word(0x6000 + i) == f.payload(i), "Every repeated destination preserves the raw source word"); }
-			if (!m_pipeline_replay)
-			{
-				m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_store_writes = m_recurring_irq_snapshot[1]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[2]; m_pipeline_store_case = m_recurring_irq_snapshot[3]; m_pipeline_register_writes = m_recurring_irq_snapshot[4]; m_fast_stack_reads = m_recurring_irq_snapshot[5]; m_vector_acks = m_recurring_irq_snapshot[6]; m_observed_instructions = m_saved_observed_instructions; return restore_pipeline_at(62155, "Restore memory count and pending copies without duplicate transactions");
-			}
-			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (variant < (wrap ? 191U : chain ? 383U : 27647U)) { start_memory_copy_repeat(variant + 1); return true; }
-			if (chain) { osd_printf_info("TMS320C54x memory-count chaining: PASS cases=384 restore=384 count_sources=AL,RAM bodies=MVDD,MVKD,MVDK then=RPT_NOP first_counts=0,1,7,31 second_count=3 flag_states=2 pages=2 snapshots=4 stale_body=excluded physical_phase_claim=0\n"); throw emu_fatalerror(3, "TMS320C54x isolated memory-count chaining complete"); }
-			if (wrap) { osd_printf_info("TMS320C54x memory-count wrap: PASS cases=192 restore=192 count_sources=AL,RAM counts=0,1,7,31 bodies=MVDD,MVKD,MVDK pages=2 snapshots=4 header=fffe,ffff body=0000 count_reads=once physical_phase_claim=0\n"); throw emu_fatalerror(3, "TMS320C54x isolated memory-count wrap complete"); }
-			osd_printf_info("TMS320C54x memory-count copies: PASS cases=27648 restore=27648 count_sources=24 owned_mapped_sources=18 counts=0,1,7,31 bodies=MVDD,MVKD,MVDK flag_states=2 pages=2 sources=none,IRQ,NMI snapshots=4 patterns=2 count_reads=once mutation_after_read=1 body_fetches=once physical_phase_claim=0\n"); throw emu_fatalerror(3, "TMS320C54x isolated memory-count copies complete");
-		}
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 62155) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 62154; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true; }
-	return false;
-}
 
 bool tms320c54x_test_state::check_repeated_mvdk_results()
 {

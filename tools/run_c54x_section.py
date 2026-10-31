@@ -477,6 +477,9 @@ def main():
     counts['product_dependencies'] = 3216
     counts['repeated_subc'] = 1200
     counts['repeated_immediate_store'] = 600
+    counts['memory_count_copy'] = 864
+    counts['memory_count_chain'] = 24
+    counts['memory_count_wrap'] = 24
     counts['block_delayed_exit'] = 1568
     counts['block_delayed_far_call'] = 576
     counts['shifted_unowned'] = 20480

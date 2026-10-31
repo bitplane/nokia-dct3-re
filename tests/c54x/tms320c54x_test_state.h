@@ -170,19 +170,6 @@ private:
 	static repeated_mvmd_fixture repeated_mvmd_case(unsigned v, bool zero = false);
 	void start_repeated_mvmd(unsigned variant = 0);
 	void start_repeated_mvdk(unsigned variant = 0);
-	struct memory_copy_repeat_fixture
-	{
-		unsigned form, count, body_kind, irq, snapshot, source_ar, destination_ar, sentinel_ar, pattern;
-		u16 address, mode, opcode, st0, st1, origin;
-		u32 base, body;
-		bool absolute, chain;
-		unsigned read_clock() const { return absolute ? 6 : 5; }
-		unsigned body_words() const { return body_kind ? 2 : 1; }
-		u16 payload(unsigned index) const { return pattern ? u16(~(0x9000 + index)) : u16(0x9000 + index); }
-	};
-	static memory_copy_repeat_fixture memory_copy_repeat_case(unsigned v, bool wrap = false, bool chain = false);
-	void set_repeat_count_source(u16 address, u16 value);
-	void start_memory_copy_repeat(unsigned variant = 0);
 	void start_repeat_mvdp(unsigned variant = 0);
 	void start_repeat_mvdp_irq(unsigned variant = 0);
 	static bool mvdd_source_owned(u16 address);
@@ -395,7 +382,6 @@ private:
 	bool check_mapped_dual_results();
 	bool check_repeat_mvdp_irq_results();
 	bool check_popd_mapped_results();
-	bool check_memory_copy_repeat_results();
 	bool check_repeated_mvdk_results();
 	bool check_rom4_fr_decoder_results();
 	bool check_rom4_codec_is_results();

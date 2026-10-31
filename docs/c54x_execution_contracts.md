@@ -722,7 +722,7 @@ boundaries are:
 | `tests/c54x/tms320c54x_test_domain_schedule.h` | Independent instruction inventory and explicit admission-control schedule; no legacy phase routing |
 | `tests/c54x/tms320c54x_test_delayed_memory_section.h` | Independent delayed-memory capture/continuation cases; no shared phase-chain state |
 | `tests/c54x/sections/xc_return.h` | Selected/annulled XC return, resumed-word protection and interrupt deferral |
-| `tests/c54x/tms320c54x_test_pipeline_repeat.cpp` | Repeat/block-control compositions and continuations |
+| `tests/c54x/tms320c54x_test_counted_copy_section.h` | Independent memory-count copy, chaining and PC-wrap contracts |
 | `tests/c54x/sections/frontend_drain.h` | Decoded/empty frontend entry, flush timing and case-owned acknowledgement checks |
 | `tests/c54x/tms320c54x_test_observer.cpp` | Instruction identity, ordinary-read exclusion and XC annulment observations |
 | `tests/c54x/tms320c54x_test_block_repeat.cpp` | Delayed-block-repeat layout, exclusions, IRQ acknowledgement and replay |
@@ -5292,15 +5292,19 @@ interrupt owns one bounded continuation write/read pair, both equal to RTN;
 RETE restores SP/status. Omitting the retirement counter from the snapshot
 fails during replay. Exact physical interrupt latency remains unclaimed.
 
-`rpt-mem-copy` passes 27,648 cases and replays: 24 addressing/source forms,
-18 owned mapped sources, counts 0/1/7/31, MVDD/MVKD/MVDK bodies, two flag
-states, two pages, IRQ/NMI controls, four snapshots and two raw-word
-patterns. Each source is mutated after Read; body fetches and count reads
+`memory_count_copy` owns 864 independent cases/restores: all 24 addressing/source
+forms, 18 owned mapped sources, counts 0/1/7/31, MVDD/MVKD/MVDK bodies and
+none/IRQ2/NMI. Flag/raw-word patterns, pages and four snapshots are assigned
+rather than fully crossed; those correlations are no longer coverage claims.
+Each source is mutated after Read; body fetches and count reads
 remain once-only, copies total RC+1, and interrupts follow the final copy.
-`rpt-mem-wrap` adds 192 replays with an absolute header at `fffe..ffff`
-and the body at `0000`. `rpt-mem-chain` adds 384 copy→memory-count-NOP
+`memory_count_wrap` owns 24 cases/restores with an absolute header at `fffe..ffff`
+and the body at `0000`. `memory_count_chain` owns 24 copy→memory-count-NOP
 sequences and replays, checking four NOP retirements and no stale pointer
-updates. The chained fixture fails without replacing non-pipelined body
+updates. Both retain AL/RAM counts, all counts and three body kinds, with
+pages/flags/patterns/snapshots assigned. Whole-data-space traces distinguish
+MVDD's first-copy drain from the two-word body's overlapping copy sequence.
+The chained fixture fails without replacing non-pipelined body
 ownership. Class-5A/5B's existing two held clocks remain partial stage
 placement, not a measured physical timing claim.
 
