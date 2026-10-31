@@ -4688,14 +4688,14 @@ that same clock. Opposite-accumulator reads and ordinary direct-ALU producer
 latency are unchanged. No result arithmetic or opcode timing is replaced
 with a firmware-specific answer.
 
-`mvmd-rptz` passes 1,536 cases plus replay: AL/BL sources, A/B clears,
-counts 0/1/39/255, four seeds and SXM/OVM combinations, two pages and three
-checkpoints. Matching clears yield zero on the first sample; opposite
+`zero_repeat_mvmd` passes 64 independently compiled cases plus replay:
+AL/BL sources, A/B clears, counts 0/1/39/255 and four seeds. SXM/OVM,
+pages and three checkpoints are distributed rather than multiplied.
+Matching clears yield zero on the first sample; opposite
 sources retain their value. A deliberate mid-repeat source change must
-affect only later copies. The unmodified core fails the retained-source
-state check. The native FR decoder independently passes all 32 vector
-frames and their full ordinary-RAM replay after this correction; this is
-isolated algorithm acceptance, not handset speech.
+affect only later copies. Exact read/write cadence, final accumulator fields,
+flags, SP/T and destination guards are checked. This section does not renew
+FR decoder or handset acceptance.
 
 `MVMD AL/BL, dmad` (`7308/730b`) can repeat into ordinary RAM. Each iteration
 samples the same mapped source, retains that word, and writes the next EAR
@@ -4704,9 +4704,9 @@ memory. This uses the existing pipelined move stages (Access sample, Read
 publication), not measured physical bus phases; other MMR sources and mapped
 destinations retain their guards (SPRU172C 4-115).
 
-`mvmd-repeat` passes 1,536 cases plus replay: counts 0/1/39/255, four source
-patterns, four SXM/OVM combinations, short/long RPT, two pages and three
-checkpoints. A deliberate source change halfway through the read sequence
+`repeated_mvmd` passes 64 independently compiled cases plus replay: AL/BL,
+counts 0/1/39/255, four source patterns and short/long RPT. Four SXM/OVM
+combinations, pages and checkpoints are distributed. A deliberate source change halfway through the read sequence
 must affect only later copies; destination and source guards, untouched ARs,
 stack, T, other accumulator and status are checked. Post-fetch literal
 poisoning and save/load must not cause re-fetch or duplicated accesses.

@@ -145,19 +145,6 @@ private:
 	};
 	rptbd_t_load_fixture rptbd_t_load_case(unsigned v) const;
 	void start_rptbd_t_load(unsigned variant = 0);
-	struct repeated_mvmd_fixture
-	{
-		unsigned count, source, snapshot, read_clock, clear_accumulator;
-		u16 value, seed, status, destination;
-		u32 base, literal;
-		bool long_header;
-		u16 sample(unsigned index) const { return index > count / 2 ? u16(~value) : value; }
-		u64 initial_accumulator() const { return 0x1234560000ULL | seed; }
-		u64 selected_after_clear() const { return clear_accumulator == unsigned(source == 0x0b) ? 0 : initial_accumulator(); }
-		u64 other_after_clear() const { return clear_accumulator == unsigned(source == 8) ? 0 : 0xfeabcd9876ULL; }
-	};
-	static repeated_mvmd_fixture repeated_mvmd_case(unsigned v, bool zero = false);
-	void start_repeated_mvmd(unsigned variant = 0);
 	void start_repeat_mvdp(unsigned variant = 0);
 	void start_repeat_mvdp_irq(unsigned variant = 0);
 	static bool mvdd_source_owned(u16 address);

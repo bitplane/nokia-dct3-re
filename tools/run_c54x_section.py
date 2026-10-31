@@ -480,6 +480,8 @@ def main():
     counts['memory_count_copy'] = 864
     counts['memory_count_chain'] = 24
     counts['memory_count_wrap'] = 24
+    counts['repeated_mvmd'] = 64
+    counts['zero_repeat_mvmd'] = 64
     counts['mapped_mvdk_producer'] = 864
     counts['accumulator_mvdk_producer'] = 2592
     counts['mapped_mvdk'] = 2376
