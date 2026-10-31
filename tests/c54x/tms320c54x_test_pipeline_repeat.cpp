@@ -243,75 +243,6 @@ void tms320c54x_test_state::start_move_repeat_owner(unsigned variant)
 	m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 }
 
-tms320c54x_test_state::block_near_call_fixture tms320c54x_test_state::block_near_call_case(unsigned v)
-{
-	block_near_call_fixture f{};
-	f.count = std::array<unsigned, 4>{0, 1, 5, 15}[v % 4]; v /= 4;
-	f.layout = v % 3; v /= 3; f.base = std::array<u32, 3>{0, 0x20000, 0x7f0000}[v % 3]; v /= 3;
-	f.depth = 1 + v % 2; v /= 2; f.interrupt = v % 3; v /= 3;
-	f.delayed_return = v % 2; v /= 2; f.delayed = v % 2; v /= 2;
-	f.checkpoint = std::array<unsigned, 4>{5, 8, 13, 25}[v];
-	f.call = f.layout == 0 ? 0x603 : f.layout == 1 ? (f.delayed ? 0x606 : 0x608) : 0x602;
-	f.end = f.layout == 2 ? f.call + (f.delayed ? 3 : 1) : 0x609;
-	f.st1 = f.interrupt ? 0x100 : 0x900;
-	return f;
-}
-
-void tms320c54x_test_state::start_block_near_call(unsigned variant)
-{
-	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-	m_observed_instructions.clear();
-	auto const f = block_near_call_case(variant); auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
-	for (unsigned i = 0; i < 32; ++i) { program.write_word(f.base + 0x600 + i, 0xf495); program.write_word(f.base + 0x700 + i, 0xf495); program.write_word(f.base + 0x800 + i, 0xf495); }
-	program.write_word(f.base + 0x600, 0xf072); program.write_word(f.base + 0x601, f.end);
-	if (f.layout != 2) program.write_word(f.base + 0x602, 0x6d94);
-	program.write_word(f.base + f.call, f.delayed ? 0xf274 : 0xf074); program.write_word(f.base + f.call + 1, 0x700);
-	if (f.delayed || f.layout == 0) program.write_word(f.base + f.call + 2, 0x6d95);
-	// A pending IRQ can legitimately wake an adjacent IDLE (SPRU131G
-	// 6.11.1). Check fallthrough once, then drain before parking.
-	program.write_word(f.base + f.end + 1, 0x6d91); program.write_word(f.base + f.end + 10, 0xf4e1);
-	program.write_word(f.base + 0x700, 0xe589);
-	if (f.depth == 2) { program.write_word(f.base + 0x701, 0xf074); program.write_word(f.base + 0x702, 0x800); }
-	unsigned const ret = f.depth == 2 ? 0x703 : 0x701;
-	program.write_word(f.base + ret, f.delayed_return ? 0xfe00 : 0xfc00);
-	if (f.delayed_return) program.write_word(f.base + ret + 1, 0x6d97);
-	program.write_word(f.base + 0x800, 0x6d96); program.write_word(f.base + 0x801, f.delayed_return ? 0xfe00 : 0xfc00);
-	if (f.delayed_return) program.write_word(f.base + 0x802, 0x6d97);
-	unsigned const vector = f.interrupt == 2 ? 4 : 0x48;
-	program.write_word(f.base | vector, 0xf495); program.write_word((f.base | vector) + 1, 0xf4eb);
-	for (unsigned i = 0; i < 16; ++i) { data.write_word(0x5000 + i, 0x9000 + i); data.write_word(0x6000 + i, 0); }
-	set_registers(*m_cpu, {
-		{cpu_regs::STATE_IDLE, 0}, {cpu_regs::STATE_ILLEGAL, 0}, {cpu_regs::STATE_PMST, 0},
-		{cpu_regs::STATE_TCR, 0x10}, {cpu_regs::STATE_IFR, 0}, {cpu_regs::STATE_IMR, f.interrupt == 1 ? 4 : 0},
-		{cpu_regs::STATE_ST0, 0xa608}, {cpu_regs::STATE_ST1, f.st1}, {cpu_regs::STATE_BRC, f.count},
-		{cpu_regs::STATE_A, 0x123456789aULL}, {cpu_regs::STATE_B, 0xfeabcd9876ULL}, {cpu_regs::STATE_T, 0x5555},
-		{cpu_regs::STATE_SP, 0x3000},
-	});
-	for (unsigned i = 0; i < 8; ++i) m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + i, i == 2 ? 0x5000 : i == 3 ? 0x6000 : 0x6c00 + 0x100 * i);
-	m_cpu->set_input_line(2, CLEAR_LINE); m_cpu->set_input_line(INPUT_LINE_NMI, CLEAR_LINE);
-	m_pipeline_operand_reads = m_pipeline_store_writes = m_pipeline_register_writes = m_fast_stack_reads = m_vector_acks = 0;
-	m_pipeline_operand_tap = data.install_read_tap(0, 0xffff, "block_near_call_read", [this, f](offs_t at, u16 &word, u16) {
-		if (machine().side_effects_disabled()) return;
-		if (at >= 0x2ff0 && at < 0x3000) { if (!f.interrupt && at == 0x2fff) expect(word == f.call + (f.delayed ? 4 : 2), "Near RET consumes the ordinary post-call continuation"); ++m_fast_stack_reads; expect(m_fast_stack_reads <= m_pipeline_register_writes, "Near RET consumes only committed frames"); return; }
-		unsigned const i = m_pipeline_operand_reads++;
-		if (i > f.count || at != 0x5000 + i || word != 0x9000 + i)
-		{
-			osd_printf_info("block_near_call_read: case=%u index=%u address=%04x value=%04x pc=%llx clock=%llu sp=%llx brc=%llx\n", m_pipeline_peripheral_case, i, unsigned(at), word, (unsigned long long)m_cpu->state_int(STATE_GENPC), (unsigned long long)m_cpu->pipeline_cycles(), (unsigned long long)m_cpu->state_int(tms320c54x_device::STATE_SP), (unsigned long long)m_cpu->state_int(tms320c54x_device::STATE_BRC));
-			for (auto const &entry : m_observed_instructions) osd_printf_info("block_near_call_retired: pc=%06x word=%04x\n", unsigned(entry.first), entry.second);
-		}
-		expect(i <= f.count && at == 0x5000 + i && word == 0x9000 + i, "Block near callee reads one ordered word per iteration");
-		if (!i && f.interrupt) m_cpu->set_input_line(f.interrupt == 2 ? INPUT_LINE_NMI : 2, ASSERT_LINE);
-	});
-	m_pipeline_write_tap = data.install_write_tap(0, 0xffff, "block_near_call_write", [this, f](offs_t at, u16 &word, u16) {
-		if (machine().side_effects_disabled()) return;
-		if (at >= 0x2ff0 && at < 0x3000) { if (!f.interrupt && at == 0x2fff) expect(word == f.call + (f.delayed ? 4 : 2), "Near CALL pushes the ordinary post-call continuation"); ++m_pipeline_register_writes; return; }
-		unsigned const i = m_pipeline_store_writes++; expect(i <= f.count && at == 0x6000 + i && word == 0x9000 + i, "Block near callee writes one ordered word per iteration");
-	});
-	m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 62150;
-	m_cpu->set_state_int(STATE_GENPC, f.base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-}
-
-
 tms320c54x_test_state::block_single_fixture tms320c54x_test_state::block_single_case(unsigned v) const
 {
 	block_single_fixture f{};
@@ -1062,34 +993,6 @@ bool tms320c54x_test_state::check_delay_dld_results()
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
 	}
 	if (m_phase == 255170) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 255160; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true; }
-	return false;
-}
-
-bool tms320c54x_test_state::check_block_near_call_results()
-{
-	if (m_phase == 62150)
-	{
-		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick; auto const f = block_near_call_case(variant);
-		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Near call preserves its caller block outside the loop address range");
-		capture_pipeline_at(f.checkpoint, {&m_pipeline_operand_reads, &m_pipeline_store_writes, &m_pipeline_register_writes, &m_fast_stack_reads, &m_vector_acks},
-			"Save block near call stack callee and return state");
-		if (tick == 1800)
-		{
-			unsigned const iterations = f.count + 1, stack = iterations * f.depth + unsigned(bool(f.interrupt));
-			if (m_pipeline_operand_reads != iterations || m_pipeline_store_writes != iterations || m_pipeline_register_writes != stack || m_fast_stack_reads != stack || m_cpu->state_int(STATE_GENPC) != f.base + f.end + 11)
-				osd_printf_info("block_near_call_effects: case=%u replay=%u pc=%llx reads=%u writes=%u stack_writes=%u stack_reads=%u expected_stack=%u brc=%llx st1=%llx ar4=%llx ar5=%llx ar6=%llx ar7=%llx\n", variant, unsigned(m_pipeline_replay), (unsigned long long)m_cpu->state_int(STATE_GENPC), m_pipeline_operand_reads, m_pipeline_store_writes, m_pipeline_register_writes, m_fast_stack_reads, stack, (unsigned long long)m_cpu->state_int(tms320c54x_device::STATE_BRC), (unsigned long long)m_cpu->state_int(tms320c54x_device::STATE_ST1), (unsigned long long)m_cpu->state_int(tms320c54x_device::STATE_AR4), (unsigned long long)m_cpu->state_int(tms320c54x_device::STATE_AR5), (unsigned long long)m_cpu->state_int(tms320c54x_device::STATE_AR6), (unsigned long long)m_cpu->state_int(tms320c54x_device::STATE_AR7));
-			expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_cpu->state_int(STATE_GENPC) == f.base + f.end + 11 && m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x3000 && m_cpu->state_int(tms320c54x_device::STATE_BRC) == 0 && m_cpu->state_int(tms320c54x_device::STATE_RSA) == 0x602 && m_cpu->state_int(tms320c54x_device::STATE_REA) == f.end && m_cpu->state_int(tms320c54x_device::STATE_ST1) == f.st1 && m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0xa608 && m_cpu->state_int(tms320c54x_device::STATE_AR1) == 0x6d01, "Near return completes the caller block and its single post-loop sentinel");
-			expect(m_pipeline_operand_reads == iterations && m_pipeline_store_writes == iterations && m_pipeline_register_writes == stack && m_fast_stack_reads == stack && m_vector_acks == unsigned(bool(f.interrupt)), "Block near calls balance every data stack and interrupt transaction");
-			expect(m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x5000 + iterations && m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x6000 + iterations && m_cpu->state_int(tms320c54x_device::STATE_AR4) == 0x7000 + (f.layout != 2 ? iterations : 0) && m_cpu->state_int(tms320c54x_device::STATE_AR5) == 0x7100 + (f.delayed || f.layout == 0 ? iterations : 0) && m_cpu->state_int(tms320c54x_device::STATE_AR6) == 0x7200 + (f.depth == 2 ? iterations : 0) && m_cpu->state_int(tms320c54x_device::STATE_AR7) == 0x7300 + (f.delayed_return ? f.depth * iterations : 0) && m_cpu->state_int(tms320c54x_device::STATE_A) == 0x123456789aULL && m_cpu->state_int(tms320c54x_device::STATE_B) == 0xfeabcd9876ULL && m_cpu->state_int(tms320c54x_device::STATE_T) == 0x5555, "Near call and return delays run once per caller iteration without register corruption");
-			if (replay_pipeline_at(62151, f.checkpoint,
-				"Restore block near call without duplicated memory or frames")) return true;
-			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (variant < 3455) { start_block_near_call(variant + 1); return true; }
-			osd_printf_info("TMS320C54x in-block near calls: PASS cases=3456 restore=3456 counts=0,1,5,15 layouts=middle,endpoint,whole_block pages=3 depths=1,2 sources=none,IRQ,NMI calls=CALL,CALLD returns=RET,RETD snapshots=4 ordered_copy=1 balanced_stack=1 physical_phase_claim=0\n"); throw emu_fatalerror(3, "TMS320C54x isolated in-block near calls complete");
-		}
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 62151) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 62150; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true; }
 	return false;
 }
 

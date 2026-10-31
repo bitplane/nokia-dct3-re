@@ -234,15 +234,6 @@ private:
 	static delay_load_fixture delay_dld_case(unsigned v);
 	static delay_load_fixture delay_add_case(unsigned v);
 	void start_delay_load(unsigned variant = 0);
-	struct block_near_call_fixture
-	{
-		unsigned count, layout, depth, interrupt, checkpoint;
-		u32 base;
-		u16 call, end, st1;
-		bool delayed, delayed_return;
-	};
-	static block_near_call_fixture block_near_call_case(unsigned v);
-	void start_block_near_call(unsigned variant = 0);
 	struct block_single_fixture
 	{
 		unsigned outer, inner, kind, checkpoint, total;
@@ -638,7 +629,6 @@ private:
 	bool check_block_branch_edge_results();
 	bool check_delay_dld_results();
 	bool check_memory_copy_repeat_results();
-	bool check_block_near_call_results();
 	bool check_repeated_mvdk_results();
 	bool check_block_exit_results();
 	bool check_rom4_fr_decoder_results();

@@ -123,7 +123,6 @@ void tms320c54x_test_state::machine_reset()
 		{ {"stm-ind", "stm-ind-edge"}, [](self &test) { test.start_indirect_stm(); } },
 		{ {"stm-low-ram"}, [](self &test) { test.start_indirect_stm(); } },
 		{ {"mvdk-repeat", "mvdk-index-rpt"}, [](self &test) { test.start_repeated_mvdk(); } },
-		{ {"rptb-call"}, [](self &test) { test.start_block_near_call(); } },
 		{ {"rpt-mem-copy", "rpt-mem-wrap", "rpt-mem-chain"}, [](self &test) { test.start_memory_copy_repeat(); } },
 	}))
 		return;
@@ -421,7 +420,7 @@ void tms320c54x_test_state::test(machine_config &config)
 	TMS320C54X(config, m_cpu, 13'000'000);
 	if (!strcmp(config.options().bios(), "instr-observer"))
 		m_cpu->instruction_observer_cb().set([this](offs_t address, u16 opcode) { m_instruction_observer.observed.emplace_back(address, opcode); });
-	else if (!strcmp(config.options().bios(), "rpt-smem") || !strcmp(config.options().bios(), "rpt-ld") || !strcmp(config.options().bios(), "rpt-sfta") || !strcmp(config.options().bios(), "rpt-ld-block") || !strcmp(config.options().bios(), "rptb-call") || !strcmp(config.options().bios(), "rpt-mem-chain") || !strcmp(config.options().bios(), "bd-rpt") || !strcmp(config.options().bios(), "retd-rpt") || !strcmp(config.options().bios(), "calld-rpt") || !strcmp(config.options().bios(), "bcd-rpt"))
+	else if (!strcmp(config.options().bios(), "rpt-smem") || !strcmp(config.options().bios(), "rpt-ld") || !strcmp(config.options().bios(), "rpt-sfta") || !strcmp(config.options().bios(), "rpt-ld-block") || !strcmp(config.options().bios(), "rpt-mem-chain") || !strcmp(config.options().bios(), "bd-rpt") || !strcmp(config.options().bios(), "retd-rpt") || !strcmp(config.options().bios(), "calld-rpt") || !strcmp(config.options().bios(), "bcd-rpt"))
 		m_cpu->instruction_observer_cb().set([this](offs_t address, u16 opcode) { m_observed_instructions.emplace_back(address, opcode); });
 	m_cpu->set_extended_program(true);
 	m_cpu->set_irq_acknowledge_callback([this](device_t &, int line) {
@@ -438,7 +437,6 @@ void tms320c54x_test_state::test(machine_config &config)
 			auto const f = rptbd_shift_store_case(m_pipeline_peripheral_case);
 			expect(f.irq && line == (f.irq == 2 || f.irq == 4 ? INPUT_LINE_NMI : 2) && !m_rptbd_counts.acks++ && m_rptbd_counts.delay_writes == 1 && m_cpu->pipeline_cycles() >= 9, "RPTBD shifted-store interrupt is acknowledged only after its complete delay publication"); m_cpu->set_input_line(line, CLEAR_LINE);
 		}
-		if (m_phase == 62150) { auto const f = block_near_call_case(m_pipeline_peripheral_case); expect(f.interrupt && line == (f.interrupt == 2 ? INPUT_LINE_NMI : 2) && !m_vector_acks && m_pipeline_operand_reads, "In-block near call acknowledges its actual pending interrupt once"); ++m_vector_acks; m_cpu->set_input_line(line, CLEAR_LINE); }
 		if (m_phase == 62154) { auto const f = memory_copy_repeat_case(m_pipeline_peripheral_case); expect(f.irq && line == (f.irq == 2 ? INPUT_LINE_NMI : 2) && !m_vector_acks && m_pipeline_store_writes == f.count + 1 && m_cpu->state_int(tms320c54x_device::STATE_RC) == 0, "Memory-count repeat defers its actual pending interrupt until all copies complete"); ++m_vector_acks; m_cpu->set_input_line(line, CLEAR_LINE); }
 		if (m_phase == 254360) { unsigned const interrupt = m_pipeline_peripheral_case / 4096; expect(interrupt && line == (interrupt == 2 ? INPUT_LINE_NMI : 2) && !m_vector_acks, "In-block branch interrupt acknowledges its actual pending source once"); ++m_vector_acks; m_cpu->set_input_line(line, CLEAR_LINE); }
 		if (m_phase == 254200) { auto const &f = m_popd_fixture; expect(f.irq && line == (f.irq == 2 ? INPUT_LINE_NMI : 0) && !m_vector_acks && m_pipeline_store_writes == f.count + 1 && m_cpu->pipeline_cycles() > f.read_clock() + f.count + 1, "POPD acknowledges IRQ/NMI only after the last repeat iteration retires"); ++m_vector_acks; }

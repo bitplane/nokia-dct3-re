@@ -5168,14 +5168,19 @@ prediction without changing the ordinary one-word return frame: CALL pushes
 PC+2, CALLD PC+4 (TI SPRU172C page 4-27). The existing 16-bit repeat-end
 comparator, including its cross-page hazard, is unchanged.
 
-`rptb-call` passes 3,456 cases and save-state replays: BRC 0/1/5/15,
+`block_near_call` owns 864 independent cases and save-state replays: BRC 0/1/5/15,
 middle/endpoint/whole-block calls, pages 0/2/127, one/two call depths,
-IRQ/NMI controls, CALL/CALLD, RET/RETD and four save points. Ordered data
-copies, frame balance, exact ordinary return addresses, delay effects,
+IRQ/NMI controls, CALL/CALLD and RET/RETD. Four save points are distributed
+instead of multiplying every semantic case by four. Ordered data
+copies, exact interleaved stack transactions and ordinary return addresses, delay effects,
 final BRC/BRAF and a once-only post-loop sentinel are checked. The final
 parking IDLE follows interrupt-drain space: a pending IRQ legitimately
 wakes an adjacent IDLE (SPRU131G section 6.11.1), so that cannot itself
 prove a failed return. Physical phase timing is not a silicon measurement.
+The staged implementation's one-depth whole-block RETD defers pending
+interrupt entry: CALL reaches the next iteration's callee Read, while CALLD
+drains the block first. IACK and the pending copy Write are checked separately;
+the interrupt frame is bounded and must equal live RTN on both write and pop.
 
 ## Memory-sourced repeat counts
 
