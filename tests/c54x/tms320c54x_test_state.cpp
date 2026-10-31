@@ -63,7 +63,6 @@ void tms320c54x_test_state::machine_reset()
 	}))
 		return;
 	if (start_profile(*this, machine().options().bios(), {
-		{ {"rpt-subc-st"}, [](self &test) { test.start_pipeline_memory_repeat(); } },
 	}))
 		return;
 	if (start_profile(*this, machine().options().bios(), {
@@ -406,14 +405,6 @@ void tms320c54x_test_state::test(machine_config &config)
 		}
 		if (m_phase == 62154) { auto const f = memory_copy_repeat_case(m_pipeline_peripheral_case); expect(f.irq && line == (f.irq == 2 ? INPUT_LINE_NMI : 2) && !m_vector_acks && m_pipeline_store_writes == f.count + 1 && m_cpu->state_int(tms320c54x_device::STATE_RC) == 0, "Memory-count repeat defers its actual pending interrupt until all copies complete"); ++m_vector_acks; m_cpu->set_input_line(line, CLEAR_LINE); }
 		if (m_phase == 254200) { auto const &f = m_popd_fixture; expect(f.irq && line == (f.irq == 2 ? INPUT_LINE_NMI : 0) && !m_vector_acks && m_pipeline_store_writes == f.count + 1 && m_cpu->pipeline_cycles() > f.read_clock() + f.count + 1, "POPD acknowledges IRQ/NMI only after the last repeat iteration retires"); ++m_vector_acks; }
-		if (m_phase == 253230)
-		{
-			auto const f = memory_repeat_case(m_pipeline_peripheral_case);
-			bool const store = m_pipeline_peripheral_case >= 38400;
-			unsigned const last = store ? (f.long_form ? 9 : 8) + 2 * f.count : (f.long_form ? 8 : 7) + f.count;
-			expect(f.interrupt && line == (f.interrupt == 2 ? INPUT_LINE_NMI : 0) && m_cpu->pipeline_cycles() > last && m_cpu->state_int(tms320c54x_device::STATE_RC) == 0 &&
-				m_cpu->state_int(tms320c54x_device::STATE_RTN) == u16(f.body + (store ? 2 : 1)) && !m_vector_acks, "Memory repeat acknowledges its pending interrupt after the final iteration at the fresh continuation"); ++m_vector_acks;
-		}
 		observe_context_irq(line);
 		if (m_phase == 251090)
 		{

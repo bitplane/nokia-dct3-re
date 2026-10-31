@@ -70,17 +70,6 @@ private:
 		u16 bk;
 	};
 	static extended_banz_fixture extended_banz_case(unsigned variant);
-	struct memory_repeat_fixture
-	{
-		bool long_form, destination;
-		unsigned count, interrupt, flags, form, pattern;
-		u32 base, body;
-		u16 opcode, divisor;
-		u64 dividend;
-	};
-	static memory_repeat_fixture memory_repeat_case(unsigned variant);
-	static std::array<u64, 2> repeat_subc_result(memory_repeat_fixture const &f, unsigned iterations);
-	void start_pipeline_memory_repeat(unsigned variant = 0);
 	void start_long_mapped_original(unsigned variant = 0);
 
 
@@ -399,7 +388,6 @@ private:
 	bool check_instruction_observer_results();
 	bool check_mvdd_source_results();
 	bool check_rptbd_t_load_results();
-	bool check_memory_repeat_results();
 	bool check_mvdk_producer_results();
 	bool check_mvdk_mapped_results();
 	bool check_long_mapped_original_results();

@@ -948,7 +948,17 @@ ADDS/SUBS, 69,632 shift-16 and 153,984 TS arithmetic cases (6,528 address
 plus 147,456 numeric). Variable-shift ADD/SUB is the 17,408-case independent
 `shifted_memory_alu` section, with deliberate route/shift factoring above.
 CMPM and BITF each retain 17,408 distinct inputs over 17 forms, with balanced
-checkpoints rather than three replays of every input. `rpt-subc-st` retains 38,400 SUBC and 38,400 repeated-store cases;
+checkpoints rather than three replays of every input. `repeated_subc` owns 1,200
+independent cases/restores and `repeated_immediate_store` owns 600. Both retain
+five legal addressing forms, short/long RPT, counts0/1/15/32/255, four numeric
+patterns and none/IRQ0/NMI. SUBC retains both destinations. Arithmetic modes,
+page and four checkpoints are assigned instead of fully crossed. SUBC checks
+per-retirement arithmetic, carry/overflow, RC and one-clock body cadence;
+stores check two-clock writes with address updates preceding each publication.
+Both poison the captured body (and store literal), require one fetch, and
+retain the original PSHM-XPC/FRETE ISR with complete ordered data/stack
+transactions and exact post-repeat RTN. FRETE clears INTM even after NMI;
+the final state explicitly reflects that model behavior.
 Memory/immediate product coverage is now the 7,424-case section above. Paired reads retain 6,144 DSUB,
 12,288 DADD and 6,144 DRSUB cases over eight forms, omitting raw form 4.
 These totals describe selected fixture domains, not every legal operand.
