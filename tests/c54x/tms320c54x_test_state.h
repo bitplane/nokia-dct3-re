@@ -85,16 +85,6 @@ private:
 		std::array<u16, 8> initial;
 	};
 	static indexed_store_fixture circular_load_case(unsigned v);
-	struct mapped_dual_fixture
-	{
-		u32 base;
-		u16 opcode, xaddress, yaddress, xword, yword, st0, st1, result_st0, bk, imr = 0, ifr = 0;
-		unsigned checkpoint, destination;
-		u64 a, b, result;
-		std::array<u16, 8> initial, final;
-	};
-	static mapped_dual_fixture mapped_dual_case(unsigned variant, bool edge, bool interrupt_registers = false, bool low_bus = false);
-	void start_mapped_dual(unsigned variant = 0);
 	struct circular_move_fixture
 	{
 		indexed_store_fixture memory;
@@ -285,7 +275,6 @@ private:
 	bool check_rptbd_t_load_results();
 	bool check_long_mapped_original_results();
 	bool check_staged_conditional_store_results();
-	bool check_mapped_dual_results();
 	bool check_circular_move_results();
 	bool check_rom4_fr_decoder_results();
 	bool check_rom4_codec_is_results();

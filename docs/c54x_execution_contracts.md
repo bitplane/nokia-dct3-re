@@ -3819,13 +3819,14 @@ or peripheral identity is introduced for those unowned words. ST0/ST1 and
 other low control/peripheral sources remain guarded, as do low sources for
 multiply/MAC/SQDST.
 
-`alu-map-irq` passes 18,432 cases and cleared-pipeline replays over IMR/IFR,
+`interrupt_dual_alu` passes 384 independent cases and cleared-pipeline replays over IMR/IFR,
 X/Y/both placements, eight selector pairs, ADD/SUB, both accumulators,
-SXM/OVM, BK=0/32, two patterns, two pages and three checkpoints. Reads leave
+and BK=0/32. SXM/OVM, two payloads, pages and checkpoints are distributed
+rather than multiplied across every address/selector case. Reads leave
 IMR/IFR intact. Post-Read poisoning changes both registers to a disjoint
 mask/pending pair, avoiding an unrelated IDLE wake, while Execute must use
 the retained operands. This does not qualify concurrent interrupt arrival.
-`alu-low-bus` passes 36,864 corresponding cases over all four unowned words,
+`low_bus_dual_alu` passes 768 corresponding cases over all four unowned words,
 with mutable board-map values and post-Read poisoning. Address modifiers and
 alias priority retain the existing dual-operand model; physical bus phases
 and producer/control hazards remain unvalidated.
@@ -3992,16 +3993,18 @@ carry and sticky-overflow arithmetic. A source that is also an updated AR
 therefore observes that update in this model. Multiply/MAC and SQDST mapped
 operands remain separately guarded.
 
-`alu-map` passes 147,456 cases plus cleared-pipeline replay: sixteen mapped
+`mapped_dual_alu` passes 3,072 independent cases plus cleared-pipeline replay: sixteen mapped
 addresses, X/Y/both lane placements, eight selector pairs (including aliases),
-ADD/SUB, both accumulators, SXM/OVM, BK=0/32, two value patterns, two pages and
-three checkpoints. The BK=32 fixtures use valid circular pointer geometry and
+ADD/SUB, both accumulators and BK=0/32. SXM/OVM, two value patterns, pages and
+three checkpoints are distributed. The BK=32 fixtures use valid circular pointer geometry and
 include wrap; BK=0 retains the declared linear behavior. Post-Read poisoning
 of mapped or RAM sources cannot change the result or cause another pointer
 update. Carry/overflow, unselected accumulator lanes, T/TRN and all ARs are
-checked independently. `alu-map-edge` passes 3,552 cases plus replay over
+checked independently. `mapped_dual_rejections` passes 888 cases plus replay over
 74 unqualified low/control/peripheral addresses, with no reads, writes
-or address updates. The prior arithmetic negative fixture now uses unowned
+or address updates, checking before and at Access rejection. The legacy
+factory/setup/checker/routes are removed. A wrong output bit fails the
+replacement's first case. The prior arithmetic negative fixture uses unowned
 ST0 rather than newly admitted T; multiply/square negatives are unchanged.
 
 This qualifies the declared operand-age/register/arithmetic model, not

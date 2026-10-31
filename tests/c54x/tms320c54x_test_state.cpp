@@ -69,7 +69,6 @@ void tms320c54x_test_state::machine_reset()
 	if (profile_is("cond-store") || profile_is("cond-store-edge")) { start_staged_conditional_store(); return; }
 	if (profile_is("cond-store-ar")) { start_staged_conditional_store(); return; }
 	if (start_profile(*this, machine().options().bios(), {
-		{ {"alu-map", "alu-map-edge", "alu-map-irq", "alu-low-bus"}, [](self &test) { test.start_mapped_dual(); } },
 		{ {"popd-ram"}, [](self &test) { test.start_pipeline_data_pop(); } },
 	}))
 		return;
