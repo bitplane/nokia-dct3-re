@@ -54,8 +54,11 @@ def main():
     parser.add_argument('--list', action='store_true', help='list sections and expected counts without building')
     parser.add_argument('--scope', choices=('cpu', 'firmware', 'all'), default='cpu', help='scope for --list or all; private/copied firmware is opt-in')
     parser.add_argument('--jobs', type=int, default=8)
+    parser.add_argument('--build-only', action='store_true', help='prepare and compile the selected section without executing it')
     parser.add_argument('--negative-control', action='store_true', help='require failure of an intentionally wrong expectation')
     args = parser.parse_args()
+    if args.build_only and args.negative_control:
+        parser.error('--negative-control must execute the section')
     selected = [name for name, item in sections.items() if args.scope == 'all' or item['scope'] == args.scope]
     if args.list:
         print(json.dumps({name: dict(cases=counts[name], source=str(sections[name]['source'].relative_to(ROOT)), scope=sections[name]['scope']) for name in selected}, indent=2))
@@ -63,6 +66,8 @@ def main():
     if args.section is None:
         parser.error('select a section, all, or --list')
     if args.section == 'all':
+        if args.build_only:
+            parser.error('--build-only requires one section')
         if args.negative_control:
             parser.error('select one section for the negative control')
         for section in selected:
@@ -106,6 +111,11 @@ def main():
         print('\n'.join((output / 'build.log').read_text().splitlines()[-30:]), file=sys.stderr)
         raise SystemExit('section build failed')
     built = time.monotonic()
+    if args.build_only:
+        result = dict(section=args.section, build_seconds=round(built-start,3), executed=False)
+        (output / 'timing.json').write_text(json.dumps(result, indent=2) + '\n')
+        print(json.dumps(result))
+        return
     command = [str(ROOT / 'mame/c54xisa'), 'tms54isa', '-video', 'none', '-sound', 'none',
                '-joystickprovider', 'none', '-midiprovider', 'none', '-nothrottle',
                '-noreadconfig', '-seconds_to_run', '1']

@@ -90,7 +90,8 @@ DRIVER_COMPONENTS := $(filter-out driver/nokia_dct3_trace_config.h,$(wildcard dr
 	driver/nokia_sim_card.cpp driver/nokia_sim_card.h \
 	driver/nokia_uif.cpp driver/nokia_uif.h \
 	driver/nokia_dct3_trace.inc
-C54X_TEST_COMPONENTS := $(wildcard tests/c54x/tms320c54x_test*.cpp tests/c54x/tms320c54x_test*.h tests/firmware/tms320c54x_test*.cpp)
+C54X_TEST_COMPONENTS := $(wildcard tests/c54x/tms320c54x_test*.cpp tests/c54x/tms320c54x_test*.h tests/firmware/tms320c54x_test*.cpp tests/firmware/tms320c54x_test*.h)
+C54X_SECTION ?= instruction_examples
 empty :=
 space := $(empty) $(empty)
 comma := ,
@@ -823,8 +824,8 @@ build: overlay roms
 	$(MAKE) -C $(MAME_DIR) REGENIE=1 SOURCES=$(BUILD_MAME_SOURCES) USE_QTDEBUG=0 -j$(JOBS)
 
 .PHONY: build-handsets build-conformance build-c54x-isa
-build-c54x-isa: overlay
-	$(MAKE) -C $(MAME_DIR) REGENIE=1 SUBTARGET=c54xisa SOURCES=src/mame/nokia/tms320c54x_test_isa.cpp USE_QTDEBUG=0 -j$(JOBS)
+build-c54x-isa:
+	python3 tools/run_c54x_section.py $(C54X_SECTION) --build-only --jobs $(JOBS)
 
 build-handsets:
 	$(MAKE) --no-print-directory build DCT3_TEST_DRIVERS=0 DCT3_RESEARCH_TRACES=0

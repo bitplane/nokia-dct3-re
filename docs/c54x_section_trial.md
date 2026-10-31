@@ -12,9 +12,16 @@ files, duplicate names and missing/ambiguous paths fail before any build.
 Do not run either complete scope until final integration is ready.
 The command replaces the **isolated
 c54xisa overlay** with a one-source runner and the selected section only;
-it does not change CPU implementation sources. `make build-c54x-isa` restores
-the ordinary overlay when the migration is integrated. Logs and measured
+it does not change CPU implementation sources. `make build-c54x-isa
+C54X_SECTION=NAME` builds that same isolated replacement without executing it
+(default: `instruction_examples`); it does not restore the retired harness.
+Logs and measured
 build/run times are in ignored `tmp/c54x-section-trial/SECTION/`.
+
+The retired fixture-ownership source test is removed: it asserted member names
+and phase handoffs in deleted legacy modules, not CPU behavior. Section replay
+and bus-event checks replace those execution contracts; the catalogue checks
+source registration, not internal C++ naming.
 
 | Pass | Replacement | Retired source | Validation |
 | --- | --- | --- | --- |
