@@ -2,82 +2,55 @@
 
 ## Authority and scope
 
-This is the processor-validation reference, separate from handset bring-up
-and loader ownership. The core implementation lives in
-`cpu/tms320c54x/`; executable acceptance lives in
-the compiled `tests/c54x/` modules, original-ROM fixtures under
-`tests/firmware/`, and
-`tools/run_c54x_core.py`.
-The [default-suite checkpoint](#core-regression-checkpoint) identifies the last
-fully qualified default run by executable and source hashes. A later focused
-fixture run does not silently renew that checkpoint. Other sections retain their explicitly bounded
-instruction, composition, original-firmware and negative-control scopes;
-their older executable hashes are not competing default-suite baselines.
-Passing CPU tests does not establish physical pipeline timing, a fitted
-handset DSP mask, RF acquisition or end-to-end speech.
+The implementation lives in `cpu/tms320c54x/`. Current generic acceptance
+uses `tests/c54x/sections/` and `tools/run_c54x_section.py`.
+`fixtures/c54x_sections.json` owns section registration and expected counts;
+the [disposition table](c54x_section_trial.md) owns replacement decisions,
+deliberate coverage reductions and validation limits.
 
-Supporting application maps are separate: [ROM4 execution](rom4_dsp_execution.md),
+Copied/acquired firmware integrations live in `tests/firmware/`.
+`tools/run_c54x_core.py` selects only `rom4-context` and `cold-pipeline`;
+codec and handset runners retain separate acceptance contracts.
+The retired generic BIOS profiles and phase-chain checkpoints are not current
+execution interfaces or renewed acceptance evidence. Complete replacement-suite,
+firmware and handset validation must be established independently.
+
+Passing CPU tests does not establish physical pipeline timing, a fitted handset
+DSP mask, RF acquisition or end-to-end speech. Supporting application maps are
+[ROM4 execution](rom4_dsp_execution.md),
 [original-code arithmetic](c54x_arithmetic_observations.md) and
-[MU4 CPU composition](c54x_mu4_observations.md). They retain bounded operand,
-bus and negative-control observations without creating another default-suite
-baseline.
+[MU4 CPU composition](c54x_mu4_observations.md).
 
 The external observation-only ROM4 opcode inventory contains 628 distinct
 words in 112 high-byte groups after 30 million MCU instructions; sorted-set
 SHA-256 is `63ae45c872ccea39112898bfde7f5926acd675701675a860d765a66a35815d34`.
-`tools/c54x_opcode_coverage.py` retains this reference. It measures reachability,
-not correctness or current core coverage; imported interrupt masks can change
-reachability without establishing a legitimate hardware reset state. The
-loader document owns that mask-provenance contract.
+`tools/c54x_opcode_coverage.py` retains this reachability reference, not a
+correctness or current CPU-coverage claim. Imported interrupt masks can change
+reachability without establishing a legitimate hardware reset state; the loader
+document owns that provenance contract.
 
-### Harness preservation contract
+### Harness contract
 
-`fixtures/c54x_conformance_baseline.json` freezes the declared BIOS inventory,
-the isolated runner profiles, seven named scopes, default-suite result
-requirements, fixture PASS formats and reviewed case identities. Lexical
-assertion counts are footprint metrics, not coverage requirements. Exact result
-strings retain case/restore counts and scope exclusions. Check it with:
+Each section owns explicit setup, independently justified expectations and
+replay. Shared helpers load memory, observe buses and serialize state; they do
+not call CPU implementation helpers to derive expected results.
+Registration/count checks cannot establish behavior.
 
-```sh
-.venv/bin/python tools/c54x_harness_inventory.py
-.venv/bin/python -m unittest tools.test_c54x_harness_inventory
-```
+The generic runner has no legacy phase router. A case that starts after IDLE
+must explicitly establish runnable state; changing PC alone does not clear
+the IDLE latch. Bus observations and their replay cursors must remain consistent
+across checkpoints, including captured reads and pending writes.
 
-Family retention/rewrite/merge/relocation/deletion decisions live in
-`fixtures/c54x_test_reviews.json`. The CPU-only bench builds without Nokia
-devices or private firmware; legacy default continuations can reuse reviewed
-case data without making the entire sequenced bench generic.
+The `disassembly` section runs 44 syntax/length/page/stepping result families.
+Its single IDLE case validates runner lifecycle, not instruction execution
+coverage for those disassembler families.
 
-Legacy phase numbers are not globally unique. The branch/store profile
-explicitly selects its result owner before execution; local continuations
-must not enter another family's checker. Long T/TRN stores instead use the CPU-only clocked runner, without
-global phase routing. An owned continuation that is not recognized is
-a harness error, not a reason to try another fixture. The owner is host routing
-metadata, unchanged by guest snapshot replay and reset on machine reset.
-
-A shared runner can finish in architectural IDLE. A legacy successor must
-establish its runnable entry state explicitly; changing PC does not clear
-the previous fixture's IDLE latch.
-
-`isa-disasm` separately runs the debugger contract against the paged C54x
-disassembler in the CPU-only executable. It shares the legacy suite's 39 literal
-banks (360 rows), generated encoding/extension sweeps and 44 result families.
-Family IDs distinguish debugger syntax, length, page wrapping and stepping from
-instruction execution; they are not a count of instruction encodings. A common
-literal checker preserves each bank's original PC set and optional exact-read
-mask, while the generated predicates remain unchanged. No case is retired.
-
-Timed replay uses one `restore_pipeline_at` tail: cancel the observer before
-loading the stream, reject load failure, suspend the CPU, publish its fixed
-continuation and enable the observer. Simple tick-based fixtures can name their
-unsigned host counters once with `capture_pipeline_at`; `replay_pipeline_at`
-rewinds the tick and those counters before the same restore tail. Spare observer
-slots are zero-filled, matching explicit array capture. Bindings stay outside
-the guest save stream. Fixtures with additional reset, input-line or mixed-state
-work retain their explicit ordering, checkpoints and resume callbacks. Untimed
-restoration and post-load assertions remain separate. Executable stub tests
-check the real helpers' success and failure paths; their use does not qualify
-the instruction cases that call them.
+Firmware-local timed replay cancels the observer before loading the stream,
+rejects load failure, suspends the CPU, publishes its continuation and enables
+the observer. Callers explicitly rewind host observations. The executable
+firmware helper test checks scheduling/failure ordering, not CPU snapshot
+correctness. Removed counted-checkpoint and atomic-restart helpers are not
+current firmware interfaces.
 
 The clocked case runner can also own a complete ordered data-bus trace
 (direction, address, value and CPU pipeline cycle). Its host event cursor is
@@ -3182,72 +3155,18 @@ legal controls remain in `logic-absolute`, `add-absolute`, `arith-ar` and
 `long_pair_arithmetic`, which includes the positive DADD/DSUB/DRSUB contracts.
 Repeat/interrupt composition and physical timing remain separate scopes.
 
-## Core regression checkpoint
+## Retained-suite acceptance
 
-The latest full-default capture is the `default_checkpoint` under
-`explicit-one-clock-observer-restarts` in `fixtures/c54x_test_reviews.json`.
-All 273 required markers occur exactly once, with 279 ordered native PASS
-records, intentional MAME exit 3 and runner exit 0. Elapsed time is approximately
-874 seconds from console timestamps; the changed cohort is not a controlled
-speed comparison. The record binds the executable, acceptance sources and
-exact bench patch over `d2c92523`. No CPU/device production source changed.
+`make check-c54x-core` executes the complete generic section catalogue,
+sequentially. `tmp/c54x-section-trial/cpu-summary.json` records only successful
+children and leaves `complete=false` on failure/interruption. The retired
+default-chain captures do not qualify the replacement suite.
 
-The 279 retained PASS records match the preceding checkpoint in order and
-content after eight explicitly reviewed removals or scope moves. No previously
-asserted opcode word is lost: the 5,692-word inventory adds atomic ROLTC A/B
-and first asserts four MIN/MAX words earlier through the new literal witnesses.
-The full host suite and both 3210 v6.00/v5.01 Phone book menu gates also pass.
-
-This qualifies the default and the named focused scopes in that record, not
-all 395 isolated profiles, every fixture input, physical timing or complete
-chip conformance. The full retained-isolated regression remains outstanding.
-
-`fixtures/c54x_fidelity_checkpoint.json` remains an immutable historical
-capture: 294 then-required markers, 295 native PASS records and 1,058.73 seconds.
-Its source hashes and 5,690-word asserted-opcode inventory apply to that
-revision, not the current bench. The separate ROM-free admission census
-retains its own capture.
-
-```sh
-python3 tools/run_c54x_core.py --mame mame/mame --rompath mame/roms \
-  --output-root tmp/c54x-core-checkpoint
-```
-
-This qualifies the default regression, not every isolated profile, the complete
-ISA, physical pipeline timing, fitted DSP-mask compatibility, native RF or
-end-to-end handset speech/calls. Later source/device changes do not silently
-renew this checkpoint. Earlier revision-bound controls below preserve their
-narrower results, not competing current default-suite baselines.
-
-Focused isolated-profile and handset runs retain their own scopes; this
-default run is not their renewal. The full retained isolated-profile regression
-and final handset acceptance for the family-by-family audit remain outstanding.
-
-The historical `c54x_modularization_checkpoint.json` separately records seven named core scopes, representative
-arithmetic, interrupt and restore profiles, and ROM4 CRC/FR decoder controls on
-both frontends. The board extraction preserves all 271 compiled machine/device
-XML records and passes eight handset gates: default and frontier 3210, v5.01
-menu, 3310/3330/3410/5210 frontiers and the native standard-SWWSR 5110 menu.
-That 5110 composition also passes its complete handset save-state gate.
-Seven native PCM cases cover external frame clocks, wire delivery, pin-clocked
-loopback and active save/load. These are preservation checks, not production
-clock, native RF or call-media acceptance.
-
-Separate revision-bound controls retain their narrower evidence: the
-pre-modularization EFR decoder passed both frontends with 163 frames,
-26,080 reference-exact PCM samples and 65,440 ordinary RAM words replayed per
-frame; its staged NSE-1 Phone book menu was exact. The scalar-arithmetic
-checkpoint passed the reset-bank6150 laboratory clocked-tone gate in
-`tmp/nsm1-post-arithmetic-native-tone`, preserving cold-input, storage, SIM,
-pixel and waveform checks. These additional runs are not silently renewed by
-the modularization checkpoint.
-
-The cold-catalogue checkpoint adds no CPU instruction admissions. Its staged
-`bootopenstage` gate passes with the saved recorder endpoint and rejects the
-original no-track seed after successful transport. The existing atomic
-`bootstatus` control retains its exact 11 RX/14 TX exchange. Tooling acceptance
-is 2,879 tests (one skip); earlier CPU instruction scopes below are not
-implicitly renewed by these MU4 fixture runs.
+Final native CPU regression, linked firmware integration and affected handset
+acceptance remain required. The current C54x-related host tests pass 438 checks
+in the project virtualenv; mocked runners and helper tests do not renew native
+acceptance. Firmware code and copied programs remain separate from generic
+CPU acceptance, including codec, RF and handset claims.
 
 `instruction_observer` passes 24 independent cases and save/replays covering
 repeat/XC1/XC2, atomic/staged frontends, two logical pages and OVLY clear/set.
