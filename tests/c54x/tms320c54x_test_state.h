@@ -41,7 +41,6 @@ private:
 
 	void xf_w(int state);
 	bool m_xf_pin = true;
-	void check_control_disassembler();
 	void start_pipeline_mu4_prologue(unsigned variant = 0);
 	void observe_context_irq(int line);
 	bool check_rom4_context_results();
