@@ -194,20 +194,6 @@ private:
 	static memory_copy_repeat_fixture memory_copy_repeat_case(unsigned v, bool wrap = false, bool chain = false);
 	void set_repeat_count_source(u16 address, u16 value);
 	void start_memory_copy_repeat(unsigned variant = 0);
-	struct register_product_fixture
-	{
-		u16 opcode, t, st0, st1, pmst;
-		u64 a, b;
-		u32 base;
-		unsigned mode, checkpoint;
-		bool smem = false, mapped_t = false;
-		bool poly = false, immediate = false;
-		unsigned length = 1;
-	};
-	static register_product_fixture register_product_case(unsigned variant);
-	static u16 product_input_t(register_product_fixture const &f);
-	static std::array<u64,3> register_product_reference(register_product_fixture const &f);
-	void start_register_product(unsigned variant = 0);
 	void start_repeat_mvdp(unsigned variant = 0);
 	void start_repeat_mvdp_irq(unsigned variant = 0);
 	static bool mvdd_source_owned(u16 address);
@@ -420,7 +406,6 @@ private:
 	bool check_staged_conditional_store_results();
 	bool check_mapped_dual_results();
 	bool check_repeat_mvdp_irq_results();
-	bool check_register_product_results();
 	bool check_popd_mapped_results();
 	bool check_memory_copy_repeat_results();
 	bool check_repeated_mvdk_results();

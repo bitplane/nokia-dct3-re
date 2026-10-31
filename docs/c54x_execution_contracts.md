@@ -715,7 +715,7 @@ boundaries are:
 | `tests/c54x/tms320c54x_test_memory_examples.h` | Ordered literal memory arithmetic/multiply/T examples, with original partial setup and assertion masks |
 | `tests/c54x/tms320c54x_test_domains.h` | Independent single-memory admission fixture: catalogue, preserved state, bus observers and replay |
 | `tests/c54x/tms320c54x_test_dispatch.cpp` | Ordered callback routing and the initial-program completion tail |
-| `tests/c54x/tms320c54x_test_arithmetic.cpp` | Arithmetic, multiplier and logical-operation fixtures and checks |
+| `tests/c54x/sections/product_dependencies.h` | Independent product operand/producer dependency cases; numeric product owners remain separate |
 | `tests/c54x/tms320c54x_test_addressing.cpp` | Address generation and memory/register transfers, including the stack-transfer continuation |
 | `tests/c54x/tms320c54x_test_domains.h` | CPU-only admission fixture with owned progress, observations, taps and snapshots |
 | `tests/c54x/tms320c54x_test_register_unary.h` | Independent register-logic, shift, NEG/ABS inputs, balanced replay keys and explicit clocked observations |

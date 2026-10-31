@@ -474,6 +474,7 @@ def main():
     counts['delayed_square_accumulate'] = 576
     counts['delayed_memory_square'] = 288
     counts['delayed_long_accumulator'] = 768
+    counts['product_dependencies'] = 3216
     counts['block_delayed_exit'] = 1568
     counts['block_delayed_far_call'] = 576
     counts['shifted_unowned'] = 20480

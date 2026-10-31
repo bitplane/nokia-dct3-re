@@ -7,6 +7,22 @@
 
 namespace c54x_test {
 
+std::array<u64, 2> tms320c54x_test_state::repeat_subc_result(memory_repeat_fixture const &f, unsigned iterations)
+{
+	u64 accumulator = f.dividend; u16 flags = 0x1804;
+	for (unsigned i = 0; i < iterations; ++i)
+	{
+		s64 const dividend = BIT(accumulator, 39) ? s64(accumulator) - (s64(1) << 40) : s64(accumulator);
+		s64 const divisor = f.flags & 1 ? s16(f.divisor) : s64(f.divisor);
+		s64 const difference = dividend - divisor * 32768;
+		bool const subtract = difference >= 0;
+		flags = (flags & ~0x800) | (subtract ? 0x800 : 0);
+		if (difference < -2147483648LL || difference > 2147483647LL) flags |= f.destination ? 0x200 : 0x400;
+		accumulator = u64(subtract ? difference * 2 + 1 : dividend * 2) & 0xffffffffffULL;
+	}
+	return {accumulator, flags};
+}
+
 
 
 
