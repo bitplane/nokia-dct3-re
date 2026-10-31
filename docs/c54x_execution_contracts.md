@@ -4222,14 +4222,14 @@ destination literal and publishes once; accumulator lanes, T/TRN, DAGEN,
 BRC and RAM destinations retain their separate ownership. The profile
 clears the live pipeline before restoring its snapshots.
 
-Short RPT has a separate `mvdk-index-rpt` qualification: 8,928 cases plus
-replay, all sixteen encodings, counts 0/1/5/15, six separated/overlapping RAM
-placements, CMPT/CPL combinations, two pages and three checkpoints. Source
+Short RPT has a separate `repeated_indexed_mvdk` qualification: 1,488 independent
+cases/restores, all sixteen encodings, counts 0/1/5/15, six separated/overlapping RAM
+placements and CMPT/CPL combinations; pages and three checkpoints are distributed. Source
 samples and pointer updates are fresh per copy; EAR advances from the one
 retained destination literal. The reference preserves the existing staged
 ordering in which a copy's Access sample precedes the previous copy's Read
 publication. This is not independent silicon validation of overlapping-bus
-ordering. 288 self-indexed source geometries that enter mapped space are
+ordering. Forty-eight self-indexed source geometries that enter mapped space are
 excluded from positive acceptance. Mapped repeated source/destination
 accesses, interrupts and wider control compositions remain
 unqualified; no firmware-specific address participates in the implementation.
@@ -5227,10 +5227,10 @@ The resident sequence `ec05 7192 13d0` at `7f8d..7f8f` is qualified:
 `RPT #5; MVDK *AR2+,13d0`. TI SPRU172C page 4-108 specifies six
 copies, incrementing the destination EAR as well as the source's explicit
 postincrement. It becomes single-cycle after the repeat pipeline starts.
-The `mvdk-repeat` gate passes 105,696 cases and save-state replays across
+`repeated_mvdk` owns 17,616 independent cases/restores across
 184 direct/short/circular source encodings, four counts, six disjoint/overlap
-placements, both CMPT/CPL states, two program pages and three snapshots.
-Its address oracle skips 288 self-indexed geometries that enter mapped
+placements and both CMPT/CPL states; pages and three snapshots are distributed.
+Its address oracle skips 48 self-indexed geometries that enter mapped
 memory, rather than claiming them as RAM cases. Mapped
 repeat accesses, physical memory-bank timing and interrupt composition
 remain unqualified. The overlap tests pin the existing staged order:

@@ -127,17 +127,6 @@ private:
 	static circular_move_fixture circular_move_case(unsigned variant);
 	static circular_move_fixture indexed_move_case(unsigned variant);
 	void start_circular_move(unsigned variant = 0);
-	struct repeated_mvdk_fixture
-	{
-		u16 opcode, destination, bk, st0, st1;
-		u32 base;
-		unsigned count, snapshot;
-		std::array<u16, 8> initial, final;
-		std::array<u16, 16> sources, values;
-		bool excluded;
-		static u16 seed(u16 address) { return u16((unsigned(address) * 0x3917) ^ 0xa55a); }
-	};
-	static repeated_mvdk_fixture repeated_mvdk_case(unsigned variant, bool indexed = false);
 	struct rptbd_t_load_fixture
 	{
 		unsigned count, slot, form, snapshot, accumulator;
@@ -169,7 +158,6 @@ private:
 	};
 	static repeated_mvmd_fixture repeated_mvmd_case(unsigned v, bool zero = false);
 	void start_repeated_mvmd(unsigned variant = 0);
-	void start_repeated_mvdk(unsigned variant = 0);
 	void start_repeat_mvdp(unsigned variant = 0);
 	void start_repeat_mvdp_irq(unsigned variant = 0);
 	static bool mvdd_source_owned(u16 address);
@@ -382,7 +370,7 @@ private:
 	bool check_mapped_dual_results();
 	bool check_repeat_mvdp_irq_results();
 	bool check_popd_mapped_results();
-	bool check_repeated_mvdk_results();
+	bool check_circular_move_results();
 	bool check_rom4_fr_decoder_results();
 	bool check_rom4_codec_is_results();
 	bool check_rom4_crc_input_results();

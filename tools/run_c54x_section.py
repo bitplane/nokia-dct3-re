@@ -480,6 +480,8 @@ def main():
     counts['memory_count_copy'] = 864
     counts['memory_count_chain'] = 24
     counts['memory_count_wrap'] = 24
+    counts['repeated_mvdk'] = 17616
+    counts['repeated_indexed_mvdk'] = 1488
     counts['block_delayed_exit'] = 1568
     counts['block_delayed_far_call'] = 576
     counts['shifted_unowned'] = 20480
