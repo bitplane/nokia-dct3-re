@@ -461,6 +461,8 @@ def main():
     counts['internal_delayed_branch'] = 128
     counts['internal_tc_branch'] = 128
     counts['internal_banz'] = 192
+    counts['delayed_load'] = 1200
+    counts['delayed_paired_load'] = 1200
     counts['block_delayed_exit'] = 1568
     counts['block_delayed_far_call'] = 576
     counts['shifted_unowned'] = 20480

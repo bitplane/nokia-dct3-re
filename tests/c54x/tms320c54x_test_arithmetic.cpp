@@ -234,7 +234,7 @@ void tms320c54x_test_state::start_delay_multiply(unsigned variant)
 tms320c54x_test_state::delay_load_fixture tms320c54x_test_state::delay_shift_alu_case(unsigned variant)
 {
 	unsigned const operation = variant % 4, v = variant / 4;
-	auto f = delay_load_case(v, true);
+	auto f = delay_shift_load_case(v);
 	u64 const shifted = f.result, source = operation & 1 ? f.b : f.a;
 	s64 const left = source & 0x8000000000ULL ? s64(source) - 0x10000000000LL : s64(source);
 	s64 const right = shifted & 0x8000000000ULL ? s64(shifted) - 0x10000000000LL : s64(shifted);

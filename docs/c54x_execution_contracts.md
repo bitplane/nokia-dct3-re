@@ -1516,11 +1516,15 @@ memory and physical phase timing remain unvalidated.
 
 ### Double-word loads in control delay words
 
-`--profile dld-delay` passes 147,456 cases and save/replays over BD,
+`delayed_paired_load` owns 1,200 independent cases/restores over BD,
 taken/untaken BCD, CALLD, cross-page FCALLD and RETD. Offset, preincrement,
 circular and absolute forms cover eight AR selectors, offsets -1/+2 with
-even/odd effective addresses, both destinations, four distinct long-word
-patterns, SXM/C16, both compatibility states, two pages and three checkpoints.
+even/odd effective addresses and both destinations. Long-word patterns,
+SXM/C16, page and three checkpoints are assigned across interaction tuples,
+not fully crossed. Both compatibility states remain; absolute forms do not
+duplicate an ignored AR selector. The standalone `paired_load` section owns
+broader numeric/load semantics; this section does not renew the old full
+numeric/control cross-product.
 The first addressed word is the high half and its XOR-1 partner is the low
 half; both are sampled once in Read. Sign extension follows SXM, and C16
 does not change this load's final bit pattern (SPRU172C section 4-42).
@@ -2477,7 +2481,7 @@ The separate original-firmware run records one RPTBD Execute entry, one
 delay-MAR entry and 1,024 first-body entries with zero observer writes. Its
 resident-memory comparison and first 128 ordered low-page reads still pass.
 RPTB (6,168 cases/restores plus 16 edge cases), backward in-block branches,
-in-block far calls, delayed LD (147,456 cases/restores) and the native 5110
+in-block far calls, delayed LD (`delayed_load`) and the native 5110
 save-state control pass on this implementation. These focused profiles retain
 their own scope; current default-suite coverage is recorded in the
 [core checkpoint](#core-regression-checkpoint).
@@ -2526,11 +2530,13 @@ Access/Read/Execute ownership retains the literal, address, auxiliary update
 and RAM word through the control transfer. This follows SPRU131G 6.3's
 one-two-word/two-one-word delay rule; the load is not a PC discontinuity.
 
-`load-delay` passes 147,456 cases/restores across BD, BCD taken/untaken,
+`delayed_load` owns 1,200 independent cases/restores across BD, BCD taken/untaken,
 CALLD, FCALLD and RETD; offset/preincrement/circular/absolute forms; eight
-AR fields, offsets +/-1 (two RAM addresses for absolute), A/B, four RAM
-values, SXM/OVM, CMPT, two pages and three snapshots. Absolute ignores the
-encoded AR dimension. Replacing literals after Fetch, pointers after Access
+AR fields, offsets +/-1 (two RAM addresses for absolute), A/B and CMPT.
+RAM values, SXM/OVM, page and three snapshots are assigned rather than fully
+crossed. Absolute no longer duplicates an ignored AR field. The standalone
+scalar/absolute-load sections retain numeric contracts; this is a deliberately
+bounded control-interaction bank. Replacing literals after Fetch, pointers after Access
 and RAM after Read cannot change the retained load or duplicate updates.
 The selected target observes the result once; BCD decisions survive delay
 loads that change A. Call frames and RETD's separate stack read are checked;

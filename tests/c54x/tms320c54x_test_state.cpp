@@ -72,7 +72,7 @@ void tms320c54x_test_state::machine_reset()
 	}))
 		return;
 	if (start_profile(*this, machine().options().bios(), {
-		{ {"load-delay", "add-delay", "dld-delay"}, [](self &test) { test.start_delay_load(); } },
+		{ {"add-delay"}, [](self &test) { test.start_delay_load(); } },
 		{ {"st-dagen"}, [](self &test) { test.start_constant_dagen(); } },
 		{ {"shift-delay"}, [](self &test) { test.start_delay_load(); } },
 		{ {"shift-alu-delay"}, [](self &test) { test.start_delay_load(); } },

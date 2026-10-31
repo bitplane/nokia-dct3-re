@@ -20,20 +20,6 @@ namespace c54x_test {
 
 
 
-tms320c54x_test_state::delay_load_fixture tms320c54x_test_state::delay_dld_case(unsigned v)
-{
-	auto f = delay_load_case(v);
-	bool const odd = (v / 192) % 2 == 0;
-	f.address = odd ? 0x5007 : 0x5004;
-	f.literal = f.form == 3 ? f.address : odd ? 2 : 0xffff;
-	if (f.form == 1 || f.form == 2) f.final[f.selected] = f.address;
-	f.st1 = (f.st1 & ~u16(0x200)) | (f.flags & 2 ? 0x80 : 0);
-	f.memory_low = std::array<u16, 4>{0x1234, 0xffff, 0, 0x8001}[(v / 768) % 4];
-	f.result = (u64(f.memory) << 16) | f.memory_low;
-	if ((f.flags & 1) && (f.memory & 0x8000)) f.result |= 0xff00000000ULL;
-	return f;
-}
-
 tms320c54x_test_state::delay_load_fixture tms320c54x_test_state::delay_add_case(unsigned v)
 {
 	delay_load_fixture f{};
