@@ -3162,11 +3162,15 @@ sequentially. `tmp/c54x-section-trial/cpu-summary.json` records only successful
 children and leaves `complete=false` on failure/interruption. The retired
 default-chain captures do not qualify the replacement suite.
 
-Final native CPU regression, linked firmware integration and affected handset
-acceptance remain required. The current C54x-related host tests pass 438 checks
-in the project virtualenv; mocked runners and helper tests do not renew native
-acceptance. Firmware code and copied programs remain separate from generic
-CPU acceptance, including codec, RF and handset claims.
+The complete generic run passes 506 sections / 1,476,141 cases and restores;
+the separate copied-firmware run passes 12 sections / 1,770 cases and restores.
+The [disposition checkpoint](c54x_section_trial.md#validation-checkpoint)
+records source revision, catalogue identity and measured build/runtime.
+Linked firmware integration and affected handset acceptance remain required.
+The C54x-related host tests pass 438 checks in the project virtualenv; mocked
+runners and helper tests do not renew native acceptance. Firmware code and
+copied programs remain separate from generic CPU acceptance, including codec,
+RF and handset claims.
 
 `instruction_observer` passes 24 independent cases and save/replays covering
 repeat/XC1/XC2, atomic/staged frontends, two logical pages and OVLY clear/set.

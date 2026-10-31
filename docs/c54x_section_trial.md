@@ -1,7 +1,30 @@
-# Section replacement trial
+# C54x replacement suite
 
-Legacy C54x tests are reference-only during migration. They may temporarily
-have unresolved continuations. Do not build or run them to qualify a section.
+The generic legacy phase chain is retired. Independent sections are the
+executable authority; retained firmware adapters remain separate.
+
+## Validation checkpoint
+
+At source revision `0471a6a2`, the complete generic catalogue passes all 506
+sections: 1,476,141 cases and 1,476,141 restores. Total wall time 3,758.582s
+(62.64 minutes), including 3,155.973s building and 581.324s executing.
+This sequential cold-section/warm-core run compiles each section once;
+it is not the per-edit development workflow or a clean-framework build.
+Catalogue SHA-256:
+`0e6bcdd0b3d5788644939700cb3fb09ddbde349f6fbcd98ed1a09ae02f435583`.
+The separate copied-firmware scope passes all 12 sections: 1,770 cases and
+1,770 restores in 74.760s. These sections do not link the private-ROM adapter.
+The 438 C54x-related host tests pass in 6.233s using the project virtualenv.
+All six moved firmware adapter translation units pass a syntax check against
+the current MAME headers; linking/runtime and affected handset acceptance
+remain outstanding. The full generic result does not qualify those scopes.
+
+Compared with the trial baseline `0ab50f98`, combined CPU/firmware C++ sources
+are 52,063 ->34,419 lines and 3,388,653 ->2,093,122 bytes, including replacement
+helpers and relocated firmware (17,644 fewer lines; relocation is not deletion).
+Tooling/manifests are additional, separately reduced source, not hidden C++.
+
+## Execution
 
 Run `python3 tools/run_c54x_section.py SECTION`. List the authoritative
 catalogue without building with `--list --scope cpu|firmware|all`.
@@ -14,7 +37,7 @@ successful section names/counts, measured wall time and an explicit completion
 flag. A failed/interrupted child leaves the scope incomplete; no cached result
 is credited as a fresh pass. Sections are built sequentially against the shared
 object tree, without retaining one emulator binary per section.
-Do not run either complete scope until final integration is ready.
+Use complete scopes at integration checkpoints, not between section edits.
 The command replaces the **isolated
 c54xisa overlay** with a one-source runner and the selected section only;
 it does not change CPU implementation sources. `make build-c54x-isa
@@ -566,7 +589,8 @@ The initial trial does not provide a reliable completion estimate: later
 sections vary substantially in contract recovery and removable duplication.
 The disposition table above records subsequent migrations and measurements.
 Already structured independent cases should not be rewritten merely to meet
-a size or throughput target. Full retained-suite timing is still unknown.
+a size or throughput target. Current full retained-suite timing is recorded
+in the validation checkpoint above; the numbers here describe only the pilot.
 
 The following is the early pilot checkpoint, not the current migration total.
 After the case-owned IRQ expectation change, all15 migrated sections pass:
