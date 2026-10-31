@@ -2,14 +2,36 @@
 from pathlib import Path
 import contextlib
 import io
+import json
+import subprocess
 import tempfile
 import unittest
 from unittest.mock import patch
 
-from tools.run_c54x_section import load_sections, main
+from tools.run_c54x_section import load_sections, main, run_suite
 
 
 class SectionCatalogTests(unittest.TestCase):
+    def test_suite_reports_only_successful_children(self):
+        for fail in (False, True):
+            with self.subTest(fail=fail), tempfile.TemporaryDirectory() as directory:
+                failure = subprocess.CalledProcessError(1, ['runner'])
+                results = [None, failure] if fail else [None, None]
+                with patch('tools.run_c54x_section.subprocess.run', side_effect=results) as run, \
+                        contextlib.redirect_stdout(io.StringIO()):
+                    if fail:
+                        with self.assertRaises(subprocess.CalledProcessError):
+                            run_suite(['a', 'b'], {'a': {'cases': 2}, 'b': {'cases': 3}}, 4, 'cpu', Path(directory))
+                    else:
+                        run_suite(['a', 'b'], {'a': {'cases': 2}, 'b': {'cases': 3}}, 4, 'cpu', Path(directory))
+                report = json.loads((Path(directory) / 'tmp/c54x-section-trial/cpu-summary.json').read_text())
+                self.assertEqual(report['complete'], not fail)
+                self.assertEqual(report['passed_cases'], 2 if fail else 5)
+                self.assertEqual([item['section'] for item in report['completed']], ['a'] if fail else ['a', 'b'])
+                self.assertEqual(report.get('active_section'), 'b' if fail else None)
+                self.assertEqual(run.call_count, 2)
+                self.assertTrue(all(call.kwargs['check'] for call in run.call_args_list))
+
     def test_invalid_build_modes_do_not_start_a_build(self):
         for arguments in (['all', '--build-only'],
                           ['immediate_store', '--build-only', '--negative-control']):

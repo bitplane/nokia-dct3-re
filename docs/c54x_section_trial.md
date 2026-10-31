@@ -9,6 +9,11 @@ catalogue without building with `--list --scope cpu|firmware|all`.
 resolve to exactly one CPU section or firmware fixture. Unregistered source
 files, duplicate names and missing/ambiguous paths fail before any build.
 `all` defaults to CPU-only; `all --scope firmware` is a separate opt-in run.
+Complete-scope runs write `tmp/c54x-section-trial/SCOPE-summary.json` with
+successful section names/counts, measured wall time and an explicit completion
+flag. A failed/interrupted child leaves the scope incomplete; no cached result
+is credited as a fresh pass. Sections are built sequentially against the shared
+object tree, without retaining one emulator binary per section.
 Do not run either complete scope until final integration is ready.
 The command replaces the **isolated
 c54xisa overlay** with a one-source runner and the selected section only;

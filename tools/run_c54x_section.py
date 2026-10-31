@@ -46,6 +46,29 @@ def copy_changed(source, target):
         shutil.copyfile(source, target)
 
 
+def run_suite(selected, sections, jobs, scope, root=ROOT):
+    output = root / 'tmp/c54x-section-trial' / (scope + '-summary.json')
+    output.parent.mkdir(parents=True, exist_ok=True)
+    started = time.monotonic()
+    report = dict(scope=scope, selected=len(selected), completed=[], complete=False, passed_cases=0)
+    try:
+        for name in selected:
+            current = time.monotonic()
+            report['active_section'] = name
+            output.write_text(json.dumps(report, indent=2) + '\n')
+            subprocess.run([sys.executable, __file__, name, '--jobs', str(jobs)], check=True)
+            report['completed'].append(dict(section=name, cases=sections[name]['cases'],
+                                            wall_seconds=round(time.monotonic()-current, 3)))
+            report['passed_cases'] += sections[name]['cases']
+        report.pop('active_section', None)
+        report['complete'] = True
+    finally:
+        report['passed_cases'] = sum(item['cases'] for item in report['completed'])
+        report['wall_seconds'] = round(time.monotonic()-started, 3)
+        output.write_text(json.dumps(report, indent=2) + '\n')
+        print(f'C54x suite report: {output}', flush=True)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     sections = load_sections()
@@ -70,8 +93,7 @@ def main():
             parser.error('--build-only requires one section')
         if args.negative_control:
             parser.error('select one section for the negative control')
-        for section in selected:
-            subprocess.run([sys.executable, __file__, section, '--jobs', str(args.jobs)], check=True)
+        run_suite(selected, sections, args.jobs, args.scope)
         return
     selected_source = sections[args.section]['source']
     sections = ROOT / 'tests/c54x/sections'
