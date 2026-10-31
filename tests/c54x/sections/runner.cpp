@@ -244,6 +244,21 @@ protected:
 			}
 		});
 #endif
+#ifdef C54X_SECTION_OBSERVE_MVDK
+		m_fixture->set_data_observer([this](bool write,u32 at,u16) {
+			u32 pc=0;u16 opcode=0;
+			if(write){
+				if(m_cpu->observe_staged_data_read(at,pc,opcode))throw emu_fatalerror("MVDK read owner survives into publication");
+				return;
+			}
+			auto const &instruction=m_cases.at(m_fixture->count()).states.front().observation.program.front();
+			if(!m_cpu->observe_staged_data_read(at,pc,opcode) || pc!=instruction.address || opcode!=instruction.value)
+				throw emu_fatalerror("MVDK source loses its Address-stage instruction owner");
+			if(m_cpu->observe_staged_data_read(at^1,pc,opcode))throw emu_fatalerror("MVDK source observer accepts wrong address");
+			auto const disable=machine().disable_side_effects();
+			if(m_cpu->observe_staged_data_read(at,pc,opcode))throw emu_fatalerror("MVDK source observer accepts debugger peek");
+		});
+#endif
 #ifdef C54X_SECTION_OBSERVE_MVDD
 		m_fixture->set_data_observer([this](bool write,u32 at,u16) {
 			auto const &input=m_cases.at(m_fixture->count());

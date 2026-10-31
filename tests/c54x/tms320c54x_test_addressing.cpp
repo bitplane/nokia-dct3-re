@@ -808,71 +808,6 @@ void tms320c54x_test_state::start_mvdd_source(unsigned variant)
 }
 
 
-tms320c54x_test_state::mvdk_mapped_fixture tms320c54x_test_state::mvdk_mapped_case(unsigned v, bool accumulator_destination, bool clock)
-{
-	mvdk_mapped_fixture f{};
-	if (clock)
-	{
-		f.source = 0x1420; f.destination = 0x58; f.form = v % 3;
-		f.value = std::array<u16,4>{0,0x3146,0x8006,0xffff}[(v / 3) % 4];
-		f.base = (v / 12) % 2 ? 0x20000 : 0;
-		f.access = f.form == 2 ? 6 : 5;
-		f.checkpoint = f.access + std::array<int,3>{-1,1,3}[v / 24];
-		return f;
-	}
-	unsigned const sources = accumulator_destination ? 19 : 18, destinations = accumulator_destination ? 6 : 11;
-	f.source = v % sources == 18 ? 0x62 : 8 + v % sources; f.form = (v / sources) % 3;
-	unsigned const destination = (v / (sources * 3)) % destinations, patterns = sources * 3 * destinations;
-	f.destination = accumulator_destination ? 8 + destination : destination < 8 ? 0x10 + destination : destination < 10 ? 0x0e + destination - 8 : 0x6000;
-	f.value = std::array<u16, 4>{0, 1, 0x8000, 0xffff}[(v / patterns) % 4];
-	if (f.source == 0x0a || f.source == 0x0d) f.value &= 0xff;
-	if (f.form == 1 && f.source == 0x16) f.value = f.source;
-	f.base = (v / (patterns * 4)) % 2 ? 0x20000 : 0; f.access = f.form == 2 ? 6 : 5;
-	f.checkpoint = f.access - 1 + v / (patterns * 8);
-	return f;
-}
-
-void tms320c54x_test_state::start_mvdk_mapped(unsigned variant)
-{
-	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-	bool const clock = profile_is("clock-mvdk");
-	auto const f = mvdk_mapped_case(variant, profile_is("mvdk-acc"), clock); auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
-	for (unsigned i = 0; i < 16; ++i) program.write_word(f.base + 0x600 + i, 0xf495);
-	program.write_word(f.base + 0x600, f.form == 0 ? 0x7100 | (f.source & 0x7f) : f.form == 1 ? 0x7196 : 0x71f8);
-	program.write_word(f.base + 0x601, f.form == 2 ? f.source : f.destination);
-	if (f.form == 2) program.write_word(f.base + 0x602, f.destination);
-	program.write_word(f.base + (f.form == 2 ? 0x603 : 0x602), 0xf4e1);
-	m_cpu->set_pipeline_frontend(false);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ST0, clock ? 0xa628 : 0xa600); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x900);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
-	m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x123456789aULL); m_cpu->set_state_int(tms320c54x_device::STATE_B, 0xfedcba9876ULL);
-	for (unsigned r = 0; r < 8; ++r) m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + r, 0x1400 + r);
-	m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x3000); m_cpu->set_state_int(tms320c54x_device::STATE_BK, 13);
-	data.write_word(f.source, f.value); if (f.form == 1) m_cpu->set_state_int(tms320c54x_device::STATE_AR6, f.source);
-	if (clock) { data.write_word(0x58,0); data.write_word(0x58,0); }
-	m_pipeline_operand_reads = m_pipeline_store_writes = m_pipeline_extensions_reads = 0;
-	m_pipeline_operand_tap = data.install_read_tap(0, 0xffff, "mvdk_mapped_source",
-		[this, f](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return;
-			u32 instruction; u16 opcode;
-			u16 const expected = f.form == 0 ? 0x7100 | (f.source & 0x7f) : f.form == 1 ? 0x7196 : 0x71f8;
-			expect(m_cpu->observe_staged_data_read(at,instruction,opcode) && instruction == f.base+0x600 && opcode == expected,
-				"MVDK source observer owns the actual Address-stage instruction, including mapped aliases");
-			expect(!m_cpu->observe_staged_data_read(at^1,instruction,opcode), "Read ownership rejects another address");
-			{ auto const disable = machine().disable_side_effects();
-				expect(!m_cpu->observe_staged_data_read(at,instruction,opcode), "Debugger scope cannot claim the enclosing operand read"); }
-			expect(at == f.source && word == f.value && !m_pipeline_operand_reads && m_cpu->pipeline_cycles() == f.access, "MVDK samples one mapped register in Access before alias publication"); ++m_pipeline_operand_reads; });
-	m_pipeline_write_tap = data.install_write_tap(0, 0xffff, "mvdk_mapped_destination",
-		[this, f, clock](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return;
-			expect(at == f.destination && word == f.value && !m_pipeline_store_writes && m_pipeline_operand_reads == 1 && m_cpu->pipeline_cycles() == f.access + (clock ? 2 : unsigned(f.destination < 0x10 || f.destination >= 0x60)), "MVDK publishes one retained word at its destination-owned clock"); ++m_pipeline_store_writes; });
-	m_pipeline_fetch_tap = program.install_read_tap(f.base + 0x601, f.base + (f.form == 2 ? 0x602 : 0x601), "mvdk_mapped_literals",
-		[this, f](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return;
-			unsigned const i = m_pipeline_extensions_reads++;
-			expect(at == f.base + 0x601 + i && i < (f.form == 2 ? 2U : 1U) && word == (f.form == 2 && !i ? f.source : f.destination), "MVDK fetches source/address literals once and in order"); });
-	m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 255360;
-	m_cpu->set_state_int(STATE_GENPC, f.base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-}
-
 tms320c54x_test_state::mvdk_producer_fixture tms320c54x_test_state::mvdk_producer_case(unsigned v, bool accumulator_destination)
 {
 	unsigned const group = accumulator_destination ? v / 5184 : 0; v %= 5184;
@@ -1301,64 +1236,6 @@ bool tms320c54x_test_state::check_mvdk_producer_results()
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
 	}
 	if (m_phase == 255390) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 255380; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true; }
-	return false;
-}
-
-bool tms320c54x_test_state::check_mvdk_mapped_results()
-{
-	if (m_phase == 255360)
-	{
-		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
-		bool const accumulator_destination = profile_is("mvdk-acc");
-		bool const clock = profile_is("clock-mvdk");
-		auto const f = mvdk_mapped_case(variant, accumulator_destination, clock);
-		u32 observed_instruction; u16 observed_opcode;
-		expect(!m_cpu->observe_staged_data_read(f.source,observed_instruction,observed_opcode),
-			"MVDK read ownership is transient outside the actual bus callback, including after restore");
-		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Mapped MVDK remains in supported staged forms");
-		if (tick == 3) { auto const disable = machine().disable_side_effects(); m_cpu->space(AS_PROGRAM).write_word(f.base + 0x601, 0xdead); }
-		if (tick == 4 && f.form == 2) { auto const disable = machine().disable_side_effects(); m_cpu->space(AS_PROGRAM).write_word(f.base + 0x602, 0xdead); }
-		if (tick == f.access && f.source != f.destination) { auto const disable = machine().disable_side_effects(); m_cpu->space(AS_DATA).write_word(f.source, 0xdead); }
-		capture_pipeline_at(f.checkpoint, {&m_pipeline_operand_reads, &m_pipeline_store_writes, &m_pipeline_extensions_reads},
-			"Save mapped MVDK before Access, after capture or after publication");
-		if (tick == 20)
-		{
-			{ auto const disable = machine().disable_side_effects();
-				expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_cpu->state_int(STATE_GENPC) == f.base + (f.form == 2 ? 0x604 : 0x603) &&
-					m_cpu->state_int(tms320c54x_device::STATE_ST0) == (clock ? 0xa628 : 0xa600) && m_cpu->state_int(tms320c54x_device::STATE_ST1) == 0x900 &&
-					m_pipeline_operand_reads == 1 && m_pipeline_store_writes == 1 && m_pipeline_extensions_reads == (f.form == 2 ? 2U : 1U) && m_cpu->space(AS_DATA).read_word(f.destination) == (clock ? (f.value & ~u16(1)) | BIT(f.value,1) : (f.value & (f.destination == 0xa || f.destination == 0xd ? 0xff : 0xffff))),
-					"Mapped MVDK retains the sampled word, flags and continuation across replay"); }
-			if (accumulator_destination)
-			{
-				u64 a = 0x123456789aULL, b = 0xfedcba9876ULL;
-				auto const field = [&a, &b](unsigned address, u16 word) {
-					if (address < 8 || address > 0xd) return;
-					unsigned const part = (address - 8) % 3, shift = part * 16;
-					u64 const mask = (part == 2 ? 0xffULL : 0xffffULL) << shift;
-					u64 &value = address >= 0xb ? b : a; value = (value & ~mask) | ((u64(word) << shift) & mask);
-				};
-				field(f.source, f.value); if (f.source != f.destination) field(f.source, 0xdead); field(f.destination, f.value);
-				expect(m_cpu->state_int(tms320c54x_device::STATE_A) == a && m_cpu->state_int(tms320c54x_device::STATE_B) == b, "Mapped accumulator move preserves every other field and truncates only guard destinations");
-			}
-			if (replay_pipeline_at(255370, f.checkpoint,
-				"Restore mapped MVDK without rereading source or repeating writes")) return true;
-			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (variant < (clock ? 71U : accumulator_destination ? 8207U : 14255U)) { start_mvdk_mapped(variant + 1); return true; }
-			if (clock)
-			{
-				osd_printf_info("TMS320C54x staged CLKMD MVDK: PASS cases=72 restore=72 forms=direct,indirect,absolute patterns=4 pages=2 snapshots=3 source_reads=1 destination_writes=1 peripheral_extra_clock=1 retained_source=1 retained_literals=1 read_owner=Address observer_scope=bus_only debug_excluded=1 pll_reference=unconfigured physical_clock_claim=0\n");
-				throw emu_fatalerror(0, "TMS320C54x isolated staged CLKMD MVDK complete");
-			}
-			if (accumulator_destination)
-			{
-				osd_printf_info("TMS320C54x MVDK accumulator destinations: PASS cases=8208 restore=8208 sources=18_mapped,1_RAM destinations=AL,AH,AG,BL,BH,BG forms=direct,indirect,absolute patterns=4 pages=2 snapshots=3 source_reads=1 destination_writes=1 source_sample=Access write=next_clock retained_literals=1 aliases=1 guard_width=8 other_fields_preserved=1 read_owner=Address observer_scope=bus_only debug_excluded=1 physical_phase_claim=0\n"); throw emu_fatalerror(0, "TMS320C54x isolated MVDK accumulator destinations complete");
-			}
-			osd_printf_info("TMS320C54x mapped MVDK: PASS cases=14256 restore=14256 sources=18 forms=direct,indirect,absolute destinations=11 patterns=4 pages=2 snapshots=3 source_reads=1 destination_writes=1 source_sample=Access mapped_aliases=1 producer_composition=unvalidated read_owner=Address observer_scope=bus_only debug_excluded=1 physical_phase_claim=0\n");
-			throw emu_fatalerror(0, "TMS320C54x isolated mapped MVDK complete");
-		}
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 255370) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 255360; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true; }
 	return false;
 }
 

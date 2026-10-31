@@ -187,14 +187,6 @@ private:
 	};
 	static mvdd_source_fixture mvdd_source_case(unsigned variant, bool repeated);
 	void start_mvdd_source(unsigned variant = 0);
-	struct mvdk_mapped_fixture
-	{
-		u16 source, destination, value;
-		unsigned form, access, checkpoint;
-		u32 base;
-	};
-	static mvdk_mapped_fixture mvdk_mapped_case(unsigned v, bool accumulator_destination = false, bool clock = false);
-	void start_mvdk_mapped(unsigned variant = 0);
 	struct mvdk_producer_fixture
 	{
 		u16 source, destination, value, expected;
@@ -364,7 +356,6 @@ private:
 	bool check_mvdd_source_results();
 	bool check_rptbd_t_load_results();
 	bool check_mvdk_producer_results();
-	bool check_mvdk_mapped_results();
 	bool check_long_mapped_original_results();
 	bool check_staged_conditional_store_results();
 	bool check_mapped_dual_results();

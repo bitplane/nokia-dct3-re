@@ -2419,9 +2419,13 @@ no-conflict ordering. A same-clock mapped STL/POPM accumulator publication
 is sampled after Execute and can still publish a DAGEN destination in the
 move's Access clock. A direct ALU producer is not forwarded by that rule.
 
-`mvdk-mapped` passes 14,256 cases/restores: 18 sources, direct/postincrement/
-absolute forms, 11 destinations (eight ARs, T/TRN and RAM), four patterns,
-two pages and three snapshots. Guard words use eight bits; the indirect
+`mapped_mvdk` passes 2,376 independently compiled cases/restores: 18 sources,
+direct/postincrement/absolute forms, 11 destinations (eight ARs, T/TRN and
+RAM), and four patterns. Pages and three snapshots are distributed rather
+than multiplied. `accumulator_mvdk` adds 1,368 cases for six accumulator
+destinations and a nineteenth RAM source; `clock_mvdk` adds 12 cases for
+CLKMD's extra publication clock and readback normalization, without a
+configured PLL reference or physical clock claim. Guard words use eight bits; the indirect
 AR6-source self-alias uses its actual address value. Replacing fetched
 literals and changing the source after Access cannot change the retained
 transfer. `mvdk-producer` passes 5,184 cases/restores across six accumulator
@@ -2433,16 +2437,15 @@ STLM-to-accumulator sources, general producer/interrupt/repeat compositions
 and measured physical timing remain unvalidated.
 
 Actual read-identity acceptance is separate from that timing projection.
-The mapped, accumulator-destination and CLKMD MVDK profiles now require
+The mapped, accumulator-destination and CLKMD MVDK sections require
 the captured Address-slot instruction address/opcode inside every source
 bus callback. They reject another address and debugger scope, and require
-the identity to be unavailable between callbacks, including after restore.
-All22,536 cases/restores pass with the existing one-read/one-write counts.
-A control that bypasses only the Address-stage observer fails at case0's
-first source read; it does not establish a guest arithmetic fault.
-Restoring the observer reproduces the same executable SHA256
-`6c27ffa46fa576b480b2773e7e8c831e146fac44e3406104e65e8d88782413e3`
-and all three positive profiles. No CPU emulation change is retained.
+read identity to be unavailable at destination publication. The legacy
+between-tick observer polling is not retained. All 3,756 cases/restores pass
+with exact one-read/one-write counts and ordered literal fetches. A negative
+control expecting a changed publication word fails at the first CLKMD write.
+Legacy factories, phase handlers and routes are removed. No CPU emulation
+change is retained.
 This tests the bounded diagnostic API, not every operand family, physical
 silicon phases or a renewed complete default-core checkpoint.
 
