@@ -1,180 +1,71 @@
 # C++ test contracts
 
-Tests are separate from shipped device implementations. Directory ownership
-describes what a fixture can establish, not how recently it was written.
+Tests are separate from shipped device implementations.
 
 | Directory | Contract | Limits |
 | --- | --- | --- |
-| `unit/` | Standalone algorithms, codecs and protocol data | No scheduler, device timing or handset acceptance. |
-| `c54x/` | Synthetic processor execution, addressing, interrupts, peripheral composition and restoration | Expected values must remain independent of CPU implementation helpers. |
-| `devices/` | MAME device benches using real registers, callbacks and saved state | Self-conformance is not independently measured silicon behavior. |
-| `firmware/` | Acquired original-ROM and music-DSP execution fixtures | Each owns its input hashes and bounded acceptance; no implicit full-handset promotion. |
+| `unit/` | Standalone algorithms, codecs and protocol data | No scheduler or handset acceptance. |
+| `c54x/` | Synthetic processor execution, interrupts, bus ordering, peripheral composition and restoration | Expectations must not call CPU implementation helpers. Timing projections are not measured silicon behavior. |
+| `devices/` | MAME device benches using registers, callbacks and saved state | Self-conformance is not independently measured hardware behavior. |
+| `firmware/` | Copied instruction sequences and acquired-ROM execution | Input identity and bounded integration contracts, not generic CPU or full-handset acceptance. |
 
-The C54x machine-registration module also retains the small verifier-sensitivity
-machines. Those are research instruments, not processor-conformance or fitted
-handset verdicts. Their declared `boundary`, `cobba`, `cobba_alt` and `rom4`
-profiles do not become hardware facts because the runner exits successfully.
+## CPU sections
 
-Likewise, ROM4 `cold`/`cold-pipeline` are mask-only controls with the MCU loader
-deliberately absent. Their retained `cold frontier` result names are runner
-compatibility, not a claim that ordinary native handset boot still stops there.
+`fixtures/c54x_sections.json` owns section names and expected case counts.
+Each entry resolves to exactly one source in `c54x/sections/` or
+`firmware/c54x_*.h`. Missing, ambiguous and unregistered sources fail closed.
 
-## Build and run
+- `python3 tools/run_c54x_section.py --list`: list generic CPU sections.
+- `python3 tools/run_c54x_section.py NAME`: build and execute only that section.
+- `make build-c54x-isa C54X_SECTION=NAME`: build that section without executing.
+- `make check-c54x-core`: complete retained generic CPU scope.
+- `python3 tools/run_c54x_section.py all --scope firmware`: explicitly opt into copied-firmware sections.
 
-- `make build` retains the complete research/conformance composition.
-- `make build-conformance` explicitly selects those test drivers.
-- `make build-c54x-isa` builds the CPU-only test sources without handset devices
-  or firmware images. The test sources have no Nokia/GSM dependencies. It produces
-  `mame/c54xisa`, leaving the normal `mame/mame` binary and driver archive
-  intact. Its reviewed case catalogue is `fixtures/c54x_test_reviews.json`.
-- `make build-handsets` excludes synthetic test drivers and firmware-PC probes.
-  Research handset compositions remain available; this is not an upstream export.
-- Builds share the MAME overlay/object tree: never run the two modes or their
-  acceptance gates concurrently. Rebuild the required mode before its gates.
-- `-listfull` also includes device types in this build. Compare source-declared
-  system names, not raw output-line counts, when checking bench exclusion.
+The selected bench produces `mame/c54xisa`, independently of the handset
+binary. Builds share the overlay/object tree: never run builds concurrently.
+Selected execution remains the development workflow; complete regression is
+a final integration checkpoint, not a prerequisite for each edit.
 
-Source files are overlaid by basename into MAME's Nokia directory for the
-existing local build. That compatibility mapping does not make a CPU test a
-Nokia hardware device. BIOS declarations own profile selection;
-`tools/c54x_test_oracles.py` separately owns expected results.
+The catalogue checks registration and counts, not instruction correctness.
+Executable sections must establish their own stimulus, bus/state expectations,
+replay and meaningful rejection controls. See
+[`c54x_section_trial.md`](../docs/c54x_section_trial.md) for the canonical
+disposition table, deliberate coverage reductions and unresolved integration work.
 
-Use `make test-tools` for host-side algorithms and tooling, and
-`make check-c54x-core` for the full default processor regression (including
-its build). For an already-built conformance executable, run
-`python3 tools/run_c54x_core.py --mame mame/mame --rompath mame/roms`;
-`--profile` selects an isolated declared fixture rather than the default
-sequence. Firmware and device gates retain their individual input and
-acceptance requirements in `Makefile` and `gates.json`.
+## Firmware and handset acceptance
 
-## Validation boundaries
+`tools/run_c54x_core.py` now runs only the retained `rom4-context` and
+`cold-pipeline` firmware integrations. The historical generic BIOS profiles,
+default phase chain, review manifests and frozen transcript inventories are
+retired. Their old command lines are not current acceptance interfaces.
 
-| Check | Establishes | Does not establish |
-| --- | --- | --- |
-| Harness inventory | Declared profiles, result text and reviewed case identities remain intact | Those profiles actually execute or the assertions are correct |
-| Host layout/ownership tests | Source selection, ownership conventions and runner selection | CPU transitions, timing or restoration |
-| Full default C54x run | The ordered default instruction/composition regression | All optional BIOS profiles or physical silicon timing |
-| Isolated C54x profile | Its declared stimulus, rejection controls and replay result | Other profiles or a fitted handset |
-| Device/firmware gate | Its register, serial or acquired-code contract | Full phone support |
-| Handset acceptance | The named product/composition and user workflow | Every underlying hardware contract |
+`make check-c54x-rom4-context` selects the copied context integration.
+Acquired-ROM codec fixtures retain separate runners and input hashes.
+ROM4 `cold`/`cold-pipeline` omit the MCU loader deliberately: a cold-frontier
+result is not a statement that normal handset boot stops there.
+Verifier-sensitivity machines are research instruments, not handset verdicts.
 
-For source moves and independent setup batching, use the inventory, host suite
-and affected isolated profiles. Run the full retained regression at shared-harness
-and broader campaign milestones, not after every edit. For ownership changes, include
-the family's rejection, interrupt and restore variants. For build-selection
-changes, build both modes sequentially, inspect actual bench registrations and
-run handset gates on the test-free executable. A mocked runner test is not a
-substitute for those emulator runs.
+`make build-conformance` includes device/firmware benches;
+`make build-handsets` excludes synthetic test drivers and firmware-PC probes.
+Handset acceptance remains product/workflow-specific in Makefile and gates.json.
+Host tooling tests and mocked runner tests never substitute for native execution.
 
-Development checks should use the affected isolated families. The large
-default regression remains a broad checkpoint for retained fixtures, not a gate
-after every small edit. The CPU-only bench covers reviewed families,
-not a replacement for all default coverage. Family review must track runtime
-as well as source size, and separate value-space coverage from distinct
-checkpoint-state coverage before reducing their Cartesian product.
+## Retention rules
 
-`make build-c54x-isa` builds only that bench and its CPU, without private ROMs
-or handset devices. Pass `--mame mame/c54xisa` to its runner.
-`--profile isa-square` and `isa-parallel` run independently reset architectural
-examples. `isa-scalars` runs 34 scalar boundaries in 19 reset groups; a
-continuation keeps the preceding checked flags, accumulator or instruction
-words live. Resetting every row would remove those interaction contracts.
-`--profile source-domain` runs implementation-admission limits, not
-silicon-illegality conformance. Use an empty `--rompath` to verify independence
-from the local firmware collection. Normal handset gates use `mame/mame`.
+Retain distinct operand contrasts, arithmetic boundaries, bus ordering,
+side-effect counts, output-pin behavior and restore points. An old bug
+regression is not obsolete merely because the implementation passes it.
 
-`--profile legacy-atomic` on the normal binary stops the inherited sequence
-before the staged matrices. It includes a Nokia DSPIF save-state check and
-is deliberately not called CPU-only. Use it to verify legacy continuations
-after scalar-case extraction without running the full default checkpoint.
+Replace redundant Cartesian products with justified boundaries, recording
+lost coverage explicitly. Delete unjustifiable fixtures after bounded review;
+existence and old passing counts are not retention arguments.
+A final-frame oracle cannot replace instruction-level checks.
 
-Long RAM RMW uses all 38,400 distinct stimuli in its balanced default schedule.
-Each operation/address/compatibility/status group covers all four checkpoints
-twice across eight value pairs. `--profile rmw-long` runs that family directly,
-with no retained full value-by-checkpoint product. It reports
-actual case/restore counts and an independently checked ordered coverage digest.
-This is a reduction in repeated execution, not a claim of full value-by-phase
-coverage in the balanced run. The sequenced RMW fixture is not yet CPU-only.
+Keep setup, expectations and replay explicit. Helpers may load memory,
+compare state and serialize snapshots; they must not calculate expected
+results through the CPU decoder, arithmetic, addressing or timing code.
+No implicit cross-family phase chain belongs in the replacement suite.
 
-## Retention and consolidation
-
-Keep a test when it protects a distinct contract: legal/illegal operand
-contrast, ordering, side-effect count, arithmetic boundary or restore point.
-An old bug's regression is not obsolete merely because the implementation
-now passes it.
-
-A justified fixture can be retired when a replacement covers its distinguishing
-stimulus, expected behavior, negative controls and restoration obligations.
-Redundant or unjustifiable fixtures may instead be deleted after bounded
-investigation and an explicit review decision; existence is not justification.
-A broad boot or final-frame oracle is not a replacement for an instruction test.
-Temporary sensitivity and frontier experiments may instead be removed after
-their reusable conclusion is retained in reviewed evidence.
-
-During behavior-preserving refactors, run `tools/c54x_harness_inventory.py`
-without rewriting its baseline. Its declarations and result-text inventory
-are structural guards, not executed coverage. Reviewed families additionally
-require named case identities in the native result stream. Lexical assertion
-counts measure footprint, not coverage: a table-driven rewrite can legitimately
-reduce them. Deliberate changes require a reviewed retention/replacement/deletion
-decision and executable acceptance, not an automatic `--write` to make a guard green.
-
-`fixtures/c54x_test_reviews.json` records reviewed families and their expectation
-basis, distinguishing obligations and limits. `python3 -m tools.c54x_test_reviews`
-reports reviewed profiles and the unreviewed remainder; unreviewed tests are not
-automatically classified or justified by their names. The generic fixture owns
-only program/data loading and register/bus comparisons. It has no opcode decoder,
-arithmetic oracle, implicit reset policy or replay scripting language.
-
-Fixture helpers may centralize stimulus, CPU reset, memory loading and result
-reporting. They must not calculate expected results through the CPU's own
-decoder, addressing, arithmetic or timing implementation. Family-specific
-state should stay with its fixture rather than accumulate in a global bench.
-
-The default atomic regression remains an ordered sequence, partitioned into
-basic, corpus, TI-reference and extended-control owners. Its router is checked
-against every top-level guard, including uncovered gaps and the extended phase
-identifiers. Splitting its source does not remove inherited state between
-steps; further isolation requires retaining those cross-instruction contrasts.
-Batch setup is limited to independent values: later values must not depend on
-an earlier register or memory write. Live-state-dependent setup stays explicit.
-
-Operand-domain, absolute-alias and short-source rejection controls share the
-CPU-only `source_domain_fixture`, with a separate, host-testable stimulus
-schedule. It owns its progress, observations, taps and snapshots without the
-legacy phase router. Host observations deliberately survive CPU snapshot
-replay to detect duplicate bus effects; registering or clearing them during
-restoration would weaken the tests. Positive instruction and stack-transfer
-profiles remain separate from this implementation-admission census.
-
-Interrupt entry owns its vector-prefetch, acceptance, spacing and per-stage
-restore observations in `interrupt_entry_fixture`. Its acknowledgement checks
-live beside the fixture rather than in the general IRQ callback. Entry setup
-retires predecessor taps at the handoff boundary; active entry
-observers use dedicated handles. Replay counter rewinds remain explicit.
-
-Saved-IRQ repeat, direct-body repeat, active-context restoration and delayed
-far-call tests own separate `replay_fixture` instances. Their immutable inputs
-and observation types live in the repeat-state header. The template shares
-storage only: event-driven checkpoints, rewind order and input-edge handling
-stay in each family's code. Unrelated rearm and conditional-call handlers are
-dispatched separately in their original order.
-
-Atomic and peripheral replays use separate checkpoint streams for
-transport/repeat, near return, far transfer, XF output, idle/NMI, deep-idle
-timer, idle DMA, timer prescaler, BSP, PLL lock and selected clock rates.
-Transport/repeat retains its saved host read count and shared-RAM comparison;
-far-transfer capture and replay share one owner across the control and restore
-modules. These are storage boundaries, not reset-independent fixtures: phase
-order, host-counter rewinds and device mutation remain explicit at each site.
-
-Frontend entry/flush, instruction observation and delayed-block-repeat layout
-fixtures own their progress, observations, taps and checkpoints in separate
-modules. The CPU wiring delegates their acknowledgements without changing
-the ordered callback route. Other repeat and dependency fixtures still share
-the sequenced bench storage; that sharing is not evidence of reset isolation.
-
-The remaining pipeline compositions are grouped into data/dependency,
-control-flow and repeat-control modules. Each retains its ordered continuation
-handlers, including cross-family handoffs. These source boundaries improve
-navigation; they do not add another dispatcher or change BIOS ownership.
+Final integration validation is still outstanding during the replacement
+campaign. A selected section's passing result must not be reported as proof
+that the full CPU suite, moved firmware adapter or handset gates pass.

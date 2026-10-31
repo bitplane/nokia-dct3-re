@@ -1360,8 +1360,12 @@ check-dspif-save: build
 		test "$$(grep -Fxc 'Nokia DSPIF state: PASS ram_words=2048 queued_packets=2 registers=1 save_replay=1 cpu=0 firmware=0' output.log)" -eq 1; \
 		grep -Fxq 'Fatal error: Nokia DSPIF state fixture complete' output.log
 
-check-c54x-core: build
-	$(PYTHON) tools/run_c54x_core.py --mame $(MAME_DIR)/mame --rompath $(MAME_DIR)/roms
+check-c54x-core:
+	$(PYTHON) tools/run_c54x_section.py all --jobs $(JOBS)
+
+.PHONY: check-c54x-rom4-context
+check-c54x-rom4-context: build
+	$(PYTHON) tools/run_c54x_core.py --mame $(MAME_DIR)/mame --rompath $(MAME_DIR)/roms --profile rom4-context
 
 .PHONY: check-c54x-rom4-crc-helper
 check-c54x-rom4-crc-helper: build prepare-c54x-rom4-fixture
@@ -1866,7 +1870,7 @@ check-c54x-observed-coverage: build
 		trap 'status=$$?; if test "$$status" -eq 0; then rm -rf "$$tmp"; else printf "Native coverage failed; evidence retained: %s\n" "$$tmp" >&2; fi' EXIT; \
 		mkdir -p "$$tmp/core" "$$tmp/rom4/nvram/noki5110" "$$tmp/menu/nvram/noki5110" "$$tmp/power/nvram/noki5110"; \
 		status=0; \
-		(cd "$$tmp/core"; $(abspath $(MAME_DIR))/mame tms54test \
+		(cd "$$tmp/core"; $(abspath $(MAME_DIR))/mame tms54test -bios rom4-context \
 			-rompath $(abspath $(MAME_DIR))/roms -video none -sound none -joystickprovider none -midiprovider none \
 			-log -verbose -noreadconfig -nothrottle -seconds_to_run 5 >output.log 2>&1) || status=$$?; \
 		$(PYTHON) -c 'from pathlib import Path; import sys; from tools.run_c54x_core import check_result; check_result(Path(sys.argv[1]).read_text(), int(sys.argv[2]), verbose_teardown=True)' \

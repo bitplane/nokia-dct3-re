@@ -89,11 +89,9 @@ def main():
         results['physical_completion_proved']=False
         results['long_run_stability_proved']=False
         if args.core_controls:
-            profiles=['instr-observer','portr-bypass']
+            profiles=['instruction_observer','port_read_forwarding']
             for profile in profiles:
-                command=[sys.executable,str(root/'tools/run_c54x_core.py'),
-                         '--mame',str(mame),'--rompath',str(root/'mame/roms'),
-                         '--output-root',str(run/'core'),'--verbose','--profile',profile]
+                command=[sys.executable,str(root/'tools/run_c54x_section.py'),profile]
                 with (run/f'core-{profile}.log').open('w') as stream:
                     run_stage(command,root,stream)
             results['focused_cpu_controls']=dict(profiles=profiles,passed=True,
