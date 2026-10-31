@@ -10,7 +10,8 @@ Section names/counts live in `fixtures/c54x_sections.json`; the catalogue is
 registration metadata, not proof of correctness. Generic CPU and copied-firmware
 scopes remain separate. See [tests/README.md](../tests/README.md) for commands.
 
-Still required before completion: final runner consolidation, native validation
-of the moved firmware adapter, complete retained CPU regression, relevant host
-tests and affected handset acceptance. Selected passing sections do not establish
-any of those broader results.
+The integration checkpoint passes all 518 registered sections, linked firmware
+context/cold controls, the full host suite and seven affected handset gates.
+The canonical disposition records exact counts, source identity, timings and
+remaining hardware/coverage limitations. Later selected runs do not renew the
+complete regression or unrelated handset workflows.

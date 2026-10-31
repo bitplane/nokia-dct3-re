@@ -66,6 +66,7 @@ compare state and serialize snapshots; they must not calculate expected
 results through the CPU decoder, arithmetic, addressing or timing code.
 No implicit cross-family phase chain belongs in the replacement suite.
 
-Final integration validation is still outstanding during the replacement
-campaign. A selected section's passing result must not be reported as proof
-that the full CPU suite, moved firmware adapter or handset gates pass.
+The completed integration checkpoint is recorded in the disposition document:
+all 518 CPU/copied-firmware sections, the linked firmware context/cold controls,
+the full host suite and seven affected handset gates pass their named contracts.
+A later selected section's result must not silently renew that broad checkpoint.
