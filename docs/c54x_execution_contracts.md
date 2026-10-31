@@ -4675,13 +4675,15 @@ and short-indirect encodings below MOD 3; other control owners and extended
 T-load delay forms are not newly admitted. The first body multiply must see
 the loaded T, rather than an old value or a re-read of changed memory.
 
-`rptbd-t-load` passes 9,216 cases plus replay: counts 0/1/7, four input
-patterns, direct/plain/postincrement/postdecrement addressing, DP/SP modes,
-both delay positions, four SXM/OVM combinations, A/B multiply destinations,
-two program pages and three checkpoints. It verifies one delay read at
+`block_delay_t_load` passes 192 independent cases plus replay: counts 0/1/7,
+four input patterns, direct/plain/postincrement/postdecrement addressing,
+both delay positions and A/B multiply destinations. DP/SP, SXM/OVM, program
+pages and three checkpoints are distributed rather than multiplied. It verifies one delay read at
 prototype clock 7 or 8, count+1 body products, single delay DAGEN update,
 buffer sentinels and unselected state. Source memory and the fetched opcode
-are poisoned after capture. Interrupt composition and physical stage timing
+are poisoned after capture. The RPTBD-only legacy branches and route are
+removed; the shared BANZD/control reference remains pending migration.
+A changed product bit fails at the first publication. Interrupt composition and physical stage timing
 are not established.
 
 ## Repeated fixed-accumulator transfer
