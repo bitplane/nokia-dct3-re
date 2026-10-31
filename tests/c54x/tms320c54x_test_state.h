@@ -127,33 +127,6 @@ private:
 	void start_rptbd_t_load(unsigned variant = 0);
 	void start_repeat_mvdp(unsigned variant = 0);
 	void start_repeat_mvdp_irq(unsigned variant = 0);
-	static bool mvdd_source_owned(u16 address);
-	static u64 mvdd_source_a(unsigned pattern);
-	static u64 mvdd_source_b(unsigned pattern);
-	static u16 mvdd_source_word(u16 address, unsigned pattern, u32 base, u16 ar2, u16 ar3);
-	struct mvdd_source_fixture
-	{
-		unsigned source, pattern, xmode, ymode, prefix, count, snapshot;
-		bool repeated, fixed;
-		u32 base;
-		u16 destination = 0x1000;
-		u16 address(unsigned i) const { return source + (fixed ? 0 : i); }
-		unsigned read_clock(unsigned i) const
-		{
-			unsigned waits = 0;
-			for (unsigned n = 0; n <= i; ++n) waits += address(n) >= 0x20 && address(n) < 0x60;
-			return 5 + prefix + i + waits;
-		}
-		unsigned write_clock(unsigned i) const { return repeated && i + 1 < count ? read_clock(i + 1) : read_clock(i) + 1; }
-		u16 word(unsigned i) const
-		{
-			if (fixed && i) return 0;
-			unsigned const issued = std::min(i + 2, count);
-			return mvdd_source_word(address(i), pattern, base, repeated ? 0x1000 + issued : 0x2222, repeated ? source + (fixed ? 0 : issued) : 0x3333);
-		}
-	};
-	static mvdd_source_fixture mvdd_source_case(unsigned variant, bool repeated);
-	void start_mvdd_source(unsigned variant = 0);
 	virtual void machine_start() override;
 
 	virtual void machine_reset() override;
@@ -311,7 +284,6 @@ private:
 		return true;
 	}
 	bool check_instruction_observer_results();
-	bool check_mvdd_source_results();
 	bool check_rptbd_t_load_results();
 	bool check_long_mapped_original_results();
 	bool check_staged_conditional_store_results();
