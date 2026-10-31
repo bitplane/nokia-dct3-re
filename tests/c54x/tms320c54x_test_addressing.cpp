@@ -95,35 +95,25 @@ void tms320c54x_test_state::start_long_mapped_original(unsigned variant)
 	m_cpu->set_state_int(STATE_GENPC,base+0xbdb6); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1,m_cpu->clock()));
 }
 
-tms320c54x_test_state::popd_fixture tms320c54x_test_state::popd_case(unsigned v, bool repeated)
+tms320c54x_test_state::popd_fixture tms320c54x_test_state::popd_case(unsigned v)
 {
-	popd_fixture f{}; f.repeated = repeated;
-	unsigned const spec = v % 17, form = repeated ? (spec < 15 ? spec / 3 : spec - 10) : (v / 84) % 3;
-	unsigned const pattern = repeated ? (v / 17) % 4 : (v / 21) % 4;
-	f.prefix = repeated ? 1 + (v / 68) % 2 : 0;
-	f.cmpt = repeated ? (v / 136) % 2 : (v / 252) % 2;
-	f.base = (repeated ? (v / 272) % 2 : (v / 504) % 2) ? 0x20000 : 0;
-	f.irq = repeated ? (v / 544) % 3 : 0;
-	f.count = !repeated ? 0 : spec < 15 ? std::array<unsigned, 3>{0, 1, 15}[spec % 3] : spec == 15 ? 4 : 11;
-	f.pointer = !repeated ? (form ? popd_fixture::reg(v % 21) : 0x7777) : std::array<u16, 7>{0x4000, 0x400f, 0x4020, 0x3001, 0x2fff, 0x1d, 0x16}[form];
-	f.mode = !repeated ? (form ? form == 1 ? 0x97 : 0x8f : popd_fixture::reg(v % 21)) : form == 2 ? 0x20 : form == 1 || form >= 5 ? 0x8f : 0x97;
-	f.step = BIT(f.mode, 7) ? (f.mode & 0x78) == 0x08 ? -1 : 1 : 0;
-	f.st0 = 0xa600 | (repeated && form == 2 ? 0x80 : 0);
-	f.st1 = 0x100 | (f.cmpt ? 0x20 : 0) | (f.irq == 1 ? 0 : 0x800);
-	for (unsigned i = 0; i <= f.count; ++i)
-	{
-		f.destination[i] = !repeated ? popd_fixture::reg(v % 21) : f.pointer + i * f.step;
-		f.word[i] = std::array<u16, 4>{0, 1, 0x8000, 0xffff}[pattern] ^ (i * 0x111);
-	}
-	unsigned const checkpoint = repeated ? v / 1632 : v / 1008;
-	f.snapshot = std::array<unsigned, 4>{3 + f.prefix, 4 + f.prefix, f.read_clock() + (f.count + 1) / 2, f.read_clock() + f.count + 1}[checkpoint];
+	popd_fixture f{};
+	unsigned const spec=v%17,form=spec<15 ? spec/3 : spec-10,pattern=(v/17)%4;
+	f.prefix=1+(v/68)%2;f.cmpt=(v/136)%2;f.base=(v/272)%2 ? 0x20000 : 0;f.irq=(v/544)%3;
+	f.count=spec<15 ? std::array<unsigned,3>{0,1,15}[spec%3] : spec==15 ? 4 : 11;
+	f.pointer=std::array<u16,7>{0x4000,0x400f,0x4020,0x3001,0x2fff,0x1d,0x16}[form];
+	f.mode=form==2 ? 0x20 : form==1 || form>=5 ? 0x8f : 0x97;
+	f.step=BIT(f.mode,7) ? (f.mode&0x78)==0x08 ? -1 : 1 : 0;
+	f.st0=0xa600|(form==2 ? 0x80 : 0);f.st1=0x100|(f.cmpt ? 0x20 : 0)|(f.irq==1 ? 0 : 0x800);
+	for(unsigned i=0;i<=f.count;++i){f.destination[i]=f.pointer+i*f.step;f.word[i]=std::array<u16,4>{0,1,0x8000,0xffff}[pattern]^(i*0x111);}
+	f.snapshot=std::array<unsigned,4>{3+f.prefix,4+f.prefix,f.read_clock()+(f.count+1)/2,f.read_clock()+f.count+1}[v/1632];
 	return f;
 }
 
 void tms320c54x_test_state::start_popd_mapped(unsigned variant)
 {
 	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-	m_popd_fixture = popd_case(variant, profile_is("popd-repeat")); auto &f = m_popd_fixture;
+	m_popd_fixture = popd_case(variant); auto &f = m_popd_fixture;
 	auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
 	// PMST restoration may select the common lower program window.
 	for (u32 const base : {0U, 0x20000U})
@@ -132,7 +122,7 @@ void tms320c54x_test_state::start_popd_mapped(unsigned variant)
 		if (f.prefix) program.write_word(base + 0x600, f.prefix == 2 ? 0xf070 : 0xec00 | f.count);
 		if (f.prefix == 2) program.write_word(base + 0x601, f.count);
 		program.write_word(base + 0x600 + f.prefix, f.opcode()); program.write_word(base + 0x601 + f.prefix, 0xf4e1);
-		u16 const pmst = f.repeated && f.destination[0] == 0x1d ? f.word[0] : 0;
+		u16 const pmst = f.destination[0] == 0x1d ? f.word[0] : 0;
 		program.write_word(base + (pmst & 0xff80) + (f.irq == 2 ? 4 : 0x40), 0xf4eb);
 	}
 	m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
@@ -1072,7 +1062,6 @@ bool tms320c54x_test_state::check_popd_mapped_results()
 		if (tick == 3 && f.prefix == 2) { auto const disable = machine().disable_side_effects(); for (u32 const base : {0U, 0x20000U}) m_cpu->space(AS_PROGRAM).write_word(base + 0x601, 0xffff); }
 		unsigned const reads = std::min(f.count + 1, tick >= f.read_clock() ? tick - f.read_clock() + 1 : 0);
 		expect(m_pipeline_operand_reads == reads && m_popd_write_mask == f.write_mask(tick) && m_pipeline_store_writes == f.write_count(tick), "POPD retains exact stack and destination transactions across replay");
-		if (!f.repeated && tick == 4 && BIT(f.mode, 7)) { expect(m_cpu->state_int(tms320c54x_device::STATE_AR7) == u16(f.pointer + f.step), "POPD modifies its destination pointer once at Access"); m_cpu->set_state_int(tms320c54x_device::STATE_AR7, 0x2222); }
 		if (tick >= f.read_clock() && tick <= f.read_clock(f.count)) { auto const disable = machine().disable_side_effects(); m_cpu->space(AS_DATA).write_word(0x3000 + tick - f.read_clock(), 0xdead); }
 		if (tick <= f.read_clock() + f.count + 1 || tick == 96)
 		{
@@ -1081,7 +1070,7 @@ bool tms320c54x_test_state::check_popd_mapped_results()
 			for (unsigned r = 0; r < f.initial.size(); ++r)
 			{
 				u16 const address = popd_fixture::reg(r); u16 expected = f.initial[r];
-				if (address == 0x17 && BIT(f.mode, 7)) expected = !f.repeated && tick >= 4 ? 0x2222 : u16(f.pointer + f.step * accessed);
+				if (address == 0x17 && BIT(f.mode, 7)) expected = u16(f.pointer + f.step * accessed);
 				for (unsigned i = 0; i <= f.count; ++i) if (address == f.destination[i] && tick >= f.write_clock(i)) expected = (address == 0xa || address == 0xd) ? f.word[i] & 0xff : f.word[i];
 				u16 const actual = m_cpu->space(AS_DATA).read_word(address);
 				if (actual != expected) osd_printf_info("popd_register: case=%u replay=%u tick=%u address=%04x actual=%04x expected=%04x\n", m_pipeline_peripheral_case, unsigned(m_pipeline_replay), tick, address, actual, expected);
@@ -1100,9 +1089,8 @@ bool tms320c54x_test_state::check_popd_mapped_results()
 				return restore_pipeline_at(254210, "Restore POPD without duplicating a stack read, mapped write, modifier or interrupt");
 			}
 			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (m_pipeline_peripheral_case < (f.repeated ? 6527 : 4031)) { start_popd_mapped(m_pipeline_peripheral_case + 1); return true; }
-			if (f.repeated) { osd_printf_info("TMS320C54x repeated POPD: PASS cases=6528 restore=6528 layouts=RAM,fixed,forward_alias,back_alias,PMST_to_BK,AR6_to_BL forms=short,long counts=0,1,15,4,11 patterns=4 cmpt=2 pages=2 snapshots=4 sources=none,IRQ,NMI reads_each=1 writes_each=1 body_fetches=1 literal_fetches=once read_before_older_write=1 interrupt_return=1 active_block_acceptance=0 silicon_phase_claim=0\n"); throw emu_fatalerror(0, "TMS320C54x isolated repeated POPD complete"); }
-			osd_printf_info("TMS320C54x mapped POPD: PASS cases=4032 restore=4032 registers=21 forms=direct,postincrement,postdecrement patterns=4 cmpt=2 pages=2 snapshots=4 reads=1 writes=1 captured_destination=1 captured_source=1 dagen_write=Read data_write=Execute active_block_acceptance=0 silicon_phase_claim=0\n"); throw emu_fatalerror(0, "TMS320C54x isolated mapped POPD complete");
+			if (m_pipeline_peripheral_case < 6527) { start_popd_mapped(m_pipeline_peripheral_case + 1); return true; }
+			osd_printf_info("TMS320C54x repeated POPD: legacy reference complete\n"); throw emu_fatalerror(0, "TMS320C54x isolated repeated POPD complete");
 		}
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
 	}

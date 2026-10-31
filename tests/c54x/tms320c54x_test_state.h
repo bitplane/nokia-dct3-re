@@ -77,7 +77,7 @@ private:
 	struct popd_fixture
 	{
 		unsigned mode, count, prefix, irq, snapshot;
-		bool repeated, cmpt;
+		bool cmpt;
 		u32 base;
 		u16 pointer, st0, st1;
 		int step;
@@ -90,7 +90,7 @@ private:
 		unsigned write_count(unsigned tick) const { unsigned n = 0; for (unsigned i = 0; i <= count; ++i) if (tick >= write_clock(i)) ++n; return n; }
 		u16 opcode() const { return 0x8b00 | mode; }
 	};
-	static popd_fixture popd_case(unsigned v, bool repeated);
+	static popd_fixture popd_case(unsigned v);
 	void start_popd_mapped(unsigned variant = 0);
 	struct indexed_store_fixture
 	{
