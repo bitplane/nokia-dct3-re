@@ -27,6 +27,40 @@ def compiled_cpp(source):
 
 class CaseFixtureTests(unittest.TestCase):
     @unittest.skipUnless(shutil.which('c++'), 'C++ compiler required')
+    def test_stimulus_batches_preserve_order_and_width(self):
+        source = r'''
+#include <cassert>
+#include <vector>
+#include "tests/c54x/tms320c54x_test_support.h"
+struct cpu {
+    std::vector<c54x_test::register_setting> writes;
+    void set_state_int(int index, std::uint64_t value) { writes.emplace_back(index, value); }
+};
+struct space {
+    std::vector<c54x_test::memory_word> writes;
+    void write_word(std::uint32_t at, std::uint16_t value) { writes.emplace_back(at, value); }
+};
+int main() {
+    cpu registers;
+    c54x_test::set_registers(registers, {{4, 1}, {4, -1}, {-1, 0x8000000000ULL}});
+    c54x_test::set_registers(registers, {});
+    assert(registers.writes.size() == 3);
+    assert(registers.writes[0].index == 4 && registers.writes[0].value == 1);
+    assert(registers.writes[1].index == 4 && registers.writes[1].value == UINT64_MAX);
+    assert(registers.writes[2].index == -1 && registers.writes[2].value == 0x8000000000ULL);
+    space words;
+    c54x_test::write_words(words, {{0x600, 0x1234}, {0x600, -1}, {0x7fffff, 0x10001}});
+    c54x_test::write_words(words, {});
+    assert(words.writes.size() == 3);
+    assert(words.writes[0].address == 0x600 && words.writes[0].value == 0x1234);
+    assert(words.writes[1].address == 0x600 && words.writes[1].value == 0xffff);
+    assert(words.writes[2].address == 0x7fffff && words.writes[2].value == 1);
+}
+'''
+        with compiled_cpp(source) as program:
+            subprocess.run([str(program)], check=True, capture_output=True)
+
+    @unittest.skipUnless(shutil.which('c++'), 'C++ compiler required')
     def test_port_case_preserves_circular_and_absolute_marker_layouts(self):
         source = r'''
 #include <cassert>
