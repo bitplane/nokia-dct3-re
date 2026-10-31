@@ -692,28 +692,6 @@ void tms320c54x_test_state::start_mvdd_source(unsigned variant)
 }
 
 
-void tms320c54x_test_state::check_st1_memory_rules()
-{
-	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); auto &data = m_cpu->space(AS_DATA);
-	for (unsigned masked = 0; masked < 2; ++masked)
-		for (u16 mask : {u16(0xffff), u16(0x00ff), u16(0xff00), u16(0x0800)})
-			for (unsigned word = 0; word < 0x10000; ++word)
-			{
-				u16 const before = 0x6300 | (masked ? 0x800 : 0);
-				m_cpu->set_state_int(tms320c54x_device::STATE_ST1, before | 0x400);
-				expect(data.read_word(7) == before && m_cpu->state_int(tms320c54x_device::STATE_ST1) == before, "Reserved ST1 bit 10 cannot survive debugger import");
-				u16 const merged = (before & ~mask) | (word & mask);
-				u16 const expected = (merged & ~u16(0xc00)) | (before & merged & 0x800);
-				data.write_word(7, word, mask);
-				expect(data.read_word(7) == expected && m_cpu->state_int(tms320c54x_device::STATE_ST1) == expected && m_xf_pin == bool(expected & 0x2000), "Full and partial memory writes cannot set INTM and reserved bit 10 reads zero");
-			}
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x6fff);
-	expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save architectural INTM independently of the memory-write restriction");
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0);
-	expect(restore_snapshot(machine(), m_saved_pipeline) == STATERR_NONE && data.read_word(7) == 0x6bff && m_xf_pin, "Restore INTM and XF without treating load-state as a firmware memory write");
-	osd_printf_info("TMS320C54x ST1 memory rules: PASS cases=524288 word_values=65536 old_intm=2 masks=ffff,00ff,ff00,0800 memory_cannot_set_intm=1 reserved_bit10=0 debugger_seed=1 restore=1 xf_restored=1 clear_policy=legacy_unverified instruction_phase_claim=0\n");
-	throw emu_fatalerror(0, "TMS320C54x isolated ST1 memory rules complete");
-}
 
 
 

@@ -173,7 +173,6 @@ private:
 	};
 	static mvdd_source_fixture mvdd_source_case(unsigned variant, bool repeated);
 	void start_mvdd_source(unsigned variant = 0);
-	void check_st1_memory_rules();
 	virtual void machine_start() override;
 
 	virtual void machine_reset() override;

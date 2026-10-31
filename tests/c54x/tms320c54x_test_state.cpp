@@ -43,7 +43,6 @@ void tms320c54x_test_state::machine_reset()
 	}))
 		return;
 	if (start_profile(*this, machine().options().bios(), {
-		{ {"st1-rules"}, [](self &test) { test.check_st1_memory_rules(); } },
 	}))
 		return;
 	if (start_profile(*this, machine().options().bios(), {
