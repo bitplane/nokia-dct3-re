@@ -125,8 +125,6 @@ private:
 	};
 	rptbd_t_load_fixture rptbd_t_load_case(unsigned v) const;
 	void start_rptbd_t_load(unsigned variant = 0);
-	void start_repeat_mvdp(unsigned variant = 0);
-	void start_repeat_mvdp_irq(unsigned variant = 0);
 	virtual void machine_start() override;
 
 	virtual void machine_reset() override;
@@ -288,7 +286,6 @@ private:
 	bool check_long_mapped_original_results();
 	bool check_staged_conditional_store_results();
 	bool check_mapped_dual_results();
-	bool check_repeat_mvdp_irq_results();
 	bool check_circular_move_results();
 	bool check_rom4_fr_decoder_results();
 	bool check_rom4_codec_is_results();

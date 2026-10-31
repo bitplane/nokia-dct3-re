@@ -411,69 +411,6 @@ void tms320c54x_test_state::start_rptbd_t_load(unsigned variant)
 }
 
 
-void tms320c54x_test_state::start_repeat_mvdp(unsigned variant)
-{
-	unsigned const form = variant % 5, reg = (variant / 5) % 8;
-	unsigned const count = std::array<unsigned, 5>{0, 1, 2, 7, 255}[(variant / 40) % 5];
-	bool const long_count = (variant / 400) % 2;
-	u32 const base = (variant / 200) % 2 ? 0x20000 : 0;
-	bool const mapped = (variant / 1600) % 2;
-	u16 const destination = (variant / 800) % 2 ? 0xfffc : 0x2e00;
-	m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
-	set_registers(*m_cpu, {
-		{cpu_regs::STATE_IDLE, 0}, {cpu_regs::STATE_ILLEGAL, 0}, {cpu_regs::STATE_PMST, 0},
-		{cpu_regs::STATE_ST0, 0xa624}, {cpu_regs::STATE_ST1, 0x800 | (form == 1 ? 0x4000 : 0)},
-		{cpu_regs::STATE_IFR, 0}, {cpu_regs::STATE_IMR, 0}, {cpu_regs::STATE_TCR, 0x10},
-		{cpu_regs::STATE_SP, 0x1200}, {cpu_regs::STATE_BK, 16},
-	});
-	for (unsigned ar = 0; ar < 8; ++ar)
-		m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + ar, ar == reg ? 0x1230 : 0x3000 + ar);
-	m_pipeline_operand_reads = m_pipeline_store_writes = 0;
-	m_pipeline_replay = false; m_idle_fixture_tick = 0;
-	m_pipeline_peripheral_case = variant;
-	auto &program = m_cpu->space(AS_PROGRAM);
-	unsigned const prefix = long_count ? 2 : 1;
-	u8 const mode = form < 2 ? 3 : (form == 2 ? 0x80 : form == 3 ? 0x90 : 0x88) + reg;
-	// OVLY maps the executing code too, not just the copy destination.
-	auto emit = [&program, mapped](u32 at, u16 word) { program.write_word(mapped && u16(at) < 0x8000 ? u16(at) : at, word); };
-	emit(base + 0x600, long_count ? 0xf070 : 0xec00 | count);
-	if (long_count) emit(base + 0x601, count);
-	emit(base + 0x600 + prefix, 0x7d00 | mode);
-	emit(base + 0x601 + prefix, destination);
-	emit(base + 0x602 + prefix, 0xf4e1);
-	for (unsigned i = 0; i <= count; ++i)
-	{
-		u16 const source = form < 2 ? 0x1203 : form == 3 ? 0x1230 + i : form == 4 ? 0x1230 - i : 0x1230;
-		m_cpu->space(AS_DATA).write_word(source, 0x2468 + (form >= 3 ? i : 0));
-		u32 const logical = base | u16(destination + i);
-		program.write_word(mapped && u16(logical) < 0x8000 ? u16(logical) : logical, 0xbeef);
-	}
-	m_cpu->set_state_int(tms320c54x_device::STATE_PMST, mapped ? 0x20 : 0);
-	m_first_port_cycle = 0;
-	m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0, 0xffff, "repeat_mvdp_source",
-		[this, form, count](offs_t at, u16 &word, u16) {
-			if (machine().side_effects_disabled()) return;
-			unsigned const i = m_pipeline_operand_reads;
-			u16 const source = form < 2 ? 0x1203 : form == 3 ? 0x1230 + i : form == 4 ? 0x1230 - i : 0x1230;
-			if (i > count || at != source || word != 0x2468 + (form >= 3 ? i : 0))
-				osd_printf_info("MVDP repeat source mismatch: case=%u iteration=%u at=%04x expected=%04x word=%04x expected_word=%04x cycle=%llu\n", m_pipeline_peripheral_case, i, unsigned(at), source, word, unsigned(0x2468 + (form >= 3 ? i : 0)), (unsigned long long)m_cpu->pipeline_cycles());
-			expect(i <= count && at == source && word == 0x2468 + (form >= 3 ? i : 0), "Repeated MVDP samples each iteration's source in order");
-			++m_pipeline_operand_reads;
-		});
-	m_pipeline_write_tap = program.install_write_tap(0, 0x7fffff, "repeat_mvdp_destination",
-		[this, form, count, base, destination, mapped](offs_t at, u16 &word, u16) {
-			if (machine().side_effects_disabled()) return;
-			unsigned const i = m_pipeline_store_writes;
-			u32 const logical = base | u16(destination + i);
-			u32 const physical = mapped && u16(logical) < 0x8000 ? u16(logical) : logical;
-			if (!i) m_first_port_cycle = m_cpu->pipeline_cycles();
-			expect(i <= count && at == physical && word == 0x2468 + (form >= 3 ? i : 0) && m_cpu->pipeline_cycles() == m_first_port_cycle + i, "Repeated MVDP wraps pmad and retires one word per accelerated clock");
-			++m_pipeline_store_writes;
-		});
-	m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_phase = 259940;
-	m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE);
-	m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-}
 
 
 

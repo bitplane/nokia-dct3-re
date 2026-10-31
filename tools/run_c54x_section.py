@@ -480,6 +480,7 @@ def main():
     counts['memory_count_copy'] = 864
     counts['memory_count_chain'] = 24
     counts['memory_count_wrap'] = 24
+    counts['repeated_mvdp_irq'] = 96
     counts['mapped_source_mvdd'] = 6144
     counts['repeated_mapped_source_mvdd'] = 40
     counts['memory_count_popd'] = 4

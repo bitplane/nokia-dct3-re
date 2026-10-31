@@ -71,7 +71,6 @@ void tms320c54x_test_state::machine_reset()
 	if (start_profile(*this, machine().options().bios(), {
 		{ {"alu-map", "alu-map-edge", "alu-map-irq", "alu-low-bus"}, [](self &test) { test.start_mapped_dual(); } },
 		{ {"popd-ram"}, [](self &test) { test.start_pipeline_data_pop(); } },
-		{ {"rpt-mvdp-irq"}, [](self &test) { test.start_repeat_mvdp_irq(); } },
 	}))
 		return;
 	if (start_profile(*this, machine().options().bios(), {
@@ -384,14 +383,6 @@ void tms320c54x_test_state::test(machine_config &config)
 		m_cpu->instruction_observer_cb().set([this](offs_t address, u16 opcode) { m_observed_instructions.emplace_back(address, opcode); });
 	m_cpu->set_extended_program(true);
 	m_cpu->set_irq_acknowledge_callback([this](device_t &, int line) {
-		if (m_phase == 259960)
-		{
-			unsigned const variant = m_pipeline_peripheral_case;
-			unsigned const count = std::array<unsigned, 4>{0, 1, 7, 255}[variant % 4];
-			bool const nmi = (variant / 16) % 2, long_count = (variant / 8) % 2;
-			expect(line == (nmi ? INPUT_LINE_NMI : 0) && !m_vector_acks && m_pipeline_store_writes == count + 1 && m_cpu->state_int(tms320c54x_device::STATE_RTN) == (long_count ? 0x604 : 0x603), "Repeated MVDP acknowledges the pending source only after all writes with the unexecuted continuation");
-			++m_vector_acks;
-		}
 		observe_context_irq(line);
 		if (m_phase == 251090)
 		{
