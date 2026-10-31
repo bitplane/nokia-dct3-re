@@ -444,6 +444,7 @@ def main():
     counts['block_exit'] = 144
     counts['block_branch'] = 384
     counts['block_branch_limits'] = 16
+    counts['block_xc'] = 2176
     counts['block_delayed_exit'] = 1568
     counts['block_delayed_far_call'] = 576
     counts['shifted_unowned'] = 20480

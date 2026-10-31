@@ -107,7 +107,6 @@ ROM_START(tms54test)
 	ROM_SYSTEM_BIOS(156, "asm-store-bp", "ASM-shifted same-location store and load bypass")
 	ROM_SYSTEM_BIOS(157, "move-brc", "Memory move block count and zero-latency repeat setup")
 	ROM_SYSTEM_BIOS(158, "ld-circular", "Signed circular loads with retained block size and replay")
-	ROM_SYSTEM_BIOS(160, "block-xc", "Conditional block slots and loop endpoint ownership")
 	ROM_SYSTEM_BIOS(161, "imm-forward", "Immediate RAM store forwarding and producer replay")
 
 	ROM_SYSTEM_BIOS(163, "rptb-bd", "Unconditional delayed branches within a repeat block")

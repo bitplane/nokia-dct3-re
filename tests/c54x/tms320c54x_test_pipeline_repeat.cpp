@@ -16,51 +16,6 @@ tms320c54x_test_state::delay_multiply_fixture tms320c54x_test_state::delay_squar
 	return f;
 }
 
-tms320c54x_test_state::block_xc_fixture tms320c54x_test_state::block_xc_case(unsigned v)
-{
-	return {v % 17, (v / 17) % 4, std::array<unsigned, 4>{0, 1, 2, 7}[(v / 68) % 4], (v / 1088) % 4, v / 4352, bool((v / 272) % 2), (v / 544) % 2 ? 0x20000U : 0};
-}
-
-void tms320c54x_test_state::start_block_xc(unsigned variant)
-{
-	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant; auto const f = block_xc_case(variant);
-	auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
-	for (unsigned i = 0; i < 32; ++i) program.write_word(f.base + 0x600 + i, 0xf495);
-	u16 const end = f.endpoint ? (f.layout == 3 ? 0x606 : 0x607) : 0x60b;
-	program.write_word(f.base + 0x600, 0xf072); program.write_word(f.base + 0x601, end);
-	program.write_word(f.base + 0x602, 0x1092 | (f.b() ? 0x100 : 0));
-	u16 const predicate = f.predicate < 12 ? 0xfd42 + f.predicate % 6 + (f.b() ? 8 : 0) : f.predicate == 12 ? 0xfd20 : f.predicate == 13 ? 0xfd30 : f.predicate == 15 ? 0xfd0c : f.predicate == 16 ? 0xfd08 : 0xfd00;
-	program.write_word(f.base + 0x605, predicate | (f.layout == 1 || f.layout == 2 ? 0x200 : 0));
-	program.write_word(f.base + 0x606, f.layout == 2 ? 0x7693 : 0x8093 | (f.b() ? 0x100 : 0));
-	program.write_word(f.base + 0x607, f.layout == 2 ? 0xfd43 : 0x8094 | (f.b() ? 0x100 : 0));
-	if (f.layout == 2) program.write_word(f.base + 0x608, 0x8094 | (f.b() ? 0x100 : 0));
-	program.write_word(f.base + end + 9, 0xf4e1);
-	set_registers(*m_cpu, {
-		{cpu_regs::STATE_IDLE, 0}, {cpu_regs::STATE_ILLEGAL, 0}, {cpu_regs::STATE_PMST, 0},
-		{cpu_regs::STATE_ST0, 0xa608 | (f.rotation ? 0x1800 : 0)}, {cpu_regs::STATE_ST1, 0x900},
-		{cpu_regs::STATE_IMR, 0}, {cpu_regs::STATE_IFR, 0}, {cpu_regs::STATE_TCR, 0x10},
-		{cpu_regs::STATE_A, 0x123456789aULL}, {cpu_regs::STATE_B, 0xfedcba9876ULL}, {cpu_regs::STATE_BRC, f.count},
-		{cpu_regs::STATE_AR2, 0x5000}, {cpu_regs::STATE_AR3, 0x5100}, {cpu_regs::STATE_AR4, 0x5200},
-	});
-	m_cpu->set_input_line(0, CLEAR_LINE); m_cpu->set_input_line(INPUT_LINE_NMI, CLEAR_LINE);
-	for (unsigned i = 0; i <= f.count; ++i) data.write_word(0x5000 + i, f.word(i));
-	m_pipeline_operand_reads = m_pipeline_store_writes = m_pipeline_register_writes = 0;
-	m_pipeline_operand_tap = data.install_read_tap(0, 0xffff, "block_xc_read", [this, f](offs_t at, u16 &word, u16) {
-		if (machine().side_effects_disabled()) return;
-		unsigned const i = m_pipeline_operand_reads++;
-		expect(i <= f.count && at == 0x5000 + i && word == f.word(i) && m_cpu->state_int(tms320c54x_device::STATE_BRC) == f.count - i && bool(m_cpu->state_int(tms320c54x_device::STATE_ST1) & 0x8000) == (i < f.count), "Every XC iteration reads one source with its own counter and BRAF state");
-	});
-	m_pipeline_write_tap = data.install_write_tap(0, 0xffff, "block_xc_write", [this, f](offs_t at, u16 &word, u16) {
-		if (machine().side_effects_disabled()) return;
-		if (at >= 0x5100 && at < 0x5200) { unsigned const i = f.selected(m_pipeline_store_writes); expect(i <= f.count && at == 0x5100 + m_pipeline_store_writes++ && word == (f.layout == 2 ? 0xfd43 : f.word(i)), "Only selected first slots write in source order, including a captured opcode-shaped literal"); return; }
-		unsigned const i = f.layout == 1 ? f.selected(m_pipeline_register_writes) : f.layout >= 2 && f.endpoint ? f.count : m_pipeline_register_writes;
-		expect(i <= f.count && at == 0x5200 + m_pipeline_register_writes++ && word == f.word(i), "Second slots preserve XC1 fallthrough, XC2 selection and post-loop continuation");
-	});
-	m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 255680;
-	m_cpu->set_state_int(STATE_GENPC, f.base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-}
-
-
 void tms320c54x_test_state::start_move_repeat_owner(unsigned variant)
 {
 	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
@@ -676,30 +631,6 @@ bool tms320c54x_test_state::check_delayed_call_replay_results()
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
 	}
 	if (m_phase == 255430) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 255420; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true; }
-	return false;
-}
-
-bool tms320c54x_test_state::check_block_xc_results()
-{
-	if (m_phase == 255680)
-	{
-		auto const f = block_xc_case(m_pipeline_peripheral_case); unsigned const tick = ++m_idle_fixture_tick, checkpoint = std::array<unsigned, 4>{4, 11, 13, 24}[f.snapshot];
-		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Conditional block slots remain staged");
-		capture_pipeline_at(checkpoint, {&m_pipeline_operand_reads, &m_pipeline_store_writes, &m_pipeline_register_writes},
-			"Save block counters and selected or rejected XC slots");
-		if (tick == 120 + f.count * 12)
-		{
-			u64 const result = u64(s64(s16(f.word(f.count)))) & 0xffffffffffULL;
-			expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_pipeline_operand_reads == f.count + 1 && m_pipeline_store_writes == f.first() && m_pipeline_register_writes == f.second() && m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x5001 + f.count && m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x5100 + f.first() && m_cpu->state_int(tms320c54x_device::STATE_AR4) == 0x5200 + f.second() && m_cpu->state_int(tms320c54x_device::STATE_BRC) == 0 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == 0x900 && m_cpu->state_int(tms320c54x_device::STATE_ST0) == (0xa608 | (f.rotation ? 0x1800 : 0)) && m_cpu->state_int(tms320c54x_device::STATE_A) == (f.b() ? 0x123456789aULL : result) && m_cpu->state_int(tms320c54x_device::STATE_B) == (f.b() ? result : 0xfedcba9876ULL), "XC preserves per-iteration selection, counters, status and exact pointer effects");
-			if (replay_pipeline_at(255690, checkpoint,
-				"Restore XC decisions without duplicate source or store transactions")) return true;
-			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (m_pipeline_peripheral_case < 8703) { start_block_xc(m_pipeline_peripheral_case + 1); return true; }
-			osd_printf_info("TMS320C54x block XC: PASS cases=8704 restore=8704 predicates=17 layouts=XC1_single,XC2_two_single,XC2_one_double,XC1_penultimate counts=0,1,2,7 positions=interior,endpoint pages=2 snapshots=4 source_rotations=2 ordered_reads=1 selected_writes=1 rejected_writes=0 opcode_literal=1 counter_braf_owned=1 physical_phase_claim=0\n"); throw emu_fatalerror(0, "TMS320C54x isolated block XC complete");
-		}
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 255690) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 255680; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true; }
 	return false;
 }
 

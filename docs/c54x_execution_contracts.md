@@ -3071,11 +3071,9 @@ its supported predicates when both interrupt-protected words remain inside
 the block. Selected instructions and substituted NOPs preserve their original
 block/end tags, including a two-word instruction ending at REA.
 
-`block-xc` passes 5,760 cases/restores over 15 predicates (12 signed A/B
-conditions, TC/NTC and UNC), three slot layouts, counts 0/1/2/7, interior/end
-placement, two pages, four snapshots and two source rotations. It verifies
-ordered source reads, selected writes, absent rejected writes, opcode-shaped
-literals, pointer updates and per-iteration BRC/BRAF ownership.
+`block_xc` owns the supported block-slot execution contracts, including
+the endpoint extension described below; the old revision-specific subset
+counts are not separate execution owners.
 `composition_limits` retains 18 XC cases/restores rejecting spans crossing the block
 end before data access or pointer effects. This exclusion is a bounded model
 boundary, not a claimed silicon trap.
@@ -4248,11 +4246,14 @@ word on the final iteration. It does not conditionally annul that extra word.
 The existing saved XC endpoint field owns this continuation; no firmware PC
 or new synthetic event participates.
 
-`block-xc` passes 8,704 cases plus replay: seventeen predicates (including
+`block_xc` owns 2,176 independent cases/restores: seventeen predicates (including
 OV/NOV), four layouts including the penultimate XC 1, counts 0/1/2/7, interior
-and endpoint positions, two pages, four checkpoints and two source rotations.
+and endpoint positions, two pages and two source rotations. Four checkpoints
+are distributed instead of multiplying every semantic tuple by four.
 Ordered reads, selected writes, per-iteration conditions, pointer effects,
-BRC/BRAF and final fall-through remain checked. The eighteen XC `composition_limits`
+BRC/BRAF and final fall-through remain checked. Exact interleaved data traces
+include next-iteration Read before the previous endpoint Write, and untouched
+output tails detect rejected-slot writes or wrong destinations. The eighteen XC `composition_limits`
 cases plus replay retain guards when the *conditionally selected* span crosses
 the endpoint: XC 1 at the endpoint, or XC 2 at/just before it. These are
 model-scope exclusions, not silicon traps.

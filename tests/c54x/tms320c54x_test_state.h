@@ -146,25 +146,6 @@ private:
 	static delay_multiply_fixture delay_square_case(unsigned variant);
 	static delay_multiply_fixture delay_memory_square_case(unsigned variant);
 	void start_delay_multiply(unsigned variant = 0);
-	struct block_xc_fixture
-	{
-		unsigned predicate, layout, count, snapshot, rotation;
-		bool endpoint;
-		u32 base;
-		bool b() const { return predicate >= 6 && predicate < 12; }
-		u16 word(unsigned i) const { return std::array<u16, 8>{0, 1, 0x8000, 0xffff, 0x7fff, 2, 0x8001, 0xfffe}[(i + rotation * 4) % 8]; }
-		bool taken(unsigned i) const
-		{
-			if (predicate >= 12) return predicate == 14 || ((predicate == 13 || predicate == 15) ? bool(rotation) : !rotation);
-			s32 const value = s16(word(i));
-			return std::array<bool, 6>{value >= 0, value < 0, value != 0, value == 0, value > 0, value <= 0}[predicate % 6];
-		}
-		unsigned selected(unsigned ordinal) const { for (unsigned i = 0; i <= count; ++i) if (taken(i) && !ordinal--) return i; return count + 1; }
-		unsigned first() const { unsigned n = 0; for (unsigned i = 0; i <= count; ++i) n += taken(i); return n; }
-		unsigned second() const { return layout == 1 ? first() : layout >= 2 && endpoint ? 1 : count + 1; }
-	};
-	static block_xc_fixture block_xc_case(unsigned v);
-	void start_block_xc(unsigned variant = 0);
 	void start_move_repeat_owner(unsigned variant = 0);
 	void start_long_mapped_original(unsigned variant = 0);
 
@@ -596,7 +577,6 @@ private:
 	bool check_register_product_results();
 	bool check_popd_mapped_results();
 	bool check_bd_long_accumulator_results();
-	bool check_block_xc_results();
 	bool check_move_repeat_owner_results();
 	bool check_delay_dld_results();
 	bool check_memory_copy_repeat_results();
