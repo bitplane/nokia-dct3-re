@@ -7,93 +7,6 @@
 
 namespace c54x_test {
 
-unsigned tms320c54x_test_state::circular_fixture_mask(u16 bk)
-{
-	unsigned mask = 1;
-	while (mask < bk) mask = (mask << 1) | 1;
-	return mask;
-}
-
-bool tms320c54x_test_state::circular_fixture_domain(u16 initial, int step, u16 bk)
-{
-	return bk && (initial & circular_fixture_mask(bk)) < bk && step >= -int(bk) && step <= int(bk);
-}
-
-u16 tms320c54x_test_state::circular_fixture_next(u16 initial, int step, u16 bk)
-{
-	// SPRU131G 5.5.3.4: modulo is an oracle only inside the documented nonzero-BK domain.
-	if (!circular_fixture_domain(initial, step, bk))
-		throw emu_fatalerror(1, "Circular fixture outside documented domain: AR=%04x step=%d BK=%u", initial, step, bk);
-	unsigned const mask = circular_fixture_mask(bk);
-	int const index = (int(initial & mask) + step) % int(bk);
-	return (initial & ~mask) | (index < 0 ? index + bk : index);
-}
-
-
-
-
-
-
-
-
-
-
-tms320c54x_test_state::extended_banz_fixture tms320c54x_test_state::extended_banz_case(unsigned variant)
-{
-	unsigned const v = variant % 768, form = v % 3, reg = (v / 3) % 8, pattern = (v / 24) % 8;
-	bool const compatibility = (v / 192) % 2;
-	// Circular inputs must begin inside the queue and admit the signed step.
-	// Keep linear 16-bit wrap cases separate from legal circular wrap cases.
-	u16 const initial = form == 2 ? std::array<u16, 8>{0, 1, 0x7fff, 0, 1, 0x0234, 7, 0}[pattern] :
-		std::array<u16, 8>{0, 1, 0xffff, 0, 1, 0x1234, 7, 0x8000}[pattern];
-	s16 const offset = std::array<s16, 8>{0, -1, 1, 1, 0, s16(0xf495), 17, s16(0x8000)}[pattern];
-	u16 const bk = form == 2 ? 0x8000 : 16;
-	u16 const resolved = form == 2 ? circular_fixture_next(initial, offset, bk) : u16(initial + offset);
-	return {form, reg, compatibility && !reg ? 3U : reg, initial, u16(offset), resolved, form ? resolved : initial,
-		(v / 384) % 2 ? 0x20000U : 0U, bk};
-}
-
-
-
-
-void tms320c54x_test_state::start_long_mapped_original(unsigned variant)
-{
-	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_cpu->set_pipeline_frontend(false); m_pipeline_peripheral_case = variant;
-	unsigned v = variant;
-	u16 const length = std::array<u16,8>{12,0,6,7,8,13,21,143}[v % 8]; v /= 8;
-	u16 const stale = std::array<u16,4>{0xff84,0,7,0xffff}[v % 4]; v /= 4;
-	bool const sxm = !(v % 2); v /= 2;
-	u32 const base = v % 2 ? 0x20000 : 0;
-	auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
-	// Unchanged AA88 03:bdb6..bdc2, including the dependent double load.
-	std::array<u16,13> const source{0x1106,0x08f8,0x000b,0xf843,0xbdd2,0xf640,0x10f8,0x0008,0x4e0a,0x560a,0x7002,0x0011,0x4e00};
-	for (unsigned i=0; i<source.size(); ++i) program.write_word(base+0xbdb6+i,source[i]);
-	program.write_word(base+0xbdc3,0xf4e1); program.write_word(base+0xbdd2,0xf4e1);
-	data.write_word(0x1406,7); data.write_word(0x140a,variant?0x7777:0); data.write_word(0x140b,variant?0x8888:0x88);
-	data.write_word(0x1400,0xaaaa); data.write_word(0x1401,0xbbbb); data.write_word(0x1402,0xcccc);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IDLE,0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL,0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_PMST,0); m_cpu->set_state_int(tms320c54x_device::STATE_ST0,0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST1,0x4800 | (sxm ? 0x100 : 0));
-	m_cpu->set_state_int(tms320c54x_device::STATE_IFR,0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR,0); m_cpu->set_state_int(tms320c54x_device::STATE_TCR,0x10);
-	m_cpu->set_state_int(tms320c54x_device::STATE_SP,0x1400); m_cpu->set_state_int(tms320c54x_device::STATE_A,length); m_cpu->set_state_int(tms320c54x_device::STATE_B,stale);
-	m_cpu->set_state_int(tms320c54x_device::STATE_AR1,3);
-	m_pipeline_operand_reads=m_pipeline_extensions_reads=m_pipeline_register_writes=m_pipeline_store_writes=m_pipeline_drained_fetches=0;
-	m_pipeline_operand_tap = data.install_read_tap(0,0xffff,"long_mapped_original_read",[this](offs_t at,u16 &value,u16) {
-		if (machine().side_effects_disabled()) return;
-		if (at==0x1406) { expect(value==7 && !m_pipeline_extensions_reads++,"Original escape reads its threshold once"); return; }
-		if (at==0x11) { expect(value==3 && m_pipeline_extensions_reads==1,"Original escape copies its width once"); ++m_pipeline_extensions_reads; return; }
-		if (at==0x140a || at==0x140b) { ++m_pipeline_drained_fetches; osd_printf_info("long_mapped_original_backing_read: address=%04x value=%04x\n",unsigned(at),value); return; }
-		expect(at==8 || at==0x0b,"Original escape reads only mapped AL/BL after its threshold");
-		if (at==8) ++m_pipeline_register_writes; else ++m_pipeline_operand_reads;
-		if (value!=7) { ++m_pipeline_drained_fetches; osd_printf_info("long_mapped_original_read: case=%u address=%04x actual=%04x expected=0007\n",m_pipeline_peripheral_case,unsigned(at),value); }
-	});
-	m_pipeline_write_tap = data.install_write_tap(0,0xffff,"long_mapped_original_write",[this](offs_t at,u16 &,u16) {
-		if (machine().side_effects_disabled()) return;
-		expect(at==0x140a || at==0x140b || (at>=0x1400 && at<=0x1402),"Original escape publishes only its local value and outgoing arguments"); ++m_pipeline_store_writes;
-	});
-	m_pipeline_replay=false; m_idle_fixture_tick=0; m_phase=399940;
-	m_cpu->set_state_int(STATE_GENPC,base+0xbdb6); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1,m_cpu->clock()));
-}
 
 
 
@@ -303,41 +216,6 @@ void tms320c54x_test_state::stack_mmr_w(offs_t offset, u16 value)
 
 
 
-bool tms320c54x_test_state::check_long_mapped_original_results()
-{
-	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
-	if (m_phase == 399940)
-	{
-		unsigned const tick=++m_idle_fixture_tick, variant=m_pipeline_peripheral_case;
-		u16 const length=std::array<u16,8>{12,0,6,7,8,13,21,143}[variant%8]; bool const emits=length>=7;
-		if (tick==6 && !m_pipeline_replay)
-		{
-			m_recurring_irq_snapshot={m_pipeline_operand_reads,m_pipeline_extensions_reads,m_pipeline_register_writes,m_pipeline_store_writes,m_pipeline_drained_fetches};
-			expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE,"Save original long-mapped escape prefix");
-		}
-		if (tick==48)
-		{
-			u16 high,low,width,local_high,local_low;
-			{ auto const disable=machine().disable_side_effects(); auto &data=m_cpu->space(AS_DATA); high=data.read_word(0x1400); low=data.read_word(0x1401); width=data.read_word(0x1402); local_high=data.read_word(0x140a); local_low=data.read_word(0x140b); }
-			if (m_pipeline_drained_fetches) osd_printf_info("long_mapped_original_result: case=%u low=%04x expected=%04x\n",variant,low,emits?7:0x8888);
-			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) && m_cpu->state_int(tms320c54x_device::STATE_IDLE),"Original escape prefix completes cleanly");
-			expect(!m_pipeline_drained_fetches && m_pipeline_operand_reads==1 && m_pipeline_extensions_reads==unsigned(emits?2:1) && m_pipeline_register_writes==unsigned(emits) && m_pipeline_store_writes==unsigned(emits?5:0),"Original escape forwards its pending double store to the same-address load");
-			expect(high==(emits?0:0xaaaa) && low==(emits?7:0xbbbb) && width==(emits?3:0xcccc) && local_high==(emits?0:0x7777) && local_low==(emits?7:0x8888) && m_cpu->state_int(tms320c54x_device::STATE_B)==7,"Original escape emits the threshold and preserves real local writes");
-			if (!m_pipeline_replay)
-			{
-				m_pipeline_replay=true; m_idle_fixture_tick=6;
-				m_pipeline_operand_reads=m_recurring_irq_snapshot[0]; m_pipeline_extensions_reads=m_recurring_irq_snapshot[1]; m_pipeline_register_writes=m_recurring_irq_snapshot[2]; m_pipeline_store_writes=m_recurring_irq_snapshot[3]; m_pipeline_drained_fetches=m_recurring_irq_snapshot[4];
-				return restore_pipeline_at(399950, "Restore original long-mapped escape prefix");
-			}
-			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (variant<127) { start_long_mapped_original(variant+1); return true; }
-			osd_printf_info("TMS320C54x original escape store/load: PASS cases=128 restore=128 lengths=8 stale_values=4 sxm=2 pages=2 mapped_reads=BL,AL writes=0,5 backing_reload_reads=0 silicon_phase_claim=0\n");
-		}
-		m_check_timer->adjust(attotime::from_ticks(1,m_cpu->clock())); return true;
-	}
-	if (m_phase==399950) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase=399940; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1,m_cpu->clock())); return true; }
-	return false;
-}
 
 
 

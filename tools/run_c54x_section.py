@@ -480,6 +480,7 @@ def main():
     counts['memory_count_copy'] = 864
     counts['memory_count_chain'] = 24
     counts['memory_count_wrap'] = 24
+    counts['escape_prefix'] = 64
     counts['banz_delay_t_load'] = 192
     counts['control_delay_t_load'] = 1152
     counts['block_delay_t_load'] = 192
@@ -539,7 +540,7 @@ def main():
     if args.section in ('idle_dma', 'clock_rates'):
         for name in ('tms320c54x_dma.h', 'tms320c54x_dma.cpp'):
             copy_changed(ROOT / 'driver' / name, overlay / name)
-    selected_source = ROOT / ('tests/firmware/c54x_' + args.section + '.h') if args.section in ('descriptor_copy', 'byte_swap', 'block_swap', 'signed_branch', 'store_compare', 'conditional_store', 'stack_alignment', 'store_move_compare', 'xc_context', 'logic_composition', 'nibble_composition') else sections / (args.section + '.h')
+    selected_source = ROOT / ('tests/firmware/c54x_' + args.section + '.h') if args.section in ('descriptor_copy', 'byte_swap', 'block_swap', 'signed_branch', 'store_compare', 'conditional_store', 'stack_alignment', 'store_move_compare', 'xc_context', 'logic_composition', 'nibble_composition', 'escape_prefix') else sections / (args.section + '.h')
     copy_changed(selected_source, overlay / 'c54x_section_selected.h')
     if args.negative_control:
         selected = overlay / 'c54x_section_selected.h'

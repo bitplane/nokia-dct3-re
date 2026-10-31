@@ -57,19 +57,6 @@ private:
 	void start_pipeline_idle_sp_tail(unsigned variant = 0);
 	void start_pipeline_original_idle(unsigned variant = 0);
 	void start_instruction_observer(unsigned variant = 0);
-	static unsigned circular_fixture_mask(u16 bk);
-	static bool circular_fixture_domain(u16 initial, int step, u16 bk);
-	static u16 circular_fixture_next(u16 initial, int step, u16 bk);
-	struct indexed_store_fixture;
-	struct extended_banz_fixture
-	{
-		unsigned form, reg, selected;
-		u16 initial, offset, resolved, next_ar;
-		u32 base;
-		u16 bk;
-	};
-	static extended_banz_fixture extended_banz_case(unsigned variant);
-	void start_long_mapped_original(unsigned variant = 0);
 
 
 
@@ -244,7 +231,6 @@ private:
 		return true;
 	}
 	bool check_instruction_observer_results();
-	bool check_long_mapped_original_results();
 	bool check_circular_move_results();
 	bool check_rom4_fr_decoder_results();
 	bool check_rom4_codec_is_results();
