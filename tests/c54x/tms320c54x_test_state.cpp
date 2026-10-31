@@ -66,8 +66,6 @@ void tms320c54x_test_state::machine_reset()
 		{ {"st-dagen"}, [](self &test) { test.start_constant_dagen(); } },
 	}))
 		return;
-	if (profile_is("cond-store") || profile_is("cond-store-edge")) { start_staged_conditional_store(); return; }
-	if (profile_is("cond-store-ar")) { start_staged_conditional_store(); return; }
 	if (start_profile(*this, machine().options().bios(), {
 		{ {"popd-ram"}, [](self &test) { test.start_pipeline_data_pop(); } },
 	}))

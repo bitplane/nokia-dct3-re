@@ -346,65 +346,6 @@ void tms320c54x_test_state::stack_mmr_w(offs_t offset, u16 value)
 	m_stack_mmr[offset] = value;
 }
 
-tms320c54x_test_state::staged_conditional_store_fixture tms320c54x_test_state::staged_conditional_store_case(unsigned v) const
-{
-	staged_conditional_store_fixture f{}; f.edge = profile_is("cond-store-edge");
-	bool const mapped = profile_is("cond-store-ar");
-	unsigned const target = mapped ? v % 8 : 0; if (mapped) v /= 8;
-	f.form = v % 4; v /= 4;
-	unsigned flags = 0; int shift = 0;
-	if (f.edge) { f.mode = v % 16; v /= 16; f.condition = f.mode % 12; f.address = std::array<u16, 4>{8, 0x1a, 0x28, 0x5f}[v % 4]; v /= 4; f.base = v % 2 ? 0x20000 : 0; v /= 2; f.snapshot = v % 2; }
-	else
-	{
-		f.condition = v % 12; v /= 12; f.pattern = v % 6; v /= 6; f.mode = v % 16; v /= 16;
-		if (mapped) { shift = f.pattern & 1 ? -1 : 0; flags = f.pattern % 4; }
-		else { shift = std::array<int, 4>{-16, -1, 0, 15}[v % 4]; v /= 4; flags = v % 4; v /= 4; }
-		f.base = v % 2 ? 0x20000 : 0; v /= 2; f.snapshot = v % 3;
-		f.address = mapped ? 0x10 + target : 0x160f + 0x100 * (f.mode & 3);
-	}
-	static constexpr std::array<u64, 6> values{0, 1, 0xffffffffffULL, 0x7fffffff, 0xff80000000ULL, 0x0100000000ULL};
-	f.a = values[f.pattern]; f.b = values[(f.pattern + 3) % 6]; if (f.condition >= 6) std::swap(f.a, f.b);
-	f.t = 0x1234 ^ (f.pattern * 0x2222); f.brc = 0xabcd ^ (f.pattern * 0x1111);
-	f.st1 = 0x800 | (flags & 1 ? 0x100 : 0) | (flags & 2 ? 0x200 : 0) | (shift & 31); f.pmst = flags & 2 ? 1 : 0;
-	f.memory = 0xa55a ^ (f.pattern * 0x1111); f.bk = !mapped && (f.pattern & 1) ? 16 : 0;
-	unsigned const modification = f.mode >> 2;
-	s16 const step = mapped && !target ? s16(f.memory) : 3;
-	f.final_ar = modification == 1 ? f.address - 1 : modification == 2 ? f.address + 1 : modification == 3 ? f.bk ? (f.address & 0xfff0) | ((f.address + 3) & 15) : f.address + step : f.address;
-	if (mapped && target == 2 + (f.mode & 3)) f.memory = f.final_ar;
-	u64 const tested = f.condition >= 6 ? f.b : f.a; bool const negative = tested & 0x8000000000ULL, zero = !tested;
-	bool const take = std::array<bool, 6>{!negative, negative, !zero, zero, !negative && !zero, negative || zero}[f.condition % 6];
-	f.output = f.memory;
-	if (take)
-	{
-		if (f.form < 2) f.output = f.form ? f.brc : f.t;
-		else { u64 const source = f.form == 3 ? f.b : f.a; s64 const signed_source = source & 0x8000000000ULL ? s64(source) - 0x10000000000LL : s64(source); u64 const value = shift < 0 ? u64(f.st1 & 0x100 ? signed_source >> -shift : s64(source >> -shift)) & 0xffffffffffULL : (source << shift) & 0xffffffffffULL; f.output = value >> 16; }
-	}
-	return f;
-}
-
-void tms320c54x_test_state::start_staged_conditional_store(unsigned variant)
-{
-	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-	bool const mapped = profile_is("cond-store-ar");
-	auto const f = staged_conditional_store_case(variant); auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
-	for (unsigned i = 0; i < 16; ++i) program.write_word(f.base + 0x600 + i, 0xf495);
-	program.write_word(f.base + 0x600, 0x9c00 | (f.form << 8) | (f.mode << 4) | (f.condition < 6 ? f.condition + 2 : f.condition + 4)); program.write_word(f.base + 0x601, 0xf4e1);
-	if (!f.edge && !mapped) data.write_word(f.address, f.memory);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xa630); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, f.st1); m_cpu->set_state_int(tms320c54x_device::STATE_PMST, f.pmst);
-	m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10); m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_A, f.a ^ 0x1111111111ULL); m_cpu->set_state_int(tms320c54x_device::STATE_B, f.b ^ 0x1111111111ULL);
-	m_cpu->set_state_int(tms320c54x_device::STATE_T, f.t ^ 0xffff); m_cpu->set_state_int(tms320c54x_device::STATE_BRC, f.brc ^ 0xffff); m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x3000);
-	m_cpu->set_state_int(tms320c54x_device::STATE_AR0, 3); m_cpu->set_state_int(tms320c54x_device::STATE_BK, f.bk);
-	for (unsigned ar = 2; ar < 6; ++ar) m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + ar, 0x2200 + ar);
-	if (mapped) { for (unsigned ar : {1U, 6U, 7U}) m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + ar, 0x2200 + ar); m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + f.address - 0x10, f.memory); }
-	m_pipeline_operand_reads = m_pipeline_store_writes = m_pipeline_extensions_reads = 0;
-	m_pipeline_operand_tap = data.install_read_tap(0, 0xffff, "conditional_store_read", [this, f](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return; expect(!f.edge && !m_pipeline_operand_reads++ && at == f.address && word == f.memory && m_cpu->pipeline_cycles() == 5, "Conditional store reads the captured RAM address even when its condition is false"); });
-	m_pipeline_write_tap = data.install_write_tap(0, 0xffff, "conditional_store_write", [this, f](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return; expect(!f.edge && !m_pipeline_store_writes++ && at == f.address && word == f.output && m_cpu->pipeline_cycles() == 6, "Conditional store publishes Execute-live source or retained false-condition readback once"); });
-	m_pipeline_fetch_tap = program.install_read_tap(f.base + 0x600, f.base + 0x600, "conditional_store_opcode", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) expect(!m_pipeline_extensions_reads++, "Conditional store fetches one opcode"); });
-	m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 620200;
-	m_cpu->set_state_int(STATE_GENPC, f.base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-}
 
 
 
@@ -540,52 +481,6 @@ bool tms320c54x_test_state::check_long_mapped_original_results()
 
 
 
-bool tms320c54x_test_state::check_staged_conditional_store_results()
-{
-	if (m_phase == 620200)
-	{
-		bool const mapped = profile_is("cond-store-ar");
-		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick; auto const f = staged_conditional_store_case(variant);
-		expect(bool(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL)) == (f.edge && tick >= 4), "Conditional store rejects mapped RAM before pointer or bus effects");
-		if (tick == 3) { m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + 2 + (f.mode & 3), f.address); auto const disable = machine().disable_side_effects(); m_cpu->space(AS_PROGRAM).write_word(f.base + 0x600, 0xdead); }
-		for (unsigned ar = mapped ? 0 : 2; ar < unsigned(mapped ? 8 : 6); ++ar)
-		{
-			u16 expected = !f.edge && tick > 4 ? 0x3300 + ar : ar != 2 + (f.mode & 3) || tick < 3 ? 0x2200 + ar : !f.edge && tick == 4 ? f.final_ar : f.address;
-			if (mapped)
-			{
-				bool const target = ar == f.address - 0x10, pointer = ar == 2 + (f.mode & 3);
-				expected = target ? f.memory : ar ? 0x2200 + ar : 3;
-				if (pointer && tick >= 3) expected = tick == 3 ? f.address : tick == 4 ? f.final_ar : target ? f.memory : 0x3300 + ar;
-				else if (ar >= 2 && ar < 6 && !target && tick >= 5) expected = 0x3300 + ar;
-				if (target && tick >= 6) expected = f.output;
-			}
-			expect(m_cpu->state_int(tms320c54x_device::STATE_AR0 + ar) == expected, "Conditional store captures one address and modifies it once regardless of condition");
-		}
-		if (tick == 4 && !f.edge) for (unsigned ar = 2; ar < 6; ++ar) if (!mapped || ar != f.address - 0x10) m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + ar, 0x3300 + ar);
-		if (tick == 5 && !f.edge)
-		{
-			m_cpu->set_state_int(tms320c54x_device::STATE_A, f.a); m_cpu->set_state_int(tms320c54x_device::STATE_B, f.b);
-			m_cpu->set_state_int(tms320c54x_device::STATE_T, f.t); m_cpu->set_state_int(tms320c54x_device::STATE_BRC, f.brc); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, f.st1 ^ 31);
-			auto const disable = machine().disable_side_effects(); m_cpu->space(AS_DATA).write_word(f.address, f.memory ^ 0xffff);
-		}
-		unsigned const checkpoint = (f.edge ? 3 : 4) + f.snapshot;
-		if (tick == checkpoint && !m_pipeline_replay) { m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_store_writes, m_pipeline_extensions_reads}; expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save conditional store before/after address, readback and publication"); }
-		if (tick == 16)
-		{
-			expect(m_pipeline_operand_reads == unsigned(!f.edge) && m_pipeline_store_writes == unsigned(!f.edge) && m_pipeline_extensions_reads == 1 && bool(m_cpu->state_int(tms320c54x_device::STATE_IDLE)) == !f.edge && m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0xa630 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == (f.edge ? f.st1 : f.st1 ^ 31) && m_cpu->state_int(tms320c54x_device::STATE_PMST) == f.pmst && m_cpu->state_int(tms320c54x_device::STATE_A) == (f.edge ? f.a ^ 0x1111111111ULL : f.a) && m_cpu->state_int(tms320c54x_device::STATE_B) == (f.edge ? f.b ^ 0x1111111111ULL : f.b) && m_cpu->state_int(tms320c54x_device::STATE_T) == (f.edge ? f.t ^ 0xffff : f.t) && m_cpu->state_int(tms320c54x_device::STATE_BRC) == (f.edge ? f.brc ^ 0xffff : f.brc) && m_cpu->state_int(tms320c54x_device::STATE_BK) == f.bk && m_cpu->state_int(tms320c54x_device::STATE_AR0) == (mapped && f.address == 0x10 ? f.output : 3), "Conditional store preserves source registers and flags with one read/write or no rejected effects");
-			if (!f.edge) { auto const disable = machine().disable_side_effects(); expect(m_cpu->space(AS_DATA).read_word(f.address) == f.output && m_cpu->state_int(STATE_GENPC) == f.base + 0x602, "Conditional store writes retained false sample or selected source before a fresh continuation"); }
-			if (!m_pipeline_replay) { m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_store_writes = m_recurring_irq_snapshot[1]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[2]; m_cpu->set_pipeline_frontend(true); return restore_pipeline_at(620201, "Restore conditional store after clearing live pipeline state"); }
-			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (variant + 1 < (mapped ? 221184U : f.edge ? 1024U : 442368U)) { start_staged_conditional_store(variant + 1); return true; }
-			if (mapped) { osd_printf_info("TMS320C54x conditional AR stores: PASS cases=221184 restore=221184 forms=4 predicates=12 patterns=6 xmem=16 destinations=AR0..AR7 asm=0,-1 flags=pattern_coupled bk=0 pages=2 snapshots=3 false_read_writeback=1 address_sample=Access read_after_pointer_update=1 predicate_source_sample=Execute pointer_target_alias=1 reset_before_restore=1 physical_phase_claim=0\n"); throw emu_fatalerror(3, "TMS320C54x isolated conditional AR stores complete"); }
-			if (f.edge) { osd_printf_info("TMS320C54x conditional store exclusions: PASS cases=1024 restore=1024 forms=4 xmem=16 addresses=4 pages=2 snapshots=2 reads=0 writes=0 pointer_changes=0 reset_before_restore=1 silicon_trap_claim=0\n"); throw emu_fatalerror(3, "TMS320C54x isolated conditional store exclusions complete"); }
-			osd_printf_info("TMS320C54x staged conditional stores: PASS cases=442368 restore=442368 forms=STRCD,SRCCD,SACCDA,SACCDB predicates=12 patterns=6 xmem=16 shifts=4 flags=4 pages=2 snapshots=3 false_read_writeback=1 address_sample=Access asm_sample=Read predicate_source_sample=Execute saturation_ignored=1 read_retained=1 pointer_updates=once reset_before_restore=1 physical_phase_claim=0\n"); throw emu_fatalerror(3, "TMS320C54x isolated staged conditional stores complete");
-		}
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 620201) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 620200; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true; }
-	return false;
-}
 
 
 

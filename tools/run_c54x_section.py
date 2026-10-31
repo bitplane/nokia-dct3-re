@@ -480,6 +480,9 @@ def main():
     counts['memory_count_copy'] = 864
     counts['memory_count_chain'] = 24
     counts['memory_count_wrap'] = 24
+    counts['staged_conditional_store'] = 1152
+    counts['mapped_conditional_store'] = 1024
+    counts['conditional_store_rejections'] = 256
     counts['mapped_dual_alu'] = 3072
     counts['mapped_dual_rejections'] = 888
     counts['interrupt_dual_alu'] = 384

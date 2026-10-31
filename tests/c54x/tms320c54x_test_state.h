@@ -159,16 +159,6 @@ private:
 
 	void start_rom4_delayed_repeat(unsigned index);
 
-	struct staged_conditional_store_fixture
-	{
-		unsigned form, condition, pattern, mode, snapshot;
-		u32 base;
-		u16 address, final_ar, memory, output, t, brc, bk, st1, pmst;
-		u64 a, b;
-		bool edge;
-	};
-	staged_conditional_store_fixture staged_conditional_store_case(unsigned v) const;
-	void start_staged_conditional_store(unsigned variant = 0);
 
 
 
@@ -274,7 +264,6 @@ private:
 	bool check_instruction_observer_results();
 	bool check_rptbd_t_load_results();
 	bool check_long_mapped_original_results();
-	bool check_staged_conditional_store_results();
 	bool check_circular_move_results();
 	bool check_rom4_fr_decoder_results();
 	bool check_rom4_codec_is_results();

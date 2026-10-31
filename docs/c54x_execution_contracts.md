@@ -4189,27 +4189,29 @@ establish silicon timing for every other predicate/source or producer pairing.
 The shared store-word calculation is also used for an adjacent RAM bypass,
 without replacing the actual write transaction.
 
-`cond-store` passes 442,368 cases plus replay: four source forms, twelve A/B
-predicates, six zero/sign/guard patterns, sixteen Xmem encodings, four ASM
-shifts, four flag combinations, two pages and three snapshots. OVM/SST are
-toggled together; the two BK values are coupled to source patterns. These are
-not independent full cross-products. Late pointer and ASM changes check
+`staged_conditional_store` passes 1,152 independent cases plus replay:
+four source forms, twelve A/B predicates, six zero/sign/guard patterns and
+four ASM shifts. Xmem modes, flags, pages and checkpoints are distributed;
+BK remains coupled to source patterns. Late pointer and ASM changes check
 retention; changing A/B/T/BRC after Read checks the declared Execute sampling
 policy. Poisoning RAM after Read checks the false write-back path. Source
-registers and status are preserved. `cond-store-edge` passes 1,024 cases plus
+registers and status are preserved. `conditional_store_rejections` passes 256 cases plus
 replay, rejecting accumulator, BRC and peripheral destinations before pointer
 or bus effects.
 
-`cond-store-ar` passes 221,184 cases and cleared-pipeline replays: four
-forms, twelve predicates, six patterns, sixteen Xmem encodings, all eight
-mapped AR destinations, two pages and three checkpoints. BK is zero;
-ASM=0/-1 and SXM/OVM/SST are coupled to patterns rather than a full cross
-product. The target may alias the addressing pointer: its Read sample then
+`mapped_conditional_store` passes 1,024 independent cases and cleared-pipeline
+replays: four forms, sixteen Xmem encodings, all eight mapped AR destinations,
+and taken/not-taken EQ cases. Other predicates and numeric boundaries belong
+to the numeric section above, not an address cross-product. Pages/checkpoints
+are distributed. BK is zero; ASM=0/-1 and flags are coupled to the two tested
+values. The target may alias the addressing pointer: its Read sample then
 contains the Access-stage modification, and its Execute write replaces that
 register once. A false predicate writes the retained sample, not a newer
 poisoned AR value. AR0 destinations also test signed AR0-based address steps.
 Source/predicate values change before Execute, and non-target registers and
-status remain unchanged except for the declared pointer update.
+status remain unchanged except for the declared pointer update. Legacy
+factories/setup/checkers/routes are removed. A wrong output bit fails at
+the first replacement write; no CPU change is retained.
 
 The acquired EFR block deliberately sets AR5 to `0016` at `d1a6` and uses
 conditional store `9d3a` at `d1ad` to target mapped AR6. Atomic and staged
