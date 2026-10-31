@@ -60,7 +60,6 @@ private:
 	static unsigned circular_fixture_mask(u16 bk);
 	static bool circular_fixture_domain(u16 initial, int step, u16 bk);
 	static u16 circular_fixture_next(u16 initial, int step, u16 bk);
-	void start_pipeline_store_mvmm(unsigned variant = 0);
 	struct indexed_store_fixture;
 	struct extended_banz_fixture
 	{

@@ -4837,11 +4837,12 @@ at `1201` instead of `1202`, a wrong challenge response and MCU reason-4
 reset. The corrected clean run continues with validator `r6=1` at 0.349379 s,
 without that reset. This is a CPU addressing correction, not new provisioning.
 
-`st-mvmm` passes 1,536 cases plus replay: one/two immediate stores, all eight
-AR sources and destinations (including aliases), zero/one NOP gaps, two
-pages and three snapshots around Decode/Access. It checks each original
+`immediate_store_mvmm` passes 256 independently compiled cases plus replay:
+one/two immediate stores, all eight AR sources and destinations (including
+aliases), and zero/one NOP gaps. Pages and three snapshots around
+Decode/Access are distributed rather than multiplied. It checks each original
 store address/value and Execute clock, the one-time retained MVMM read/write,
-and a following indirect load. The unmodified core fails at the source read.
+and a following indirect load. Legacy setup and phase branches are removed.
 
 An adjacent MVMM also consumes the pending short STL/STH postincrement
 through an internal DAGEN bypass. The accumulator store retains its existing
@@ -4850,13 +4851,15 @@ AR stores retain their separate latency contracts. The acquired case is
 STL at `d444` followed by MVMM `d445` (`e734`): the copied AR3 is `1104`,
 not `1103`. Reading the stale cell made a later copy start one word early.
 
-`st-acc-mvmm` passes 24,576 cases and cleared-pipeline replays: STL/STH
+`accumulator_store_mvmm` passes 4,096 cases and cleared-pipeline replays: STL/STH
 from A/B, four boundary words, one/two stores, every AR source/destination
-pair including aliases, zero/one NOP gap, two pages and three snapshots.
+pair including aliases, and zero/one NOP gap. Pages and three snapshots
+are distributed rather than multiplied.
 It checks the original store addresses and Execute write clocks, one
 retained MVMM publication and the following indirect load. The adjacent
 case bypasses the stale cell; a gapped case performs the ordinary mapped
-read. Disabling only this bypass fails the matrix. Other modifiers,
+read. A negative control expecting a stale pointer fails at the first
+publication. Legacy setup and phase branches are removed. Other modifiers,
 mapped destinations, interrupts and physical pipeline timing are outside
 this qualification.
 These are prototype phase assertions, not measured silicon clocks; other

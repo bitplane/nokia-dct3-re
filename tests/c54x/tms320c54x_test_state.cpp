@@ -47,8 +47,6 @@ void tms320c54x_test_state::machine_reset()
 	}))
 		return;
 	if (start_profile(*this, machine().options().bios(), {
-		{ {"st-mvmm"}, [](self &test) { test.start_pipeline_store_mvmm(); } },
-		{ {"st-acc-mvmm"}, [](self &test) { test.start_pipeline_store_mvmm(); } },
 		{ {"add-bk", "add-absolute", "add-sp"}, [](self &test) { test.start_pipeline_absolute_add(); } },
 		{ {"instr-observer"}, [](self &test) { test.start_instruction_observer(); } },
 	}))

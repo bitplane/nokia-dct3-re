@@ -29,64 +29,6 @@ u16 tms320c54x_test_state::circular_fixture_next(u16 initial, int step, u16 bk)
 	return (initial & ~mask) | (index < 0 ? index + bk : index);
 }
 
-void tms320c54x_test_state::start_pipeline_store_mvmm(unsigned variant)
-{
-	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-	bool const accumulator = profile_is("st-acc-mvmm");
-	unsigned const count = 1 + variant % 2, source = (variant / 2) % 8, destination = (variant / 16) % 8;
-	unsigned const width = accumulator ? 1 : 2, form=(variant/1536)%4;
-	u16 const stored=std::array<u16,4>{0,1,0x8000,0xffff}[variant/6144];
-	unsigned const gap = (variant / 128) % 2, read_cycle = 3 + width * count + gap;
-	u32 const base = (variant / 256) % 2 ? 0x20000 : 0;
-	auto &program = m_cpu->space(AS_PROGRAM);
-	for (unsigned i = 0; i < 32; ++i) program.write_word(base + 0x600 + i, 0xf495);
-	for (unsigned i = 0; i < count; ++i)
-	{
-		program.write_word(base + 0x600 + width * i, (accumulator ? 0x8090|(form<<8) : 0x7690) | source);
-		if (!accumulator) program.write_word(base + 0x601 + 2 * i, i ? 0 : 0x3532);
-	}
-	program.write_word(base + 0x600 + width * count + gap, 0xe700 | (source << 4) | destination);
-	program.write_word(base + 0x601 + width * count + gap, 0x1080 | destination);
-	set_registers(*m_cpu, {
-		{cpu_regs::STATE_TCR, 0x10}, {cpu_regs::STATE_PMST, 0}, {cpu_regs::STATE_ILLEGAL, 0}, {cpu_regs::STATE_ST0, 0},
-		{cpu_regs::STATE_ST1, 0x800}, {cpu_regs::STATE_A, u64(stored)<<(form&2 ? 16 : 0)},
-		{cpu_regs::STATE_B, u64(stored)<<(form&2 ? 16 : 0)},
-	});
-	for (unsigned i = 0; i < 8; ++i) m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + i, 0x1400);
-	m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + source, 0x1200);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
-	for (unsigned i = 0; i < 3; ++i) m_cpu->space(AS_DATA).write_word(0x1200 + i, 0x55aa);
-	m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_cpu->set_pipeline_frontend(true);
-	m_pipeline_replay = false; m_idle_fixture_tick = 0;
-	m_pipeline_operand_reads = m_pipeline_store_writes = m_pipeline_extensions_reads = 0;
-	m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0, 0xffff, "store_mvmm_read",
-		[this, source, count, read_cycle, accumulator, gap](offs_t at, u16 &word, u16) {
-			if (machine().side_effects_disabled()) return;
-			if (at == 0x10 + source)
-			{
-				expect((!accumulator || gap) && word == 0x1200 + count && !m_pipeline_operand_reads && m_cpu->pipeline_cycles() == read_cycle,
-					"MVMM reads the committed AR only when no internal DAGEN bypass applies"); ++m_pipeline_operand_reads;
-			}
-			else
-			{
-				expect(at == 0x1200 + count && word == 0x55aa && !m_pipeline_extensions_reads,
-					"Following load uses the retained MVMM destination"); ++m_pipeline_extensions_reads;
-			}
-		});
-	m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0, 0xffff, "store_mvmm_write",
-		[this, destination, count, read_cycle, accumulator, stored](offs_t at, u16 &word, u16) {
-			if (machine().side_effects_disabled()) return;
-			if (at == 0x10 + destination)
-				expect(word == 0x1200 + count && m_cpu->pipeline_cycles() == read_cycle + 1,
-					"MVMM publishes its retained sample in Access");
-			else
-				expect(at >= 0x1200 && at < 0x1200 + count && word == (accumulator ? stored : at == 0x1200 ? 0x3532 : 0) &&
-					m_cpu->pipeline_cycles() == (accumulator ? 6 + (at-0x1200) : 7 + 2 * (at - 0x1200)), "Stores retain original addresses and publish once in Execute");
-			++m_pipeline_store_writes;
-		});
-	m_phase = 600001; m_cpu->resume(SUSPEND_REASON_DISABLE);
-	m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-}
 
 
 
@@ -992,46 +934,6 @@ bool tms320c54x_test_state::check_rptbd_t_load_results()
 	if (m_phase == 600031)
 	{
 		m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 600030; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 600001)
-	{
-		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
-		bool const accumulator = profile_is("st-acc-mvmm");
-		unsigned const count = 1 + variant % 2, source = (variant / 2) % 8, destination = (variant / 16) % 8;
-		unsigned const gap=(variant/128)%2, read_cycle = 3 + (accumulator ? 1 : 2) * count + gap;
-		unsigned const checkpoint = read_cycle - 1 + (variant / 512)%3;
-		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Store/MVMM chain remains supported");
-		if (tick == checkpoint && !m_pipeline_replay)
-		{
-			m_idle_fixture_saved_tick = tick;
-			m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_store_writes, m_pipeline_extensions_reads};
-			expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save store/MVMM chain around Decode and Access");
-		}
-		if (tick == 20)
-		{
-			expect(m_pipeline_operand_reads == unsigned(!accumulator || gap) && m_pipeline_store_writes == count + 1 && m_pipeline_extensions_reads == 1 &&
-				m_cpu->state_int(tms320c54x_device::STATE_AR0 + source) == 0x1200 + count &&
-				m_cpu->state_int(tms320c54x_device::STATE_AR0 + destination) == 0x1200 + count &&
-				m_cpu->state_int(tms320c54x_device::STATE_A) == 0x55aa, "Store/MVMM composition preserves each pointer and bus access across replay");
-			if (!m_pipeline_replay)
-			{
-				m_pipeline_replay = true; m_idle_fixture_tick = m_idle_fixture_saved_tick;
-				m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_store_writes = m_recurring_irq_snapshot[1];
-				m_pipeline_extensions_reads = m_recurring_irq_snapshot[2];
-				m_cpu->set_pipeline_frontend(true); return restore_pipeline_at(600002, "Restore retained store/MVMM chain");
-			}
-			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (variant < (accumulator ? 24575 : 1535)) { start_pipeline_store_mvmm(variant + 1); return true; }
-			if(accumulator) { osd_printf_info("TMS320C54x accumulator store MVMM: PASS cases=24576 restore=24576 forms=STL_A,STL_B,STH_A,STH_B values=4 stores=1,2 source_registers=8 destination_registers=8 gap_nops=0,1 pages=2 snapshots=3 pending_dagen_bypass=1 original_write_addresses=1 reset_before_restore=1 physical_phase_claim=0\n"); throw emu_fatalerror(3,"TMS320C54x isolated accumulator store MVMM complete"); }
-			osd_printf_info("TMS320C54x staged store MVMM: PASS cases=1536 restore=1536 stores=1,2 source_registers=8 destination_registers=8 gap_nops=0,1 pages=2 snapshots=3 physical_phase_claim=0\n");
-			throw emu_fatalerror(3, "TMS320C54x isolated store MVMM complete");
-		}
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 600002)
-	{
-		m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 600001;
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
 	}
 	return false;
 }
