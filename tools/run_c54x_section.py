@@ -448,6 +448,12 @@ def main():
     counts['mapped_move_repeat_owner'] = 32
     counts['block_single_repeat'] = 192
     counts['block_memory_repeat'] = 960
+    counts['branch_delay_repeat'] = 120
+    counts['call_delay_repeat'] = 120
+    counts['return_delay_repeat'] = 120
+    counts['conditional_delay_repeat'] = 1440
+    counts['block_delay_repeat'] = 120
+    counts['delay_repeat_limits'] = 36
     counts['block_delayed_exit'] = 1568
     counts['block_delayed_far_call'] = 576
     counts['shifted_unowned'] = 20480

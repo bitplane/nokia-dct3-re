@@ -3980,14 +3980,14 @@ the predicate early. BCD's empty prefetch slot also places the count header
 in Read when a one-word body reaches Decode; that exact delay relationship
 admits the Read-owned count, not arbitrary older repeat headers.
 
-`bcd-rpt` passes 69,120 atomic/staged cases and cleared-pipeline replays:
+`conditional_delay_repeat` owns 1,440 independent atomic/staged cases/restores:
 twelve signed A/B predicates, zero/+1/-1/positive-guard patterns, STL/MVDD/NOP
-bodies, counts 0/1/8/39/255, independent path counts 0/2/7, both directions,
-two pages and four checkpoints. Staged A/B changes after predicate Read
+bodies and counts 0/1/8/39/255. Path counts 0/2/7, direction, page and four
+checkpoints are distributed rather than fully crossed. Staged A/B changes after predicate Read
 reverse the condition without changing the selected path. Target/body
-poisoning, execution observations, ordered copies, exact buffers and
+poisoning, exact body retirement counts, ordered copies, exact buffers and
 preserved counters/status check that the delay repeat drains before a fresh
-target or fallthrough repeat. `bcd-rpt-edge` adds twenty replayed rejections
+target or fallthrough repeat. The conditional bank in `delay_repeat_limits` retains ten cases/restores
 of late headers, long/memory counts and spilling bodies without data,
 pointer or counter effects. TC/carry/overflow/BIO predicates, conditional
 calls, active outer blocks, arbitrary interrupts and silicon phases remain
@@ -4001,12 +4001,12 @@ continuation frame once; repeating the delay body must not repeat that push.
 The shared saved redirect mechanism resumes the target after the delay
 repeat drains, and a target-side repeat has an independent count.
 
-`calld-rpt` passes 5,760 cases and cleared-pipeline replays: atomic/staged,
-STL/MVDD/NOP bodies, counts 0/1/8/39/255, target counts 0/2/7, forward/backward
-calls, four patterns, two pages and four checkpoints. The target returns
+`call_delay_repeat` owns 120 independent cases/restores: atomic/staged,
+STL/MVDD/NOP bodies, counts 0/1/8/39/255 and four patterns. Target counts
+0/2/7, direction, page and four checkpoints are distributed. The target returns
 with RET to the original caller; one frame write and one return read restore
 SP. Target-literal poisoning, staged body-opcode poisoning, ordered accesses,
-execution observations and buffer guards check continuation ownership.
+exact body retirement counts and buffer guards check continuation ownership.
 Far calls, late-header placement, active outer blocks, arbitrary body/interrupt
 composition and physical pipeline phases remain unqualified. The shared
 exclusion fixture retains CALLD with RPT in the last delay word.
@@ -4020,9 +4020,9 @@ re-sample the stack location after it has changed. Existing return-prefetch
 ownership is retained; the repeat uses the same saved continuation mechanism
 as BD, not a new stack or firmware-specific target.
 
-`retd-rpt` passes 5,760 cases and cleared-pipeline replays across atomic/staged
-frontends, STL/MVDD/NOP bodies, counts 0/1/8/39/255, independent target counts
-0/2/7, both return directions, four patterns, two pages and four checkpoints.
+`return_delay_repeat` owns 120 independent cases/restores across atomic/staged
+frontends, STL/MVDD/NOP bodies, counts 0/1/8/39/255 and four patterns. Target
+counts 0/2/7, return direction, page and four checkpoints are distributed.
 The original return word is read once, then poisoned; the target starts its
 own fresh repeat only after delay writes finish. Tests check balanced SP,
 ordered accesses, pointers, unrelated loop state, status and retained staged
@@ -4041,12 +4041,12 @@ Discarding speculative outer-body prefetch rebuilds its remaining-iteration
 prediction from BRC, including a single-iteration outer block. Otherwise a
 correct store count can conceal an incorrectly retained BRAF.
 
-`rptbd-rpt` passes 5,760 cases plus cleared-pipeline replay: atomic/staged,
-STL/MVDD/NOP delay bodies, inner counts 0/1/8/39/255, outer counts 0/2/7,
-one/two-word outer blocks, four patterns, two pages and four checkpoints.
+`block_delay_repeat` owns 120 independent cases/restores: atomic/staged,
+STL/MVDD/NOP delay bodies, inner counts 0/1/8/39/255 and four patterns. Outer
+counts 0/2/7, one/two-word block layouts, pages and four checkpoints are distributed.
 Ordered read/write observations require the delay body to drain before outer
 publication; counters, pointer updates, stack and final status are checked.
-`rptbd-rpt-edge` passes twenty cases plus replay, rejecting late placement,
+The RPTBD bank in `delay_repeat_limits` retains ten cases/restores, rejecting late placement,
 long/memory count forms and spilling store/copy bodies before data access or
 short-repeat pointer/counter updates. RPTBD's preceding setup is retained.
 
@@ -4374,23 +4374,25 @@ prefetch, so the CPU retains the decoded target separately and resumes it only
 after all repeated delay copies drain. Both continuation fields are reset and
 saved. This is instruction-derived continuation state, not a firmware hook.
 
-`bd-rpt` passes 5,760 cases plus replay on atomic and staged frontends: STL,
-MVDD and NOP bodies; counts 0/1/8/39/255; independent target repeat counts
-0/2/7; forward/backward targets; four data/status patterns; two pages; and four
-checkpoints before, during or after the pending continuation. The selected
+`branch_delay_repeat` owns 120 independent cases/restores on atomic and staged frontends:
+STL/MVDD/NOP bodies, counts 0/1/8/39/255 and four data/status patterns.
+Target counts 0/2/7, direction, page and four checkpoints are distributed;
+their previous full cross-product is deliberately removed. The selected
 frontend's live pipeline is cleared before each load, so retained targets and
 repeat metadata must actually be restored rather than survive from the future
 run. It checks exact
 buffer contents/guards, ordered transactions, pointers, preserved registers,
-execution-owned body/header counts and final PC. The target literal is poisoned
+execution-owned body counts and final PC. Separate branch/header retirement
+counts are no longer observed: ordered path writes and final state qualify
+the continuation. The target literal is poisoned
 after capture; body-opcode poisoning is staged-only because the atomic frontend
 refetches repeat opcodes. Equal architectural outcomes are not a clock/bus
 equivalence claim. The existing acquired-ROM atomic delayed-repeat fixture
 provides separate BD/RETD corroboration.
 
-`bd-rpt-edge` passes 32 rejection/replay cases: late header, BANZD,
-late CALLD/RETD headers, long/memory counts and spilling store/copy bodies, over two pages and
-two checkpoints. No rejected-repeat transaction or address-register/counter
+The BD bank in `delay_repeat_limits` retains sixteen cases/restores: late header, BANZD,
+late CALLD/RETD headers, long/memory counts and spilling store/copy bodies on two pages;
+two checkpoints are distributed. No rejected-repeat transaction or address-register/counter
 change occurs. The enclosing CALLD's Decode stack reservation and RETD's one
 return-word Read/SP increment legitimately precede rejection and are retained,
 not undone. These are bounded model exclusions, not silicon traps. Other

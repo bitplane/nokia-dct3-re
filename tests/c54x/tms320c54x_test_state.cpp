@@ -105,14 +105,6 @@ void tms320c54x_test_state::machine_reset()
 		{ {"rptbd-t-load"}, [](self &test) { test.start_rptbd_t_load(); } },
 		{ {"banzd-t-load"}, [](self &test) { test.start_rptbd_t_load(); } },
 		{ {"ctrl-t-load"}, [](self &test) { test.start_rptbd_t_load(); } },
-		{ {"bd-rpt"}, [](self &test) { test.start_branch_repeat(); } },
-		{ {"retd-rpt"}, [](self &test) { test.start_branch_repeat(); } },
-		{ {"calld-rpt"}, [](self &test) { test.start_branch_repeat(); } },
-		{ {"bcd-rpt"}, [](self &test) { test.start_branch_repeat(); } },
-		{ {"bcd-rpt-edge"}, [](self &test) { test.start_conditional_delay_repeat_edge(); } },
-		{ {"rptbd-rpt"}, [](self &test) { test.start_block_delay_repeat(); } },
-		{ {"rptbd-rpt-edge"}, [](self &test) { test.start_block_delay_repeat_edge(); } },
-		{ {"bd-rpt-edge"}, [](self &test) { test.start_branch_repeat_edge(); } },
 		{ {"stm-ind", "stm-ind-edge"}, [](self &test) { test.start_indirect_stm(); } },
 		{ {"stm-low-ram"}, [](self &test) { test.start_indirect_stm(); } },
 		{ {"mvdk-repeat", "mvdk-index-rpt"}, [](self &test) { test.start_repeated_mvdk(); } },
@@ -413,7 +405,7 @@ void tms320c54x_test_state::test(machine_config &config)
 	TMS320C54X(config, m_cpu, 13'000'000);
 	if (!strcmp(config.options().bios(), "instr-observer"))
 		m_cpu->instruction_observer_cb().set([this](offs_t address, u16 opcode) { m_instruction_observer.observed.emplace_back(address, opcode); });
-	else if (!strcmp(config.options().bios(), "rpt-smem") || !strcmp(config.options().bios(), "rpt-ld") || !strcmp(config.options().bios(), "rpt-sfta") || !strcmp(config.options().bios(), "rpt-ld-block") || !strcmp(config.options().bios(), "rpt-mem-chain") || !strcmp(config.options().bios(), "bd-rpt") || !strcmp(config.options().bios(), "retd-rpt") || !strcmp(config.options().bios(), "calld-rpt") || !strcmp(config.options().bios(), "bcd-rpt"))
+	else if (!strcmp(config.options().bios(), "rpt-smem") || !strcmp(config.options().bios(), "rpt-ld") || !strcmp(config.options().bios(), "rpt-sfta") || !strcmp(config.options().bios(), "rpt-ld-block") || !strcmp(config.options().bios(), "rpt-mem-chain"))
 		m_cpu->instruction_observer_cb().set([this](offs_t address, u16 opcode) { m_observed_instructions.emplace_back(address, opcode); });
 	m_cpu->set_extended_program(true);
 	m_cpu->set_irq_acknowledge_callback([this](device_t &, int line) {

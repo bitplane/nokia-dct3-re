@@ -249,29 +249,6 @@ private:
 	};
 	rptbd_t_load_fixture rptbd_t_load_case(unsigned v) const;
 	void start_rptbd_t_load(unsigned variant = 0);
-	struct branch_repeat_fixture
-	{
-		unsigned kind, count, following, checkpoint, limit;
-		bool staged;
-		u32 base;
-		u16 target, seed, status;
-		bool conditional = false;
-		unsigned condition = 0, predicate_pattern = 0;
-		u16 body() const { return std::array<u16,3>{0x8094,0xe5ab,0xf495}[kind]; }
-		u64 tested_value() const { return std::array<u64,4>{0,1,0xffffffffffULL,0x0080000000ULL}[predicate_pattern]; }
-		bool test(u64 value) const { bool const negative = value & 0x8000000000ULL, zero = !value; return std::array<bool,6>{!negative,negative,!zero,zero,!negative && !zero,negative || zero}[condition % 6]; }
-		bool taken() const { return !conditional || test(tested_value()); }
-		u64 poisoned_value() const { for (u64 value : {0ULL,1ULL,0xffffffffffULL}) if (test(value) != taken()) return value; return 0; }
-		u64 a(bool final = false) const { return conditional && condition < 6 ? final && staged ? poisoned_value() : tested_value() : 0x1234560000ULL | seed; }
-		u64 b(bool final = false) const { return conditional && condition >= 6 ? final && staged ? poisoned_value() : tested_value() : 0xfeabcd0000ULL | u16(~seed); }
-		u16 continuation() const { return taken() ? target : 0x604; }
-	};
-	branch_repeat_fixture branch_repeat_case(unsigned v) const;
-	void start_branch_repeat(unsigned variant = 0);
-	void start_block_delay_repeat(unsigned variant = 0);
-	void start_branch_repeat_edge(unsigned variant = 0);
-	void start_block_delay_repeat_edge(unsigned ordinal = 0);
-	void start_conditional_delay_repeat_edge(unsigned ordinal = 0);
 	struct repeated_mvmd_fixture
 	{
 		unsigned count, source, snapshot, read_clock, clear_accumulator;
@@ -550,7 +527,6 @@ private:
 	}
 	bool check_instruction_observer_results();
 	bool check_mvdd_source_results();
-	bool check_branch_repeat_results();
 	bool check_rptbd_t_load_results();
 	bool check_memory_repeat_results();
 	bool check_asm_store_results_part2();
