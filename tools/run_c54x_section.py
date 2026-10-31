@@ -480,6 +480,8 @@ def main():
     counts['memory_count_copy'] = 864
     counts['memory_count_chain'] = 24
     counts['memory_count_wrap'] = 24
+    counts['initial_control_sequences'] = 3
+    counts['receive_ring_copy'] = 4
     counts['disassembly'] = 1
     counts['instruction_observer'] = 24
     counts['circular_mvdk'] = 26840

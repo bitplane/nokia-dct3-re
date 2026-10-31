@@ -1,93 +1,12 @@
 // license:BSD-3-Clause
 // copyright-holders:Gaz
-
 #include "emu.h"
 #include "tms320c54x_test_state.h"
-
 namespace c54x_test {
-
 TIMER_CALLBACK_MEMBER(tms320c54x_test_state::check_results)
 {
-	if (m_result_owner)
-	{
-		expect((this->*m_result_owner)(), "Selected fixture owns its local continuation");
-		return;
-	}
-	auto &program = m_cpu->space(AS_PROGRAM);
-	auto &data = m_cpu->space(AS_DATA);
-	if (check_rom4_fr_decoder_results()) return;
-	if (check_rom4_codec_is_results()) return;
-	if (check_rom4_crc_input_results()) return;
-
-	osd_printf_info("TMS320C54x test state: pc=%04x sp=%04x brc=%04x "
-			"rpt=%04x,%04x,%04x block=%04x,%04x,%04x\n",
-			u16(m_cpu->state_int(tms320c54x_device::STATE_PC)),
-			u16(m_cpu->state_int(tms320c54x_device::STATE_SP)),
-			u16(m_cpu->state_int(tms320c54x_device::STATE_BRC)),
-			data.read_word(0x0400), data.read_word(0x0401), data.read_word(0x0402),
-			data.read_word(0x0600), data.read_word(0x0601), data.read_word(0x0602));
-	expect(data.read_word(0x0700) == 0xbeef, "CALL/RET continuation");
-	expect(m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x0300,
-			"balanced system stack");
-	expect(data.read_word(0x0400) == 0x1111 &&
-			data.read_word(0x0401) == 0x2222 &&
-			data.read_word(0x0402) == 0x3333, "RPT memory transfer");
-	expect(data.read_word(0x0600) == 0x1111 &&
-			data.read_word(0x0601) == 0x2222 &&
-			data.read_word(0x0602) == 0x3333, "RPTB multiword CALL");
-	expect(m_cpu->state_int(tms320c54x_device::STATE_BRC) == 0,
-			"RPTB terminal count");
-	expect(!(m_cpu->state_int(tms320c54x_device::STATE_ST1) & 0x8000),
-			"RPTB terminal state clears ST1.BRAF");
-	expect(data.read_word(0x0900) == 0xcccc &&
-			data.read_word(0x0901) == 0xaaaa &&
-			data.read_word(0x0902) == 0xbbbb,
-			"circular addressing wrap order");
-	expect(m_cpu->state_int(tms320c54x_device::STATE_AR6) == 0x0802,
-			"circular addressing final pointer");
-	expect(data.read_word(0x0903) == 0x0000,
-			"BITF and conditional return");
-	expect(data.read_word(0x0904) == 0xbbbb,
-			"absolute data-memory copy");
-	expect(data.read_word(0x0905) == 0x0a00,
-			"memory-mapped auxiliary-register read");
-	expect(m_cpu->state_int(tms320c54x_device::STATE_AR4) == 0xaaaa,
-			"memory-mapped auxiliary-register write");
-	expect(m_cpu->state_int(tms320c54x_device::STATE_A) == 0x00aa00aa,
-			"unsigned data operand load and accumulator XOR shift");
-	expect(m_cpu->state_int(tms320c54x_device::STATE_B) == 0xaa00,
-			"immediate accumulator mask and rotate");
-	expect(m_cpu->space(AS_PROGRAM).read_word(0x0907) == 0xaaaa,
-			"data-to-program memory transfer");
-	expect(data.read_word(0x0908) == 0xaaaa,
-			"program-to-data memory transfer");
-	for (unsigned i = 0; i != 26; ++i)
-		expect(data.read_word(0x0882 + i) == 0x6000 + i,
-				"MVDD dual-operand circular transfer");
-	expect_opcode(0xe59c, m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x089c &&
-			m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x131a,
-			"ROM4 MVDD receive-ring copy updates both operands after 26 checked words");
-
-	// IDLE3 must retain its continuation PC, then an enabled source must
-	// vector through PMST.IPTR and preserve the return address on stack.
-	program.write_word(0x0048, 0x7680);
-	program.write_word(0x0049, 0xcafe);
-	program.write_word(0x004a, 0xf49b); // RETF
-	program.write_word(0x0400, 0xf5e1);
-	program.write_word(0x0401, 0xf5e1);
-	m_fast_stack_reads = 0;
-	data.install_read_tap(0x02ff, 0x02ff, "fast_return_stack",
-		[this](offs_t, u16 &, u16) {
-			if (m_phase == 3 && !machine().side_effects_disabled())
-				++m_fast_stack_reads;
-		});
-	m_phase = 3;
-	set_registers(*m_cpu, {
-		{cpu_regs::STATE_PC, 0x0400}, {cpu_regs::STATE_SP, 0x0300}, {cpu_regs::STATE_ST1, 0x0000},
-		{cpu_regs::STATE_PMST, 0x0000}, {cpu_regs::STATE_IMR, 0x0004}, {cpu_regs::STATE_AR0, 0x0a10},
-		{cpu_regs::STATE_ILLEGAL, 0}, {cpu_regs::STATE_IDLE, 0},
-	});
-	m_check_timer->adjust(attotime::from_usec(100));
+	if(m_result_owner){expect((this->*m_result_owner)(),"Selected firmware fixture owns its continuation");return;}
+	if(check_rom4_fr_decoder_results() || check_rom4_codec_is_results() || check_rom4_crc_input_results())return;
+	throw emu_fatalerror("Unowned firmware fixture phase %u",m_phase);
 }
-
-} // namespace c54x_test
+}
