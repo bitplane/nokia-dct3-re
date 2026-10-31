@@ -81,51 +81,6 @@ private:
 	static memory_repeat_fixture memory_repeat_case(unsigned variant);
 	static std::array<u64, 2> repeat_subc_result(memory_repeat_fixture const &f, unsigned iterations);
 	void start_pipeline_memory_repeat(unsigned variant = 0);
-	struct delay_multiply_fixture
-	{
-		unsigned kind, form, destination, flags, checkpoint;
-		u16 memory, t, source;
-		u32 caller, target;
-		u64 a, b, result;
-		unsigned operation = 0;
-		bool accumulator_source = false;
-		bool square = false;
-		bool memory_square = false;
-		bool extended_accumulator = false;
-		unsigned address_ar = 2;
-		u16 extension() const { return extended_accumulator ? form == 2 ? source : form ? 0xeb08 : 3 : form == 3 ? 3 : source; }
-		unsigned delay() const { return kind == 5 ? 1 : 2; }
-		static unsigned operand_read(unsigned kind, unsigned form) { return 7 + unsigned(form != 0) + unsigned(kind == 5 || ((kind == 1 || kind == 2) && form)); }
-		unsigned read() const { return extended_accumulator ? 8 : operand_read(kind, accumulator_source ? 0 : form); }
-		unsigned literal_clock() const { return kind == 5 ? 4 : kind == 1 || kind == 2 ? 6 : 5; }
-		s64 arithmetic() const
-		{
-			if (memory_square) return s64(s16(memory)) * s16(memory) * (flags & 1 ? 2 : 1);
-			if (square)
-			{
-				s64 const product = s64(s16(memory)) * s16(memory) * (flags & 1 ? 2 : 1);
-				u64 const source = destination ? b : a;
-				s64 const current = BIT(source, 39) ? s64(source) - (s64(1) << 40) : s64(source);
-				return operation ? current - product : current + product;
-			}
-			if (accumulator_source)
-			{
-				s32 const bits = (a >> 16) & 0x1ffff;
-				s64 product = s64(bits & 0x10000 ? bits - 0x20000 : bits) * s16(memory) * (flags & 1 ? 2 : 1);
-				if (operation && (flags & 7) == 7) product = std::clamp(product, s64(-2147483648LL), s64(2147483647LL));
-				s64 const old_b = BIT(b, 39) ? s64(b) - (s64(1) << 40) : s64(b);
-				s64 const value = !operation ? product : operation == 1 ? old_b - product : old_b + product;
-				return operation == 3 ? (value + 32768) & ~s64(65535) : value;
-			}
-			throw emu_fatalerror("Legacy delay fixture has no accumulator-source contract");
-		}
-		bool overflow() const { return arithmetic() < -2147483648LL || arithmetic() > 2147483647LL; }
-	};
-	static delay_multiply_fixture delay_accumulator_multiply_case(unsigned variant);
-	static delay_multiply_fixture bd_long_accumulator_case(unsigned v);
-	static delay_multiply_fixture delay_square_case(unsigned variant);
-	static delay_multiply_fixture delay_memory_square_case(unsigned variant);
-	void start_delay_multiply(unsigned variant = 0);
 	void start_long_mapped_original(unsigned variant = 0);
 
 
@@ -203,7 +158,7 @@ private:
 		unsigned branch_count = 0;
 		bool ordinary = false;
 		unsigned control = 0, late_t = 0;
-		unsigned read_clock() const { return ordinary ? delay_multiply_fixture::operand_read(control, slot) : 7 + slot; }
+		unsigned read_clock() const { return ordinary ? 7 + unsigned(slot != 0) + unsigned(control == 5 || ((control == 1 || control == 2) && slot)) : 7 + slot; }
 		u16 target() const { return accumulator ? 0x580 : 0x610; }
 		u32 target_base() const { return ordinary && control == 4 ? base ^ 0x20000 : base; }
 		u16 loaded_t() const { return late_t == 2 ? 0x5aa5 : late_t ? value ^ 0xffff : value; }
@@ -467,7 +422,6 @@ private:
 	bool check_repeat_mvdp_irq_results();
 	bool check_register_product_results();
 	bool check_popd_mapped_results();
-	bool check_bd_long_accumulator_results();
 	bool check_memory_copy_repeat_results();
 	bool check_repeated_mvdk_results();
 	bool check_rom4_fr_decoder_results();

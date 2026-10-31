@@ -470,6 +470,10 @@ def main():
     counts['delayed_multiply'] = 768
     counts['delayed_mac'] = 3072
     counts['delayed_rounded_multiply'] = 768
+    counts['delayed_accumulator_multiply'] = 576
+    counts['delayed_square_accumulate'] = 576
+    counts['delayed_memory_square'] = 288
+    counts['delayed_long_accumulator'] = 768
     counts['block_delayed_exit'] = 1568
     counts['block_delayed_far_call'] = 576
     counts['shifted_unowned'] = 20480

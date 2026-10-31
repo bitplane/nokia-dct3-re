@@ -49,10 +49,6 @@ void tms320c54x_test_state::machine_reset()
 	if (start_profile(*this, machine().options().bios(), {
 		{ {"st-mvmm"}, [](self &test) { test.start_pipeline_store_mvmm(); } },
 		{ {"st-acc-mvmm"}, [](self &test) { test.start_pipeline_store_mvmm(); } },
-		{ {"maca-delay"}, [](self &test) { test.start_delay_multiply(); } },
-		{ {"bd-maca-long"}, [](self &test) { test.start_delay_multiply(); } },
-		{ {"square-delay"}, [](self &test) { test.start_delay_multiply(); } },
-		{ {"squr-delay"}, [](self &test) { test.start_delay_multiply(); } },
 		{ {"add-bk", "add-absolute", "add-sp"}, [](self &test) { test.start_pipeline_absolute_add(); } },
 		{ {"instr-observer"}, [](self &test) { test.start_instruction_observer(); } },
 	}))

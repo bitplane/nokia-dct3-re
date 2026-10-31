@@ -6,16 +6,6 @@
 
 namespace c54x_test {
 
-tms320c54x_test_state::delay_multiply_fixture tms320c54x_test_state::delay_square_case(unsigned variant)
-{
-	auto f = delay_accumulator_multiply_case(variant);
-	f.square = true; f.destination = f.operation & 1; f.operation >>= 1;
-	if (f.kind != 1 && f.kind != 2) f.a = f.b ^ 0x55;
-	s64 const result = f.arithmetic();
-	f.result = u64(f.flags & 2 ? std::clamp(result, s64(-2147483648LL), s64(2147483647LL)) : result) & 0xffffffffffULL;
-	return f;
-}
-
 void tms320c54x_test_state::set_repeat_count_source(u16 address, u16 value)
 {
 	if (address >= 0x60) { auto const disable = machine().disable_side_effects(); m_cpu->space(AS_DATA).write_word(address, value); }

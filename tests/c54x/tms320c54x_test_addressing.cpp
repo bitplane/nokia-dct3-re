@@ -212,27 +212,6 @@ void tms320c54x_test_state::start_pipeline_memory_repeat(unsigned variant)
 
 
 
-tms320c54x_test_state::delay_multiply_fixture tms320c54x_test_state::delay_memory_square_case(unsigned variant)
-{
-	auto f = delay_square_case(variant % 36 + (variant / 36) * 72);
-	f.square = false; f.memory_square = true;
-	s64 const result = f.arithmetic();
-	f.result = u64(f.flags & 2 ? std::clamp(result, s64(-2147483648LL), s64(2147483647LL)) : result) & 0xffffffffffULL;
-	return f;
-}
-
-
-
-
-
-
-
-
-
-
-
-
-
 void tms320c54x_test_state::start_long_mapped_original(unsigned variant)
 {
 	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_cpu->set_pipeline_frontend(false); m_pipeline_peripheral_case = variant;

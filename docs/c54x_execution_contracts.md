@@ -3743,10 +3743,10 @@ the selected accumulator with the signed square. FRCT doubles the product,
 OVM clamps the result with sticky overflow, and SMUL does not clamp the
 product. This differs from SQURA/SQURS, which accumulate into the old value.
 
-`squr-delay` passes 27,648 cases and cleared-pipeline replays across BD,
+`delayed_memory_square` owns 288 independent cases/restores across BD,
 both BCD outcomes, CALLD, FCALLD and RETD; both destinations; DP/plain/
-postincrement RAM; eight patterns; FRCT/OVM/SMUL/SXM; two pages and three
-checkpoints. `rptbd-squr` passes 92,160 cases and cleared-pipeline replays:
+postincrement RAM and eight patterns. FRCT/OVM/SMUL/SXM, page and three
+checkpoints are assigned, not fully crossed. `rptbd-squr` passes 92,160 cases and cleared-pipeline replays:
 first/second/both-same/both-split layouts plus SQUR followed by MPYA,
 with the same addressing/pattern/mode dimensions, outer counts 0/1/7 and
 four checkpoints. The mixed case consumes the correct signed 17-bit A
@@ -3763,10 +3763,10 @@ the signed memory operand and publishes it to T; Execute adds or subtracts
 its square from the selected live accumulator. FRCT doubles the square,
 OVM applies to the result, and SMUL does not clamp the product.
 
-`square-delay` passes 55,296 cases and save/load replays: BD, both BCD
+`delayed_square_accumulate` owns 576 independent cases/restores: BD, both BCD
 outcomes, CALLD, FCALLD and RETD; direct, indirect and postincrement RAM;
-both operations and destinations; eight patterns; FRCT/OVM/SMUL/SXM;
-two pages and three checkpoints. It checks one retained read, pointer
+both operations and destinations and eight patterns. FRCT/OVM/SMUL/SXM,
+page and three checkpoints are assigned. It checks one retained read, pointer
 updates, T publication followed by a newer T value, per-clock accumulator
 publication, result/status/stack preservation and target observation.
 BCD fixes A to satisfy its branch condition, so those cases do not vary
@@ -3913,9 +3913,12 @@ words. They use the ordinary signed 17-bit A-high and signed Smem arithmetic;
 memory publishes to T in Read and B publishes in Execute. The return/call
 frame remains independently owned. Extended address forms remain guarded.
 
-`maca-delay` passes 55,296 cases and save/load replays: six control paths,
+`delayed_accumulator_multiply` owns 576 independent cases/restores: six control paths,
 four operations, DP/indirect/postincrement, eight input patterns,
-FRCT/OVM/SMUL/SXM, two pages and three checkpoints. The two BCD paths seed
+with FRCT/OVM/SMUL/SXM, page and three checkpoints assigned across tuples.
+These three short-family sections deliberately drop the old numeric-mode/control
+cross-products; standalone accumulator/square sections own broader numeric
+contracts. The two BCD paths seed
 A=0/1 to select their outcomes; they do not independently vary A-high.
 Checks cover A preservation, B publication, one memory sample, pointer update,
 T poisoning after Read, balanced frames and target observation. This does
@@ -5495,11 +5498,12 @@ strict conformance checker.
 
 ## BD long accumulator multiply
 
-`bd-maca-long` qualifies stationary long-offset and absolute
-MPYA/MASA/MACA/MACAR to B within BD's two delay words: 98,304 cases and
-cleared-pipeline replays cover eight addressing ARs, three address forms,
-four operations, eight numeric patterns, sixteen arithmetic-mode combinations,
-two pages and four checkpoints. Smem and T are Read-owned; accumulator inputs
+`delayed_long_accumulator` qualifies stationary long-offset and absolute
+MPYA/MASA/MACA/MACAR to B within BD's two delay words: 768 independent cases/restores
+cover eight addressing ARs, three address forms, four operations and eight
+numeric patterns. Arithmetic modes, page and four checkpoints are assigned,
+not fully crossed. Initial A/B are poisoned and replaced after Read, so
+Smem and T are Read-owned while accumulator inputs
 remain Execute-owned. Other long addressing modes and control owners are
 not newly admitted.
 
