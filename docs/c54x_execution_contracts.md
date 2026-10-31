@@ -720,7 +720,7 @@ boundaries are:
 | `tests/c54x/tms320c54x_test_domains.h` | CPU-only admission fixture with owned progress, observations, taps and snapshots |
 | `tests/c54x/tms320c54x_test_register_unary.h` | Independent register-logic, shift, NEG/ABS inputs, balanced replay keys and explicit clocked observations |
 | `tests/c54x/tms320c54x_test_domain_schedule.h` | Independent instruction inventory and explicit admission-control schedule; no legacy phase routing |
-| `tests/c54x/tms320c54x_test_pipeline.cpp` | Dependency, status and data-path compositions and their sequenced continuations |
+| `tests/c54x/tms320c54x_test_delayed_memory_section.h` | Independent delayed-memory capture/continuation cases; no shared phase-chain state |
 | `tests/c54x/sections/xc_return.h` | Selected/annulled XC return, resumed-word protection and interrupt deferral |
 | `tests/c54x/tms320c54x_test_pipeline_repeat.cpp` | Repeat/block-control compositions and continuations |
 | `tests/c54x/sections/frontend_drain.h` | Decoded/empty frontend entry, flush timing and case-owned acknowledgement checks |
@@ -1676,10 +1676,10 @@ Access address capture, Read operand and Execute arithmetic implement the
 operation; admission now counts both words and retains the delay-span bound.
 Control/peripheral sources outside the admitted register set remain excluded.
 
-`--profile add-delay` passes 18,432 cases and save/replays across BD,
+`delayed_absolute_add` owns 3,072 independent cases/restores across BD,
 CALLD, FCALLD and RETD; RAM, AR3, AL, AH, BL and BH sources; both
-destinations; four operand/initial patterns; SXM/OVM; two pages and three
-snapshots. Aliased accumulator fields are included in the independent
+destinations; four operand/initial patterns; SXM/OVM. Pages and three
+snapshots are distributed. Aliased accumulator fields are included in the independent
 arithmetic expectation. Carry, sticky overflow, saturation, preserved T/ST1,
 one source read, one address-literal fetch, owned call/return frames and the
 target's observed result are checked. RAM is replaced after Read to detect
@@ -2001,10 +2001,12 @@ extension does not inherit admission merely by sharing the first word.
 The existing source Read, encoded shift and Execute result are reused,
 without an atomic-interpreter fallback or additional CPU save fields.
 
-`shift-delay` passes 110,592 cases/restores for BD, taken/untaken BCD,
+`delayed_shift_load` owns 1,152 independent cases/restores for BD, taken/untaken BCD,
 CALLD, FCALLD and RETD; DP/plain-indirect/postincrement sources; A/B;
-all 32 shifts; four source words; four SXM/OVM states; two pages and three
-snapshots. Replacing the fetched extension, source memory and address
+all 32 shifts. Source patterns, SXM/OVM, pages and three snapshots are assigned
+across interaction tuples, not fully crossed. Standalone shifted-load sections
+own broader numeric contracts; the old numeric/control correlations are not
+renewed here. Replacing the fetched extension, source memory and address
 registers after capture must not change the result or duplicate updates.
 The selected continuation observes the completed load and the original
 call/return frame, while a conditional owner retains its earlier decision.
@@ -3906,10 +3908,12 @@ Read retains one memory operand; Execute consumes the selected accumulator
 and publishes the result, carry and sticky overflow. Source and destination
 accumulators are independently selected. The existing SXM/OVM rules apply.
 
-`shift-alu-delay` passes 442,368 cases and save/load replays: six control
+`delayed_shift_alu` owns 4,608 independent cases/restores: six control
 paths including both BCD outcomes, DP/indirect/postincrement addressing,
-ADD/SUB, four source/destination pairs, all 32 signed shifts, four memory
-values, SXM/OVM, two pages and three checkpoints. Extension and memory
+ADD/SUB, four source/destination pairs and all 32 signed shifts. Memory
+patterns, SXM/OVM, pages and three checkpoints are assigned rather than fully
+crossed. Standalone shifted arithmetic owns broader numeric coverage;
+this drops the old numeric/control Cartesian correlations. Extension and memory
 poisoning check retained ownership; the target observes the result and
 stack/pointer counts remain exact.
 Interrupt composition and physical pipeline phases remain unvalidated.

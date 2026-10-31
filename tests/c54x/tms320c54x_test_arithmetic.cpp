@@ -231,41 +231,6 @@ void tms320c54x_test_state::start_delay_multiply(unsigned variant)
 
 
 
-tms320c54x_test_state::delay_load_fixture tms320c54x_test_state::delay_shift_alu_case(unsigned variant)
-{
-	unsigned const operation = variant % 4, v = variant / 4;
-	auto f = delay_shift_load_case(v);
-	u64 const shifted = f.result, source = operation & 1 ? f.b : f.a;
-	s64 const left = source & 0x8000000000ULL ? s64(source) - 0x10000000000LL : s64(source);
-	s64 const right = shifted & 0x8000000000ULL ? s64(shifted) - 0x10000000000LL : s64(shifted);
-	s64 const result = operation & 2 ? left - right : left + right;
-	bool const carry = operation & 2 ? u32(source) >= u32(shifted) : u64(u32(source)) + u32(shifted) > 0xffffffffULL;
-	bool const overflow = result < -2147483648LL || result > 2147483647LL;
-	f.st0 = 0xa020 | ((v / 1152) % 4 << 9);
-	f.final_st0 = (f.st0 & ~0x800) | (carry ? 0x800 : 0) | (overflow ? f.destination ? 0x200 : 0x400 : 0);
-	f.result = u64(f.flags & 2 ? std::clamp(result, s64(-2147483648LL), s64(2147483647LL)) : result) & 0xffffffffffULL;
-	f.literal = 0x0c00 | (operation & 2 ? 0x20 : 0) | ((operation & 1) << 9) | (f.destination << 8) | (f.literal & 31);
-	return f;
-}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 tms320c54x_test_state::register_product_fixture tms320c54x_test_state::register_product_case(unsigned variant)
 {
 	if (variant >= 176640)

@@ -170,22 +170,6 @@ private:
 	static popd_fixture popd_case(unsigned v, bool repeated);
 	void start_popd_mapped(unsigned variant = 0);
 	void start_popd_edges(unsigned variant = 0);
-	struct delay_load_fixture
-	{
-		unsigned kind, form, ar, selected, destination, flags, read, checkpoint;
-		bool compatibility;
-		u16 literal, address, memory, st0, final_st0, st1;
-		u32 caller, target;
-		u64 a, b, result;
-		std::array<u16, 8> initial, final;
-		u16 memory_low = 0;
-		unsigned delay() const { return kind == 5 ? 1 : 2; }
-		unsigned literal_clock() const { return kind == 5 ? 4 : kind == 1 || kind == 2 ? 6 : 5; }
-	};
-	static delay_load_fixture delay_shift_load_case(unsigned v);
-	static delay_load_fixture delay_shift_alu_case(unsigned variant);
-	static delay_load_fixture delay_add_case(unsigned v);
-	void start_delay_load(unsigned variant = 0);
 	struct indexed_store_fixture
 	{
 		unsigned ar, selected, selector, snapshot;
@@ -505,7 +489,6 @@ private:
 	bool check_register_product_results();
 	bool check_popd_mapped_results();
 	bool check_bd_long_accumulator_results();
-	bool check_delay_arithmetic_results();
 	bool check_memory_copy_repeat_results();
 	bool check_repeated_mvdk_results();
 	bool check_rom4_fr_decoder_results();

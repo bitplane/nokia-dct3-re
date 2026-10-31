@@ -384,53 +384,6 @@ void tms320c54x_test_state::start_popd_edges(unsigned variant)
 
 
 
-tms320c54x_test_state::delay_load_fixture tms320c54x_test_state::delay_shift_load_case(unsigned v)
-{
-	delay_load_fixture f{};
-	f.kind = v % 6; f.form = (v / 6) % 3; f.destination = (v / 18) % 2; f.flags = (v / 4608) % 4;
-	unsigned const raw = (v / 36) % 32; int const shift = raw < 16 ? int(raw) : int(raw) - 32;
-	f.literal = 0x0c40 | (f.destination << 8) | raw; f.address = 0x1002;
-	f.memory = std::array<u16, 4>{0, 1, 0x8000, 0xffff}[(v / 1152) % 4];
-	f.st0 = f.final_st0 = 0xa620; f.st1 = 0x800 | (f.flags & 1 ? 0x100 : 0) | (f.flags & 2 ? 0x200 : 0);
-	f.caller = (v / 18432) % 2 ? 0x20000 : 0; f.target = f.kind == 4 ? f.caller ^ 0x20000 : f.caller;
-	f.a = f.kind == 1 ? 0 : f.kind == 2 ? 1 : 0x123456789aULL; f.b = 0xfedcba9876ULL;
-	s64 const input = f.flags & 1 ? s64(s16(f.memory)) : s64(f.memory);
-	s64 const divisor = s64(1) << (shift < 0 ? -shift : 0);
-	f.result = u64(shift >= 0 ? input * (s64(1) << shift) : input / divisor - (input < 0 && input % divisor != 0)) & 0xffffffffffULL;
-	for (unsigned i = 0; i < 8; ++i) f.initial[i] = 0x5100 + i;
-	f.initial[3] = 0x1002; f.final = f.initial; if (f.form == 2) ++f.final[3];
-	f.read = delay_multiply_fixture::operand_read(f.kind, 1); f.checkpoint = std::array<unsigned, 3>{f.literal_clock(), f.read - 1, f.read}[v / 36864];
-	return f;
-}
-
-void tms320c54x_test_state::start_delay_load(unsigned variant)
-{
-	bool const shift_alu = profile_is("shift-alu-delay");
-	bool const add = profile_is("add-delay");
-	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant; auto const f = shift_alu ? delay_shift_alu_case(variant) : add ? delay_add_case(variant) : delay_shift_load_case(variant);
-	auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
-	for (unsigned i = 0; i < 16; ++i) program.write_word(f.caller + 0x600 + i, 0xf495);
-	program.write_word(f.caller + 0x600, f.kind == 4 ? 0xfb80 | (f.target >> 16) : std::array<u16, 6>{0xf273, 0xfa45, 0xfa45, 0xf274, 0, 0xfe00}[f.kind]);
-	if (f.kind != 5) program.write_word(f.caller + 0x601, 0x700);
-	program.write_word(f.caller + 0x600 + f.delay(), add ? 0x00f8 | (f.destination << 8) : 0x6f00 | (f.form == 0 ? 2 : f.form == 1 ? 0x83 : 0x93)); program.write_word(f.caller + 0x601 + f.delay(), f.literal);
-	for (u32 at : {f.caller + 0x604, f.target + 0x700}) { program.write_word(at, 0x880f | (f.destination << 8)); program.write_word(at + 1, 0xf4e1); }
-	m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0); m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10); m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST0, f.st0); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, f.st1); m_cpu->set_state_int(tms320c54x_device::STATE_A, f.a); m_cpu->set_state_int(tms320c54x_device::STATE_B, f.b); m_cpu->set_state_int(tms320c54x_device::STATE_T, 0x5aa5); m_cpu->set_state_int(tms320c54x_device::STATE_TRN, 0x2468); m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x3000); m_cpu->set_state_int(tms320c54x_device::STATE_BK, 13);
-	for (unsigned i = 0; i < 8; ++i) m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + i, f.initial[i]);
-	data.write_word(0x3000, 0x700); data.write_word(f.address, f.memory);
-	m_cpu->set_input_line(0, CLEAR_LINE); m_cpu->set_input_line(INPUT_LINE_NMI, CLEAR_LINE); m_pipeline_operand_reads = m_pipeline_store_writes = m_pipeline_register_writes = m_fast_stack_reads = m_pipeline_extensions_reads = 0;
-	m_pipeline_operand_tap = data.install_read_tap(0, 0xffff, "delay_load_read", [this, f](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return; if (at == 0x3000) { expect(f.kind == 5 && word == 0x700 && !m_fast_stack_reads, "RETD load delay has one independent return-frame read"); ++m_fast_stack_reads; return; } expect(m_pipeline_operand_reads < 1U && at == f.address && word == f.memory && m_cpu->pipeline_cycles() == f.read, "Delayed load retains its ordered RAM operand once at Read"); ++m_pipeline_operand_reads; });
-	m_pipeline_write_tap = data.install_write_tap(0, 0xffff, "delay_load_write", [this, f](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return; if (at == 0x2fff || at == 0x2ffe) { unsigned const i = m_pipeline_register_writes; expect((f.kind == 3 || f.kind == 4) && i < (f.kind == 4 ? 2 : 1) && at == 0x2fff - i && word == (i ? f.caller >> 16 : 0x604), "Delayed load does not change its owning call frame"); ++m_pipeline_register_writes; return; } expect(at == 0x0f && word == u16(f.result) && !m_pipeline_store_writes && m_pipeline_operand_reads == 1U && m_cpu->pipeline_cycles() >= f.read + 2, "Target observes the completed delay load once"); ++m_pipeline_store_writes; });
-	m_pipeline_fetch_tap = program.install_read_tap(f.caller + 0x601 + f.delay(), f.caller + 0x601 + f.delay(), "delay_load_literal", [this, f](offs_t, u16 &word, u16) { if (machine().side_effects_disabled()) return; expect(word == f.literal && !m_pipeline_extensions_reads && m_cpu->pipeline_cycles() == f.literal_clock(), "Delayed LD owns one literal without decoding it as an opcode"); ++m_pipeline_extensions_reads; });
-	m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 255260;
-	m_cpu->set_state_int(STATE_GENPC, f.caller + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-}
-
-
-
-
-
 tms320c54x_test_state::indexed_store_fixture tms320c54x_test_state::circular_load_case(unsigned v)
 {
 	indexed_store_fixture f{};

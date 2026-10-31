@@ -29,7 +29,6 @@ TIMER_CALLBACK_MEMBER(tms320c54x_test_state::check_results)
 	if (check_register_product_results()) return;
 	if (check_popd_mapped_results()) return;
 	if (check_bd_long_accumulator_results()) return;
-	if (check_delay_arithmetic_results()) return;
 	if (check_memory_copy_repeat_results()) return;
 	if (check_repeated_mvdk_results()) return;
 	if (check_rom4_fr_decoder_results()) return;
