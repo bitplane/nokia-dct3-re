@@ -97,24 +97,6 @@ private:
 	static circular_move_fixture circular_move_case(unsigned variant);
 	static circular_move_fixture indexed_move_case(unsigned variant);
 	void start_circular_move(unsigned variant = 0);
-	struct rptbd_t_load_fixture
-	{
-		unsigned count, slot, form, snapshot, accumulator;
-		u16 value, status, mode, source;
-		u32 base;
-		bool branch = false;
-		unsigned branch_count = 0;
-		bool ordinary = false;
-		unsigned control = 0, late_t = 0;
-		unsigned read_clock() const { return ordinary ? 7 + unsigned(slot != 0) + unsigned(control == 5 || ((control == 1 || control == 2) && slot)) : 7 + slot; }
-		u16 target() const { return accumulator ? 0x580 : 0x610; }
-		u32 target_base() const { return ordinary && control == 4 ? base ^ 0x20000 : base; }
-		u16 loaded_t() const { return late_t == 2 ? 0x5aa5 : late_t ? value ^ 0xffff : value; }
-		u16 product() const { return u16(s32(s16(loaded_t())) * 3); }
-		u16 final_sp() const { return 0x1e00 + (ordinary ? control == 3 ? -1 : control == 4 ? -2 : control == 5 ? 1 : 0 : 0); }
-	};
-	rptbd_t_load_fixture rptbd_t_load_case(unsigned v) const;
-	void start_rptbd_t_load(unsigned variant = 0);
 	virtual void machine_start() override;
 
 	virtual void machine_reset() override;
@@ -262,7 +244,6 @@ private:
 		return true;
 	}
 	bool check_instruction_observer_results();
-	bool check_rptbd_t_load_results();
 	bool check_long_mapped_original_results();
 	bool check_circular_move_results();
 	bool check_rom4_fr_decoder_results();

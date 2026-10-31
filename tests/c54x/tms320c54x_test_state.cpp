@@ -75,8 +75,6 @@ void tms320c54x_test_state::machine_reset()
 		return;
 	if (start_profile(*this, machine().options().bios(), {
 		{ {"mvdk-circular", "mvdk-index"}, [](self &test) { test.start_circular_move(); } },
-		{ {"banzd-t-load"}, [](self &test) { test.start_rptbd_t_load(); } },
-		{ {"ctrl-t-load"}, [](self &test) { test.start_rptbd_t_load(); } },
 		{ {"stm-ind", "stm-ind-edge"}, [](self &test) { test.start_indirect_stm(); } },
 		{ {"stm-low-ram"}, [](self &test) { test.start_indirect_stm(); } },
 	}))

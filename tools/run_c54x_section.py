@@ -480,6 +480,8 @@ def main():
     counts['memory_count_copy'] = 864
     counts['memory_count_chain'] = 24
     counts['memory_count_wrap'] = 24
+    counts['banz_delay_t_load'] = 192
+    counts['control_delay_t_load'] = 1152
     counts['block_delay_t_load'] = 192
     counts['staged_conditional_store'] = 1152
     counts['mapped_conditional_store'] = 1024

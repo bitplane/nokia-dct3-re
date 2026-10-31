@@ -3687,17 +3687,19 @@ owns the address and pointer modification; Read publishes the sampled word
 to T. Execute must not overwrite a newer T, and the selected continuation
 must consume the resulting T through the ordinary multiply path.
 
-`ctrl-t-load` passes 55,296 cases and cleared-pipeline replays: six control
+`control_delay_t_load` passes 1,152 independent cases and cleared-pipeline replays: six control
 outcomes, both slots, direct/plain/postincrement/postdecrement sources,
-DP/CPL, four patterns and flag combinations, both multiply destinations,
-two pages and three checkpoints. Three cohorts retain the loaded T or
+four patterns and both multiply destinations. DP/CPL, flag combinations,
+pages and checkpoints are distributed. Three cohorts retain the loaded T or
 replace it at Read with its complement or `5aa5`. Source/opcode/target
 poisoning, one source read, target products, pointer effects and owner-only
 stack transactions are checked. CPL addresses account for each control's
 SP change; BCD's second delay position uses the existing prototype control
 timing helper, not a newly measured silicon phase. The mapped/peripheral,
 extended-address and arbitrary interrupt/producer compositions are not
-qualified by this RAM fixture.
+qualified by this RAM fixture. The shared legacy fixture/setup/checker/routes
+are removed. Replacing the newer-T mutation with the old value fails the
+replacement's T-publication assertion; no CPU change is retained.
 
 ## Mapped memory/immediate MAC
 
@@ -4516,10 +4518,10 @@ unvalidated. Non-repeated square arithmetic retains its separate matrix.
 ## BANZD delay-owned T loads
 
 One-word `LD Smem,T` can occupy either delay position of BANZD, using the
-existing Read-owned T publication. `banzd-t-load` passes 9,216 cases plus
-replay: counters 0/1/7, four source patterns, DP/SP and plain/post-increment/
-post-decrement addressing, both delay positions, four SXM/OVM combinations,
-A/B multiply consumers, two program pages and three snapshots.
+existing Read-owned T publication. `banz_delay_t_load` passes 192 independent
+cases plus replay: counters 0/1/7, four source patterns, direct/plain/
+post-increment/post-decrement addressing, both delay positions and A/B
+multiply consumers. DP/SP, SXM/OVM, pages and checkpoints are distributed.
 
 Each selected target or fallthrough multiplies the loaded T by an independent
 RAM operand. The fixture checks exactly one delay read, one multiply/store,
@@ -4681,8 +4683,8 @@ both delay positions and A/B multiply destinations. DP/SP, SXM/OVM, program
 pages and three checkpoints are distributed rather than multiplied. It verifies one delay read at
 prototype clock 7 or 8, count+1 body products, single delay DAGEN update,
 buffer sentinels and unselected state. Source memory and the fetched opcode
-are poisoned after capture. The RPTBD-only legacy branches and route are
-removed; the shared BANZD/control reference remains pending migration.
+are poisoned after capture. The entire shared legacy T-load fixture,
+setup/checker/declarations and routes are removed after BANZD/control migration.
 A changed product bit fails at the first publication. Interrupt composition and physical stage timing
 are not established.
 

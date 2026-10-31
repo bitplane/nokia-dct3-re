@@ -16,7 +16,6 @@ TIMER_CALLBACK_MEMBER(tms320c54x_test_state::check_results)
 	auto &program = m_cpu->space(AS_PROGRAM);
 	auto &data = m_cpu->space(AS_DATA);
 	if (check_instruction_observer_results()) return;
-	if (check_rptbd_t_load_results()) return;
 	if (check_long_mapped_original_results()) return;
 	if (check_circular_move_results()) return;
 	if (check_rom4_fr_decoder_results()) return;
