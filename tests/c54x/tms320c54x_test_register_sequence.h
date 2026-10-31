@@ -110,7 +110,7 @@ public:
 				m_program_cursor = m_saved_program_cursor;
 				m_xf_cursor = m_saved_xf_cursor;
 				m_volatile_words = m_saved_volatile_words;
-				if (m_input.clear_pipeline_before_restore) m_cpu.set_pipeline_frontend(true);
+				if (m_input.clear_pipeline_before_restore) m_cpu.set_pipeline_frontend(m_input.pipeline_frontend);
 				require(restore_snapshot(m_machine, m_timer, m_saved) == STATERR_NONE, "restore register sequence");
 				m_last_data_total = m_saved_data_age ? std::optional<u64>(m_cpu.total_cycles() - *m_saved_data_age) : std::nullopt;
 				m_first_data_total = m_saved_first_data_age ? std::optional<u64>(m_cpu.total_cycles() - *m_saved_first_data_age) : std::nullopt;
