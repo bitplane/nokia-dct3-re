@@ -72,8 +72,6 @@ void tms320c54x_test_state::machine_reset()
 	}))
 		return;
 	if (start_profile(*this, machine().options().bios(), {
-		{ {"rptb-single"}, [](self &test) { test.start_block_single(); } },
-		{ {"rptb-memory"}, [](self &test) { test.start_block_single(); } },
 		{ {"load-delay", "add-delay", "dld-delay"}, [](self &test) { test.start_delay_load(); } },
 		{ {"st-dagen"}, [](self &test) { test.start_constant_dagen(); } },
 		{ {"shift-delay"}, [](self &test) { test.start_delay_load(); } },

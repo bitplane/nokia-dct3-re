@@ -2622,9 +2622,9 @@ not decrement the outer count. No new scalar save-state fields are required.
 SPRU131G sections 6.7/6.8 describe the separate single/block controls; the
 block-count update is Decode-owned. This is not nested RPTB support.
 
-`rptb-single` passes 768 cases/restores over outer and inner counts 0/1/2/7,
-MVDD, immediate ST and NOP bodies, middle/end placement, two pages and four
-snapshots. Ordered RAM copies/stores, one prefix/suffix per outer iteration,
+`block_single_repeat` owns 192 independent cases/restores over outer and inner counts 0/1/2/7,
+MVDD, immediate ST and NOP bodies, middle/end placement and two pages; four
+snapshots are distributed. Ordered RAM copies/stores, one prefix/suffix per outer iteration,
 final BRC/RPTC, BRAF, RSA/REA and continuation are checked. NOP has no memory
 effects; it is a control-state case, not an independently measured cycle count.
 Boundary-straddling body encodings, combined inner-RPT/block interrupt behavior
@@ -4473,14 +4473,18 @@ RPTC independently of BRC and uses the existing block-resume prediction after
 the final repeated body. Endpoint-overlapping headers remain guarded;
 long-immediate and nested-block setup exclusions are unchanged.
 
-`rptb-memory` passes 3,840 cases plus replay, extending the existing short-RPT
+`block_memory_repeat` owns 960 independent cases/restores, extending the short-RPT
 fixture across DP, SP, plain indirect, post-increment and absolute sources.
 It covers outer/base-inner counts 0/1/2/7, MVDD/ST/NOP bodies at the middle
-or end, two program pages and four checkpoints. Post-increment sources
+or end and two program pages; four checkpoints are distributed. Post-increment sources
 alternate base and base+1 counts across outer iterations; consumed words
-are overwritten with `ffff`. It checks one fresh count read and pointer
+are inverted after capture by the volatile-read fixture. This preserves
+retained-count poisoning, not the historical exact `ffff` poison value.
+It checks one fresh count read and pointer
 update per outer iteration, exact ordered body transactions, independent
-outer completion, and one final fallthrough. IRQ/NMI composition and physical
+outer completion, untouched output tails and one final fallthrough. The whole
+data-bus trace includes the final T write and distinguishes memory-count
+first-copy draining from subsequent pipelined copy issues. IRQ/NMI composition and physical
 bus phases are not newly qualified. SPRU172C's RPTB description explicitly
 permits single-instruction repeat loops inside block repeats.
 

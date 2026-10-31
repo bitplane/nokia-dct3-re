@@ -187,17 +187,6 @@ private:
 	static delay_load_fixture delay_dld_case(unsigned v);
 	static delay_load_fixture delay_add_case(unsigned v);
 	void start_delay_load(unsigned variant = 0);
-	struct block_single_fixture
-	{
-		unsigned outer, inner, kind, checkpoint, total;
-		bool tail;
-		u32 base;
-		u16 end;
-		bool memory = false;
-		unsigned count_form = 0, body = 0x604;
-	};
-	block_single_fixture block_single_case(unsigned v) const;
-	void start_block_single(unsigned variant = 0);
 	struct indexed_store_fixture
 	{
 		unsigned ar, selected, selector, snapshot;
