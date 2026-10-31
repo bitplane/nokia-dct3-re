@@ -40,7 +40,6 @@ void tms320c54x_test_state::machine_reset()
 	}))
 		return;
 	if (start_profile(*this, machine().options().bios(), {
-		{ {"rptb-exit", "rptb-exit-delay"}, [](self &test) { test.start_block_exit(); } },
 	}))
 		return;
 	if (start_profile(*this, machine().options().bios(), {

@@ -441,6 +441,8 @@ def main():
     counts['block_repeat_backward'] = 384
     counts['block_far_call'] = 192
     counts['block_near_call'] = 864
+    counts['block_exit'] = 144
+    counts['block_delayed_exit'] = 1568
     counts['block_delayed_far_call'] = 576
     counts['shifted_unowned'] = 20480
     counts['shifted_bsp'] = 5120

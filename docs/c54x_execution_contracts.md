@@ -4563,13 +4563,21 @@ software can clear BRAF outside the block and revisit the old endpoint after
 the documented spacing. Backward exits, endpoint-overlapping delay spans,
 other predicate families and interrupt composition are not newly qualified.
 
-`rptb-exit-delay` passes 9,984 cases plus replay: BD/twelve A/B predicates,
+`block_delayed_exit` owns 1,568 independent cases/restores: BD/twelve A/B predicates,
 counts 0/1/2/7, first/middle/last/never exits, two endpoint layouts, two delay
-load/store orders, two program pages and six checkpoints. A delay load
+load/store orders and two program pages. Six checkpoints are distributed;
+unconditional branches retain one input pattern rather than four identical
+decisions. A delay load
 reverses the selected condition, so a re-evaluated rather than retained
 decision fails. Ordered reads/writes, single delay effects, BRC/BRAF at exit,
 explicit software clear and a spaced endpoint revisit are checked. Original
-non-delayed forward exits and internal delayed branches retain their gates.
+non-delayed forward exits are owned by `block_exit` (144 independent
+cases/restores replacing 1,152 phase-chain executions), retaining B and
+BC A/B equality, the same counts, exit positions, layouts and pages.
+Both sections observe the whole data bus: endpoint layouts permit the next
+iteration's Read before the previous tail Write. Delayed conditional and
+unconditional forms also differ in delay-load/store bus ordering, which is
+checked as implementation behavior, not a measured silicon phase claim.
 
 ## RPTBD delay-owned T load
 

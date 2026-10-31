@@ -94,29 +94,6 @@ private:
 	void start_rptbd_shift_store(unsigned variant = 0);
 	static unsigned block_branch_count(unsigned variant);
 	static u16 block_branch_source(unsigned variant, unsigned i);
-	struct block_exit_fixture
-	{
-		unsigned count, exit, reads, body_writes, writes, checkpoint, form;
-		u32 base;
-		u16 end;
-		bool b, taken, endpoint_store, delayed, reverse_delay;
-		u16 tail() const { return delayed ? 0x607 : 0x605; }
-		u16 value(bool condition) const
-		{
-			if (!delayed || !form) return condition ? 0 : 1;
-			switch ((form - 1) % 6)
-			{
-			case 0: return condition ? 0 : 0xffff; // >= 0
-			case 1: return condition ? 0xffff : 0; // < 0
-			case 2: return condition ? 1 : 0; // != 0
-			case 3: return condition ? 0 : 1; // == 0
-			case 4: return condition ? 1 : 0; // > 0
-			default: return condition ? 0 : 1; // <= 0
-			}
-		}
-	};
-	static block_exit_fixture block_exit_case(unsigned v, bool delayed = false);
-	void start_block_exit(unsigned variant = 0);
 	void start_block_branch(unsigned variant = 0);
 	void start_block_branch_edge(unsigned variant = 0);
 	struct delay_multiply_fixture
@@ -630,7 +607,6 @@ private:
 	bool check_delay_dld_results();
 	bool check_memory_copy_repeat_results();
 	bool check_repeated_mvdk_results();
-	bool check_block_exit_results();
 	bool check_rom4_fr_decoder_results();
 	bool check_rom4_codec_is_results();
 	bool check_rom4_crc_input_results();
