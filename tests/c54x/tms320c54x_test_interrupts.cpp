@@ -20,6 +20,11 @@ namespace c54x_test {
 
 
 
+void tms320c54x_test_state::stack_mmr_w(offs_t offset, u16 value)
+{
+	m_stack_mmr[offset] = value;
+}
+
 u16 tms320c54x_test_state::repeat_irq_r(offs_t offset)
 {
 	if (m_phase == 6517 || m_phase == 6518 || m_phase == 251210 || m_phase == 62162 || m_phase == 62163)

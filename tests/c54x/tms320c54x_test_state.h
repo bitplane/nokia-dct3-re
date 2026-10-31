@@ -61,29 +61,6 @@ private:
 
 
 
-	struct indexed_store_fixture
-	{
-		unsigned ar, selected, selector, snapshot;
-		bool add, compatibility, excluded;
-		u32 base;
-		u64 value;
-		u16 word, st0, st1, pmst, address, final_ar, bk;
-		u8 mode;
-		std::array<u16, 8> initial;
-	};
-	static indexed_store_fixture circular_load_case(unsigned v);
-	struct circular_move_fixture
-	{
-		indexed_store_fixture memory;
-		u16 destination, word, sp = 0x2200, bk, brc = 0, t = 0xbeef, trn = 0x1357;
-		u64 a = 0x123456789aULL, b = 0xfeabcd9876ULL;
-		std::array<u16, 8> final;
-		bool excluded;
-		unsigned write_clock;
-	};
-	static circular_move_fixture circular_move_case(unsigned variant);
-	static circular_move_fixture indexed_move_case(unsigned variant);
-	void start_circular_move(unsigned variant = 0);
 	virtual void machine_start() override;
 
 	virtual void machine_reset() override;
@@ -231,7 +208,6 @@ private:
 		return true;
 	}
 	bool check_instruction_observer_results();
-	bool check_circular_move_results();
 	bool check_rom4_fr_decoder_results();
 	bool check_rom4_codec_is_results();
 	bool check_rom4_crc_input_results();
@@ -240,8 +216,6 @@ private:
 	required_device<tms320c54x_device> m_cpu;
 	u16 m_shifted_bus_word = 0;
 	ordered_case_digest m_context_coverage;
-	ordered_case_digest m_circular_move_coverage;
-	unsigned m_circular_move_excluded = 0;
 	tms320c54x_bsp_state m_shifted_bsp;
 	util::gsm_fr_codec m_rom4_codec;
 	util::gsm_fr_codec::pcm_block m_rom4_pcm{};

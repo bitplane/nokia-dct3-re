@@ -716,7 +716,7 @@ boundaries are:
 | `tests/c54x/tms320c54x_test_domains.h` | Independent single-memory admission fixture: catalogue, preserved state, bus observers and replay |
 | `tests/c54x/tms320c54x_test_dispatch.cpp` | Ordered callback routing and the initial-program completion tail |
 | `tests/c54x/sections/product_dependencies.h` | Independent product operand/producer dependency cases; numeric product owners remain separate |
-| `tests/c54x/tms320c54x_test_addressing.cpp` | Address generation and memory/register transfers, including the stack-transfer continuation |
+| `tests/c54x/tms320c54x_test_modified_mvdk_section.h` | Independent circular/indexed move geometry, mapped aliases and raw payload contracts |
 | `tests/c54x/tms320c54x_test_domains.h` | CPU-only admission fixture with owned progress, observations, taps and snapshots |
 | `tests/c54x/tms320c54x_test_register_unary.h` | Independent register-logic, shift, NEG/ABS inputs, balanced replay keys and explicit clocked observations |
 | `tests/c54x/tms320c54x_test_domain_schedule.h` | Independent instruction inventory and explicit admission-control schedule; no legacy phase routing |
@@ -4229,11 +4229,11 @@ before a potentially aliasing mapped destination is published. CMPT/ARP
 selection and destination-specific publication use the established move
 path. BK does not impose circular wrapping on these modes.
 
-`mvdk-index` retains 114,240 cases plus replay, including 2,688 selected
-excluded-input cases. It reuses the circular-move matrix with independently recomputed
+`indexed_mvdk` retains 13,504 independently compiled cases plus replay.
+It shares move construction with circular cases but uses independently computed
 linear pointer results: sixteen unique encodings, twenty-one destination
-kinds, eighteen mapped sources, representative signed indices, two pages and
-balanced checkpoints. Each accepted case samples one raw word, fetches one
+kinds, eighteen mapped sources and representative signed indices. Pages,
+flags and checkpoints are distributed. Each accepted case samples one raw word, fetches one
 destination literal and publishes once; accumulator lanes, T/TRN, DAGEN,
 BRC and RAM destinations retain their separate ownership. The profile
 clears the live pipeline before restoring its snapshots.
@@ -5214,8 +5214,8 @@ interrupt/repeat composition or measured bus phases.
 
 Short circular sources `71c0..71df` retain one raw source word, update the
 source pointer using the old BK/index, then publish the destination. Native
-`71d2` uses a +1 circular step, not AR0. The `mvdk-circular` profile passes
-114,240 cases and save-state replays, including 2,688 selected excluded-input cases,
+`71d2` uses a +1 circular step, not AR0. `circular_mvdk` passes
+26,840 independently compiled cases and save-state replays, including rejected sources,
 all 32 encodings, 21 destination kinds, 18 owned mapped sources and native
 BK=82. Destination admission is register-specific: CLKMD at `0058` has a
 separate move path, so the peripheral range is not a blanket rejection
@@ -5223,26 +5223,16 @@ domain. Circular/indexed CLKMD writes are not covered by the dedicated
 clock-move gate. Physical phase timing and interrupt/repeat composition
 remain unvalidated.
 
-The four cohorts retain every non-checkpoint input ordinal: 43,008 addressing,
-1,344 numeric/status, 48,384 mapped-source and 21,504 native-BK inputs.
-Each input runs and restores once, with checkpoint selection balanced within
-every cohort/destination-kind group. This replaces the former 294,336-case
-snapshot cross-product, retiring 180,096 executions/restores per profile.
-It no longer tests every input at all two/three checkpoints and is not an
-equivalent-coverage claim. The host audit compiles the actual reference
-factories and verifies that checkpoint copies differ only in their snapshot
-selector; native completion checks ordered original-key digests. The same
-sampling policy applies to `mvdk-index`.
-
-Successful, nonexcluded cases emit exact-word assertion attribution for
-`71c0..71df`; excluded cases do not earn execution credit. The completion gate
-requires `asserted_encodings=32` after checking that every encoding reached its
-transfer assertion. This associates the existing source-sample, pointer-update,
-destination-publication and replay tests with exact native words such as `71c2`.
-It does not expand the operand matrix, alter CPU execution, or establish RF
-sample encoding or acquisition. Reproduce with `tools/run_c54x_core.py
---profile mvdk-circular --verbose` and retain both its successful completion and
-the run's `error.log` before using the assertion inventory in a coverage report.
+The replacements separate legal pointer geometry, every mapped-source/
+destination pairing, and eight raw payloads per destination kind. BK includes
+0/1/7/16/82 with explicit legal self-indexed AR0 geometry. Page/flag/checkpoint
+and payload/geometry cross-products are distributed, not retained as exhaustive
+ordinal coverage. The old scheduler, source-extraction host audit, digest and
+legacy addressing source are deleted. Exact source Read, pointer update,
+destination publication, literal/source poison and all unselected fields are
+checked with replay. A wrong indexed update fails the independent section.
+Run `python3 tools/run_c54x_section.py circular_mvdk` or `indexed_mvdk`.
+This does not establish physical bus phases or RF sample encoding/acquisition.
 
 The resident sequence `ec05 7192 13d0` at `7f8d..7f8f` is qualified:
 `RPT #5; MVDK *AR2+,13d0`. TI SPRU172C page 4-108 specifies six
