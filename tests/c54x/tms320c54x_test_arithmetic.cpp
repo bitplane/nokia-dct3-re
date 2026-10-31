@@ -36,34 +36,6 @@ std::array<u64, 2> tms320c54x_test_state::repeat_subc_result(memory_repeat_fixtu
 	return {accumulator, flags};
 }
 
-tms320c54x_test_state::delay_multiply_fixture tms320c54x_test_state::delay_multiply_case(unsigned variant, bool mac, bool rounded)
-{
-	unsigned const group = mac || rounded ? variant / 18432 : 0;
-	variant %= 18432;
-	unsigned const kind = variant % 6, form = (variant / 6) % 4, destination = (variant / 24) % 2, pair = (variant / 48) % 16, flags = (variant / 768) % 4;
-	u16 const memory = std::array<u16, 4>{0, 1, 0x8000, 0xffff}[pair % 4], t = std::array<u16, 4>{0, 1, 0x8000, 0xffff}[pair / 4];
-	u32 const caller = (variant / 3072) % 2 ? 0x20000 : 0, target = kind == 4 ? caller ^ 0x20000 : caller;
-	s64 const product = s64(s16(memory)) * s16(t) * (flags & 1 ? 2 : 1);
-	u64 const result = u64(product > 0x7fffffffLL && (flags & 2) ? 0x7fffffffLL : product) & 0xffffffffffULL;
-	unsigned const read = delay_multiply_fixture::operand_read(kind, form);
-	delay_multiply_fixture f{kind, form, destination, flags, std::array<unsigned, 3>{3, read - 1, read}[variant / 6144], memory, t,
-		std::array<u16, 4>{0x5000, 0x5000, u16(mac ? 0x15 : 0x17), 0x5003}[form], caller, target,
-		kind == 1 ? 0 : kind == 2 ? 1 : 0x123456789aULL, 0xfedcba9876ULL, result};
-	if (mac)
-	{
-		f.accumulate = true; f.operation = group % 4; f.flags |= group / 4 ? 4 : 0;
-		s64 const value = f.arithmetic();
-		f.result = u64(f.overflow() && (f.flags & 2) ? std::clamp(value, s64(-2147483648LL), s64(2147483647LL)) : value) & 0xffffffffffULL;
-	}
-	if (rounded)
-	{
-		f.rounded = true; f.flags |= group ? 4 : 0;
-		s64 const value = f.arithmetic();
-		f.result = u64(f.flags & 2 ? std::clamp(value, s64(-2147483648LL), s64(2147483647LL)) : value) & 0xffffffffffULL;
-	}
-	return f;
-}
-
 tms320c54x_test_state::delay_multiply_fixture tms320c54x_test_state::delay_accumulator_multiply_case(unsigned variant)
 {
 	unsigned v = variant;
@@ -106,23 +78,19 @@ tms320c54x_test_state::delay_multiply_fixture tms320c54x_test_state::bd_long_acc
 void tms320c54x_test_state::start_delay_multiply(unsigned variant)
 {
 	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-	bool const mac = profile_is("mac-delay");
 	bool const square = profile_is("square-delay");
 	bool const memory_square = profile_is("squr-delay");
 	bool const long_acc = profile_is("bd-maca-long");
-	bool const acc = square || memory_square || long_acc || profile_is("maca-delay");
-	bool const rounded = profile_is("mpyr-delay");
-	auto const f = long_acc ? bd_long_accumulator_case(variant) : memory_square ? delay_memory_square_case(variant) : square ? delay_square_case(variant) : acc ? delay_accumulator_multiply_case(variant) : delay_multiply_case(variant, mac, rounded); auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
+	auto const f = long_acc ? bd_long_accumulator_case(variant) : memory_square ? delay_memory_square_case(variant) : square ? delay_square_case(variant) : delay_accumulator_multiply_case(variant); auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
 	for (unsigned i = 0; i < 16; ++i) program.write_word(f.caller + 0x600 + i, 0xf495);
 	program.write_word(f.caller + 0x600, f.kind == 4 ? 0xfb80 | (f.target >> 16) : std::array<u16, 6>{0xf273, 0xfa45, 0xfa45, 0xf274, 0, 0xfe00}[f.kind]);
 	if (f.kind != 5) program.write_word(f.caller + 0x601, 0x700);
-	program.write_word(f.caller + 0x600 + f.delay(), memory_square ? 0x2600 | (f.destination << 8) | (f.form == 0 ? 0x62 : f.form == 1 ? 0x82 : 0x92) : square ? (0x3800 | (f.operation << 9) | (f.destination << 8) | (f.form == 0 ? 0x62 : f.form == 1 ? 0x82 : 0x92)) : acc ? (0x3100 + f.operation * 0x200) | (f.form == 0 ? 0x62 : f.form == 1 ? 0x82 : 0x92) : (mac ? 0x2800 + f.operation * 0x200 : rounded ? 0x2200 : 0x2000) | (f.destination << 8) | (f.form == 0 ? rounded ? 0x92 : 0x82 : f.form == 3 ? 0xe2 : 0xf8));
+	program.write_word(f.caller + 0x600 + f.delay(), memory_square ? 0x2600 | (f.destination << 8) | (f.form == 0 ? 0x62 : f.form == 1 ? 0x82 : 0x92) : square ? (0x3800 | (f.operation << 9) | (f.destination << 8) | (f.form == 0 ? 0x62 : f.form == 1 ? 0x82 : 0x92)) : (0x3100 + f.operation * 0x200) | (f.form == 0 ? 0x62 : f.form == 1 ? 0x82 : 0x92));
 	if (long_acc) program.write_word(f.caller + 0x602,(0x3100 + f.operation * 0x200) | (f.form == 2 ? 0xf8 : 0xe0 | f.address_ar));
-	if (f.form && !acc) program.write_word(f.caller + 0x601 + f.delay(), f.form == 3 ? 3 : f.source);
 	if (long_acc) program.write_word(f.caller + 0x603,f.extension());
 	for (u32 at : {f.caller + 0x604, f.target + 0x700}) { program.write_word(at, 0x880f | (f.destination << 8)); program.write_word(at + 1, 0xf4e1); }
 	m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_PMST, f.flags & 4 ? 2 : 0); m_cpu->set_state_int(tms320c54x_device::STATE_ST0, acc ? 0xa020 : 0xa008); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, (acc ? 0x800 | (f.flags & 8 ? 0x100 : 0) : 0x900) | (f.flags & 1 ? 0x40 : 0) | (f.flags & 2 ? 0x200 : 0));
+	m_cpu->set_state_int(tms320c54x_device::STATE_PMST, f.flags & 4 ? 2 : 0); m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xa020); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, (0x800 | (f.flags & 8 ? 0x100 : 0)) | (f.flags & 1 ? 0x40 : 0) | (f.flags & 2 ? 0x200 : 0));
 	m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
 	m_cpu->set_state_int(tms320c54x_device::STATE_A, f.a); m_cpu->set_state_int(tms320c54x_device::STATE_B, f.b); m_cpu->set_state_int(tms320c54x_device::STATE_T, f.t); m_cpu->set_state_int(tms320c54x_device::STATE_TRN, 0x2468);
 	if (long_acc) { m_cpu->set_state_int(tms320c54x_device::STATE_A,f.a ^ 0xffffffffffULL); m_cpu->set_state_int(tms320c54x_device::STATE_B,f.b ^ 0xffffffffffULL); }
@@ -380,40 +348,33 @@ bool tms320c54x_test_state::check_bd_long_accumulator_results()
 {
 	if (m_phase == 254540)
 	{
-		bool const mac = profile_is("mac-delay");
 		bool const square = profile_is("square-delay");
 		bool const memory_square = profile_is("squr-delay");
 		bool const long_acc = profile_is("bd-maca-long");
-		bool const acc = square || memory_square || long_acc || profile_is("maca-delay");
-		bool const rounded = profile_is("mpyr-delay");
-		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick; auto const f = long_acc ? bd_long_accumulator_case(variant) : memory_square ? delay_memory_square_case(variant) : square ? delay_square_case(variant) : acc ? delay_accumulator_multiply_case(variant) : delay_multiply_case(variant, mac, rounded);
+		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick; auto const f = long_acc ? bd_long_accumulator_case(variant) : memory_square ? delay_memory_square_case(variant) : square ? delay_square_case(variant) : delay_accumulator_multiply_case(variant);
 		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "A complete memory MPY fits its control-delay words");
-		if (acc)
+
 		{
 			u64 const mask = long_acc && tick <= f.read() ? 0xffffffffffULL : 0;
 			expect(m_cpu->state_int(tms320c54x_device::STATE_A) == (!f.destination && tick > f.read() ? f.result : f.a ^ mask) && m_cpu->state_int(tms320c54x_device::STATE_B) == (f.destination && tick > f.read() ? f.result : f.b ^ mask), "Delayed multiply publishes only its selected accumulator in Execute");
 			if (tick == f.read() - 1) expect(m_cpu->state_int(tms320c54x_device::STATE_AR0 + f.address_ar) == (!long_acc && f.form == 2 ? 0x5001 : 0x5000), "Delayed accumulator multiply owns one pointer update before poisoning");
 		}
-		if (((f.form && !acc) || long_acc) && tick == f.literal_clock()) { auto const disabled = machine().disable_side_effects(); m_cpu->space(AS_PROGRAM).write_word(f.caller + 0x601 + f.delay(), 0x5010); }
-		if (tick == f.read() - 1) { if (rounded) expect(m_cpu->state_int(tms320c54x_device::STATE_AR2) == (f.form == 0 ? 0x5001 : 0x5000), "Delayed MPYR owns its postincrement before pointer poisoning"); m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + f.address_ar, 0x6000); }
-		if (tick == f.read()) { expect(m_cpu->state_int(tms320c54x_device::STATE_T) == (acc ? f.memory : f.t), "Multiply owns its T publication or retained T source at Read"); auto const disabled = machine().disable_side_effects(); m_cpu->space(AS_DATA).write_word(f.source, 0xdead); m_cpu->set_state_int(tms320c54x_device::STATE_T, 0xdead); }
+		if (long_acc && tick == f.literal_clock()) { auto const disabled = machine().disable_side_effects(); m_cpu->space(AS_PROGRAM).write_word(f.caller + 0x601 + f.delay(), 0x5010); }
+		if (tick == f.read() - 1) m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + f.address_ar, 0x6000);
+		if (tick == f.read()) { expect(m_cpu->state_int(tms320c54x_device::STATE_T) == f.memory, "Multiply owns its T publication or retained T source at Read"); auto const disabled = machine().disable_side_effects(); m_cpu->space(AS_DATA).write_word(f.source, 0xdead); m_cpu->set_state_int(tms320c54x_device::STATE_T, 0xdead); }
 		if (long_acc && tick == f.read()) { m_cpu->set_state_int(tms320c54x_device::STATE_A,f.a); m_cpu->set_state_int(tms320c54x_device::STATE_B,f.b); }
 		if (tick == f.checkpoint && !m_pipeline_replay) { m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_store_writes, m_pipeline_register_writes, m_fast_stack_reads, m_pipeline_extensions_reads}; expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save delayed multiply Decode, Access and retained Read operands"); }
 		if (tick == 24)
 		{
 			u32 const continuation = f.kind == 2 ? f.caller + 0x606 : f.target + 0x702;
-			expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_cpu->state_int(STATE_GENPC) == continuation && m_pipeline_operand_reads == 1 && m_pipeline_store_writes == 1 && m_pipeline_register_writes == (f.kind == 4 ? 2U : unsigned(f.kind == 3)) && m_fast_stack_reads == unsigned(f.kind == 5) && m_pipeline_extensions_reads == unsigned(long_acc || (f.form != 0 && !acc)) && m_cpu->state_int(tms320c54x_device::STATE_A) == (f.destination ? f.a : f.result) && m_cpu->state_int(tms320c54x_device::STATE_B) == (f.destination ? f.result : f.b) && m_cpu->state_int(tms320c54x_device::STATE_T) == 0xdead && m_cpu->state_int(tms320c54x_device::STATE_TRN) == u16(f.result) && m_cpu->state_int(tms320c54x_device::STATE_ST0) == ((acc ? 0xa020 : 0xa008) | (f.overflow() ? f.destination ? 0x200 : 0x400 : 0)) && m_cpu->state_int(tms320c54x_device::STATE_ST1) == ((acc ? 0x800 | (f.flags & 8 ? 0x100 : 0) : 0x900) | (f.flags & 1 ? 0x40 : 0) | (f.flags & 2 ? 0x200 : 0)) && m_cpu->state_int(tms320c54x_device::STATE_SP) == (f.kind == 4 ? 0x2ffe : f.kind == 3 ? 0x2fff : f.kind == 5 ? 0x3001 : 0x3000), "Delayed MPY preserves independent signed arithmetic, status, frames and target page through replay");
+			expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_cpu->state_int(STATE_GENPC) == continuation && m_pipeline_operand_reads == 1 && m_pipeline_store_writes == 1 && m_pipeline_register_writes == (f.kind == 4 ? 2U : unsigned(f.kind == 3)) && m_fast_stack_reads == unsigned(f.kind == 5) && m_pipeline_extensions_reads == unsigned(long_acc) && m_cpu->state_int(tms320c54x_device::STATE_A) == (f.destination ? f.a : f.result) && m_cpu->state_int(tms320c54x_device::STATE_B) == (f.destination ? f.result : f.b) && m_cpu->state_int(tms320c54x_device::STATE_T) == 0xdead && m_cpu->state_int(tms320c54x_device::STATE_TRN) == u16(f.result) && m_cpu->state_int(tms320c54x_device::STATE_ST0) == ((0xa020) | (f.overflow() ? f.destination ? 0x200 : 0x400 : 0)) && m_cpu->state_int(tms320c54x_device::STATE_ST1) == ((0x800 | (f.flags & 8 ? 0x100 : 0)) | (f.flags & 1 ? 0x40 : 0) | (f.flags & 2 ? 0x200 : 0)) && m_cpu->state_int(tms320c54x_device::STATE_SP) == (f.kind == 4 ? 0x2ffe : f.kind == 3 ? 0x2fff : f.kind == 5 ? 0x3001 : 0x3000), "Delayed MPY preserves independent signed arithmetic, status, frames and target page through replay");
 			if (!m_pipeline_replay) { m_pipeline_replay = true; m_idle_fixture_tick = f.checkpoint; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_store_writes = m_recurring_irq_snapshot[1]; m_pipeline_register_writes = m_recurring_irq_snapshot[2]; m_fast_stack_reads = m_recurring_irq_snapshot[3]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[4]; if (memory_square || long_acc) m_cpu->set_pipeline_frontend(true); return restore_pipeline_at(254550, "Replay delayed multiply without repeated source reads or callee publications"); }
 			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (variant < (long_acc ? 98303 : memory_square ? 27647 : acc ? 55295 : rounded ? 36863 : mac ? 147455 : 18431)) { start_delay_multiply(variant + 1); return true; }
+			if (variant < (long_acc ? 98303 : memory_square ? 27647 : 55295)) { start_delay_multiply(variant + 1); return true; }
 			if (long_acc) { osd_printf_info("TMS320C54x BD long accumulator multiply: PASS cases=98304 restore=98304 operations=MPYA,MASA,MACA,MACAR forms=positive_offset,negative_offset,absolute address_registers=8 patterns=8 flags=16 pages=2 snapshots=4 extension_reads=1 source_reads=1 accumulators=Execute t_publish=Read target_observes_result=1 reset_before_restore=1 physical_phase_claim=0\n"); throw emu_fatalerror(3,"TMS320C54x isolated BD long accumulator multiply complete"); }
 			if (memory_square) { osd_printf_info("TMS320C54x delayed memory SQUR: PASS cases=27648 restore=27648 controls=BD,BCD_taken,BCD_untaken,CALLD,FCALLD,RETD destinations=2 forms=DP,indirect,postincrement patterns=8 frct_ovm_smul_sxm=16 pages=2 snapshots=3 source_reads=1 t_publication=Read newer_t_preserved=1 smul_product_clamp=0 target_observes_result=1 reset_before_restore=1 physical_phase_claim=0\n"); throw emu_fatalerror(3, "TMS320C54x isolated delayed memory SQUR complete"); }
 			if (square) { osd_printf_info("TMS320C54x delayed square accumulation: PASS cases=55296 restore=55296 controls=BD,BCD_taken,BCD_untaken,CALLD,FCALLD,RETD operations=SQURA,SQURS destinations=2 forms=DP,indirect,postincrement patterns=8 frct_ovm_smul_sxm=16 pages=2 snapshots=3 source_reads=1 t_publication=Read smul_product_clamp=0 target_observes_result=1 physical_phase_claim=0\n"); throw emu_fatalerror(3, "TMS320C54x isolated delayed square accumulation complete"); }
-			if (rounded) { osd_printf_info("TMS320C54x delayed MPYR: PASS cases=36864 restore=36864 controls=BD,BCD_taken,BCD_untaken,CALLD,FCALLD,RETD forms=postincrement,absolute_RAM,absolute_AR7,offset destinations=2 operand_pairs=16 frct_ovm_smul=8 pages=2 snapshots=3 source_reads=1 rounding=biased_high_word smul_product_clamp=0 t_retained=1 callee_observes_result=1 physical_phase_claim=0\n"); throw emu_fatalerror(3, "TMS320C54x isolated delayed MPYR complete"); }
-			if (acc) { osd_printf_info("TMS320C54x delayed accumulator multiply: PASS cases=55296 restore=55296 controls=BD,BCD_taken,BCD_untaken,CALLD,FCALLD,RETD operations=MPYA,MASA,MACA,MACAR forms=DP,indirect,postincrement patterns=8 frct_ovm_smul_sxm=16 pages=2 snapshots=3 source_reads=1 t_publication=Read target_observes_result=1 physical_phase_claim=0\n"); throw emu_fatalerror(3, "TMS320C54x isolated delayed accumulator multiply complete"); }
-			if (mac) { osd_printf_info("TMS320C54x staged delay MAC/MAS: PASS cases=147456 restore=147456 controls=BD,BCD_taken,BCD_untaken,CALLD,FCALLD,RETD operations=MAC,MACR,MAS,MASR forms=short,absolute_RAM,absolute_AR5,offset destinations=2 operand_pairs=16 frct_ovm_smul=8 pages=2 snapshots=3 source_reads=1 t_retained=1 callee_observes_result=1 physical_phase_claim=0\n"); throw emu_fatalerror(3, "TMS320C54x isolated delay MAC/MAS complete"); }
-			osd_printf_info("TMS320C54x staged delay MPY: PASS cases=18432 restore=18432 controls=BD,BCD_taken,BCD_untaken,CALLD,FCALLD,RETD forms=short,absolute_RAM,absolute_AR,offset destinations=2 operand_pairs=16 frct_ovm=4 pages=2 snapshots=3 source_reads=1 callee_observes_result=1 silicon_phase_claim=0\n");
-			throw emu_fatalerror(0, "TMS320C54x isolated delay MPY complete");
+			{ osd_printf_info("TMS320C54x delayed accumulator multiply: PASS cases=55296 restore=55296 controls=BD,BCD_taken,BCD_untaken,CALLD,FCALLD,RETD operations=MPYA,MASA,MACA,MACAR forms=DP,indirect,postincrement patterns=8 frct_ovm_smul_sxm=16 pages=2 snapshots=3 source_reads=1 t_publication=Read target_observes_result=1 physical_phase_claim=0\n"); throw emu_fatalerror(3, "TMS320C54x isolated delayed accumulator multiply complete"); }
 		}
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
 	}

@@ -1498,11 +1498,13 @@ control-delay exclusion in [Current boundary](5510_bringup.md#current-boundary).
 
 ### Signed MAC/MAS in control delay words
 
-`--profile mac-delay` passes 147,456 cases and save/replays: all four
+`delayed_mac` owns 3,072 independent cases/restores: all four
 signed accumulating operations, BD, taken/untaken BCD, CALLD, cross-page
 FCALLD and RETD; short, absolute RAM, absolute AR5 and offset sources;
-both destinations, sixteen T/memory pairs, eight FRCT/OVM/SMUL combinations,
-two pages and three checkpoints. Expected arithmetic independently rounds
+both destinations and sixteen T/memory pairs. FRCT/OVM/SMUL, page and three
+checkpoints are assigned across interaction tuples rather than fully crossed;
+the old numeric/control correlations are deliberately retired. Standalone
+product sections own broader arithmetic contracts. Expected arithmetic independently rounds
 the accumulation/subtraction, not the product. The conditional branch
 decides from the original accumulator before the delay operation changes it.
 
@@ -1513,6 +1515,14 @@ the selected target copies the completed result. This reuses the existing
 MAC execution path and complete delay-word accounting, with no new CPU state.
 Interrupt arrival during these MAC delays, waited
 memory and physical phase timing remain unvalidated.
+
+`delayed_multiply` independently owns 768 ordinary MPY cases/restores with
+the same six controls, four addressing forms, both destinations and sixteen
+operand pairs. FRCT/OVM, page and checkpoints are assigned. Both sections
+check captured Read operands/T, Access pointer state, post-capture poison,
+Execute result/status, exact data ordering and final continuation/frame state.
+For a short FCALLD delay, Read precedes the caller-page Write at the same
+pipeline clock; extended forms publish that frame before the later Read.
 
 ### Double-word loads in control delay words
 
@@ -3772,10 +3782,11 @@ the product by adding `8000` and clearing its low word, then applies the
 existing result-overflow/OVM rules. FRCT doubles the product before rounding.
 MPYR does not use the MAC-family SMUL product clamp and does not publish T.
 
-`mpyr-delay` passes 36,864 cases and save/load replays over BD, both BCD
+`delayed_rounded_multiply` owns 768 independent cases/restores over BD, both BCD
 outcomes, CALLD, FCALLD and RETD; postincrement, absolute RAM/AR7 and offset;
 both destinations; sixteen signed operand pairs including positive/negative
-rounding ties; FRCT/OVM/SMUL; two pages and three checkpoints. Memory, T,
+rounding ties. FRCT/OVM/SMUL, page and three checkpoints are assigned, not
+fully crossed. Memory, T,
 pointer and literal poisoning reject resampling, while the target observes
 the completed result and stack effects remain exact. Other
 addressing, interrupt composition and physical pipeline phases remain

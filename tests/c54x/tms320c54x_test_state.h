@@ -87,10 +87,8 @@ private:
 		u16 memory, t, source;
 		u32 caller, target;
 		u64 a, b, result;
-		bool accumulate = false;
 		unsigned operation = 0;
 		bool accumulator_source = false;
-		bool rounded = false;
 		bool square = false;
 		bool memory_square = false;
 		bool extended_accumulator = false;
@@ -119,17 +117,10 @@ private:
 				s64 const value = !operation ? product : operation == 1 ? old_b - product : old_b + product;
 				return operation == 3 ? (value + 32768) & ~s64(65535) : value;
 			}
-			s64 product = s64(s16(memory)) * s16(t) * (flags & 1 ? 2 : 1);
-			if (!rounded && (flags & 7) == 7) product = std::clamp(product, s64(-2147483648LL), s64(2147483647LL));
-			if (rounded) product = (product + 32768) & ~s64(65535);
-			if (!accumulate) return product;
-			u64 const source = destination ? b : a;
-			s64 sum = (BIT(source, 39) ? s64(source) - (s64(1) << 40) : s64(source)) + (operation & 2 ? -product : product);
-			return operation & 1 ? (sum + 32768) & ~s64(65535) : sum;
+			throw emu_fatalerror("Legacy delay fixture has no accumulator-source contract");
 		}
 		bool overflow() const { return arithmetic() < -2147483648LL || arithmetic() > 2147483647LL; }
 	};
-	static delay_multiply_fixture delay_multiply_case(unsigned variant, bool mac = false, bool rounded = false);
 	static delay_multiply_fixture delay_accumulator_multiply_case(unsigned variant);
 	static delay_multiply_fixture bd_long_accumulator_case(unsigned v);
 	static delay_multiply_fixture delay_square_case(unsigned variant);
