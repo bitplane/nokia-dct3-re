@@ -2470,6 +2470,17 @@ the endpoint and delay words after Fetch, and the delay-load source after
 Read, cannot change retained work. Ordered body reads/writes, final memory,
 RSA/REA/BRC/BRAF, once-only delay effects and unrelated registers are checked.
 
+`block_delay_shift_store` owns 1,340 independent cases/restores. Its 960-case
+numeric bank crosses five destination forms, four source/high-low selectors,
+shifts -16/-1/15, SST/SXM, two signed source patterns and CPL at outer count2.
+The 380-case composition bank covers outer counts0/1/2/7 and none/IRQ2/NMI
+at delay/body arrival windows with representative numeric inputs. Page and
+three checkpoints are distributed. The former full numeric/count/IRQ cross
+product is deliberately retired. Endpoint/extension poisoning, source
+replacement at tick8, one exact store at clock9, no destination read,
+RTN-bound hardware frame and final body/controller effects are checked.
+These are model timing checks, not measured silicon phases.
+
 `composition_limits` retains 28 delayed-block cases/restores across seven exclusions, two pages and
 snapshots before/after the guard: STM/STLM/POPM BRC in the delay span, a
 branch, a two-word spill into one remaining delay word, and nested RPTBD

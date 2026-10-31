@@ -19,12 +19,6 @@ struct instruction_observer_fixture
 	std::stringstream saved;
 };
 
-struct rptbd_observations
-{
-	unsigned reads = 0, writes = 0, fetches = 0, delay_reads = 0, delay_writes = 0;
-	unsigned acks = 0, stack_reads = 0, stack_writes = 0;
-};
-
 } // namespace c54x_test
 
 #endif // MAME_NOKIA_TMS320C54X_TEST_PIPELINE_STATE_H

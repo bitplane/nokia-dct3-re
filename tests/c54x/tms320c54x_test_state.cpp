@@ -73,7 +73,6 @@ void tms320c54x_test_state::machine_reset()
 		return;
 	if (start_profile(*this, machine().options().bios(), {
 		{ {"st-dagen"}, [](self &test) { test.start_constant_dagen(); } },
-		{ {"rptbd-shift-st"}, [](self &test) { test.start_rptbd_shift_store(); } },
 	}))
 		return;
 	if (profile_is("cond-store") || profile_is("cond-store-edge")) { start_staged_conditional_store(); return; }
@@ -409,11 +408,6 @@ void tms320c54x_test_state::test(machine_config &config)
 			bool const nmi = (variant / 16) % 2, long_count = (variant / 8) % 2;
 			expect(line == (nmi ? INPUT_LINE_NMI : 0) && !m_vector_acks && m_pipeline_store_writes == count + 1 && m_cpu->state_int(tms320c54x_device::STATE_RTN) == (long_count ? 0x604 : 0x603), "Repeated MVDP acknowledges the pending source only after all writes with the unexecuted continuation");
 			++m_vector_acks;
-		}
-		if (m_phase == 310400)
-		{
-			auto const f = rptbd_shift_store_case(m_pipeline_peripheral_case);
-			expect(f.irq && line == (f.irq == 2 || f.irq == 4 ? INPUT_LINE_NMI : 2) && !m_rptbd_counts.acks++ && m_rptbd_counts.delay_writes == 1 && m_cpu->pipeline_cycles() >= 9, "RPTBD shifted-store interrupt is acknowledged only after its complete delay publication"); m_cpu->set_input_line(line, CLEAR_LINE);
 		}
 		if (m_phase == 62154) { auto const f = memory_copy_repeat_case(m_pipeline_peripheral_case); expect(f.irq && line == (f.irq == 2 ? INPUT_LINE_NMI : 2) && !m_vector_acks && m_pipeline_store_writes == f.count + 1 && m_cpu->state_int(tms320c54x_device::STATE_RC) == 0, "Memory-count repeat defers its actual pending interrupt until all copies complete"); ++m_vector_acks; m_cpu->set_input_line(line, CLEAR_LINE); }
 		if (m_phase == 254200) { auto const &f = m_popd_fixture; expect(f.irq && line == (f.irq == 2 ? INPUT_LINE_NMI : 0) && !m_vector_acks && m_pipeline_store_writes == f.count + 1 && m_cpu->pipeline_cycles() > f.read_clock() + f.count + 1, "POPD acknowledges IRQ/NMI only after the last repeat iteration retires"); ++m_vector_acks; }

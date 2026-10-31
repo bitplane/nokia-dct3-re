@@ -466,6 +466,7 @@ def main():
     counts['delayed_shift_load'] = 1152
     counts['delayed_shift_alu'] = 4608
     counts['delayed_absolute_add'] = 3072
+    counts['block_delay_shift_store'] = 1340
     counts['block_delayed_exit'] = 1568
     counts['block_delayed_far_call'] = 576
     counts['shifted_unowned'] = 20480

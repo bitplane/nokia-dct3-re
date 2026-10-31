@@ -81,17 +81,6 @@ private:
 	static memory_repeat_fixture memory_repeat_case(unsigned variant);
 	static std::array<u64, 2> repeat_subc_result(memory_repeat_fixture const &f, unsigned iterations);
 	void start_pipeline_memory_repeat(unsigned variant = 0);
-	struct rptbd_shift_store_fixture
-	{
-		unsigned count, form, kind, flags, irq, checkpoint;
-		int shift;
-		bool compiler;
-		u32 base;
-		u16 mode, address, initial_ar3, final_ar3, value, st0, st1;
-		u64 source;
-	};
-	static rptbd_shift_store_fixture rptbd_shift_store_case(unsigned v);
-	void start_rptbd_shift_store(unsigned variant = 0);
 	struct delay_multiply_fixture
 	{
 		unsigned kind, form, destination, flags, checkpoint;
@@ -481,7 +470,6 @@ private:
 	bool check_memory_repeat_results();
 	bool check_mvdk_producer_results();
 	bool check_mvdk_mapped_results();
-	bool check_rptbd_shift_store_results();
 	bool check_long_mapped_original_results();
 	bool check_staged_conditional_store_results();
 	bool check_mapped_dual_results();
@@ -536,8 +524,6 @@ private:
 	memory_passthrough_handler m_pipeline_operand_tap;
 	bool m_pipeline_replay = false;
 	instruction_observer_fixture m_instruction_observer;
-	rptbd_observations m_rptbd_counts, m_rptbd_saved_counts;
-	u16 m_rptbd_return = 0, m_rptbd_saved_return = 0;
 	unsigned m_pipeline_drained_fetches = 0;
 	memory_passthrough_handler m_pipeline_fetch_tap;
 	std::array<unsigned, 9> m_recurring_irq_snapshot = {};
