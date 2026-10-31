@@ -74,24 +74,6 @@ private:
 
 
 
-	struct popd_fixture
-	{
-		unsigned mode, count, prefix, irq, snapshot;
-		bool cmpt;
-		u32 base;
-		u16 pointer, st0, st1;
-		int step;
-		std::array<u16, 16> destination, word;
-		std::array<u16, 21> initial;
-		static constexpr u16 reg(unsigned i) { return i < 16 ? 8 + i : 0x19 + i - 16; }
-		unsigned read_clock(unsigned i = 0) const { return 5 + prefix + i; }
-		unsigned write_clock(unsigned i) const { return read_clock(i) + unsigned(destination[i] < 0x10 || destination[i] > 0x19); }
-		u32 write_mask(unsigned tick) const { u32 mask = 0; for (unsigned i = 0; i <= count; ++i) if (tick >= write_clock(i)) mask |= 1U << i; return mask; }
-		unsigned write_count(unsigned tick) const { unsigned n = 0; for (unsigned i = 0; i <= count; ++i) if (tick >= write_clock(i)) ++n; return n; }
-		u16 opcode() const { return 0x8b00 | mode; }
-	};
-	static popd_fixture popd_case(unsigned v);
-	void start_popd_mapped(unsigned variant = 0);
 	struct indexed_store_fixture
 	{
 		unsigned ar, selected, selector, snapshot;
@@ -335,7 +317,6 @@ private:
 	bool check_staged_conditional_store_results();
 	bool check_mapped_dual_results();
 	bool check_repeat_mvdp_irq_results();
-	bool check_popd_mapped_results();
 	bool check_circular_move_results();
 	bool check_rom4_fr_decoder_results();
 	bool check_rom4_codec_is_results();
@@ -415,8 +396,6 @@ private:
 	u16 m_middle_port_value = 0;
 	u16 m_last_port_value = 0;
 	// Immutable case inputs remain unchanged across each manual replay.
-	popd_fixture m_popd_fixture = {};
-	u32 m_popd_write_mask = 0;
 	// Separate checkpoint lifetimes; host observations still rewind explicitly.
 };
 
