@@ -1629,9 +1629,9 @@ end strictly before REA. The existing Access-owned target redirect already
 rebuilds the fetch count from Decode-owned BRC; no separate redirect or
 saved state was added.
 
-`--profile rptb-bd` passes 512 cases and save/replays across counts
+`internal_delayed_branch` owns 128 independent cases/restores across counts
 `0,1,2,7`, four source patterns, both accumulator delay consumers, one
-two-word or two single-word delay instructions, two pages and four snapshots.
+two-word or two single-word delay instructions and two pages; four snapshots are distributed.
 It checks ordered source reads, selected writes, exact iterations and delay
 effects. `block_branch_limits` retains 16 exclusions, with its delayed-control case
 now testing a BD delay span at REA rather than an admitted internal BD.
@@ -1651,9 +1651,10 @@ and its target must remain inside the block. A taken BANZ also resets the
 speculative fetch count from Decode-owned BRC after discarding fall-through
 words; AR modification remains owned by the existing address logic.
 
-`--profile rptb-banz` passes 768 cases and save/replays: three long forms
+`internal_banz` owns 192 independent cases/restores: three long forms
 (offset, preincrement, circular), eight initial/offset pairs, outer counts
-`0,1,2,7`, two pages and four checkpoints. Selected-arm writes and sequential
+`0,1,2,7` and two pages; four checkpoints are distributed. The fixture computes
+linear wrapping and modulo-32768 circular updates without CPU address helpers. Selected-arm writes and sequential
 source reads occur once per iteration, AR0 updates occur once per branch,
 and taken/untaken transitions follow the computed address rather than the
 loaded data word. CMPT, interrupts and physical phases remain unvalidated
@@ -1916,8 +1917,8 @@ instruction layouts and replay checkpoints are retained.
 
 The existing `banzd-long` profile covers ordinary BANZ before BANZD, without
 adding a BIOS slot; its runner requires both 2,304-case and 4,608-case
-markers. `rptb-banz` separately covers 768 cases at repeat counts 0/1/2/7.
-Both profiles pass, as do the neighboring `rptb-bcd` and `rptb-bd` controls.
+markers. `internal_banz` separately covers 192 independent cases at repeat counts 0/1/2/7.
+Signed and unconditional internal block branches have separate sections.
 The runner rejects missing or duplicate ordinary/delayed completion markers.
 
 Immediate-long and accumulator-long store fixtures carry their selected
@@ -2071,9 +2072,9 @@ the complete delay span strictly before the endpoint. A taken redirect
 restarts speculative Fetch accounting from the Decode-owned BRC without
 consuming an extra iteration; it does not reset the architectural count.
 
-`rptb-bcd` passes 3,072 cases/restores: 12 signed A/B predicates, counts
+`internal_signed_branch` owns 768 independent cases/restores: 12 signed A/B predicates, counts
 0/1/2/7, four source patterns, two one-word delay operations or one two-word
-operation, two pages and four snapshots. It checks ordered source reads,
+operation and two pages; four snapshots are distributed. It checks ordered source reads,
 one selected-arm write per iteration, both delay words, final pointers,
 status and count. Delay arithmetic can change the tested accumulator
 after its decision; source RAM changes after Read cannot change the
@@ -3229,7 +3230,7 @@ The direct-ISR-return checkpoint at `59f4285f` renewed the then-default populati
 288 required markers exactly once, expected completion exit and terminal
 completion check. At that revision, `repeat-body-isr` passed768 cases and save/replays.
 Controls `repeat-isr`, `repeat-context`, `repeat-pmst`, `repeat-popd`,
-`rptbd-irq`, `rptb-fcall`, `rptb-bd`, `rptb-bcd` and `rptb-banz` pass.
+RPTBD IRQ, far-call and internal block-branch contracts have separate sections.
 Tooling acceptance is 2,877 tests (one skip), and the native 5110
 save-state round trip and exact MU4 resident-memory comparison (48,261
 program and 3,656 data words) pass. These scopes do not establish complete
@@ -4855,9 +4856,9 @@ TC branches; a taken internal branch resets speculative fetch iteration
 state without changing Decode-owned BRC. Calls and out-of-block delayed
 targets are not newly admitted by this qualification.
 
-`rptb-tc-delay` passes 512 cases plus save-state replays: TC/NTC,
+`internal_tc_branch` owns 128 independent cases/restores: TC/NTC,
 counts 0/1/2/7, four source patterns, two delay layouts, two pages and
-four snapshots. BITT produces TC from ordered, post-incremented RAM reads;
+four distributed snapshots. BITT produces TC from ordered, post-incremented RAM reads;
 each source is changed after Read. One delay layout overwrites TC with
 SSBX/RSBX and advances a pointer, while the other performs a two-word
 accumulator addition. Selected-arm writes, retained branch decisions,

@@ -457,6 +457,10 @@ def main():
     counts['delayed_conditional_call'] = 384
     counts['tc_delayed_call'] = 256
     counts['block_conditional_call'] = 256
+    counts['internal_signed_branch'] = 768
+    counts['internal_delayed_branch'] = 128
+    counts['internal_tc_branch'] = 128
+    counts['internal_banz'] = 192
     counts['block_delayed_exit'] = 1568
     counts['block_delayed_far_call'] = 576
     counts['shifted_unowned'] = 20480

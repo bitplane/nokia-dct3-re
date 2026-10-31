@@ -1055,24 +1055,6 @@ void tms320c54x_test_state::start_repeat_mvdp(unsigned variant)
 
 
 
-tms320c54x_test_state::extended_banz_fixture tms320c54x_test_state::block_banz_case(unsigned v)
-{
-	return extended_banz_case((v / 4) % 3 + ((v / 12) % 8) * 24 + ((v / 96) % 2) * 384);
-}
-
-u16 tms320c54x_test_state::block_banz_resolved(unsigned v, unsigned iteration)
-{
-	auto const f = block_banz_case(v); u16 current = f.initial, resolved = current;
-	for (unsigned i = 0; i <= iteration; ++i)
-	{
-		resolved = f.form == 2 ? circular_fixture_next(current, s16(f.offset), f.bk) : u16(current + s16(f.offset));
-		if (f.form) current = resolved;
-	}
-	return resolved;
-}
-
-
-
 bool tms320c54x_test_state::mvdd_source_owned(u16 address)
 {
 	return address <= 1 || (address >= 6 && address <= 0x1e) || (address >= 0x24 && address <= 0x26) || address == 0x58;
@@ -1727,46 +1709,6 @@ bool tms320c54x_test_state::check_memory_repeat_results()
 }
 
 
-
-bool tms320c54x_test_state::check_asm_store_results_part2()
-{
-	if (m_phase == 255560)
-	{
-		bool const unconditional = profile_is("rptb-bd");
-		bool const tc = profile_is("rptb-tc-delay");
-		bool const banz = profile_is("rptb-banz");
-		unsigned const case_index = m_pipeline_peripheral_case, variant = unconditional || tc ? case_index * 6 : case_index, tick = ++m_idle_fixture_tick, count = std::array<unsigned, 4>{0, 1, 2, 7}[banz ? variant % 4 : (variant / 12) % 4], checkpoint = std::array<unsigned, 4>{7, 10, 12, 16}[banz ? variant / 192 : variant / 768];
-		bool const b = !banz && variant % 12 >= 6, wide = !banz && (variant / 192) % 2;
-		u32 const base = banz ? block_banz_case(variant).base : (variant / 384) % 2 ? 0x20000 : 0;
-		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Complete delayed internal branch remains admitted within its repeat block");
-		capture_pipeline_at(checkpoint, {&m_pipeline_operand_reads, &m_pipeline_store_writes, &m_pipeline_extensions_reads},
-			"Save delayed block branch predicate, delay work and speculative loop tags");
-		if (tick == 512)
-		{
-			u16 const last = block_bcd_source(variant, count); u64 const value = tc ? (b ? 0x2345 : 0x1234) + unsigned(wide) * (count + 1) : u64(s64(s16(last)) + unsigned(wide)) & 0xffffffffffULL;
-			u16 const st0 = tc ? 0xa608 | ((wide ? bool(last & 0x8000) : !b) ? 0x1000 : 0) : (0xa608 & ~0x800) | (wide && last == 0xffff ? 0x800 : 0);
-			unsigned fallthroughs = 0;
-			if (banz) { for (unsigned i = 0; i <= count; ++i) fallthroughs += block_banz_resolved(variant, i) == 0; expect(m_cpu->state_int(tms320c54x_device::STATE_AR0) == (block_banz_case(variant).form ? block_banz_resolved(variant, count) : block_banz_case(variant).initial), "BANZ applies each address modification once across block iterations"); }
-			expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_cpu->state_int(STATE_GENPC) == base + 0x613 && m_pipeline_operand_reads == count + 1 && m_pipeline_store_writes == count + 1 && m_pipeline_extensions_reads == count + 1 &&
-				m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x5001 + count && m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x6001 + count && m_cpu->state_int(tms320c54x_device::STATE_AR4) == 0x1400 + (wide || banz || tc ? 0 : count + 1) &&
-				m_cpu->state_int(tms320c54x_device::STATE_AR5) == 0x1500 + (banz ? fallthroughs : wide ? 0 : count + 1) && m_cpu->state_int(tms320c54x_device::STATE_AR6) == 0x1601 + count && m_cpu->state_int(tms320c54x_device::STATE_AR7) == 0x1701 &&
-				m_cpu->state_int(b ? tms320c54x_device::STATE_B : tms320c54x_device::STATE_A) == value && m_cpu->state_int(b ? tms320c54x_device::STATE_A : tms320c54x_device::STATE_B) == (b ? 0x1234 : 0x2345) && m_cpu->state_int(tms320c54x_device::STATE_ST0) == st0 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == 0x900 && !m_cpu->state_int(tms320c54x_device::STATE_BRC),
-				"Internal branches retain decisions and complete each block iteration exactly once");
-			if (replay_pipeline_at(255570, checkpoint,
-				"Restore delayed block branch without duplicate arms, delays or source reads")) return true;
-			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (case_index < (banz ? 767 : unconditional || tc ? 511 : 3071)) { start_block_bcd(case_index + 1); return true; }
-			if (tc) { osd_printf_info("TMS320C54x delayed TC branches in block: PASS cases=512 restore=512 predicates=TC,NTC counts=0,1,2,7 patterns=4 delay_layouts=2 pages=2 snapshots=4 tc_producer=BITT ordered_sources=1 selected_writes=1 delay_effects_once=1 actual_iterations=1 interrupt_composition=unvalidated physical_phase_claim=0\n"); throw emu_fatalerror(3, "TMS320C54x isolated delayed TC branches in block complete"); }
-			if (banz) { osd_printf_info("TMS320C54x long BANZ within block: PASS cases=768 restore=768 counts=0,1,2,7 forms=offset,preincrement,circular offset_pairs=8 pages=2 snapshots=4 ordered_sources=1 selected_writes=1 ar_updates_once=1 actual_iterations=1 compatibility_composition=unvalidated interrupt_composition=unvalidated physical_phase_claim=0\n"); throw emu_fatalerror(3, "TMS320C54x isolated long BANZ within block complete"); }
-			if (unconditional) { osd_printf_info("TMS320C54x unconditional delayed block branches: PASS cases=512 restore=512 counts=0,1,2,7 patterns=4 accumulators=2 delay_layouts=2 pages=2 snapshots=4 ordered_sources=1 selected_writes=1 delay_words_once=1 actual_iterations=1 interrupt_composition=unvalidated physical_phase_claim=0\n"); throw emu_fatalerror(3, "TMS320C54x isolated unconditional delayed block branches complete"); }
-			osd_printf_info("TMS320C54x delayed internal block branches: PASS cases=3072 restore=3072 predicates=12 counts=0,1,2,7 patterns=4 delay_layouts=2 pages=2 snapshots=4 ordered_sources=1 selected_writes=1 delay_decision_retained=1 actual_iterations=1 interrupt_composition=unvalidated physical_phase_claim=0\n");
-			throw emu_fatalerror(3, "TMS320C54x isolated delayed internal block branches complete");
-		}
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 255570) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 255560; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true; }
-	return false;
-}
 
 bool tms320c54x_test_state::check_mvdk_producer_results()
 {

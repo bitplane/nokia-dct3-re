@@ -292,11 +292,6 @@ private:
 	void start_register_product(unsigned variant = 0);
 	void start_repeat_mvdp(unsigned variant = 0);
 	void start_repeat_mvdp_irq(unsigned variant = 0);
-	static u16 block_bcd_source(unsigned variant, unsigned iteration);
-	static bool block_bcd_taken(unsigned variant, u16 word);
-	static extended_banz_fixture block_banz_case(unsigned v);
-	static u16 block_banz_resolved(unsigned v, unsigned iteration);
-	void start_block_bcd(unsigned variant = 0);
 	static bool mvdd_source_owned(u16 address);
 	static u64 mvdd_source_a(unsigned pattern);
 	static u64 mvdd_source_b(unsigned pattern);
@@ -501,7 +496,6 @@ private:
 	bool check_mvdd_source_results();
 	bool check_rptbd_t_load_results();
 	bool check_memory_repeat_results();
-	bool check_asm_store_results_part2();
 	bool check_mvdk_producer_results();
 	bool check_mvdk_mapped_results();
 	bool check_rptbd_shift_store_results();
