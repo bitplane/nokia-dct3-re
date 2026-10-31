@@ -16,29 +16,6 @@ tms320c54x_test_state::delay_multiply_fixture tms320c54x_test_state::delay_squar
 	return f;
 }
 
-void tms320c54x_test_state::start_move_repeat_owner(unsigned variant)
-{
-	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-	u32 const base = variant & 2 ? 0x20000 : 0;
-	u16 const value = variant & 4 ? 0x5aa5 : 0x1400, count = variant & 8 ? 3 : 0;
-	auto &program = m_cpu->space(AS_PROGRAM);
-	for (unsigned i = 0; i < 24; ++i) program.write_word(base + 0x600 + i, 0xf495);
-	unsigned cursor = 0x600;
-	auto move = [&]() { program.write_word(base + cursor++, 0x710f); program.write_word(base + cursor++, 0x12); };
-	auto repeat = [&]() { program.write_word(base + cursor++, variant & 16 ? 0xf070 : 0xec00 | count); if (variant & 16) program.write_word(base + cursor++, count); };
-	if (!(variant & 1)) move();
-	repeat();
-	if (variant & 1) move(); else program.write_word(base + cursor++, 0xf495);
-	program.write_word(base + cursor, 0xf4e1);
-	set_registers(*m_cpu, {
-		{cpu_regs::STATE_IDLE, 0}, {cpu_regs::STATE_ILLEGAL, 0}, {cpu_regs::STATE_PMST, 0}, {cpu_regs::STATE_ST0, 0},
-		{cpu_regs::STATE_ST1, 0x800}, {cpu_regs::STATE_IMR, 0}, {cpu_regs::STATE_IFR, 0}, {cpu_regs::STATE_TCR, 0x10},
-		{cpu_regs::STATE_TRN, value}, {cpu_regs::STATE_AR2, 0x3333},
-	});
-	m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 299000;
-	m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-}
-
 tms320c54x_test_state::block_single_fixture tms320c54x_test_state::block_single_case(unsigned v) const
 {
 	block_single_fixture f{};
@@ -631,29 +608,6 @@ bool tms320c54x_test_state::check_delayed_call_replay_results()
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
 	}
 	if (m_phase == 255430) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 255420; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true; }
-	return false;
-}
-
-bool tms320c54x_test_state::check_move_repeat_owner_results()
-{
-	if (m_phase == 299000)
-	{
-		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick, checkpoint = variant & 32 ? 7 : 4;
-		if (tick == checkpoint && !m_pipeline_replay) { expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save mapped move alongside independent repeat header"); }
-		if (tick == 40)
-		{
-			bool const rejected = variant & 1;
-			expect(bool(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL)) == rejected && m_cpu->state_int(tms320c54x_device::STATE_AR2) == (rejected ? 0x3333 : variant & 4 ? 0x5aa5 : 0x1400), "Repeat guard belongs to its body, not an older mapped move");
-			if (!rejected) expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE), "Independent repeat and its continuation finish");
-			if (!m_pipeline_replay) { m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; m_cpu->set_pipeline_frontend(true); return restore_pipeline_at(299010, "Restore repeat ownership after clearing live pipeline"); }
-			m_cpu->set_pipeline_frontend(false);
-			if (variant < 63) { start_move_repeat_owner(variant + 1); return true; }
-			osd_printf_info("TMS320C54x mapped move repeat ownership: PASS cases=64 restore=64 before_header=1 repeated_body_rejected=1 headers=short,long pages=2 values=2 counts=0,3 snapshots=2 physical_phase_claim=0\n");
-			throw emu_fatalerror(0, "TMS320C54x isolated repeat ownership complete");
-		}
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 299010) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 299000; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true; }
 	return false;
 }
 

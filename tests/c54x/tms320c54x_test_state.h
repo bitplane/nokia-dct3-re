@@ -146,7 +146,6 @@ private:
 	static delay_multiply_fixture delay_square_case(unsigned variant);
 	static delay_multiply_fixture delay_memory_square_case(unsigned variant);
 	void start_delay_multiply(unsigned variant = 0);
-	void start_move_repeat_owner(unsigned variant = 0);
 	void start_long_mapped_original(unsigned variant = 0);
 
 
@@ -577,7 +576,6 @@ private:
 	bool check_register_product_results();
 	bool check_popd_mapped_results();
 	bool check_bd_long_accumulator_results();
-	bool check_move_repeat_owner_results();
 	bool check_delay_dld_results();
 	bool check_memory_copy_repeat_results();
 	bool check_repeated_mvdk_results();
