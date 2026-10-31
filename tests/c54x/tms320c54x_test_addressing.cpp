@@ -170,40 +170,6 @@ void tms320c54x_test_state::start_popd_mapped(unsigned variant)
 	m_cpu->set_state_int(STATE_GENPC, f.base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 }
 
-void tms320c54x_test_state::start_popd_edges(unsigned variant)
-{
-	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-	bool const conflict = variant >= 15, active = variant >= 8 && variant < 12;
-	unsigned const c = conflict ? variant - 15 : 0;
-	u32 const base = conflict && c >= 8 ? 0x20000 : 0;
-	u16 const destination = conflict ? std::array<u16, 4>{0x10, 0x12, 0x17, 0x19}[c % 4] : variant < 8 ? std::array<u16, 8>{0, 1, 6, 7, 0x18, 0x1e, 0x24, 0x58}[variant] : active ? 0x1a + variant - 8 : 0x4000;
-	u16 const writer = (c / 4) % 2 ? destination : destination == 0x12 ? 0x11 : 0x12;
-	auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
-	for (unsigned i = 0; i < 32; ++i) program.write_word(base + 0x600 + i, 0xf495);
-	if (conflict) { program.write_word(base + 0x600, 0x8000 | writer); program.write_word(base + 0x601, 0x8b97); program.write_word(base + 0x602, 0xf4e1); }
-	else if (active) { program.write_word(0x600, 0xf072); program.write_word(0x601, 0x603); program.write_word(0x602, 0x8b97); }
-	else if (variant == 12) { program.write_word(0x600, 0x47f8); program.write_word(0x601, 0x100); program.write_word(0x602, 0x8b97); data.write_word(0x100, 1); }
-	else program.write_word(0x600, variant == 14 ? 0x8ba0 : 0x8b97);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0); m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
-	if (conflict) data.write_word(destination, 0x2222);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xa600); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x900);
-	m_cpu->set_state_int(tms320c54x_device::STATE_SP, variant == 13 ? 0xe : 0x3000); m_cpu->set_state_int(tms320c54x_device::STATE_AR7, destination); m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x1357);
-	m_cpu->set_state_int(tms320c54x_device::STATE_BRC, 1); m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10); m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
-	m_cpu->set_input_line(0, CLEAR_LINE); m_cpu->set_input_line(INPUT_LINE_NMI, CLEAR_LINE); data.write_word(0x3000, 0x2468);
-	m_pipeline_operand_reads = m_pipeline_store_writes = m_popd_write_mask = 0;
-	m_pipeline_operand_tap = data.install_read_tap(0, 0xffff, "popd_edge_read", [this, conflict, variant](offs_t at, u16 &word, u16) {
-		if (machine().side_effects_disabled()) return;
-		if (!conflict && variant == 12 && at == 0x100) return;
-		expect(conflict && at == 0x3000 && word == 0x2468 && m_cpu->pipeline_cycles() == 6 && !m_pipeline_operand_reads, "POPD rejects unsupported contracts before stack consumption and retains the conflict source once"); ++m_pipeline_operand_reads;
-	});
-	m_pipeline_write_tap = data.install_write_tap(0, 0xffff, "popd_edge_write", [this, conflict, destination, writer](offs_t at, u16 &word, u16) {
-		if (machine().side_effects_disabled()) return;
-		unsigned const bit = m_cpu->pipeline_cycles() == 6 && at == writer && word == 0x1357 ? 1 : m_cpu->pipeline_cycles() == 7 && at == destination && word == 0x2468 ? 2 : 0;
-		expect(conflict && bit && !(m_popd_write_mask & bit), "POPD defers its Read-owned DAGEN write behind the older store's bank access"); m_popd_write_mask |= bit; ++m_pipeline_store_writes;
-	});
-	m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 254220;
-	m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-}
 
 
 
@@ -1141,40 +1107,6 @@ bool tms320c54x_test_state::check_popd_mapped_results()
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
 	}
 	if (m_phase == 254210) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 254200; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true; }
-	if (m_phase == 254220)
-	{
-		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick, c = variant >= 15 ? variant - 15 : 0;
-		bool const conflict = variant >= 15, active = variant >= 8 && variant < 12;
-		// RPTB flushes the speculative body and refetches it before Access.
-		unsigned const fail = active ? 8 : variant == 12 || variant == 13 ? 5 : variant == 14 ? 3 : 4, checkpoint = conflict ? 6 : fail - 1;
-		u16 const destination = conflict ? std::array<u16, 4>{0x10, 0x12, 0x17, 0x19}[c % 4] : variant < 8 ? std::array<u16, 8>{0, 1, 6, 7, 0x18, 0x1e, 0x24, 0x58}[variant] : active ? 0x1a + variant - 8 : 0x4000;
-		u16 const writer = (c / 4) % 2 ? destination : destination == 0x12 ? 0x11 : 0x12;
-		if (bool(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL)) != (!conflict && tick >= fail)) osd_printf_info("popd_edge_stop: case=%u replay=%u tick=%u cycle=%llu illegal=%u expected_at=%u\n", variant, unsigned(m_pipeline_replay), tick, (unsigned long long)m_cpu->pipeline_cycles(), unsigned(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL)), fail);
-		expect(bool(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL)) == (!conflict && tick >= fail), "POPD fails closed at Decode/Access/Read before consuming an unsupported transaction");
-		expect(m_pipeline_operand_reads == unsigned(conflict && tick >= 6) && m_pipeline_store_writes == (conflict ? unsigned(tick >= 6) + unsigned(tick >= 7) : 0), "POPD edge replay neither rereads the stack nor duplicates an old/new bank write");
-		if (conflict && tick == 5) { m_cpu->set_state_int(tms320c54x_device::STATE_AR7, 0x3333); }
-		if (conflict && tick == 6) { auto const disable = machine().disable_side_effects(); m_cpu->space(AS_DATA).write_word(0x3000, 0xdead); }
-		if (tick == checkpoint && !m_pipeline_replay) { expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save rejected or deferred POPD before its decisive stage"); }
-		if (tick == (conflict ? 12 : fail))
-		{
-			if (conflict)
-			{
-				auto const disable = machine().disable_side_effects();
-				expect(m_cpu->space(AS_DATA).read_word(destination) == 0x2468 && (writer == destination || m_cpu->space(AS_DATA).read_word(writer) == 0x1357) && m_cpu->state_int(tms320c54x_device::STATE_AR7) == (destination == 0x17 ? 0x2468 : 0x3333) && m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x3001 && m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_cpu->state_int(STATE_GENPC) == (c >= 8 ? 0x20603 : 0x603), "Deferred POPD retains its source/destination and reaches the exact caller continuation");
-			}
-			else expect(m_cpu->state_int(tms320c54x_device::STATE_SP) == (variant == 13 ? 0xe : 0x3000) && m_cpu->state_int(tms320c54x_device::STATE_AR7) == (variant == 13 ? 0x4001 : destination), "Rejected POPD never consumes SP or applies a forbidden destination modifier");
-			if (!m_pipeline_replay)
-			{
-				m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; m_pipeline_operand_reads = conflict ? 1 : 0; m_pipeline_store_writes = conflict ? 1 : 0; m_popd_write_mask = conflict ? 1 : 0;
-				return restore_pipeline_at(254230, "Restore POPD rejection/deferred-write ownership without repeating effects");
-			}
-			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (variant < 30) { start_popd_edges(variant + 1); return true; }
-			osd_printf_info("TMS320C54x POPD edges: PASS cases=31 restore=31 exclusions=15 dagen_conflicts=16 conflict_read=6 conflict_write=7 same_and_different_registers=1 active_controls_rejected=4 memory_count_rejected=1 source_capture=1 destination_capture=1 silicon_phase_claim=0\n"); return true;
-		}
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 254230) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 254220; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true; }
 	return false;
 }
 

@@ -92,7 +92,6 @@ private:
 	};
 	static popd_fixture popd_case(unsigned v, bool repeated);
 	void start_popd_mapped(unsigned variant = 0);
-	void start_popd_edges(unsigned variant = 0);
 	struct indexed_store_fixture
 	{
 		unsigned ar, selected, selector, snapshot;

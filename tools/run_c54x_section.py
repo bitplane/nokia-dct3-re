@@ -480,6 +480,7 @@ def main():
     counts['memory_count_copy'] = 864
     counts['memory_count_chain'] = 24
     counts['memory_count_wrap'] = 24
+    counts['popd_edges'] = 30
     counts['st1_memory_rules'] = 272
     counts['immediate_store_mvmm'] = 256
     counts['accumulator_store_mvmm'] = 4096
