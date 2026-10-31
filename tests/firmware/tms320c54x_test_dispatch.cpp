@@ -2,6 +2,7 @@
 // copyright-holders:Gaz
 #include "emu.h"
 #include "tms320c54x_test_state.h"
+// Firmware-local dispatch; no generic phase-chain fallback.
 namespace c54x_test {
 TIMER_CALLBACK_MEMBER(tms320c54x_test_state::check_results)
 {

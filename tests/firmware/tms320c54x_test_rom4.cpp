@@ -1423,63 +1423,6 @@ bool tms320c54x_test_state::check_rom4_crc_input_results()
 				unsigned(m_cpu->state_int(tms320c54x_device::STATE_IDLE)));
 		expect(false, "ROM4 cold execution stopped before the loader-entry fetch");
 	}
-	if (m_phase == 3)
-	{
-		if (!m_irq_raised)
-		{
-			expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE),
-					"IDLE3 entry");
-			expect(m_cpu->state_int(tms320c54x_device::STATE_PC) == 0x0401,
-					"IDLE3 continuation PC");
-			m_cpu->set_input_line(2, ASSERT_LINE);
-			m_irq_raised = true;
-			m_check_timer->adjust(attotime::from_usec(100));
-			return true;
-		}
-		expect(data.read_word(0x0a10) == 0xcafe,
-				"maskable interrupt vector execution");
-		expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE),
-				"fast-interrupt return continuation");
-		expect(m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x0300 &&
-				!(m_cpu->state_int(tms320c54x_device::STATE_ST1) & 0x0800),
-				"RETF restores the fast return and interrupt-mask state");
-		expect(m_fast_stack_reads == 0,
-				"SPRU172C RETF increments SP without reading the stacked return address");
-		osd_printf_info("TMS320C54x fast return case: variant=%u a=%010llx b=%010llx pc=%04x\n",
-			m_fast_return_case,
-			(unsigned long long)m_cpu->state_int(tms320c54x_device::STATE_A),
-			(unsigned long long)m_cpu->state_int(tms320c54x_device::STATE_B),
-			unsigned(m_cpu->state_int(tms320c54x_device::STATE_PC)));
-		expect(m_cpu->state_int(tms320c54x_device::STATE_PC) == 0x0402 &&
-			(!m_fast_return_case || m_cpu->state_int(m_fast_return_case == 1 ?
-				tms320c54x_device::STATE_B : tms320c54x_device::STATE_A) == 2),
-				"SPRU172C RETFD executes two one-word instructions or one two-word instruction before returning");
-		if (m_fast_return_case < 2)
-		{
-			++m_fast_return_case;
-			program.write_word(0x004a, 0xf69b); // RETFD
-			program.write_word(0x004b, m_fast_return_case == 1 ? 0xe901 : 0xf020);
-			program.write_word(0x004c, m_fast_return_case == 1 ? 0xe902 : 0x0002);
-			m_cpu->set_input_line(2, CLEAR_LINE);
-			m_irq_raised = false;
-			m_fast_stack_reads = 0;
-			set_registers(*m_cpu, {
-				{cpu_regs::STATE_PC, 0x0400}, {cpu_regs::STATE_SP, 0x0300}, {cpu_regs::STATE_ST1, 0},
-				{cpu_regs::STATE_A, 0}, {cpu_regs::STATE_IDLE, 0},
-			});
-			m_check_timer->adjust(attotime::from_usec(100));
-			return true;
-		}
-		osd_printf_info("TMS320C54x fast return bus: PASS cases=3 stack_reads=0 delayed_words=2\n");
-		m_cpu->set_input_line(2, CLEAR_LINE);
-		m_phase = 1;
-		set_registers(*m_cpu, {
-			{cpu_regs::STATE_PC, 0x0300}, {cpu_regs::STATE_SP, 0x0300}, {cpu_regs::STATE_ST1, 0x0100},
-			{cpu_regs::STATE_ILLEGAL, 0}, {cpu_regs::STATE_IDLE, 0},
-		});
-		m_check_timer->adjust(attotime::from_usec(100));
-		return true;
-	}
 	if (m_phase == 2)
 	{
 		if (!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) &&
@@ -1514,28 +1457,6 @@ bool tms320c54x_test_state::check_rom4_crc_input_results()
 		// IDLE3 at 0x7ec9 advances PC before waiting for a wake source.
 		expect(pc == 0x7eca, "ROM4 DSP sleep PC");
 		throw emu_fatalerror(0, "TMS320C54x ROM4 frontier complete");
-	}
-	if (m_phase)
-	{
-		static constexpr u16 expected[] = {
-			0x1cee, 0x7cb6, 0xd2a3, 0xb986, 0x4c57, 0xe65e
-		};
-		osd_printf_info("TMS320C54x transform result: %04x,%04x,%04x,%04x,%04x,%04x\n",
-				data.read_word(0x1202), data.read_word(0x1203),
-				data.read_word(0x1204), data.read_word(0x1205),
-				data.read_word(0x1206), data.read_word(0x1207));
-		for (unsigned i = 0; i != std::size(expected); ++i)
-			expect(data.read_word(0x1202 + i) == expected[i],
-					"ROM4 challenge transform terminal loop");
-		expect(m_cpu->state_int(tms320c54x_device::STATE_BRC) == 0,
-				"ROM4 challenge transform repeat count");
-		m_phase = 5;
-		set_registers(*m_cpu, {
-			{cpu_regs::STATE_PC, 0x0350}, {cpu_regs::STATE_AR0, 0}, {cpu_regs::STATE_ILLEGAL, 0},
-			{cpu_regs::STATE_IDLE, 0},
-		});
-		m_check_timer->adjust(attotime::from_usec(100));
-		return true;
 	}
 	return false;
 }

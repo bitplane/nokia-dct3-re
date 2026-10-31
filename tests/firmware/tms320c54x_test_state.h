@@ -8,14 +8,13 @@
 #include "cpu/tms320c54x/tms320c54x.h"
 #include "gsm_tch_f_l1.h"
 #include "util/gsmfr.h"
-#include "tms320c54x_bsp_state.h"
-#include "tms320c54x_test_selection.h"
 #include "tms320c54x_test_support.h"
 #include "tms320c54x_test_register_sequence.h"
 #include "tms320c54x_test_snapshot.h"
 #include <sstream>
 #include <bitset>
 
+// Private-ROM and copied-firmware integration state; never included by CPU sections.
 namespace c54x_test {
 
 class tms320c54x_test_state : public driver_device
@@ -39,8 +38,6 @@ private:
 		return name == machine().options().bios();
 	}
 
-	void xf_w(int state);
-	bool m_xf_pin = true;
 	void start_pipeline_mu4_prologue(unsigned variant = 0);
 	void observe_context_irq(int line);
 	bool check_rom4_context_results();
@@ -65,12 +62,7 @@ private:
 	void program_map(address_map &map) ATTR_COLD;
 
 	void data_map(address_map &map) ATTR_COLD;
-	void plain_data_map(address_map &map) ATTR_COLD;
 	void io_map(address_map &map) ATTR_COLD;
-	u16 test_port_r();
-	void test_port_w(u16 value);
-	u16 repeat_irq_r(offs_t offset);
-	void stack_mmr_w(offs_t offset, u16 value);
 
 	static void rom4_crc_input(unsigned vector, u16 (&words)[12]);
 
@@ -171,30 +163,6 @@ private:
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 		return true;
 	}
-	void capture_pipeline_at(unsigned checkpoint, std::initializer_list<unsigned *> observers, const char *message)
-	{
-		if (m_idle_fixture_tick != checkpoint || m_pipeline_replay) return;
-		expect(observers.size() && observers.size() <= m_recurring_irq_snapshot.size(), "Explicit observer checkpoint capacity");
-		for (auto *observer : observers) expect(observer != nullptr, "Explicit observer checkpoint binding");
-		m_recurring_irq_snapshot.fill(0);
-		m_pipeline_counter_count = 0;
-		for (auto *observer : observers)
-		{
-			m_pipeline_counter_bindings[m_pipeline_counter_count] = observer;
-			m_recurring_irq_snapshot[m_pipeline_counter_count++] = *observer;
-		}
-		expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, message);
-	}
-	bool replay_pipeline_at(unsigned phase, unsigned checkpoint, const char *message)
-	{
-		if (m_pipeline_replay) return false;
-		expect(m_pipeline_counter_count != 0, "Replay has captured observer bindings");
-		m_pipeline_replay = true;
-		m_idle_fixture_tick = checkpoint;
-		for (unsigned i = 0; i < m_pipeline_counter_count; ++i)
-			*m_pipeline_counter_bindings[i] = m_recurring_irq_snapshot[i];
-		return restore_pipeline_at(phase, message);
-	}
 	bool restore_pipeline_at(unsigned phase, const char *message)
 	{
 		// Callers rewind host observations explicitly before loading guest state.
@@ -210,9 +178,7 @@ private:
 	TIMER_CALLBACK_MEMBER(check_results);
 
 	required_device<tms320c54x_device> m_cpu;
-	u16 m_shifted_bus_word = 0;
 	ordered_case_digest m_context_coverage;
-	tms320c54x_bsp_state m_shifted_bsp;
 	util::gsm_fr_codec m_rom4_codec;
 	util::gsm_fr_codec::pcm_block m_rom4_pcm{};
 	std::array<u16, 76> m_rom4_parameters{};
@@ -231,15 +197,15 @@ private:
 	memory_passthrough_handler m_vector_stack_tap;
 	unsigned m_vector_reads = 0, m_vector_acks = 0;
 	std::stringstream m_saved_pipeline;
-	std::vector<std::pair<offs_t, u16>> m_observed_instructions, m_saved_observed_instructions;
 	u64 m_pipeline_expected_cycle = 0;
-	bool m_pipeline_memory_case = false;
 	unsigned m_pipeline_operand_reads = 0;
 	unsigned m_pipeline_store_case = 0;
+	unsigned m_pipeline_stm_case = 0;
+	unsigned m_pipeline_long_case = 0, m_pipeline_return_case = 0, m_pipeline_rmw_case = 0;
+	u16 m_timer_probe_return_pc = 0;
 	unsigned m_pipeline_store_writes = 0;
 	unsigned m_pipeline_indirect_case = 0;
 	unsigned m_pipeline_branch_case = 0;
-	unsigned m_pipeline_stm_case = 0;
 	unsigned m_pipeline_peripheral_case = 0;
 	unsigned m_pipeline_extensions_reads = 0;
 	memory_passthrough_handler m_pipeline_write_tap;
@@ -249,14 +215,9 @@ private:
 	unsigned m_pipeline_drained_fetches = 0;
 	memory_passthrough_handler m_pipeline_fetch_tap;
 	std::array<unsigned, 9> m_recurring_irq_snapshot = {};
-	// Host observation bindings, deliberately outside the guest save stream.
-	std::array<unsigned *, 9> m_pipeline_counter_bindings = {};
-	unsigned m_pipeline_counter_count = 0;
 	unsigned m_recurring_irq_first_return_writes = ~0U, m_recurring_irq_end_writes = 0;
 	unsigned m_idle_fixture_tick = 0, m_idle_fixture_saved_tick = 0;
-	unsigned m_pipeline_repeat_count_reads = 0;
 	u64 m_recurring_irq_checkpoint_cycle = 0, m_recurring_irq_end_cycle = 0;
-	memory_passthrough_handler m_operand_data_tap;
 	unsigned m_phase = 0;
 	bool (tms320c54x_test_state::*m_result_owner)() = nullptr;
 	std::bitset<65536> m_asserted_opcodes;
@@ -264,20 +225,6 @@ private:
 	unsigned m_rom4_checks = 0;
 	bool m_irq_raised = false;
 	unsigned m_fast_stack_reads = 0;
-	unsigned m_fast_return_case = 0;
-	unsigned m_repeat_reads = 0;
-	u16 m_stack_mmr[2] = {};
-	unsigned m_irq_trigger_read = 1;
-	u64 m_first_operand_cycle = 0;
-	u64 m_last_operand_cycle = 0;
-	u64 m_first_port_cycle = 0;
-	u64 m_middle_port_cycle = 0;
-	u64 m_last_port_cycle = 0;
-	unsigned m_port_reads = 0;
-	unsigned m_port_writes = 0;
-	u16 m_first_port_value = 0;
-	u16 m_middle_port_value = 0;
-	u16 m_last_port_value = 0;
 	// Immutable case inputs remain unchanged across each manual replay.
 	// Separate checkpoint lifetimes; host observations still rewind explicitly.
 };

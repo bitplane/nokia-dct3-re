@@ -4,91 +4,21 @@
 #include "emu.h"
 #include "tms320c54x_test_state.h"
 
+// Firmware integration lifecycle; generic CPU cases use sections/runner.cpp.
 namespace c54x_test {
 
-void tms320c54x_test_state::xf_w(int state)
-{
-	m_xf_pin = bool(state);
-}
 
 
 void tms320c54x_test_state::machine_start()
 {
-	save_item(NAME(m_stack_mmr));
 	m_check_timer = timer_alloc(FUNC(tms320c54x_test_state::check_results), this);
-	save_item(NAME(m_shifted_bus_word));
-	save_item(NAME(m_shifted_bsp.control));
-	save_item(NAME(m_shifted_bsp.receive));
-	save_item(NAME(m_shifted_bsp.receive_ready));
-	save_item(NAME(m_shifted_bsp.receive_overrun));
 }
 
 void tms320c54x_test_state::machine_reset()
 {
-	using self = tms320c54x_test_state;
-	m_result_owner = nullptr;
-	m_pipeline_counter_count = 0;
-	m_context_coverage = {};
-	if (start_profile(*this, machine().options().bios(), {
-		{ {"rom4-context"}, [](self &test) { test.m_result_owner = &self::check_rom4_context_results; test.start_pipeline_mu4_prologue(); } },
-		{ {"pop-irq"}, [](self &test) { test.start_pipeline_mmr_pop(); } },
-		{ {"mvpd-extended"}, [](self &test) { test.start_extended_mvpd(); } },
-		{ {"mvpd-controls"}, [](self &test) { test.start_pipeline_mvpd(); } },
-	}))
-		return;
-	if (start_profile(*this, machine().options().bios(), {
-	}))
-		return;
-	if (start_profile(*this, machine().options().bios(), {
-	}))
-		return;
-	if (start_profile(*this, machine().options().bios(), {
-	}))
-		return;
-	if (start_profile(*this, machine().options().bios(), {
-		{ {"add-bk", "add-absolute", "add-sp"}, [](self &test) { test.start_pipeline_absolute_add(); } },
-	}))
-		return;
-	if (start_profile(*this, machine().options().bios(), {
-		{ {"store-observe"}, [](self &test) { test.start_pipeline_store_case(); } },
-		{ {"push-observe"}, [](self &test) { test.start_pipeline_xpc_push(); } },
-	}))
-		return;
-	if (start_profile(*this, machine().options().bios(), {
-		{ {"indirect-load"}, [](self &test) { test.start_pipeline_indirect_case(); } },
-	}))
-		return;
-	if (start_profile(*this, machine().options().bios(), {
-	}))
-		return;
-	if (start_profile(*this, machine().options().bios(), {
-		{ {"st-dagen"}, [](self &test) { test.start_constant_dagen(); } },
-	}))
-		return;
-	if (start_profile(*this, machine().options().bios(), {
-		{ {"popd-ram"}, [](self &test) { test.start_pipeline_data_pop(); } },
-	}))
-		return;
-	if (start_profile(*this, machine().options().bios(), {
-	}))
-		return;
-	if (start_profile(*this, machine().options().bios(), {
-		{ {"stm-ind", "stm-ind-edge"}, [](self &test) { test.start_indirect_stm(); } },
-		{ {"stm-low-ram"}, [](self &test) { test.start_indirect_stm(); } },
-	}))
-		return;
-	if (start_profile(*this, machine().options().bios(), {
-	}))
-		return;
-	if (absolute_memory_dp()) { start_pipeline_memory_dp(); return; }
-	if (start_profile(*this, machine().options().bios(), {
-	}))
-		return;
-	if (!strcmp(machine().system().name, "tms54test") &&
-			profile_is("timer"))
-	{
-		throw emu_fatalerror("Legacy timer entry retired: run stopped_timer_reload, timer_prescaler and timer_irq_mask");
-	}
+	m_result_owner=nullptr;
+	m_context_coverage={};
+	if(profile_is("rom4-context")){m_result_owner=&tms320c54x_test_state::check_rom4_context_results;start_pipeline_mu4_prologue();return;}
 	if (!strcmp(machine().system().name, "tms54rom4"))
 	{
 		auto &data = m_cpu->space(AS_DATA);
@@ -237,19 +167,11 @@ void tms320c54x_test_state::program_map(address_map &map)
 void tms320c54x_test_state::data_map(address_map &map)
 {
 	map(0x0000, 0xffff).ram();
-	map(0x0060, 0x0061).rw(FUNC(tms320c54x_test_state::repeat_irq_r), FUNC(tms320c54x_test_state::stack_mmr_w));
-}
-
-void tms320c54x_test_state::plain_data_map(address_map &map)
-{
-	map(0, 0xffff).ram();
 }
 
 void tms320c54x_test_state::io_map(address_map &map)
 {
 	map(0x0000, 0xffff).ram();
-	map(0x0123, 0x0123).r(FUNC(tms320c54x_test_state::test_port_r));
-	map(0x0124, 0x0124).w(FUNC(tms320c54x_test_state::test_port_w));
 }
 
 void tms320c54x_test_state::rom4_program_map(address_map &map)
@@ -269,16 +191,6 @@ void tms320c54x_test_state::expect(bool condition, const char *message)
 	{
 		unsigned case_index = m_pipeline_peripheral_case, tick = m_idle_fixture_tick;
 		bool replay = m_pipeline_replay;
-		auto progress = [&](auto const &fixture) {
-			case_index = fixture.variant;
-			tick = fixture.tick;
-			replay = fixture.replay;
-		};
-		switch (m_phase)
-		{
-		case 255320: case 255330: case 255331:
-			progress(m_rptbd); break;
-		}
 		osd_printf_info("c54x_failure: phase=%u case=%u tick=%u replay=%u pc=%06x rc=%04x ar1=%04x a=%010llx b=%010llx st0=%04x illegal=%u reads=%u writes=%u\n",
 			m_phase, case_index, tick, unsigned(replay), unsigned(m_cpu->state_int(STATE_GENPC)),
 			unsigned(m_cpu->state_int(tms320c54x_device::STATE_RC)), unsigned(m_cpu->state_int(tms320c54x_device::STATE_AR1)),
@@ -302,31 +214,12 @@ void tms320c54x_test_state::expect_opcode(u16 opcode, bool condition, const char
 
 void tms320c54x_test_state::test(machine_config &config)
 {
-	TMS320C54X(config, m_cpu, 13'000'000);
-	if (!strcmp(config.options().bios(), "rpt-smem") || !strcmp(config.options().bios(), "rpt-ld") || !strcmp(config.options().bios(), "rpt-sfta") || !strcmp(config.options().bios(), "rpt-ld-block"))
-		m_cpu->instruction_observer_cb().set([this](offs_t address, u16 opcode) { m_observed_instructions.emplace_back(address, opcode); });
+	TMS320C54X(config,m_cpu,13'000'000);
 	m_cpu->set_extended_program(true);
-	m_cpu->set_irq_acknowledge_callback([this](device_t &, int line) {
-		observe_context_irq(line);
-		if (m_phase == 251090)
-		{
-			expect(line == 0 && m_cpu->pipeline_cycles() == 6, "Indirect load drains while vector IACK occurs");
-			++m_vector_acks;
-		}
-		if (m_phase == 251070)
-		{
-			expect(line == 0 && m_cpu->pipeline_cycles() == 6,
-				"Direct store retires during vector Fetch/IACK");
-			++m_vector_acks;
-		}
-		return 0;
-	}, "vector_acknowledge");
-	m_cpu->xf_out_cb().set(FUNC(tms320c54x_test_state::xf_w));
-	m_cpu->set_addrmap(AS_PROGRAM, &tms320c54x_test_state::program_map);
-	// The low-page copy must see RAM at 0060, not the legacy IRQ probe.
-	else if (!strcmp(config.options().bios(), "stm-ind") || !strcmp(config.options().bios(), "stm-ind-edge") || !strcmp(config.options().bios(), "stm-low-ram") || !strcmp(config.options().bios(), "bitt-ctrl")) m_cpu->set_addrmap(AS_DATA, &tms320c54x_test_state::plain_data_map);
-	else m_cpu->set_addrmap(AS_DATA, &tms320c54x_test_state::data_map);
-	m_cpu->set_addrmap(AS_IO, &tms320c54x_test_state::io_map);
+	m_cpu->set_irq_acknowledge_callback([this](device_t &,int line){observe_context_irq(line);return 0;},"context_vector_acknowledge");
+	m_cpu->set_addrmap(AS_PROGRAM,&tms320c54x_test_state::program_map);
+	m_cpu->set_addrmap(AS_DATA,&tms320c54x_test_state::data_map);
+	m_cpu->set_addrmap(AS_IO,&tms320c54x_test_state::io_map);
 }
 
 void tms320c54x_test_state::rom4(machine_config &config)
