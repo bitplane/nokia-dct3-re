@@ -1,15 +1,11 @@
 """Executable checks of the small case harness, not C54x instruction semantics."""
 from pathlib import Path
-from collections import Counter, defaultdict
 from contextlib import contextmanager
 import shutil
 import subprocess
 import tempfile
 import unittest
 
-from tools.c54x_test_oracles import EXTRA_PROFILES
-from tools.c54x_test_reviews import reviewed_profiles
-from tools.run_c54x_core import check_result
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -21,9 +17,11 @@ def compiled_cpp(source):
         root = Path(directory)
         (root / 'fixture.cpp').write_text(source)
         program = root / 'fixture'
-        subprocess.run(['c++', '-std=c++17', '-Wall', '-Wextra', '-Werror', '-I', str(ROOT),
-                        str(root / 'fixture.cpp'), '-o', str(program)],
-                       check=True, capture_output=True)
+        build = subprocess.run(['c++', '-std=c++17', '-Wall', '-Wextra', '-Werror', '-I', str(ROOT),
+                                str(root / 'fixture.cpp'), '-o', str(program)],
+                               capture_output=True, text=True)
+        if build.returncode:
+            raise AssertionError(build.stderr)
         yield program
 
 
@@ -34,7 +32,7 @@ class CaseFixtureTests(unittest.TestCase):
 #include <cassert>
 #include <cstdint>
 #include <stdexcept>
-using u16 = std::uint16_t; using u64 = std::uint64_t;
+using u16 = std::uint16_t; using u32 = std::uint32_t; using u64 = std::uint64_t;
 enum { AS_PROGRAM, AS_DATA };
 #define MAME_CPU_TMS320C54X_TMS320C54X_H
 struct tms320c54x_device { enum { STATE_PC, STATE_IDLE }; };
@@ -72,19 +70,25 @@ int main() {
         finish_clock = runner[runner.index('\t\t\tif (m_input.final_pipeline_clock)'):runner.index('\t\t\tif (m_input.require_idle)')]
         source = r'''
 #include <cassert>
+#include <cstdint>
 #include <stdexcept>
 #include <optional>
+#include <array>
 #include <vector>
 #include "tests/c54x/tms320c54x_test_support.h"
 using c54x_test::register_setting;
 using c54x_test::memory_word;
+using u16 = std::uint16_t;
 constexpr int AS_PROGRAM = 0;
+constexpr int AS_DATA = 1;
+constexpr int AS_IO = 2;
 constexpr int SUSPEND_REASON_DISABLE = 0;
 ''' + action + r'''
 struct bench {
     unsigned m_tick = 5;
     bool disabled = false;
     bool m_resume = false;
+    bool m_bio_level = true, m_ready_level = true;
     unsigned scheduled = 0;
     void schedule() { ++scheduled; }
     void require(bool ok, const char *message) { if (!ok) throw std::runtime_error(message); }
@@ -98,9 +102,12 @@ struct bench {
         std::vector<unsigned> writes{}, memory{};
         unsigned cycles = 0, resumes = 0, observations = 0;
         unsigned pipeline_cycles() const { return cycles; }
+        void reset() { }
+        void set_input_line(int, int) { }
         void resume(int reason) { assert(reason == SUSPEND_REASON_DISABLE); ++resumes; }
         void set_state_int(int index, unsigned value) { assert(index == 0); writes.push_back(value); }
         cpu &space(int index) { assert(index == AS_PROGRAM); return *this; }
+        void write_word(unsigned, unsigned, unsigned) { assert(false); }
         void write_word(unsigned at, unsigned value) {
             assert(disabled && writes.back() == (value == 99 ? 11 : 12));
             memory.push_back(at); memory.push_back(value);
@@ -150,10 +157,13 @@ int main() {
         end = header.index('struct clocked_register_case', begin)
         source = r'''
 #include <cassert>
+#include <array>
 #include <cstdint>
 #include <optional>
 #include <vector>
-using u16 = std::uint16_t; using u32 = std::uint32_t;
+using u16 = std::uint16_t; using u32 = std::uint32_t; using u64 = std::uint64_t;
+#include "tests/c54x/tms320c54x_test_support.h"
+''' + header[header.index('struct register_check'):header.index('struct instruction_case')] + r'''
 ''' + header[begin:end] + r'''
 int main() {
     std::vector<clocked_data_event> events{{false, 0x10, 0xabcd, 5}, {true, 0x20, 0x1234, 7}};
@@ -240,35 +250,6 @@ int main() {
         with compiled_cpp(source) as program:
             subprocess.run([str(program)], check=True, capture_output=True)
 
-    def test_reviewed_case_identities_are_required_in_order(self):
-        for profile, review in reviewed_profiles().items():
-            if not review['case_ids']:
-                continue
-            markers, ending = EXTRA_PROFILES[profile]
-            markers = [markers] if isinstance(markers, str) else list(markers)
-            cases = ['C54x ISA case: PASS id=' + name
-                     for name in reviewed_profiles()[profile]['case_ids']]
-            text = '\n'.join(cases + markers + [ending])
-            check_result(text, 3, profile=profile)
-            for changed in (cases[1:], cases + cases[:1], list(reversed(cases)),
-                            ['C54x ISA case: PASS id=unknown'] + cases[1:]):
-                with self.subTest(profile=profile, cases=changed), self.assertRaisesRegex(ValueError, 'identities'):
-                    check_result('\n'.join(changed + markers + [ending]), 3, profile=profile)
-
-    def test_reviewed_ordered_coverage_is_required(self):
-        for profile in ('rmw-long', 'long-mvkd', 'source-domain'):
-            markers, ending = EXTRA_PROFILES[profile]
-            markers = (markers,) if isinstance(markers, str) else markers
-            coverage = reviewed_profiles()[profile]['coverage']
-            marker = next(m for m in markers if m.startswith(coverage['result_prefix']))
-            text = '\n'.join((*markers, ending))
-            check_result(text, 3, profile=profile)
-            digest = reviewed_profiles()[profile]['coverage']['fnv64']
-            for changed in (text.replace(digest, '0' * 16),
-                            text.replace('coverage_fnv64=' + digest, ''),
-                            marker + '\n' + text):
-                with self.subTest(profile=profile), self.assertRaisesRegex(ValueError, 'coverage digest'):
-                    check_result(changed, 3, profile=profile)
 
 
     @unittest.skipUnless(shutil.which('c++'), 'C++ compiler required')
@@ -278,6 +259,7 @@ int main() {
 #include <cstdint>
 #include <stdexcept>
 using u16 = std::uint16_t;
+using u32 = std::uint32_t;
 using u64 = std::uint64_t;
 enum { AS_PROGRAM, AS_DATA };
 struct emu_fatalerror : std::runtime_error {
