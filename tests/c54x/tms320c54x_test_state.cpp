@@ -47,7 +47,6 @@ void tms320c54x_test_state::machine_reset()
 		return;
 	if (start_profile(*this, machine().options().bios(), {
 		{ {"add-bk", "add-absolute", "add-sp"}, [](self &test) { test.start_pipeline_absolute_add(); } },
-		{ {"instr-observer"}, [](self &test) { test.start_instruction_observer(); } },
 	}))
 		return;
 	if (start_profile(*this, machine().options().bios(), {
@@ -342,7 +341,6 @@ void tms320c54x_test_state::expect(bool condition, const char *message)
 		};
 		switch (m_phase)
 		{
-		case 292000: case 292010: progress(m_instruction_observer); break;
 		case 255320: case 255330: case 255331:
 			progress(m_rptbd); break;
 		}
@@ -370,9 +368,7 @@ void tms320c54x_test_state::expect_opcode(u16 opcode, bool condition, const char
 void tms320c54x_test_state::test(machine_config &config)
 {
 	TMS320C54X(config, m_cpu, 13'000'000);
-	if (!strcmp(config.options().bios(), "instr-observer"))
-		m_cpu->instruction_observer_cb().set([this](offs_t address, u16 opcode) { m_instruction_observer.observed.emplace_back(address, opcode); });
-	else if (!strcmp(config.options().bios(), "rpt-smem") || !strcmp(config.options().bios(), "rpt-ld") || !strcmp(config.options().bios(), "rpt-sfta") || !strcmp(config.options().bios(), "rpt-ld-block"))
+	if (!strcmp(config.options().bios(), "rpt-smem") || !strcmp(config.options().bios(), "rpt-ld") || !strcmp(config.options().bios(), "rpt-sfta") || !strcmp(config.options().bios(), "rpt-ld-block"))
 		m_cpu->instruction_observer_cb().set([this](offs_t address, u16 opcode) { m_observed_instructions.emplace_back(address, opcode); });
 	m_cpu->set_extended_program(true);
 	m_cpu->set_irq_acknowledge_callback([this](device_t &, int line) {

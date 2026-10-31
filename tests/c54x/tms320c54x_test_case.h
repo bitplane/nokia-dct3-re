@@ -114,6 +114,7 @@ struct clocked_register_case
 	bool bus_uses_elapsed_clocks = false; // Atomic external transfers have no staged pipeline counter.
 	std::optional<std::vector<clocked_line_sample>> bio_samples{};
 	bool observe_data_reads = true; // Write-only contracts can leave variable polling reads unconstrained.
+	std::optional<std::vector<memory_word>> instruction_events{}; // Bounded logical Execute address/opcode sequence, not fetch history.
 	std::vector<memory_word> synthetic_data_reads{}; // Test endpoints, not claims about peripheral register contents.
 	unsigned observation_subticks = 1; // Half-clock samples avoid ties; sixteenths resolve fractional PLL deadlines.
 	unsigned observation_clock_hz = 0; // Fixed fixture clock for tests that change the CPU clock; zero follows CPU.

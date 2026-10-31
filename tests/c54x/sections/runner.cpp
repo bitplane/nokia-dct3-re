@@ -39,6 +39,9 @@ public:
 		m_cpu->set_follow_clkmd(true); m_cpu->set_reset_clkmd(0);
 #endif
 		m_cpu->set_extended_program(true);
+#ifdef C54X_SECTION_INSTRUCTION_EVENTS
+		m_cpu->instruction_observer_cb().set([this](offs_t pc,u16 opcode){m_fixture->observe_instruction(pc,opcode);});
+#endif
 #ifdef C54X_SECTION_COUNT_RETIREMENTS
 		m_cpu->instruction_observer_cb().set([this](offs_t pc,u16 opcode) {
 			auto const &expected=*m_cases.at(m_fixture->count()).retired_instruction;
@@ -539,6 +542,12 @@ private:
 		}
 		if (now==3899 && m_serial_words!=unsigned(index>=4 || (index&1)))
 			throw emu_fatalerror("Deep-idle serial clock did not complete exactly the eligible word");
+#endif
+#ifdef C54X_SECTION_INSTRUCTION_EVENTS
+		// Bus inspection is not execution, with or without debugger scope.
+		u32 const probe=m_cases.at(m_fixture->count()).states.front().observation.program.front().address;
+		m_cpu->space(AS_PROGRAM).read_word(probe);
+		{auto const disable=machine().disable_side_effects();m_cpu->space(AS_PROGRAM).read_word(probe+1);}
 #endif
 		bool const complete = m_fixture->step();
 #ifdef C54X_SECTION_COUNT_RETIREMENTS

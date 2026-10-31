@@ -45,6 +45,13 @@ public:
 		require(m_xf_cursor < m_input.xf_events->size() && value == (*m_input.xf_events)[m_xf_cursor], "ordered XF publication");
 		++m_xf_cursor;
 	}
+	void observe_instruction(u32 address,u16 opcode)
+	{
+		if(!m_observing_outputs || !m_input.instruction_events)return;
+		require(m_instruction_cursor<m_input.instruction_events->size(),"instruction observation count");
+		auto const &expected=(*m_input.instruction_events)[m_instruction_cursor++];
+		require(address==expected.address && opcode==expected.value,"logical Execute address and captured opcode");
+	}
 	u64 digest() const { return m_coverage.value; }
 	unsigned tick_count() const { return m_tick; }
 	bool step()
@@ -73,6 +80,7 @@ public:
 			m_saved_bio_cursor = m_bio_cursor; m_saved_bio_level = m_bio_level;
 			m_saved_program_cursor = m_program_cursor;
 			m_saved_xf_cursor = m_xf_cursor;
+			m_saved_instruction_cursor=m_instruction_cursor;
 			m_saved_volatile_words = m_volatile_words;
 			m_saved_data_age = m_last_data_total ? std::optional<u64>(m_cpu.total_cycles() - *m_last_data_total) : std::nullopt;
 			m_saved_first_data_age = m_first_data_total ? std::optional<u64>(m_cpu.total_cycles() - *m_first_data_total) : std::nullopt;
@@ -88,6 +96,7 @@ public:
 			if (m_input.io_events) require(m_io_cursor == m_input.io_events->size(), "complete IO-bus trace");
 			if (m_input.bio_samples) require(m_bio_cursor == m_input.bio_samples->size(), "complete BIO sample trace");
 			if (m_input.xf_events) require(m_xf_cursor == m_input.xf_events->size(), "complete XF publication trace");
+			if(m_input.instruction_events)require(m_instruction_cursor==m_input.instruction_events->size(),"complete instruction observation sequence");
 			for (unsigned i=0;i<m_volatile_words.size();++i) {
 				auto const disable = m_machine.disable_side_effects();
 				require(m_cpu.space(m_input.volatile_data_space).read_word(m_input.volatile_data_reads[i].address) == m_volatile_words[i], "volatile endpoint debug peek");
@@ -109,6 +118,7 @@ public:
 				m_bio_cursor = m_saved_bio_cursor; m_bio_level = m_saved_bio_level;
 				m_program_cursor = m_saved_program_cursor;
 				m_xf_cursor = m_saved_xf_cursor;
+				m_instruction_cursor=m_saved_instruction_cursor;
 				m_volatile_words = m_saved_volatile_words;
 				if (m_input.clear_pipeline_before_restore) m_cpu.set_pipeline_frontend(m_input.pipeline_frontend);
 				require(restore_snapshot(m_machine, m_timer, m_saved) == STATERR_NONE, "restore register sequence");
@@ -210,6 +220,7 @@ private:
 		m_ready_level = m_input.initial_ready;
 		m_clock_start=m_cpu.total_cycles();
 		m_xf_cursor = 0;
+		m_instruction_cursor=0;
 		m_volatile_words.clear();
 		for (auto const &endpoint : m_input.volatile_data_reads) m_volatile_words.push_back(endpoint.value);
 		m_last_data_total.reset();
@@ -328,6 +339,7 @@ private:
 	u64 m_clock_start=0, m_saved_clock_age=0;
 	unsigned m_program_cursor = 0, m_saved_program_cursor = 0;
 	unsigned m_xf_cursor = 0, m_saved_xf_cursor = 0;
+	unsigned m_instruction_cursor=0,m_saved_instruction_cursor=0;
 	std::optional<u64> m_last_data_total, m_saved_data_age;
 	std::optional<u64> m_first_data_total, m_saved_first_data_age;
 	bool m_observing_outputs = false;

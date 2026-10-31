@@ -480,6 +480,7 @@ def main():
     counts['memory_count_copy'] = 864
     counts['memory_count_chain'] = 24
     counts['memory_count_wrap'] = 24
+    counts['instruction_observer'] = 24
     counts['circular_mvdk'] = 26840
     counts['indexed_mvdk'] = 13504
     counts['escape_prefix'] = 64

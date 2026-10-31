@@ -13,7 +13,6 @@
 #include "tms320c54x_test_support.h"
 #include "tms320c54x_test_register_sequence.h"
 #include "tms320c54x_test_snapshot.h"
-#include "tms320c54x_test_pipeline_state.h"
 #include <sstream>
 #include <bitset>
 
@@ -56,7 +55,6 @@ private:
 	void start_pipeline_mu4_recurring_timer(unsigned variant = 0);
 	void start_pipeline_idle_sp_tail(unsigned variant = 0);
 	void start_pipeline_original_idle(unsigned variant = 0);
-	void start_instruction_observer(unsigned variant = 0);
 
 
 
@@ -207,7 +205,6 @@ private:
 		m_check_timer->enable(true);
 		return true;
 	}
-	bool check_instruction_observer_results();
 	bool check_rom4_fr_decoder_results();
 	bool check_rom4_codec_is_results();
 	bool check_rom4_crc_input_results();
@@ -250,7 +247,6 @@ private:
 	unsigned m_pipeline_register_writes = 0;
 	memory_passthrough_handler m_pipeline_operand_tap;
 	bool m_pipeline_replay = false;
-	instruction_observer_fixture m_instruction_observer;
 	unsigned m_pipeline_drained_fetches = 0;
 	memory_passthrough_handler m_pipeline_fetch_tap;
 	std::array<unsigned, 9> m_recurring_irq_snapshot = {};

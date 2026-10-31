@@ -3249,23 +3249,22 @@ original no-track seed after successful transport. The existing atomic
 is 2,879 tests (one skip); earlier CPU instruction scopes below are not
 implicitly renewed by these MU4 fixture runs.
 
-The instruction-observation checkpoint passes `instr-observer`: 32 cases
-and save/replays covering atomic/staged frontends, two logical pages,
-OVLY clear/set and four snapshots. Each observes the same seven ordered
-instruction entries, including three real repeat iterations; ordinary
+`instruction_observer` passes 24 independent cases and save/replays covering
+repeat/XC1/XC2, atomic/staged frontends, two logical pages and OVLY clear/set.
+Four checkpoints are distributed. Repeat cases observe seven ordered
+instruction entries, including three real repeat iterations; XC cases observe
+only the selected instruction identities. Ordinary
 program reads, extension words and annulled fetches produce no extra events.
 Overwriting program bytes after fetch does not change the captured opcode.
 The staged accelerated-repeat execution path is observed separately from
 the normal Execute slot. This optional diagnostic callback is configuration,
 not architectural state or a physical pin; it does not assert retirement
-or an atomic snapshot of other registers. Tooling acceptance is 2,879 tests
-(one skip). Fresh `check-mu4-bootstrap-original` runs pass for both
-`bootrecmeta` (native success) and `bootrecstage` (expected empty-field
-rejection), with exactly one startup Execute entry each and unchanged source
-NAND. Their endpoint hashes reproduce the pre-observer captures exactly.
-The older atomic `bootrecordram` gate and native 5110 save-state round trip
-also pass with this observation wiring.
-Current default CPU population coverage is stated above.
+or an atomic snapshot of other registers. The section uses a bounded expected
+sequence and replay cursor rather than saving a growing observation history.
+The legacy observer module and phase routing are removed. A wrong expected
+opcode fails; shared-fixture controls retain 1,730 memory-count and five
+atomic repeat cases/restores. This migration does not renew handset/NAND
+acceptance or the complete CPU suite.
 
 The mapped-SP ADD checkpoint passes `add-sp` (4,096 arithmetic cases/restores,
 576 stack-update contexts/restores and twenty control/peripheral exclusions),
