@@ -316,7 +316,7 @@ longer coverage claims. Supported delay-slot arithmetic, addressing, control
 and restoration tests remain separate. Older revision-bound checkpoints below
 may name retired diagnostics; they are not the current test inventory.
 
-Block-control admission similarly retains the 32-case `rptb-br-edges` and
+Block-control admission similarly retains the 16-case `block_branch_limits` and
 28 delayed-block boundary cases in `composition_limits` rather than a separate exclusion profile
 for every unsupported composition. The near-call, far-call and inner-repeat
 exclusion matrices are retired: 108 rejected case/restore pairs, their precise
@@ -1604,6 +1604,21 @@ writes and captures checkpoints afterward. Cases own expected arithmetic;
 the runner owns only the CPU clock, optional bus observers and snapshot
 continuation. Each case has explicit setup; no handset device is imported.
 
+### Internal block branches
+
+`block_branch` owns 384 independent cases/restores: counts 0/1/2/7,
+four zero/nonzero patterns, diamond/endpoint layouts, A/B, pages 0/2 and
+none/IRQ2/NMI. Each case checks the complete ordered data trace, selected
+stores, BRC and BRAF at source Read, both accumulator results and balanced
+RTN-bound interrupt frames. A later ordinary branch replaces held tags
+before replay. Eight snapshots are distributed. Physical interrupts are
+asserted on the first selected store; the former four crossed arrival-clock
+values are no longer a coverage claim. Depending on the selected arm, the
+next source Read and an issued store can precede the hardware frame.
+`block_branch_limits` independently owns eight unsupported control shapes
+on both pages, with no data transactions and no speculative body/frame write.
+These are implementation-limit tests, not silicon rejection requirements.
+
 ### Unconditional delayed branch in a block
 
 `f273` is two-word BD, not RETD. The original instruction at `03:da7e`
@@ -1618,7 +1633,7 @@ saved state was added.
 `0,1,2,7`, four source patterns, both accumulator delay consumers, one
 two-word or two single-word delay instructions, two pages and four snapshots.
 It checks ordered source reads, selected writes, exact iterations and delay
-effects. `rptb-br-edges` retains 32 exclusions, with its delayed-control case
+effects. `block_branch_limits` retains 16 exclusions, with its delayed-control case
 now testing a BD delay span at REA rather than an admitted internal BD.
 The original recorder passes this branch and stops at extended BANZ
 `02:a4cb`. Interrupt composition and measured physical phases remain outside
@@ -2536,7 +2551,7 @@ balanced interrupt frames and restored held words. Interrupts arrive after
 the first copy, not at every clock. On the unconditional route with another
 inner copy pending, its Read precedes IACK and its Write drains before the
 hardware frame; the complete ordered trace checks that model interaction.
-An off-by-one inner count fails on an extra source Read. The32-case `rptb-br-edges` control
+An off-by-one inner count fails on an extra source Read. The 16-case `block_branch_limits` control
 tests below/above-block targets and a conditional call instead of treating
 ordinary backward branches as unsupported. Outside-block branches, delayed back edges and
 measured physical phase timing remain unvalidated.

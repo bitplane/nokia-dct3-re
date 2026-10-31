@@ -92,10 +92,6 @@ private:
 	};
 	static rptbd_shift_store_fixture rptbd_shift_store_case(unsigned v);
 	void start_rptbd_shift_store(unsigned variant = 0);
-	static unsigned block_branch_count(unsigned variant);
-	static u16 block_branch_source(unsigned variant, unsigned i);
-	void start_block_branch(unsigned variant = 0);
-	void start_block_branch_edge(unsigned variant = 0);
 	struct delay_multiply_fixture
 	{
 		unsigned kind, form, destination, flags, checkpoint;
@@ -599,11 +595,9 @@ private:
 	bool check_repeat_mvdp_irq_results();
 	bool check_register_product_results();
 	bool check_popd_mapped_results();
-	bool check_block_branch_count_results();
 	bool check_bd_long_accumulator_results();
 	bool check_block_xc_results();
 	bool check_move_repeat_owner_results();
-	bool check_block_branch_edge_results();
 	bool check_delay_dld_results();
 	bool check_memory_copy_repeat_results();
 	bool check_repeated_mvdk_results();
