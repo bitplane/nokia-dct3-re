@@ -42,7 +42,8 @@ MAME_PATCHES := patches/mame-nokia-dct3-driver-name.patch \
 	patches/mame-nse2-model.patch \
 	patches/mame-nse2-native-model.patch \
 	patches/mame-c54x-isa-test.patch \
-	patches/mame-c54x-test-compositions.patch
+	patches/mame-c54x-test-compositions.patch \
+	patches/mame-c54x-firmware-registration.patch
 LIB_COMPONENTS := lib/util/gsmfr.cpp lib/util/gsmfr.h
 CPU_COMPONENTS := cpu/tms320c54x/tms320c54x.cpp \
 	cpu/tms320c54x/tms320c54x.h

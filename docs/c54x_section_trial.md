@@ -15,9 +15,16 @@ Catalogue SHA-256:
 The separate copied-firmware scope passes all 12 sections: 1,770 cases and
 1,770 restores in 74.760s. These sections do not link the private-ROM adapter.
 The 438 C54x-related host tests pass in 6.233s using the project virtualenv.
-All six moved firmware adapter translation units pass a syntax check against
-the current MAME headers; linking/runtime and affected handset acceptance
-remain outstanding. The full generic result does not qualify those scopes.
+The normal conformance build links the moved firmware adapter. Its registration
+patch assigns `tms54test` to `tms320c54x_test_context_machine.cpp` and removes
+retired `tms54xtra`; `-listfull` confirms the retained machine. The linked
+`rom4-context` passes358 cases/restores with digest `ce54ab5aff19dbc0`;
+the separate acquired-ROM `cold-pipeline` result also passes.
+Affected handset gates pass:3210 v6.00/v5.01 Phone book menus, native5110
+Phone book menu, and3310/3330/3410/5210 frontiers with their existing stable
+frame hashes. These do not renew unrelated model, codec, RF or call workflows.
+An additional39 device-boundary/profile/patch tests pass; source-string checks
+for deleted legacy diagnostic messages are retired, not behavioral coverage.
 
 Compared with the trial baseline `0ab50f98`, combined CPU/firmware C++ sources
 are 52,063 ->34,419 lines and 3,388,653 ->2,093,122 bytes, including replacement

@@ -1,0 +1,9 @@
+diff --git a/src/mame/mame.lst b/src/mame/mame.lst
+--- a/src/mame/mame.lst
++++ b/src/mame/mame.lst
+@@ -36242,4 +36242,3 @@
+-@source:nokia/tms320c54x_test.cpp
++@source:nokia/tms320c54x_test_context_machine.cpp
+ tms54test
+-tms54xtra
+ 

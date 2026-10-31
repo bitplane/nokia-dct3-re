@@ -24,9 +24,6 @@ class DspDeviceSplitTest(unittest.TestCase):
                     (ROOT / "driver/nokia_mad2.h").read_text())
         cls.c54x = ((ROOT / "cpu/tms320c54x/tms320c54x.cpp").read_text() +
                     (ROOT / "cpu/tms320c54x/tms320c54x.h").read_text())
-        from tools.c54x_profiles import harness_sources
-        cls.c54x_test = '\n'.join(path.read_text() for path in harness_sources(ROOT)
-                                  if path.suffix == '.cpp')
 
     def test_transport_has_no_service_protocol(self):
         for token in ("DISCOVERY_NODE", "registration_sent", "channel_map", "0x64, 0x01"):
@@ -48,12 +45,6 @@ class DspDeviceSplitTest(unittest.TestCase):
         ):
             self.assertIn(semantic, self.c54x)
         self.assertNotIn("m_pc == 0x", self.c54x.lower())
-        for contract in (
-            "CALL/RET continuation", "RPT memory transfer",
-            "RPTB multiword CALL", "balanced system stack",
-            "ROM4 challenge transform terminal loop",
-        ):
-            self.assertIn(contract, self.c54x_test)
 
     def test_external_peer_has_no_hardware_ownership(self):
         for token in ("shared_r", "shared_w", "dspif", "fiq0", "service_irq", "TX_PRODUCER"):

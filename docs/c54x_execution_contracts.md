@@ -3166,7 +3166,9 @@ The complete generic run passes 506 sections / 1,476,141 cases and restores;
 the separate copied-firmware run passes 12 sections / 1,770 cases and restores.
 The [disposition checkpoint](c54x_section_trial.md#validation-checkpoint)
 records source revision, catalogue identity and measured build/runtime.
-Linked firmware integration and affected handset acceptance remain required.
+The moved linked firmware context integration passes358 cases/restores with its
+expected digest; acquired-ROM cold-pipeline also passes. The3210 two-BIOS and
+native5110 menus plus3310/3330/3410/5210 frontier gates pass existing oracles.
 The C54x-related host tests pass 438 checks in the project virtualenv; mocked
 runners and helper tests do not renew native acceptance. Firmware code and
 copied programs remain separate from generic CPU acceptance, including codec,
