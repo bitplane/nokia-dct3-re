@@ -134,11 +134,23 @@ native duplex call or a bound on active-call overhead. Native traffic-channel
 activation remains unqualified; HLE call gates cannot substitute for this test.
 
 A C54x-only GCC PGO trial trained on 32-frame FR encode/decode fixtures on both
-frontends, holding out EFR and handset boot. It improved the measured workload,
-but the original frame-timing runner enabled verbose extension tracking on both
-builds. Those codec rates and paired budgets are not clean no-trace estimates.
-Re-evaluate PGO with the corrected runner and fresh profiles before claiming its
-untraced gain. Average throughput is not a per-frame deadline guarantee.
+frontends, holding out EFR and handset boot. On the host/compiler above, pinned
+to CPU 0, alternating ordinary/PGO three-run batches without verbose tracing gave:
+
+| Measurement | Ordinary release | FR-trained PGO |
+| --- | --- | --- |
+| Staged EFR encoder, first execution | 111--113% realtime | 134--136% realtime |
+| Staged EFR decoder, first execution | 1110--1133% realtime | 1376--1379% realtime |
+| Staged 5110 boot/idle | 671--674% realtime | 680--686% realtime |
+| Paired EFR mean frame budget | 19.60--19.85 ms | 16.21--16.44 ms |
+| Paired EFR plus boot/idle estimate | 22.57--22.83 ms | 19.12--19.38 ms |
+
+PGO improves staged encoder throughput by about 19--22% in these batches.
+Its paired-codec p99 is 16.38--17.58 ms, worst 17.89 ms. Adding the average
+boot/idle estimate gives a worst frame of 20.84 ms: even this estimate is not a
+deadline guarantee. Atomic EFR also passed, measuring 520% encoding and 5443%
+decoding with PGO, versus 379% and 4070% in the ordinary initial batch.
+These clean measurements supersede the earlier verbose-instrumented PGO trial.
 
 This is an optional build experiment, not a source-level emulator mode. Start
 with a current ordinary build and no concurrent builds/gates. Only the C54x
@@ -160,7 +172,7 @@ for mode in --fr-encoder --fr-decoder; do
 done
 touch mame/src/devices/cpu/tms320c54x/tms320c54x.cpp
 make -C "$build" config=release64 -j8 FORCE_INCLUDE= \
-  CXXFLAGS="-fprofile-use=$profile -fprofile-partial-training"
+  CXXFLAGS="-fprofile-use=$profile -fprofile-partial-training -g"
 python3 tools/bench_c54x_codec.py --output tmp/c54x-speed/pgo-evaluation \
   --frame-timing --handset --cpu 0
 ```
@@ -171,11 +183,56 @@ Partial training preserves normal optimization of functions absent from the
 training workload. Both 5110 menu oracles must still pass. To return to the
 ordinary build, touch that overlaid CPU source and run the generated make command
 again **without** the profile flags; make does not track compiler flag changes.
-The retained trial binary is `tmp/c54x-speed/mame-c54x-pgo` (ignored, reproducible
+The retained trial binary is `tmp/c54x-speed/mame-clean-pgo` (ignored, reproducible
 from the recipe), not the normal `mame/mame` build.
-PGO validation also passed 12 focused CPU sections (14,483 cases/restores),
-both native 5110 menu oracles and the held-out EFR bit-exact/replay checks.
-The default release build was restored after the trial.
+The measured PGO build also includes `-g` on the C54x translation unit for
+subsequent source-line sampling; optimization remains the normal `-O3` plus PGO.
+Validation passed 12 focused CPU sections (9,716 cases plus restores, 78 s),
+both native 5110 menu oracles, and FR/EFR bit-exact output and frame replay on
+both frontends. This is not a full-suite run. The CPU source is `bc65de7e`;
+the default release build was restored byte-identically after profiling.
+
+### Host Hotspot Sampling
+
+`tools/profile_c54x_gdb.py` is a fallback when host performance counters are
+unavailable. Build only the C54x translation unit with `CXXFLAGS=-g` and
+`FORCE_INCLUDE=` (retaining the generated build's normal `-O3`), then run:
+
+```sh
+DCT3_PROFILE_JSON="$PWD/tmp/c54x-speed/profile.json" \
+gdb -batch -x tools/profile_c54x_gdb.py --args "$PWD/mame/mame" tms54rom4 \
+  -bios efr-encoder-pipe -rompath "$PWD/mame/roms" \
+  -video none -sound none -nothrottle -noreadconfig \
+  -joystickprovider none -midiprovider none -seconds_to_run 10
+```
+
+The JSON counts interrupted main-thread stack/source locations at jittered
+10--30 ms intervals. It includes replay, snapshots and validation; debugger
+pauses invalidate throughput measurements. Optimized inline/source attribution
+is approximate. Repeat samples to establish a candidate, then measure changes
+with the uninstrumented benchmark. `complete` means the inferior exited, not
+that its codec output passed: correctness must be checked separately.
+
+Two ordinary-build samples (297/296 stops) and two PGO samples (245/246) of
+staged EFR encoding at `bc65de7e` agree on the broad ranking:
+
+- `pipeline_step` is the exclusive frame in 55--61% of samples. Its callees
+  account for additional pipeline work; this is not the entire pipeline cost.
+- Stage-copy lines account for approximately 6--10% of all samples. They do not
+  justify a save-state/layout rewrite as the first optimization.
+- The ASM-store predicate is a recurring inline location (approximately 4--7%
+  of samples); dual-operand reads and MAME memory handlers also recur. Source
+  attribution alone cannot establish how much a replacement would save.
+- Retirement still updates diagnostic opcode counts/first-PC entries without
+  verbose output and queries the verbose option for shifted forms. Making that
+  bookkeeping opt-in and caching the option is a bounded next experiment, not
+  an already-measured gain. Preserve enabled diagnostic output and observers.
+
+Prioritize that bookkeeping experiment, then isolated classification or memory
+path changes against the bit-exact/replay controls. Do not infer that all memory
+accesses can bypass MAME handlers: mapped registers, forwarding and bus side
+effects remain part of the instruction contract. The rejected full Execute
+switch is not reopened by these coarse samples.
 
 ## Retention rules
 
