@@ -13,6 +13,7 @@
 #include "tms320c54x_test_snapshot.h"
 #include <sstream>
 #include <bitset>
+#include <chrono>
 
 // Private-ROM and copied-firmware integration state; never included by CPU sections.
 namespace c54x_test {
@@ -186,6 +187,9 @@ private:
 	unsigned m_rom4_cni_nonzero_frames = 0;
 	bool m_rom4_codec_replay = false;
 	unsigned m_rom4_codec_replays = 0;
+	// Host measurement is outside emulated snapshots and excludes replay/checks.
+	std::chrono::steady_clock::time_point m_rom4_frame_started;
+	double m_rom4_execute_seconds = 0;
 	unsigned m_rom4_fr_trace_count = 0;
 	// Read-only bench counters stay outside the snapshot; replay emits no duplicate observations.
 	unsigned m_rom4_efr_pitch_observations = 0, m_rom4_efr_code_observations = 0;

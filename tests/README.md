@@ -50,6 +50,133 @@ Verifier-sensitivity machines are research instruments, not handset verdicts.
 Handset acceptance remains product/workflow-specific in Makefile and gates.json.
 Host tooling tests and mocked runner tests never substitute for native execution.
 
+## Codec performance
+
+After building the conformance binary, run:
+
+```
+python3 tools/bench_c54x_codec.py --output tmp/c54x-speed/current
+```
+
+This runs the acquired ROM4 EFR encoder/decoder on both frontends, three times
+each, unthrottled and without tracing. Every run must still pass bit-exact output
+and full-frame save/replay checks. JSON records binary/workspace-source hashes,
+commands and individual timings; it cannot infer source provenance for an
+arbitrary `--binary`. Do not run builds or other gates concurrently with it.
+
+Process throughput includes startup, preparation, output checks and two
+executions of every frame. Separately reported first-execution spans exclude
+reset, preparation, snapshots, replay and output comparison, but include normal
+emulator scheduling. Both use 163 frames / 3.26 seconds of audio; neither is a
+full-handset call benchmark or proof of physical DSP cycle accuracy. Older
+binaries without span instrumentation report process throughput only.
+
+Reference measurement (Ryzen 9 9950X3D, GCC 15.2, normal `-O3` build,
+three-run medians):
+
+| ROM4 EFR fixture | Before decode/copy optimization | Optimized process time | First-execution throughput |
+| --- | --- | --- | --- |
+| Atomic encoder | 1.79 s | 1.80 s | 394% realtime |
+| Staged encoder | 16.84 s | 6.05 s | 110% realtime |
+| Atomic decoder | 0.300 s | 0.305 s | 4015% realtime |
+| Staged decoder | 1.83 s | 0.724 s | 1123% realtime |
+
+These are workload/host results, not guaranteed rates. In particular, 110%
+encoding alone does not establish headroom for realtime duplex calls plus the
+handset. Small per-field `copy_backward` calls and
+a larger 64-predicate cache regressed the measured workload and are not retained.
+
+Source-line sampling identified repeated retirement-length and opcode-admission
+classification in the staged pipeline. Those now share a compact descriptor;
+XC and forwarding checks reject irrelevant cases before scanning/classifying.
+The descriptor does not replace live state, extension or profile checks. Fixed
+stage copies accounted for roughly 7--12% of two short sample sets, not a dominant
+hotspot; rotating storage was deferred rather than changing save-state and
+forwarding layout for that limited ceiling.
+
+Validation of this optimization covered 53 CPU sections (29,244 cases and
+restores), both native 5110 menu oracles, bit-exact EFR fixtures with replay on
+both frontends, and 438 related host tests. It was not a full 518-section rerun.
+The focused section batch took 336 seconds. A separate exhaustive transformation
+check compared all 65,536 opcodes against the previous decoder: 121 predicates,
+retirement spans, extension counts across four bus-profile combinations, and
+admission across eight extended-program/bus-profile combinations. That establishes
+optimization equivalence, not independent ISA or silicon validation.
+
+The subsequent Access/Read classification cache uses the descriptor's two
+remaining bits, without increasing table storage. CPU-0-pinned, no-trace
+three-run medians measured staged EFR encoding at 5.94--6.01 s per validation
+process (111--113% first-execution realtime), against 6.17--6.32 s
+(106--108%) for the saved control. Decoding measured 0.725--0.745 s
+(1111--1140%), against 0.748--0.761 s (1073--1099%). This is a small host-specific
+gain, not a new realtime guarantee. An exhaustive comparison covers the SP
+classification for every opcode and the Read decision for every opcode/extension
+pair. Stage actions, SP sampling time and live extension checks are unchanged.
+Focused validation covers 17 CPU sections (31,370 cases plus restores, 119 s),
+the staged EFR bit-exact/replay checks, both native 5110 menu oracles and 442
+related host tests. This is not a full-suite rerun.
+
+Do not replace the entire Execute chain with a predecoded operation switch
+without measuring it: the equivalent 72-handler switch regressed this workload
+to 7.10 s encoding and 0.849 s decoding and was discarded.
+
+### Frame Budgets and PGO
+
+`--frame-timing --handset --cpu 0` adds first-execution frame distributions and
+three fresh-NVRAM, 30-second staged 5110 boot/idle runs. The codec fixtures still
+validate every output and replay every frame; timing records exclude that replay
+and are emitted outside the measured interval. Do not enable `-verbose` for
+performance runs: it also enables per-instruction DSP extension tracking.
+Paired budgets sum corresponding encoder/decoder frame durations.
+The handset estimate adds its average boot/idle cost per 20 ms, including its
+idle DSP. Neither sum models concurrent cache/scheduler effects, nor is it a
+native duplex call or a bound on active-call overhead. Native traffic-channel
+activation remains unqualified; HLE call gates cannot substitute for this test.
+
+A C54x-only GCC PGO trial trained on 32-frame FR encode/decode fixtures on both
+frontends, holding out EFR and handset boot. It improved the measured workload,
+but the original frame-timing runner enabled verbose extension tracking on both
+builds. Those codec rates and paired budgets are not clean no-trace estimates.
+Re-evaluate PGO with the corrected runner and fresh profiles before claiming its
+untraced gain. Average throughput is not a per-frame deadline guarantee.
+
+This is an optional build experiment, not a source-level emulator mode. Start
+with a current ordinary build and no concurrent builds/gates. Only the C54x
+translation unit should be stale when invoking the incremental generated build:
+
+```sh
+profile="$PWD/tmp/c54x-speed/pgo-profile"
+build=mame/build/projects/sdl/mame/gmake-linux
+mkdir -p "$profile"
+touch mame/src/devices/cpu/tms320c54x/tms320c54x.cpp
+make -C "$build" config=release64 -j8 FORCE_INCLUDE= \
+  CXXFLAGS="-fprofile-generate=$profile -fprofile-update=single" \
+  LDFLAGS="-fprofile-generate=$profile"
+for mode in --fr-encoder --fr-decoder; do
+  python3 tools/run_c54x_rom4_crc.py --mame mame/mame --rompath mame/roms \
+    "$mode" --staged --output-root tmp/c54x-speed/pgo-training
+  python3 tools/run_c54x_rom4_crc.py --mame mame/mame --rompath mame/roms \
+    "$mode" --output-root tmp/c54x-speed/pgo-training
+done
+touch mame/src/devices/cpu/tms320c54x/tms320c54x.cpp
+make -C "$build" config=release64 -j8 FORCE_INCLUDE= \
+  CXXFLAGS="-fprofile-use=$profile -fprofile-partial-training"
+python3 tools/bench_c54x_codec.py --output tmp/c54x-speed/pgo-evaluation \
+  --frame-timing --handset --cpu 0
+```
+
+Use a fresh profile directory for a new experiment. Do not suppress missing or
+mismatched profile errors, or reuse profiles after source/compiler changes.
+Partial training preserves normal optimization of functions absent from the
+training workload. Both 5110 menu oracles must still pass. To return to the
+ordinary build, touch that overlaid CPU source and run the generated make command
+again **without** the profile flags; make does not track compiler flag changes.
+The retained trial binary is `tmp/c54x-speed/mame-c54x-pgo` (ignored, reproducible
+from the recipe), not the normal `mame/mame` build.
+PGO validation also passed 12 focused CPU sections (14,483 cases/restores),
+both native 5110 menu oracles and the held-out EFR bit-exact/replay checks.
+The default release build was restored after the trial.
+
 ## Retention rules
 
 Retain distinct operand contrasts, arithmetic boundaries, bus ordering,

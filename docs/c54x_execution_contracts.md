@@ -29,6 +29,32 @@ correctness or current CPU-coverage claim. Imported interrupt masks can change
 reachability without establishing a legitimate hardware reset state; the loader
 document owns that provenance contract.
 
+### Host execution cost
+
+The staged frontend shares immutable opcode-property and compact descriptor
+tables (320 KiB per process). The byte descriptor contains extension count,
+retirement span, base/extended opcode admission, Access-stage SP sampling and
+the opcode-only part of generic Read-operand selection. The shifted-memory
+extension check remains live; overlapping stage actions retain their ordering.
+They are keyed by the fetched word, never its
+program address: self-modifying code and retained prefetch still follow the
+normal pipeline. Extension-word contents, CPU state and profile-dependent bus
+register recognition remain live decisions. These tables are not emulated
+state and need no save-state registration or invalidation.
+
+Fixed-index stage advancement preserves the original field arrays, slot order
+and invalid-slot contents. Interrupt hazard scanning can return early only
+when the existing acceptance predicate already rejects the source; peripheral
+classification checks addresses before opcode families. Mapped-register and
+RAM-forwarding checks reject nonmatching addresses before classifying producers.
+The younger-XC scan runs only when active protection could end at the retiring
+instruction; its decision remains after Execute publication. None changes clocks,
+interrupt acceptance points, bus effects or supported instruction forms.
+
+Use the [codec benchmark](../tests/README.md#codec-performance) to measure host
+cost separately from emulated timing. Optimizing a host path does not strengthen
+the model's silicon-timing claims.
+
 ### Harness contract
 
 Each section owns explicit setup, independently justified expectations and

@@ -483,7 +483,7 @@ void tms320c54x_test_state::start_rom4_fr_packing(unsigned vector, unsigned stag
 void tms320c54x_test_state::save_rom4_codec_frame(unsigned frame)
 {
 	m_rom4_codec_replay = false;
-	if (!frame) m_rom4_codec_replays = 0;
+	if (!frame) { m_rom4_codec_replays = 0; m_rom4_execute_seconds = 0; }
 	m_rom4_checkpoint_pc = m_cpu->state_int(tms320c54x_device::STATE_PC);
 	m_rom4_checkpoint_data.resize(0x10000 - 0x60);
 	{
@@ -492,6 +492,7 @@ void tms320c54x_test_state::save_rom4_codec_frame(unsigned frame)
 	}
 	m_saved_pipeline.str({}); m_saved_pipeline.clear();
 	expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save native codec frame with its existing history and prepared input");
+	m_rom4_frame_started = std::chrono::steady_clock::now();
 }
 
 bool tms320c54x_test_state::replay_rom4_codec_frame(unsigned phase, unsigned milliseconds)
@@ -502,6 +503,9 @@ bool tms320c54x_test_state::replay_rom4_codec_frame(unsigned phase, unsigned mil
 	auto &data = m_cpu->space(AS_DATA);
 	if (!m_rom4_codec_replay)
 	{
+		double const elapsed = std::chrono::duration<double>(std::chrono::steady_clock::now() - m_rom4_frame_started).count();
+		m_rom4_execute_seconds += elapsed;
+		osd_printf_info("ROM4 codec frame timing: index=%u host_seconds=%.9f replay_included=0\n", m_rom4_codec_replays, elapsed);
 		m_rom4_replay_data.resize(0x10000 - 0x60);
 		for (unsigned i = 0x60; i < 0x10000; ++i) m_rom4_replay_data[i - 0x60] = data.read_word(i);
 		m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never);
@@ -998,6 +1002,7 @@ bool tms320c54x_test_state::check_rom4_codec_is_results()
 			osd_printf_info("TMS320C54x ROM4 EFR DTX encoder: PASS frames=518 parameters=29526 flags=1036 packed_words=8806 mismatches=0 handset_audio_claim=0\n");
 			throw emu_fatalerror(0, "TMS320C54x ROM4 EFR DTX encoder complete");
 		}
+		osd_printf_info("ROM4 EFR encoder execution: frames=163 audio_seconds=3.26 host_seconds=%.9f replay_included=0\n", m_rom4_execute_seconds);
 		osd_printf_info("TMS320C54x ROM4 EFR encoder replay: PASS frames=163 ram_words=65440 checkpoints=before_preprocessing handset_audio_claim=0\n");
 		osd_printf_info("TMS320C54x ROM4 EFR encoder: PASS frames=163 parameters=9291 flags=326 packed_words=2771 mismatches=0 handset_audio_claim=0\n");
 		throw emu_fatalerror(0, "TMS320C54x ROM4 EFR encoder complete");
@@ -1222,6 +1227,7 @@ bool tms320c54x_test_state::check_rom4_codec_is_results()
 			osd_printf_info("TMS320C54x ROM4 EFR DTX decoder: PASS frames=518 samples=82880 sid=8 erased=135 nonzero_cni_frames=46 mismatches=0 handset_audio_claim=0\n");
 			throw emu_fatalerror(0, "TMS320C54x ROM4 EFR DTX decoder complete");
 		}
+		osd_printf_info("ROM4 EFR decoder execution: frames=163 audio_seconds=3.26 host_seconds=%.9f replay_included=0\n", m_rom4_execute_seconds);
 		osd_printf_info("TMS320C54x ROM4 EFR decoder replay: PASS frames=163 ram_words=65440 checkpoints=frame_input handset_audio_claim=0\n");
 		osd_printf_info("TMS320C54x ROM4 EFR decoder: PASS frames=163 samples=26080 mismatches=0 handset_audio_claim=0\n");
 		throw emu_fatalerror(0, "TMS320C54x ROM4 EFR decoder complete");
