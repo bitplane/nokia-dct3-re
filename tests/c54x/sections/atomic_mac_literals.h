@@ -20,7 +20,7 @@ inline std::vector<clocked_register_case> section_cases()
 		if (mask) final.expected.push_back({r::STATE_ST0,flags,mask});
 		clocked_register_case c{{{0,std::move(initial)},{1,observation("pre-MAC-snapshot", {{r::STATE_A,a},{r::STATE_B,b}})},
 			{2,observation("MAC-running", {})},{32,std::move(final)}},1,32};
-		c.pipeline_frontend = false;
+		c.pipeline_frontend = true;
 		c.data_events = std::vector<clocked_data_event>{{false,0xf90,x,0,false},
 			{parallel,alias ? 0xf90U : 0xf91U,parallel ? stored : y,0,false}};
 		cases.push_back(std::move(c));

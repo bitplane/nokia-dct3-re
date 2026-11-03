@@ -39,18 +39,18 @@ inline std::vector<clocked_register_case> section_cases()
 		initial.initial.insert(initial.initial.end(),v.initial.begin(),v.initial.end());
 		auto final = observation("fixed-literal-results-with-explicit-source-state", {{STATE_GENPC,0x602 + v.words.size()}});
 		final.expected.insert(final.expected.end(),v.expected.begin(),v.expected.end()); final.expected_data = v.final_data;
-		clocked_register_case c{{{0,std::move(initial)},{1,observation("pre-literal-snapshot", {{STATE_GENPC,0x601}})},
+		clocked_register_case c{{{0,std::move(initial)},{1,observation("pre-literal-snapshot", {{STATE_GENPC,0x600}})},
 			{2,observation("literal-running", {})},{24,std::move(final)}},1,24};
-		c.pipeline_frontend = false; c.data_events = v.events; cases.push_back(std::move(c));
+		c.pipeline_frontend = true; c.data_events = v.events; cases.push_back(std::move(c));
 	}
 	for (bool tc : {false,true}) {
 		auto initial = initial_case("XC-two-MAR-slots-NTC", {0xf495,0xff20,0x6d91,0x6d92,0xf4e1});
 		initial.initial.insert(initial.initial.end(),{{r::STATE_AR1,0x120},{r::STATE_AR2,0x130},{r::STATE_ST0,tc ? 0x1000U : 0U}});
 		auto final = observation("both-slots-execute-or-both-annul", {{STATE_GENPC,0x605},
 			{r::STATE_AR1,tc ? 0x120U : 0x121U},{r::STATE_AR2,tc ? 0x130U : 0x131U},{r::STATE_ST0,tc ? 0x1000U : 0U}});
-		clocked_register_case c{{{0,std::move(initial)},{1,observation("pre-XC-snapshot", {{STATE_GENPC,0x601}})},
+		clocked_register_case c{{{0,std::move(initial)},{1,observation("pre-XC-snapshot", {{STATE_GENPC,0x600}})},
 			{2,observation("XC-running", {})},{24,std::move(final)}},1,24};
-		c.pipeline_frontend = false; c.data_events = std::vector<clocked_data_event>{}; cases.push_back(std::move(c));
+		c.pipeline_frontend = true; c.data_events = std::vector<clocked_data_event>{}; cases.push_back(std::move(c));
 	}
 	return cases;
 }

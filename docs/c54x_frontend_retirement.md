@@ -79,6 +79,10 @@ Also validated on staged: `atomic_subtract`, `atomic_accumulator_add_literals`,
 Only cold first-clock PC expectations change; arithmetic, carry/saturation,
 annulment, bus events and replay checks retain their independent expectations.
 
+Also validated: `atomic_guard_conditions`, `atomic_status_xf`,
+`atomic_logic_pointer_literals` and `atomic_mac_literals`. Status/XF publication,
+guard conditions, pointer changes, literal MAC results and replay remain checked.
+
 ### Unresolved migration contrasts
 
 `atomic_product_literals` remains atomic: after accounting for cold Prefetch,
@@ -90,8 +94,23 @@ contract against independent evidence before migrating this section.
 `atomic_xorm` and `atomic_register_copy_sequences` also remain atomic after
 staged trials set STATE_ILLEGAL in case 0. The former includes `6a05`, beyond
 the staged XOR admission of absolute `6af8`; the latter writes `7728` under the
-legacy default bus profile. Resolve opcode admission and explicit bus-profile
-selection respectively, rather than weakening the illegal-state check.
+legacy default bus profile. A standard-SWWSR trial of the register-copy sequence
+passes admission but rejects simultaneous staged peripheral arbitration:
+`4858` reads CLKMD at PC `0607` while `7758` writes it at PC `0605`.
+Resolve opcode admission and peripheral arbitration respectively, rather than
+weakening the illegal-state check or inserting gaps into the original sequence.
+
+Further preserved atomic sections after isolated staged trials:
+
+| Section | First observed contrast | Follow-up |
+| --- | --- | --- |
+| `atomic_memory_arithmetic` | Case 1, `5aea 0006`, sets ILLEGAL | Audit extended two-word arithmetic admission |
+| `atomic_memory_address_literals` | Case 16, repeated ADD, sets ILLEGAL | Audit repeated-body admission and ownership |
+| `atomic_accumulator_calls` | Case 0 observes stack read `02ff=0602` at clock 15 rather than its retained bus sequence | Decode staged call/return ordering before retiming |
+| `atomic_memory_literals` | Case 0, ABDST, sets ILLEGAL after cold-Prefetch correction | Audit ABDST admission |
+
+These are migration blockers, not established silicon defects. An atomic
+expectation is not automatically correct where implementations disagree.
 
 Classifications below are routing priorities based on explicit frontend settings
 and contract families, not behavioral equivalence findings. Validate migrated
