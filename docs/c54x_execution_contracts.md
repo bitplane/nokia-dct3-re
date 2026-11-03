@@ -42,6 +42,10 @@ normal pipeline. Extension-word contents, CPU state and profile-dependent bus
 register recognition remain live decisions. These tables are not emulated
 state and need no save-state registration or invalidation.
 
+The ASM-store classifier uses a constant mode mask: each bit represents eight
+Smem encodings, preserving the ranges 00..97, a8..b7 and c0..df. It adds no
+table storage and does not change addressing, supported forms or stage timing.
+
 Fixed-index stage advancement preserves the original field arrays, slot order
 and invalid-slot contents. Interrupt hazard scanning can return early only
 when the existing acceptance predicate already rejects the source; peripheral

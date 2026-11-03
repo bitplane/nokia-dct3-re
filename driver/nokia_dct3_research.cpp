@@ -856,6 +856,7 @@ void nse1_pipeline_fixture_state::nse1plg(machine_config &config)
 void nse1_pipeline_fixture_state::nse1astd(machine_config &config)
 {
 	noki5110(config);
+	subdevice<tms320c54x_device>("dsp_c54x:cpu")->set_pipeline_frontend(false);
 	subdevice<tms320c54x_device>("dsp_c54x:cpu")->set_standard_swwsr(true);
 }
 
@@ -865,15 +866,22 @@ void dct3_pcm_fixture_state::nsm1pcm(machine_config &config)
 	CLOCK(config, "external_pcm_frame", 8'000).signal_handler().set(FUNC(dct3_pcm_fixture_state::frame_w));
 }
 
-void dct3_pcm_fixture_state::nse1pcm(machine_config &config)
+void dct3_pcm_fixture_state::nse1obs(machine_config &config)
 {
 	noki5110(config);
+	subdevice<tms320c54x_device>("dsp_c54x:cpu")->instruction_observer_cb().set(FUNC(dct3_pcm_fixture_state::instruction_w));
+	m_execution_demand_observer = true;
+}
+
+void dct3_pcm_fixture_state::nse1pcm(machine_config &config)
+{
+	nse1obs(config);
 	CLOCK(config, "external_pcm_frame", 8'000).signal_handler().set(FUNC(dct3_pcm_fixture_state::frame_w));
 }
 
 void dct3_pcm_fixture_state::nse1bit(machine_config &config)
 {
-	noki5110(config);
+	nse1obs(config);
 	CLOCK(config, "external_pcm_bit", 1'000'000).signal_handler().set(FUNC(dct3_pcm_fixture_state::bit_w));
 }
 
@@ -887,6 +895,7 @@ void dct3_pcm_fixture_state::nse1pin(machine_config &config)
 void dct3_pcm_fixture_state::nse1aclk(machine_config &config)
 {
 	nse1pin(config);
+	subdevice<tms320c54x_device>("dsp_c54x:cpu")->set_pipeline_frontend(false);
 	subdevice<tms320c54x_device>("dsp_c54x:cpu")->set_standard_swwsr(true);
 	subdevice<tms320c54x_device>("dsp_c54x:cpu")->instruction_observer_cb().set(FUNC(dct3_pcm_fixture_state::instruction_w));
 	m_execution_demand_observer = true;

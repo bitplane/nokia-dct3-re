@@ -133,8 +133,9 @@ Keep these acceptance levels distinct:
 | `verify-5110-menu` and `verify-5110-save-state` | Unassisted graphical/input and restoration behavior |
 | Staged/codec laboratory profiles | Only their separately documented clocks, media and replay contracts |
 
-The default 5110 frontend remains atomic; explicitly selected staged profiles
-do not silently promote fitted bus timing, native RF acquisition or speech.
+The default 5110 frontend is staged with standard SWWSR decoding. Atomic
+comparison fixtures remain explicitly selected; neither configuration proves
+fitted bus timing, native RF acquisition or speech.
 Research mask substitutions and opcode reachability counts are not hardware
 reset specifications or CPU correctness oracles.
 

@@ -19,7 +19,7 @@ class RepeatTests(unittest.TestCase):
 
     def test_machine_profiles_keep_frontend_and_bus_dialect_distinct(self):
         for machine, frontend, bus in (
-            ('noki5110', 'atomic', 'legacy'), ('nse1astd', 'atomic', 'standard'),
+            ('noki5110', 'staged', 'standard'), ('nse1astd', 'atomic', 'standard'),
             ('nse1plg', 'staged', 'legacy'), ('nse1pipe', 'staged', 'standard')):
             with self.subTest(machine=machine):
                 self.assertEqual(machine_profile(machine), dict(machine=machine,
@@ -44,7 +44,7 @@ class RepeatTests(unittest.TestCase):
     def test_independent_results_survive_rejected_score(self):
         text = TONE.replace('0000007fff', '0000000538').replace('second=400', 'second=0').replace('accepted=8', 'accepted=0')
         with self.case_checks():
-            report = inspect_case(text, '', 'tone')
+            report = inspect_case(text, '', 'tone', 'nse1astd')
         self.assertEqual(report['status'], 'failed')
         self.assertEqual(set(report['failures']), {'score_acceptance'})
         self.assertEqual(report['score']['maximum'], 0x538)
@@ -71,7 +71,7 @@ class RepeatTests(unittest.TestCase):
 
     def test_passing_case_keeps_all_checks(self):
         with self.case_checks():
-            report = inspect_case(TONE, '', 'tone')
+            report = inspect_case(TONE, '', 'tone', 'nse1astd')
         self.assertEqual(report['status'], 'pass')
         self.assertFalse(report['failures'])
         self.assertEqual(len(report['checks']), 11)
@@ -82,7 +82,7 @@ class RepeatTests(unittest.TestCase):
         def failed(text):
             raise ValueError('window counts differ')
         with self.case_checks(check_window=failed):
-            report = inspect_case(TONE, '', 'tone')
+            report = inspect_case(TONE, '', 'tone', 'nse1astd')
         self.assertEqual(set(report['failures']), {'window_observation'})
         self.assertEqual(report['checks']['delivery']['status'], 'pass')
         self.assertEqual(report['status'], 'failed')
@@ -90,7 +90,7 @@ class RepeatTests(unittest.TestCase):
     def test_mode_and_correlations_cannot_pass_silently(self):
         with self.case_checks(check_request=lambda text: 110,
                               nse1_gsm900_tuning_consistency=lambda words: {'channel': 111}):
-            report = inspect_case(TONE, '', 'zero')
+            report = inspect_case(TONE, '', 'zero', 'nse1astd')
         self.assertEqual(report['status'], 'failed')
         self.assertEqual(set(report['failures']), {'mode', 'request_correlation', 'tuning_correlation'})
 

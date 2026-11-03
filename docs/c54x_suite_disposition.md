@@ -10,6 +10,10 @@ Section names/counts live in `fixtures/c54x_sections.json`; the catalogue is
 registration metadata, not proof of correctness. Generic CPU and copied-firmware
 scopes remain separate. See [tests/README.md](../tests/README.md) for commands.
 
+The [frontend retirement inventory](c54x_frontend_retirement.md) classifies the
+atomic migration surface. It does not authorize deletion of independent
+assertions or establish staged parity.
+
 The integration checkpoint passes all 518 registered sections, linked firmware
 context/cold controls, the full host suite and seven affected handset gates.
 The canonical disposition records exact counts, source identity, timings and

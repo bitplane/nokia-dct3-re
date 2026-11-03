@@ -1175,7 +1175,7 @@ The timed replay harness resumes through the restored checker deadline.
 Restoring a stream inside a callback and then scheduling from the cached
 pre-load callback time shifts emulated timer phase; the exact-cycle gate
 guards against that harness error. Neither device timer semantics nor
-the default atomic handset/MU4 path are changed by this fixture correction.
+the unrelated handset/MU4 paths are changed by this fixture correction.
 
 Staged `10f8`/`11f8` absolute LD now retains its 16-bit address word and
 Read-stage data, then loads A/B with the selected SXM behavior (SPRU172C

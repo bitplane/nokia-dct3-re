@@ -23,7 +23,7 @@ except ModuleNotFoundError:
 
 
 MACHINES = {
-    'noki5110': ('atomic', 'legacy'),
+    'noki5110': ('staged', 'standard'),
     'nse1astd': ('atomic', 'standard'),
     'nse1plg': ('staged', 'legacy'),
     'nse1pipe': ('staged', 'standard'),

@@ -120,6 +120,16 @@ Do not replace the entire Execute chain with a predecoded operation switch
 without measuring it: the equivalent 72-handler switch regressed this workload
 to 7.10 s encoding and 0.849 s decoding and was discarded.
 
+The ASM-store predicate's constant mode mask preserves all 65,536 opcode
+classifications without adding storage. Ordinary-build, CPU-0-pinned three-run
+batches measured staged encoding at 5.84--5.87 s (114--115% first-execution
+realtime), versus saved controls at 5.98--6.02 s (111--112%). Decoding measured
+0.713--0.718 s (1150--1159%), versus 0.729--0.737 s (1120--1126%). This modest
+gain was retained; it is not included in the older PGO measurements below.
+Validation passed 10 focused CPU sections (18,214 cases plus restores, 68 s),
+EFR bit-exact/replay checks on both frontends, both native 5110 menu oracles,
+36 benchmark/codec-runner tests, and an exhaustive C++ predicate comparison.
+
 ### Frame Budgets and PGO
 
 `--frame-timing --handset --cpu 0` adds first-execution frame distributions and
@@ -224,15 +234,30 @@ staged EFR encoding at `bc65de7e` agree on the broad ranking:
   of samples); dual-operand reads and MAME memory handlers also recur. Source
   attribution alone cannot establish how much a replacement would save.
 - Retirement still updates diagnostic opcode counts/first-PC entries without
-  verbose output and queries the verbose option for shifted forms. Making that
-  bookkeeping opt-in and caching the option is a bounded next experiment, not
-  an already-measured gain. Preserve enabled diagnostic output and observers.
+  verbose output and queries the verbose option for shifted forms. Trials that
+  cached the option and gated collection, both inline and in a cold helper,
+  regressed staged encoding to 6.29--6.36 s and decoding to 0.772 s. They were
+  removed, despite preserving all 2,128 enabled staged diagnostic records in
+  the inline trial. Less bookkeeping did not produce faster compiled code.
 
-Prioritize that bookkeeping experiment, then isolated classification or memory
-path changes against the bit-exact/replay controls. Do not infer that all memory
+The isolated ASM-store mask above produced a small gain. Checking DST destination
+addresses before opcode classification in the shared operand-read path did not
+improve on it, so that trial was also removed. Do not infer that all memory
 accesses can bypass MAME handlers: mapped registers, forwarding and bus side
 effects remain part of the instruction contract. The rejected full Execute
 switch is not reopened by these coarse samples.
+
+## Native 5110 Frontend
+
+The ordinary `noki5110` native DSP composition now selects staged execution and
+standard SWWSR decoding. `verify-5110-menu`, late-input, power-lifecycle and
+save-state gates exercise that default, including passive staged health checks.
+`nse1astd` and `nse1aclk` explicitly retain atomic comparison coverage.
+The native PCM runner's `nse1obs` control adds only a passive instruction
+observer to ordinary 5110: no external clocks or firmware-state modification.
+Its execution-owned helper observations replace fetch-time argument sampling.
+Opcode fingerprints were rechecked on the new compositions before retaining
+the existing drift gates; matching them is not independent CPU validation.
 
 ## Retention rules
 

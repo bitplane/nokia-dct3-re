@@ -617,7 +617,9 @@ constexpr bool decode_staged_extended_store(u16 word)
 
 constexpr bool staged_asm_store(u16 word)
 {
-	return (word & 0xfc00) == 0x8400 && (u8(word) < 0x98 || (u8(word) >= 0xa8 && u8(word) < 0xb8) || (u8(word) >= 0xc0 && u8(word) < 0xe0));
+	// Each bit covers eight Smem encodings: 00..97, a8..b7, c0..df.
+	constexpr u32 modes = ((1U << 19) - 1) | (3U << 21) | (15U << 24);
+	return (word & 0xfc00) == 0x8400 && BIT(modes, (word >> 3) & 31);
 }
 
 constexpr bool decode_staged_store(u16 word)

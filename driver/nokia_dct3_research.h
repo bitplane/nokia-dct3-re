@@ -28,6 +28,7 @@ public:
 	using nokia_dct3_state::nokia_dct3_state;
 	void nsm1pcm(machine_config &config);
 	void nse1pcm(machine_config &config);
+	void nse1obs(machine_config &config);
 	void nse1bit(machine_config &config);
 	void nse1pin(machine_config &config);
 	void nse1aclk(machine_config &config);

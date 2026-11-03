@@ -77,7 +77,7 @@ def main():
     (root / 'inputs.json').write_text(json.dumps(input_provenance(inputs), indent=2) + '\n')
     print(f'Native external-frame evidence: {root}', flush=True)
     results = []
-    cases = [('control', False, 'noki5110'), ('clock', True, 'nse1pcm')]
+    cases = [('control', False, 'nse1obs'), ('clock', True, 'nse1pcm')]
     if args.wire:
         cases.append(('wire', True, 'nse1bit'))
     if args.clocked_loopback:
@@ -126,7 +126,7 @@ def main():
             else:
                 result = check_wire(text) if wire else check(text, clock=clock)
             if machine in ('nse1pin', 'nse1aclk', 'nse1pclk'):
-                result['clocked_boot'] = check_clocked_boot(text, staged=machine == 'nse1pclk')
+                result['clocked_boot'] = check_clocked_boot(text, staged=machine != 'nse1aclk')
                 reference_machine = 'nse1bit' if args.wire else 'nse1pcm'
                 reference_case = ('wire_restore' if args.wire else 'restore') if restoring else ('wire' if args.wire else 'clock')
                 if machine == 'nse1pclk':
@@ -134,12 +134,12 @@ def main():
                     reference_case = 'atomic_pin_restore' if restoring else 'atomic_pin'
                 result['screen'] = paired_screen(case / 'snap' / machine / '0000.png',
                     root / reference_case / 'snap' / reference_machine / '0000.png')
-            result['codec_demand'] = demand_transitions(text, staged=machine == 'nse1pclk')
+            result['codec_demand'] = demand_transitions(text, staged=machine != 'nse1aclk')
             if args.coverage:
-                profile = 'control' if not clock else 'pin_boot' if machine == 'nse1pin' else 'tone'
-                # New frontend/bus combinations are observations, not inherited
-                # atomic-legacy instruction-set fingerprints.
-                result['instruction_observations'] = instruction_report(text, None if machine in ('nse1aclk', 'nse1pclk') else profile)
+                # Staged/standard runs independently reproduced these opcode sets;
+                # retain the drift gate, not an instruction-correctness claim.
+                profile = 'control' if not clock else 'pin_boot' if machine in ('nse1pin', 'nse1aclk', 'nse1pclk') else 'tone'
+                result['instruction_observations'] = instruction_report(text, profile)
             result['status'] = 'pass'
         except (OSError, ValueError) as error:
             result = dict(clock=clock, status='failed', error=str(error))

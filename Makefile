@@ -476,11 +476,11 @@ help:
 	@echo "make verify-3410-radio-unsuitable-cells check NHM-2 cell and assignment rejection"
 	@echo "make verify-3410-radio-paging check NHM-2 PCH access and Paging Response"
 	@echo "make verify-3310-frontier boot local v6.39 to its deterministic idle frame"
-	@echo "make verify-5110-menu boot ROM4/C54x and open the NSE-1 Phone book menu (NSE1_MACHINE=nse1pipe for staged CPU)"
+	@echo "make verify-5110-menu boot ROM4/C54x and open the NSE-1 Phone book menu (staged CPU by default; NSE1_MACHINE overrides composition)"
 	@echo "make probe-c54x-timer-boundary observe synthetic timer reload/mask timing (not a fidelity gate)"
-	@echo "make verify-5110-late-input open the NSE-1 menu after the later idle interval (NSE1_MACHINE=nse1pipe for staged CPU)"
-	@echo "make verify-5110-power-lifecycle check short and sustained NSE-1 power presses (NSE1_MACHINE=nse1pipe for staged CPU)"
-	@echo "make verify-5110-save-state restore ROM4/C54x idle then open the menu (NSE1_MACHINE=nse1pipe for staged CPU)"
+	@echo "make verify-5110-late-input open the NSE-1 menu after the later idle interval (staged CPU by default; NSE1_MACHINE overrides composition)"
+	@echo "make verify-5110-power-lifecycle check short and sustained NSE-1 power presses (staged CPU by default; NSE1_MACHINE overrides composition)"
+	@echo "make verify-5110-save-state restore ROM4/C54x idle then open the menu (staged CPU by default; NSE1_MACHINE overrides composition)"
 	@echo "make verify-3310-menu drive the v6.39 keypad to its Phone book menu"
 	@echo "make verify-3310-navigation navigate the v6.39 Phone book and return to idle"
 	@echo "make verify-3330-frontier complete virgin-PMM setup and reach v4.50 idle"
@@ -1750,7 +1750,7 @@ verify-5110-menu: build
 			--flash $(abspath roms/noki5110/5110f530.fls) \
 			--output "$$tmp/nvram/$(NSE1_MACHINE)/eeprom"; \
 		script="$(abspath mame_nokia_dct3_input_exerciser.lua)"; \
-		if [ "$(NSE1_MACHINE)" = nse1pipe ]; then script="$(abspath tools/c54x_rom4_staged_menu.lua)"; fi; \
+		if [ "$(NSE1_MACHINE)" = nse1pipe ] || [ "$(NSE1_MACHINE)" = noki5110 ]; then script="$(abspath tools/c54x_rom4_staged_menu.lua)"; fi; \
 		cd "$$tmp"; \
 		NOKIA_DCT3_POST_READY_KEYS=menu \
 		NOKIA_DCT3_POST_READY_KEY_DELAY_MS=8000 \
@@ -1766,7 +1766,7 @@ verify-5110-menu: build
 		grep -q 'input-release: .* name=menu' error.log; \
 		if grep -Eq 'rom4_reset_request|TMS320C54x.*illegal|unsupported.*staged|staged.*unsupported|unimplemented.*C54x' error.log; then \
 			echo 'FAIL - native menu boot reset or DSP fault' >&2; exit 1; fi; \
-		if [ "$(NSE1_MACHINE)" = nse1pipe ]; then grep -q 'rom4_staged_end: .*illegal=0' error.log; fi; \
+		if [ "$(NSE1_MACHINE)" = nse1pipe ] || [ "$(NSE1_MACHINE)" = noki5110 ]; then grep -q 'rom4_staged_end: .*illegal=0' error.log; fi; \
 		sha256sum snap/*.pgm | grep -q \
 			d82cc6891fcf4efb0bd11ded583508f40826f58aa69463708a46897b76fdffb5; \
 		echo 'NSE-1 ROM4 $(NSE1_MACHINE) unassisted Phone book menu: PASS'
@@ -1780,7 +1780,7 @@ verify-5110-late-input: build
 			--flash $(abspath roms/noki5110/5110f530.fls) \
 			--output "$$tmp/nvram/$(NSE1_MACHINE)/eeprom"; \
 		script="$(abspath mame_nokia_dct3_input_exerciser.lua)"; \
-		if [ "$(NSE1_MACHINE)" = nse1pipe ]; then script="$(abspath tools/c54x_rom4_staged_menu.lua)"; fi; \
+		if [ "$(NSE1_MACHINE)" = nse1pipe ] || [ "$(NSE1_MACHINE)" = noki5110 ]; then script="$(abspath tools/c54x_rom4_staged_menu.lua)"; fi; \
 		cd "$$tmp"; \
 		NOKIA_DCT3_POST_READY_KEYS=menu \
 		NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 \
@@ -1793,7 +1793,7 @@ verify-5110-late-input: build
 			-seconds_to_run 16 \
 			-autoboot_script "$$script" >/dev/null; \
 		$(PYTHON) $(abspath tools/rom4_idle_input_trace_check.py) error.log; \
-		if [ "$(NSE1_MACHINE)" = nse1pipe ]; then grep -q 'rom4_staged_end: .*illegal=0' error.log; fi; \
+		if [ "$(NSE1_MACHINE)" = nse1pipe ] || [ "$(NSE1_MACHINE)" = noki5110 ]; then grep -q 'rom4_staged_end: .*illegal=0' error.log; fi; \
 		sha256sum snap/*.pgm | grep -q \
 			d82cc6891fcf4efb0bd11ded583508f40826f58aa69463708a46897b76fdffb5; \
 		echo 'NSE-1 ROM4 $(NSE1_MACHINE) late physical Menu input: PASS'
@@ -1809,7 +1809,7 @@ verify-5110-power-lifecycle: build
 			--flash $(abspath roms/noki5110/5110f530.fls) \
 			--output "$$tmp/nvram/$(NSE1_MACHINE)/eeprom"; \
 		script="$(abspath mame_nokia_dct3_input_exerciser.lua)"; \
-		if [ "$(NSE1_MACHINE)" = nse1pipe ]; then script="$(abspath tools/c54x_rom4_staged_menu.lua)"; fi; \
+		if [ "$(NSE1_MACHINE)" = nse1pipe ] || [ "$(NSE1_MACHINE)" = noki5110 ]; then script="$(abspath tools/c54x_rom4_staged_menu.lua)"; fi; \
 		if test "$$kind" = short; then duration=220; seconds=11; else duration=4000; seconds=14; fi; \
 		(cd "$$tmp"; \
 			NOKIA_DCT3_POST_READY_KEYS=power \
@@ -1821,7 +1821,7 @@ verify-5110-power-lifecycle: build
 				-seconds_to_run "$$seconds" \
 				-autoboot_script "$$script" >/dev/null); \
 		$(PYTHON) tools/power_5110_trace_check.py "$$kind" "$$tmp/error.log"; \
-		if [ "$(NSE1_MACHINE)" = nse1pipe ]; then grep -q 'rom4_staged_end: .*illegal=0' "$$tmp/error.log"; fi; \
+		if [ "$(NSE1_MACHINE)" = nse1pipe ] || [ "$(NSE1_MACHINE)" = noki5110 ]; then grep -q 'rom4_staged_end: .*illegal=0' "$$tmp/error.log"; fi; \
 		rm -rf "$$tmp"; \
 	done
 
