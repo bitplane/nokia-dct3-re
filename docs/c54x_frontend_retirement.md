@@ -65,6 +65,22 @@ gates and documentation also expose frontend variants.
 
 ## Section work queue
 
+### Validated migrations
+
+`atomic_register_logic`, `atomic_register_shift`, `atomic_high_store_literals`
+and `atomic_alu_store_literals` now select staged. Literal results, flag masks,
+bus events and final observations are retained. The two store sections' first
+clock observes the cold pipeline's initial PC rather than atomic fetch's next
+PC. Existing section names remain stable until the final naming cleanup.
+
+### Unresolved migration contrasts
+
+`atomic_product_literals` remains atomic: after accounting for cold Prefetch,
+case 14 (`MAC offset extension order`, `65e3 0004 0002`) reads `0204` on staged
+where the retained atomic fixture expects `0202`. Do not change the expected
+address or delete this case to obtain parity. Resolve the long-offset addressing
+contract against independent evidence before migrating this section.
+
 Classifications below are routing priorities based on explicit frontend settings
 and contract families, not behavioral equivalence findings. Validate migrated
 sections independently; do not run the complete suite after every edit.

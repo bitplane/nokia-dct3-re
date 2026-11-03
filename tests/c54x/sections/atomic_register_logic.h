@@ -37,7 +37,7 @@ inline std::vector<clocked_register_case> section_cases()
 		if (v.mask) final.expected.push_back({r::STATE_ST0,v.flags,v.mask});
 		clocked_register_case c{{{0,std::move(initial)},{1,observation("pre-logic-snapshot", {{r::STATE_A,v.a},{r::STATE_B,v.b}})},
 			{2,observation("logic-running", {})},{32,std::move(final)}},1,32};
-		c.pipeline_frontend = false; c.forbid_data_access = true;
+		c.pipeline_frontend = true; c.forbid_data_access = true;
 		cases.push_back(std::move(c));
 	}
 	return cases;

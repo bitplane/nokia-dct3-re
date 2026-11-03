@@ -26,9 +26,10 @@ inline std::vector<clocked_register_case> section_cases()
 			{r::STATE_A,v.result_a},{r::STATE_B,v.result_b},{r::STATE_ST0,v.result_st0},{r::STATE_ST1,v.st1},
 			{r::STATE_PMST,v.pmst},{r::STATE_BK,4},{int(r::STATE_AR0) + int(v.ar),v.next}});
 		if (v.address) final.expected_data.push_back({v.address,v.memory});
-		clocked_register_case c{{{0,std::move(initial)},{1,observation("pre-literal-snapshot", {{STATE_GENPC,0x601}})},
+		// Cold staged entry has not advanced Prefetch's PC after its first clock.
+		clocked_register_case c{{{0,std::move(initial)},{1,observation("pre-literal-snapshot", {{STATE_GENPC,0x600}})},
 			{2,observation("literal-running", {})},{24,std::move(final)}},1,24};
-		c.pipeline_frontend = false; c.data_events = std::vector<clocked_data_event>{};
+		c.pipeline_frontend = true; c.data_events = std::vector<clocked_data_event>{};
 		if (v.address) c.data_events->push_back({v.write,v.address,v.memory,0,false});
 		cases.push_back(std::move(c));
 	}
