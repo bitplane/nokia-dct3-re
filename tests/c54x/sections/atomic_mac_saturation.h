@@ -21,9 +21,9 @@ inline std::vector<clocked_register_case> section_cases()
 			{r::STATE_ST0,variant < 2 ? 0xc00U : fractional ? 0U : 0x400U,0xc00},
 			{r::STATE_AR3,0x100},{r::STATE_AR4,variant == 4 ? 0x111U : 0x110U},{r::STATE_AR5,0x120}});
 		final.expected_data = {{0x100,u16(variant == 5 ? 0x1234 : fractional ? 0x8000 : 1)},{0x110,1},{0x120,1}};
-		clocked_register_case c{{{0,std::move(initial)},{1,observation("before-MAC",{{STATE_GENPC,0x601}})},
+		clocked_register_case c{{{0,std::move(initial)},{1,observation("before-MAC",{{STATE_GENPC,0x600}})},
 			{2,observation("MAC-running",{})},{24,std::move(final)}},1,24};
-		c.pipeline_frontend = false;
+		c.pipeline_frontend = true;
 		if (variant == 4) c.data_events = std::vector<clocked_data_event>{{false,0x120,1,0,false},{false,0x110,1,0,false}};
 		else if (variant == 5) c.data_events = std::vector<clocked_data_event>{{false,0x110,1,0,false},{true,0x100,0x1234,0,false}};
 		else c.data_events = std::vector<clocked_data_event>{{false,0x100,u16(fractional ? 0x8000 : 1),0,false}};
@@ -34,9 +34,9 @@ inline std::vector<clocked_register_case> section_cases()
 	initial.data = {{0x100,0xbeef},{0x101,0xdead}};
 	auto final = observation("low-word-and-pointer",{{STATE_GENPC,0x603},{r::STATE_A,0x12345678},{r::STATE_AR3,0x101}});
 	final.expected_data = {{0x100,0x5678},{0x101,0xdead}};
-	clocked_register_case c{{{0,std::move(initial)},{1,observation("before-store",{{STATE_GENPC,0x601}})},
+	clocked_register_case c{{{0,std::move(initial)},{1,observation("before-store",{{STATE_GENPC,0x600}})},
 		{2,observation("store-running",{})},{24,std::move(final)}},1,24};
-	c.pipeline_frontend = false;
+	c.pipeline_frontend = true;
 	c.data_events = std::vector<clocked_data_event>{{true,0x100,0x5678,0,false}};
 	cases.push_back(std::move(c));
 	return cases;

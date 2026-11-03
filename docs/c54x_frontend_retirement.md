@@ -73,6 +73,12 @@ bus events and final observations are retained. The two store sections' first
 clock observes the cold pipeline's initial PC rather than atomic fetch's next
 PC. Existing section names remain stable until the final naming cleanup.
 
+Also validated on staged: `atomic_subtract`, `atomic_accumulator_add_literals`,
+`atomic_short_immediate`, `atomic_mac_saturation`,
+`atomic_immediate_product_literals` and `atomic_single_slot_conditions`.
+Only cold first-clock PC expectations change; arithmetic, carry/saturation,
+annulment, bus events and replay checks retain their independent expectations.
+
 ### Unresolved migration contrasts
 
 `atomic_product_literals` remains atomic: after accounting for cold Prefetch,
@@ -80,6 +86,12 @@ case 14 (`MAC offset extension order`, `65e3 0004 0002`) reads `0204` on staged
 where the retained atomic fixture expects `0202`. Do not change the expected
 address or delete this case to obtain parity. Resolve the long-offset addressing
 contract against independent evidence before migrating this section.
+
+`atomic_xorm` and `atomic_register_copy_sequences` also remain atomic after
+staged trials set STATE_ILLEGAL in case 0. The former includes `6a05`, beyond
+the staged XOR admission of absolute `6af8`; the latter writes `7728` under the
+legacy default bus profile. Resolve opcode admission and explicit bus-profile
+selection respectively, rather than weakening the illegal-state check.
 
 Classifications below are routing priorities based on explicit frontend settings
 and contract families, not behavioral equivalence findings. Validate migrated

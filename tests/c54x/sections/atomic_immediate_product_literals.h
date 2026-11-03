@@ -30,9 +30,9 @@ inline std::vector<clocked_register_case> section_cases()
 		auto final = observation("literal-product-flags-T-and-source-preservation",{{STATE_GENPC,0x604 + unsigned(absolute)},
 			{r::STATE_A,v.out_a},{r::STATE_B,v.out_b},{r::STATE_T,v.out_t},{r::STATE_AR3,0x200},{r::STATE_ST1,v.st1}},{{0x200,3}});
 		if (v.mask) final.expected.push_back({r::STATE_ST0,v.flags,v.mask});
-		clocked_register_case c{{{0,std::move(initial)},{1,observation("pre-product-snapshot",{{STATE_GENPC,0x601}})},
+		clocked_register_case c{{{0,std::move(initial)},{1,observation("pre-product-snapshot",{{STATE_GENPC,0x600}})},
 			{2,observation("product-running",{})},{32,std::move(final)}},1,32};
-		c.pipeline_frontend = false; c.data_events = std::vector<clocked_data_event>{};
+		c.pipeline_frontend = true; c.data_events = std::vector<clocked_data_event>{};
 		if (memory) c.data_events->push_back({false,0x200,3,0,false});
 		cases.push_back(std::move(c));
 	}

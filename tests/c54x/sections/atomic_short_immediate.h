@@ -18,9 +18,9 @@ inline std::vector<clocked_register_case> section_cases()
 				auto final = observation("byte-result-preserves-other-accumulator-and-status",{{STATE_GENPC,0x609},
 					{r::STATE_A,destination ? 0x11111111U : value},{r::STATE_B,destination ? value : 0x22222222U},
 					{r::STATE_ST0,0x1800},{r::STATE_ST1,st1}},{{0x100,0x1111}});
-				clocked_register_case c{{{0,std::move(initial)},{1,observation("before-byte-markers",{{STATE_GENPC,0x601}})},
+				clocked_register_case c{{{0,std::move(initial)},{1,observation("before-byte-markers",{{STATE_GENPC,0x600}})},
 					{2,observation("byte-markers-running",{})},{32,std::move(final)}},3,32};
-				c.pipeline_frontend = false; c.observed_data_space = AS_IO;
+				c.pipeline_frontend = true; c.observed_data_space = AS_IO;
 				c.data_events = std::vector<clocked_data_event>{{true,0x124,0x1111,0,false},{true,0x124,0x1111,0,false,{},4}};
 				cases.push_back(std::move(c));
 			}

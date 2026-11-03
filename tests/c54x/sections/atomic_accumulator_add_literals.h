@@ -22,9 +22,9 @@ inline std::vector<clocked_register_case> section_cases()
 		auto final = observation("destination-overflow-source-T-and-TC", {{STATE_GENPC,variant == 6 ? 0x604U : 0x603U},
 			{r::STATE_A,variant == 0 || b ? a : sum},{r::STATE_B,variant == 0 || b ? sum : b_value},
 			{r::STATE_T,0x8888},{r::STATE_ST0,result_st0},{r::STATE_ST1,st1}});
-		clocked_register_case c{{{0,std::move(initial)},{1,observation("pre-add-snapshot", {{STATE_GENPC,0x601}})},
+		clocked_register_case c{{{0,std::move(initial)},{1,observation("pre-add-snapshot", {{STATE_GENPC,0x600}})},
 			{2,observation("add-running", {})},{24,std::move(final)}},1,24};
-		c.pipeline_frontend = false; c.data_events = std::vector<clocked_data_event>{}; cases.push_back(std::move(c));
+		c.pipeline_frontend = true; c.data_events = std::vector<clocked_data_event>{}; cases.push_back(std::move(c));
 	}
 	return cases;
 }

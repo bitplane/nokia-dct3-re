@@ -18,9 +18,9 @@ inline std::vector<clocked_register_case> section_cases()
 			{r::STATE_ST1,0x100},{r::STATE_AR1,0x120}});
 		auto final = observation("one-slot-executed-or-annulled-with-flags-preserved", {{STATE_GENPC,0x604},
 			{r::STATE_A,0x1234},{r::STATE_B,v.b},{r::STATE_ST0,v.st0},{r::STATE_ST1,0x100},{r::STATE_AR1,v.taken ? 0x121U : 0x120U}});
-		clocked_register_case c{{{0,std::move(initial)},{1,observation("pre-XC-snapshot", {{STATE_GENPC,0x601}})},
+		clocked_register_case c{{{0,std::move(initial)},{1,observation("pre-XC-snapshot", {{STATE_GENPC,0x600}})},
 			{2,observation("XC-running", {})},{24,std::move(final)}},1,24};
-		c.pipeline_frontend = false; c.data_events = std::vector<clocked_data_event>{}; cases.push_back(std::move(c));
+		c.pipeline_frontend = true; c.data_events = std::vector<clocked_data_event>{}; cases.push_back(std::move(c));
 	}
 	return cases;
 }
