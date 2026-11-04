@@ -2260,6 +2260,12 @@ of the original MAC is not proof of valid recording or audio.
 
 ### Software INTR and INTM followers
 
+`atomic_delayed_call` retains nine staged CCD cases with page-local return
+frames and accumulator changes in both delay words. The combined AGT+AOV
+condition (`0x76`) samples the positive predicate and OVA before those words;
+testing OV clears OVA even if the combined predicate is false (SPRU172C
+4-29..31). Other combined-condition encodings are not admitted by this result.
+
 Short `ADD Smem,A/B` bodies (direct or indirect modes below `0x98`) are
 admitted to pipelined single-instruction repeats. Each iteration captures its
 own address/source before Execute updates the accumulator; mapped/peripheral

@@ -15,8 +15,8 @@ through an expression: 241 lines and 39,048 cases. Counts describe entire
 sections, not atomic-only case counts. Helpers and firmware integration sources
 are additional migration work. The common case defaults to staged.
 
-Current validated progress: 105 sections (10,810 cases plus restores) migrated;
-32 of the original explicitly atomic sections remain, containing 663 cases.
+Current validated progress: 106 sections (10,819 cases plus restores) migrated;
+31 of the original explicitly atomic sections remain, containing 654 cases.
 The baseline counts
 describe the retirement scope, not the current number of atomic assignments.
 The seven originally paired sections are now staged-only: 24,040 cases remain
@@ -76,6 +76,11 @@ gates and documentation also expose frontend variants.
 ## Section work queue
 
 ### Validated migrations
+
+`atomic_delayed_call` retains all nine page/stack/predicate-before-delay cases.
+Staged CC[D] additionally admits the combined AGT+AOV condition (`0x76`),
+samples both predicates before the delay words, and consumes OVA as required
+by SPRU172C 4-29..31. The fixture now explicitly checks OVA clearance too.
 
 `software_interrupt` retains all 128 vector/INTM/IPTR/TRAP/RETF cases on staged
 execution. TRAP shares vector and frame delivery with INTR but preserves INTM
@@ -269,7 +274,7 @@ Further preserved atomic sections after isolated staged trials:
 | `atomic_multiply_move_literals` | Case 6 reads mapped `0015=0000` as event 0 at clock 6 | Resolve mapped-source sampling |
 | `atomic_coefficient_fir_literals` | Case 0, MACP `788b`, sets ILLEGAL | Audit program-coefficient multiply admission |
 | `atomic_mapped_moves` | Case 2, MVMD/DAR progression, sets ILLEGAL | Audit mapped-move destination admission |
-| `atomic_delayed_call` | Case 4 sets ILLEGAL | Audit delayed-call composition admission |
+| `atomic_delayed_call` | Combined AGT+AOV admitted with OVA consumption | Migrated; all nine cases and restores pass |
 | `atomic_far_edges` | Case 2, FBACCD, sets ILLEGAL after cold-PC correction | Audit accumulator far-branch admission |
 | `atomic_fast_return` | RETF checkpoint has PC `20702` rather than `20683` | Audit program replacement and retained-prefetch lifecycle |
 
@@ -300,7 +305,7 @@ sections independently; do not run the complete suite after every edit.
 | `atomic_overflow_branch` | 32 | 31 | Validated staged migration; assertions retained |
 | `carry_branch` | 8 | 26 | Migrate independent assertions; check staged admission |
 | `repeat_status` | 1 | 14 | Re-derive timing/order; retain assertions |
-| `atomic_delayed_call` | 9 | 32 | Re-derive timing/order; retain assertions |
+| `atomic_delayed_call` | 9 | 32 | Migrated; page/frame/predicate assertions retained, OVA clearance checked. |
 | `conditional_register_store` | 2,304 | 42 | Migrate independent assertions; check staged admission |
 | `zero_bk` | 208 | 27 | Migrate independent assertions; check staged admission |
 | `indirect_popm` | 4 | 27 | Migrate independent assertions; check staged admission |

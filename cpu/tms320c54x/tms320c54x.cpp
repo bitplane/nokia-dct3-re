@@ -197,7 +197,7 @@ constexpr bool decode_staged_conditional_call(u16 word)
 	// CC/CCD admit TC/NTC and six signed predicates for either accumulator.
 	u8 const condition = word;
 	return word == 0xf920 || word == 0xf930 || word == 0xfb20 || word == 0xfb30 || ((word & 0xfd00) == 0xf900 &&
-		(condition == 2 || condition == 3 || (condition >= 0x42 && condition <= 0x47) || (condition >= 0x4a && condition <= 0x4f)));
+		(condition == 2 || condition == 3 || condition == 0x76 || (condition >= 0x42 && condition <= 0x47) || (condition >= 0x4a && condition <= 0x4f)));
 }
 
 constexpr bool staged_conditional_return(u16 word)
@@ -5683,6 +5683,13 @@ void tms320c54x_device::pipeline_step()
 	}
 	if (m_pipeline_valid[4] && staged_conditional_call(m_pipeline_word[4]))
 	{
+		if (u8(m_pipeline_word[4]) == 0x76)
+		{
+			// CC[D] permits AGT+AOV together and consumes OVA even on a false
+			// combined predicate (SPRU172C 4-29..31).
+			m_pipeline_immediate[4] &= BIT(m_st0, 10);
+			m_st0 &= ~u16(0x0400);
+		}
 		// CCD must replace its target literal with the retained predicate
 		// before deciding whether the call owns any stack reservation.
 		if (m_pipeline_immediate[4]) { m_pipeline_operand_address[4] = --m_sp; m_rtn = u16(m_pipeline_address[4] + (BIT(m_pipeline_word[4], 9) ? 4 : 2)); }
