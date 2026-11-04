@@ -17,9 +17,9 @@ inline std::vector<clocked_register_case> section_cases()
 		auto final = observation(name,checks);
 		final.expected.push_back({STATE_GENPC,0x601 + unsigned(words.size())});
 		for (auto const &e : events) { initial.data.push_back({e.address,e.value}); final.expected_data.push_back({e.address,e.value}); }
-		clocked_register_case c{{{0,std::move(initial)},{1,observation("pre-address-operation", {{STATE_GENPC,0x600}})},
+		clocked_register_case c{{{0,std::move(initial)},{1,observation("pre-address-operation", {{STATE_GENPC,0x5ff}})},
 			{2,observation("operation-running", {})},{16,std::move(final)}},1,16};
-		c.pipeline_frontend = false; c.data_events = std::move(events); cases.push_back(std::move(c));
+		c.pipeline_frontend = true; c.data_events = std::move(events); cases.push_back(std::move(c));
 	};
 	append("MAR-signed-extension",{0x6ded,0xfff9},{{r::STATE_AR5,0x1000}},{{r::STATE_AR5,0xff9}});
 	append("MAR-circular-AR0-no-extension",{0x6ddc},{{r::STATE_AR4,0xc03}},{{r::STATE_AR4,0xc00},{r::STATE_AR0,1},{r::STATE_BK,4}});

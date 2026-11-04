@@ -7,12 +7,17 @@ unique assertions and the ordinary native 5110 composition. This is a static
 migration inventory, not a staged parity certificate. No section is approved for
 deletion solely because of its name or similarity to another section.
 
-The 518 registered sections total 18,148 source lines and 1,477,911 registered
-cases. 137 sections explicitly assign `pipeline_frontend = false`: 5,991 source
+The retirement baseline has 518 registered sections, 18,148 source lines and
+1,477,911 registered cases. Its 137 sections explicitly assigning
+`pipeline_frontend = false` contain 5,991 source
 lines and 11,468 registered cases. Seven additional sections select the frontend
 through an expression: 241 lines and 39,048 cases. Counts describe entire
 sections, not atomic-only case counts. Helpers and firmware integration sources
 are additional migration work. The common case defaults to staged.
+
+Current validated progress: 28 sections (1,710 cases plus restores) migrated;
+109 of the original explicitly atomic sections remain. The baseline counts
+describe the retirement scope, not the current number of atomic assignments.
 
 ## Disposition rules
 
@@ -90,6 +95,10 @@ The staged set also includes `atomic_memory_tests`, `atomic_condition_edges`,
 `atomic_asm_arithmetic`. Their semantic and bus assertions are unchanged;
 only cold first-clock PC expectations are retimed where present.
 
+Also migrated with unchanged literal results and bus events:
+`atomic_parallel_literals`, `atomic_dual_address`, `atomic_double_stores`,
+`atomic_address_literals` and `atomic_shifted_loads`.
+
 ### Unresolved migration contrasts
 
 `atomic_product_literals` remains atomic: after accounting for cold Prefetch,
@@ -122,6 +131,9 @@ Further preserved atomic sections after isolated staged trials:
 | `atomic_mapped_load_sequences` | Case 0 reads mapped `0013=8003` as event 1 at clock 8 | Resolve mapped-load bus order |
 | `atomic_mmr_transfer_literals` | Case 3 reads peripheral `0020=9abc` as event 4 at clock 13 | Resolve MMR/peripheral transfer order |
 | `atomic_memory_pairs` | Case 1 reads `0d03=2468` as event 1 at clock 7 | Resolve paired-memory operand order |
+| `atomic_coefficient_fir_literals` | Case 0, MACP `788b`, sets ILLEGAL | Audit program-coefficient multiply admission |
+| `atomic_stack_literals` | Case 2 reads `0061=abcd` as event 1 at clock 7 | Resolve stack operand sampling/order |
+| `atomic_mapped_moves` | Case 2, MVMD/DAR progression, sets ILLEGAL | Audit mapped-move destination admission |
 
 These are migration blockers, not established silicon defects. An atomic
 expectation is not automatically correct where implementations disagree.
