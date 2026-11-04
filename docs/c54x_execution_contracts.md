@@ -2260,6 +2260,15 @@ family includes cross-accumulator MAC, rounded MACR and MAS/MASR; physical
 bank timing and interrupt/repeat composition remain unvalidated. Execution
 of the original MAC is not proof of valid recording or audio.
 
+### Dual multiply interrupt-register sources
+
+Dual MPY/MACSU (`0xa400..0xa7ff`) admits IMR/IFR as either source through
+the ordinary memory map. Both words remain Read-owned and X publishes T;
+no interrupt is synthesized or acknowledged by reading those registers.
+Other unqualified low-page multiply sources retain the pre-effect guard.
+`zero_bk` keeps all 208 pointer-wrap cases and strengthens its MPY rows with
+initialized RAM/IFR values, exact Read clocks, product/T and preserved IMR/IFR.
+
 ### Parallel load and multiply-accumulate
 
 `LD Xmem,A/B || MAC[R]/MAS[R] Ymem,other` (`0xa800..0xafff`) captures
