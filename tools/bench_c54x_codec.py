@@ -94,8 +94,7 @@ def main():
     parser.add_argument('--frame-timing', action='store_true', help='require per-frame timing from a current fixture')
     parser.add_argument('--handset', action='store_true', help='measure 5110 staged boot/idle and estimate paired budget')
     parser.add_argument('--cpu', type=int, help='pin this benchmark and its children to one available logical CPU')
-    parser.add_argument('--bios', nargs='+', default=['efr-decoder', 'efr-decoder-pipe',
-                                                   'efr-encoder', 'efr-encoder-pipe'],
+    parser.add_argument('--bios', nargs='+', default=['efr-decoder-pipe', 'efr-encoder-pipe'],
                         choices=['efr-decoder', 'efr-decoder-pipe', 'efr-encoder', 'efr-encoder-pipe'])
     args = parser.parse_args()
     if args.repeats < 1:

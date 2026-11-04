@@ -28,6 +28,8 @@ MACHINES = {
     'nse1plg': ('staged', 'legacy'),
     'nse1pipe': ('staged', 'standard'),
 }
+# Retain the retired profile only when interpreting historical captures.
+LIVE_MACHINES = tuple(name for name in MACHINES if name != 'nse1astd')
 
 
 def machine_profile(name):
@@ -122,7 +124,7 @@ def main():
     parser.add_argument("--output-root", type=Path,
                         default=Path(__file__).resolve().parents[1] / 'tmp')
     parser.add_argument("--repeats", type=int, default=2)
-    parser.add_argument('--machine', choices=tuple(MACHINES), default='noki5110',
+    parser.add_argument('--machine', choices=LIVE_MACHINES, default='noki5110',
                         help='explicit CPU frontend/bus research composition; no physical dialect claim')
     parser.add_argument('--execution-probes', action='store_true',
                         help='observe scores at debugger instruction entry (automatic for staged CPUs)')

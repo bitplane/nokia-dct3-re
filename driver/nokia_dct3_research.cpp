@@ -853,13 +853,6 @@ void nse1_pipeline_fixture_state::nse1plg(machine_config &config)
 	subdevice<tms320c54x_device>("dsp_c54x:cpu")->set_standard_swwsr(false);
 }
 
-void nse1_pipeline_fixture_state::nse1astd(machine_config &config)
-{
-	noki5110(config);
-	subdevice<tms320c54x_device>("dsp_c54x:cpu")->set_pipeline_frontend(false);
-	subdevice<tms320c54x_device>("dsp_c54x:cpu")->set_standard_swwsr(true);
-}
-
 void dct3_pcm_fixture_state::nsm1pcm(machine_config &config)
 {
 	nsm1r4t(config);
@@ -892,19 +885,9 @@ void dct3_pcm_fixture_state::nse1pin(machine_config &config)
 	m_clocked_loopback = true;
 }
 
-void dct3_pcm_fixture_state::nse1aclk(machine_config &config)
-{
-	nse1pin(config);
-	subdevice<tms320c54x_device>("dsp_c54x:cpu")->set_pipeline_frontend(false);
-	subdevice<tms320c54x_device>("dsp_c54x:cpu")->set_standard_swwsr(true);
-	subdevice<tms320c54x_device>("dsp_c54x:cpu")->instruction_observer_cb().set(FUNC(dct3_pcm_fixture_state::instruction_w));
-	m_execution_demand_observer = true;
-}
-
 void dct3_pcm_fixture_state::nse1pclk(machine_config &config)
 {
-	nse1aclk(config);
-	subdevice<tms320c54x_device>("dsp_c54x:cpu")->set_pipeline_frontend(true);
+	nse1pin(config);
 }
 
 void dct3_pcm_fixture_state::machine_start()

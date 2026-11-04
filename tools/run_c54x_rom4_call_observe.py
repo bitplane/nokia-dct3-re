@@ -9,16 +9,16 @@ import sys
 import tempfile
 
 try:
-    from tools.run_c54x_rom4_rf_delivery import input_provenance, MACHINES
+    from tools.run_c54x_rom4_rf_delivery import input_provenance, LIVE_MACHINES
     from tools.c54x_rom4_call_observe_check import inspect
 except ModuleNotFoundError:
-    from run_c54x_rom4_rf_delivery import input_provenance, MACHINES
+    from run_c54x_rom4_rf_delivery import input_provenance, LIVE_MACHINES
     from c54x_rom4_call_observe_check import inspect
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--machine', choices=tuple(MACHINES), default='nse1astd')
+    parser.add_argument('--machine', choices=LIVE_MACHINES, default='noki5110')
     parser.add_argument('--keys', default='1,1,2,navi', help='empty string for no-input control')
     args = parser.parse_args()
     root = Path(__file__).resolve().parents[1]

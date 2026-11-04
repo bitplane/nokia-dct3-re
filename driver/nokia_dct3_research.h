@@ -17,7 +17,6 @@ public:
 	using nokia_dct3_state::nokia_dct3_state;
 	void nse1pipe(machine_config &config);
 	void nse1plg(machine_config &config);
-	void nse1astd(machine_config &config);
 };
 
 // Explicit laboratory attachment, not recovered COBBA clock-enable wiring.
@@ -31,7 +30,6 @@ public:
 	void nse1obs(machine_config &config);
 	void nse1bit(machine_config &config);
 	void nse1pin(machine_config &config);
-	void nse1aclk(machine_config &config);
 	void nse1pclk(machine_config &config);
 protected:
 	virtual void machine_start() override;

@@ -38,7 +38,7 @@ class KeypadInputTest(unittest.TestCase):
 
     def test_nse1_research_aliases_inherit_their_declared_input_family(self):
         self.assertIn('machine.system.parent == "noki5110"', self.harness)
-        for alias in ('nse1astd', 'nse1plg'):
+        for alias in ('nse1pipe', 'nse1plg'):
             self.assertRegex(self.driver, rf'SYST\([^\n]*\b{alias},\s*noki5110,')
 
     def test_scripted_sequences_support_emulation_time_waits(self):

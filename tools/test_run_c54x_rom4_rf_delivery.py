@@ -4,11 +4,15 @@ from pathlib import Path
 import tempfile
 from unittest.mock import patch
 
-from tools.run_c54x_rom4_rf_delivery import check_repeats, input_provenance, inspect_case, machine_profile, check_cpu_health
+from tools.run_c54x_rom4_rf_delivery import check_repeats, input_provenance, inspect_case, machine_profile, check_cpu_health, LIVE_MACHINES
 from tools.test_c54x_rom4_rf_score_check import TONE
 
 
 class RepeatTests(unittest.TestCase):
+    def test_retired_atomic_profile_cannot_launch_a_machine(self):
+        self.assertNotIn('nse1astd', LIVE_MACHINES)
+        self.assertTrue(all(machine_profile(name)['frontend']=='staged' for name in LIVE_MACHINES))
+
     def test_cpu_stop_and_wrong_profile_are_not_rf_input_failures(self):
         text = 'rom4_rf_profile: system=nse1pipe\nrom4_rf_cpu_state: illegal=0 pc=47f8\n'
         self.assertEqual(check_cpu_health(text, 'nse1pipe')['pc'], '47f8')

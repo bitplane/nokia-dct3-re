@@ -86,13 +86,13 @@ removal. Header state, save registration, reset and restore must change together
 Ordinary `noki5110` now explicitly selects staged and standard SWWSR decoding.
 The frontend-only trial rejected firmware STM `7728`; standard decoding is
 therefore a necessary part of this composition, not an unrelated research
-override. `nse1astd` and `nse1aclk` explicitly retain atomic comparison behavior.
+override. The `nse1astd` and `nse1aclk` atomic comparison machines are retired.
 Validate ordinary boot/menu, codecs, peripheral/audio integration, power/reset
 and save/restore without inheriting unrelated research overrides.
 Other HLE-backed products do not establish native DSP parity.
 
-Atomic comparison aliases and the MU4 laboratory defaults are still live
-reference consumers. ROM4 integration now selects staged at reset for ordinary
+MU4 laboratory defaults remain the unresolved reference consumers. ROM4
+integration now selects staged at reset for ordinary
 profile names as well as the retained `-pipe` aliases. Both cold names use the
 same mask-only Prefetch assertion; the unreachable atomic cold phase is removed.
 Generic-section migration does not qualify those full
@@ -116,8 +116,8 @@ codec profiles. The eight former false-mode assignments in
 `tms320c54x_test_rom4_context.cpp` were cleanup between staged cases, not atomic
 execution continuations; each successor reinitializes staged before scheduling
 CPU time. They are removed rather than counted as eight migrated code paths.
-Benchmark tools, machine registrations,
-gates and documentation also expose frontend variants.
+Remaining `-pipe` BIOS names are compatibility aliases, not alternate engines.
+The codec benchmark defaults to one staged decoder and one staged encoder.
 
 ### Stage 4 firmware qualification
 
@@ -190,8 +190,14 @@ The native Nokia DSP backend also selects staged/standard directly, rather
 than depending on handset wrappers. The isolated runner's former false-mode
 teardown call is removed; it scheduled no atomic instructions between cases.
 
+The serial/pin audio runner no longer executes the atomic comparison dimension.
+Its staged pin attachment compares the screen against the retained serial
+control, and keeps the same boot, demand, bus, opcode and replay assertions.
+RF/call command-line runners cannot select a retired atomic machine; archived
+capture metadata remains parseable for existing checker fixtures only.
+
 Remaining work is MU4 producer/consumer qualification, other uploaded
-application boundaries, retirement of explicit atomic comparison aliases, and
+application boundaries, and
 then removal of atomic scheduling/state. Shared `execute_one` instruction
 semantics remain required by staged execution.
 

@@ -396,7 +396,7 @@ help:
 	@echo "make check-c54x-rom4-pcm-restore verify exact active native DTMF word/time replay with external frames"
 	@echo "make check-c54x-rom4-pcm-wire verify native DTMF under explicit 1 MHz edges (assumed sync/fan-out)"
 	@echo "make check-c54x-rom4-clocked-boot verify pin-clocked native boot loopback, DTMF and replay"
-	@echo "make check-c54x-rom4-staged-codec compare atomic/staged laboratory codec clocks and replay"
+	@echo "make check-c54x-rom4-staged-codec validate staged laboratory codec clocks and replay"
 	@echo "make check-c54x-rom4-staged verify the reset-free ten-second staged DSP checkpoint"
 	@echo "make check-c54x-backend-bsp verify native BSP frames, serial pins and save/load (no handset clock/audio claim)"
 	@echo "make check-c54x-backend-requests verify slot pending storage and save/load (no physical request-map claim)"

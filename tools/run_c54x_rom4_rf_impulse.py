@@ -11,10 +11,10 @@ import tempfile
 
 try:
     from tools.c54x_rom4_rf_delivery_check import check_observer_health
-    from tools.run_c54x_rom4_rf_delivery import MACHINES, machine_profile, check_cpu_health
+    from tools.run_c54x_rom4_rf_delivery import MACHINES, LIVE_MACHINES, machine_profile, check_cpu_health
 except ModuleNotFoundError:
     from c54x_rom4_rf_delivery_check import check_observer_health
-    from run_c54x_rom4_rf_delivery import MACHINES, machine_profile, check_cpu_health
+    from run_c54x_rom4_rf_delivery import MACHINES, LIVE_MACHINES, machine_profile, check_cpu_health
 
 
 COEFFICIENTS = (0x0387, 0x11a3, 0x2ad6, 0x4000,
@@ -88,7 +88,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--mame", type=Path, required=True)
     parser.add_argument("--rompath", type=Path, required=True)
-    parser.add_argument('--machine',choices=tuple(MACHINES),default='noki5110',
+    parser.add_argument('--machine',choices=LIVE_MACHINES,default='noki5110',
                         help='explicit CPU frontend/bus composition, not fitted silicon')
     parser.add_argument('--mixed', action='store_true',
                         help='check overlapping bounded nonzero words instead of isolated impulses')
