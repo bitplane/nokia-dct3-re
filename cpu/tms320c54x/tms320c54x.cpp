@@ -354,9 +354,9 @@ constexpr bool staged_direct_push(u16 word)
 	return (word & 0xffe0) == 0x4a00 || (word & 0xffe0) == 0x4a60;
 }
 
-constexpr bool staged_direct_pop(u16 word)
+constexpr bool staged_mmr_pop(u16 word)
 {
-	return (word & 0xff00) == 0x8a00 && (u8(word) <= 1 || (u8(word) >= 6 && u8(word) <= 0x1d) || (u8(word) >= 0x60 && u8(word) <= 0x7f));
+	return (word & 0xff00) == 0x8a00 && (u8(word) <= 1 || (u8(word) >= 6 && u8(word) <= 0x1d) || (u8(word) >= 0x60 && u8(word) < 0xe0));
 }
 
 constexpr bool decode_staged_data_copy(u16 word)
@@ -1540,7 +1540,7 @@ bool decode_staged_supported(u16 word, bool extended_program)
 	bool const direct_push = staged_direct_push(word);
 	bool const data_push = (word & 0xff00) == 0x4b00 && (u8(word) < 0x98 || staged_extended_push(word));
 	bool const data_pop = (word & 0xff00) == 0x8b00 && (u8(word) < 0x98 || staged_extended_pop(word));
-	bool const direct_pop = staged_direct_pop(word);
+	bool const mmr_pop = staged_mmr_pop(word);
 	bool const frame = (word & 0xff00) == 0xee00;
 	bool const branch = staged_banz(word) || staged_block_repeat(word) || word == 0xf073 || word == 0xf273 ||
 		staged_conditional_branch(word) || staged_call(word) || staged_accumulator_near_call(word) ||
@@ -1556,7 +1556,7 @@ bool decode_staged_supported(u16 word, bool extended_program)
 		staged_idle(word) || (word & 0xfcf8) == 0xf4a8 || staged_memory_logic(word) || staged_mar(word) || staged_xc(word) ||
 		fast_return || plain_return || delayed_return || far_return || status_bit || immediate_dp || immediate_alu || branch ||
 		dagen_immediate || immediate_loop || immediate_t || immediate_control || (word & 0xff00) == 0xe800 || (word & 0xff00) == 0xe900 ||
-		short_repeat || frame || direct_push || data_push || data_pop || direct_pop || direct_long_load || direct_long_store ||
+		short_repeat || frame || direct_push || data_push || data_pop || mmr_pop || direct_long_load || direct_long_store ||
 		long_arithmetic || register_alu || direct_mmr_load || mmr_move || memory_dp || direct_move || data_copy || program_move ||
 		read_a || short_load || direct_store || immediate_store || long_load || rmw || staged_xmem_bit(word) || staged_xmem_load(word) ||
 		staged_xmem_arithmetic(word) || staged_xmem_store(word) || staged_conditional_store(word) || staged_dual_multiply(word) ||
@@ -4257,6 +4257,19 @@ void tms320c54x_device::pipeline_step()
 		}
 		m_pipeline_operand_address[3] = mmr_address(mode, 3);
 	}
+	if (m_pipeline_valid[3] && (m_pipeline_word[3] & 0xff00) == 0x8a00)
+	{
+		u8 const mode = m_pipeline_word[3];
+		unsigned const ar = indirect_ar(mode, 3);
+		u16 const previous_ar = m_ar[ar], previous_st0 = m_st0;
+		u16 const destination = mmr_address(mode, 3);
+		if (BIT(mode, 7) && (destination < 0x10 || destination > 0x18))
+		{
+			m_ar[ar] = previous_ar; m_st0 = previous_st0;
+			logerror("%s: staged indirect POPM non-AR/SP destination is unsupported\n", machine().describe_context()); m_illegal = true; return;
+		}
+		m_pipeline_operand_address[3] = destination;
+	}
 	if (m_pipeline_valid[3] && BIT(staged_opcode_descriptor[m_pipeline_word[3]], 6))
 		// Table 7-9: a basic direct consumer samples SP before an older
 		// PSHM allocates its stack word in this clock's Read stage.
@@ -4858,7 +4871,7 @@ void tms320c54x_device::pipeline_step()
 			logerror("%s: staged POPD register/peripheral stack source is unsupported\n", machine().describe_context());
 			m_illegal = true; return;
 		}
-		if (m_pipeline_word[4] == 0x8a18)
+		if ((m_pipeline_word[4] & 0xff00) == 0x8a00 && m_pipeline_operand_address[4] == 0x18)
 		{
 			m_pipeline_direct_sp[4] = m_sp;
 			pipeline_delay_compiler_sp(m_sp);
@@ -4867,7 +4880,7 @@ void tms320c54x_device::pipeline_step()
 		late_popm_read = (m_pipeline_word[4] & 0xff00) == 0x8a00 && late_popm_address >= 0x60 && m_pipeline_valid[5] &&
 			staged_direct_push(m_pipeline_word[5]) && m_pipeline_operand_address[5] == late_popm_address;
 		if (!late_popm_read) m_pipeline_operand[4] = data_read(late_popm_address);
-		u16 const destination = (m_pipeline_word[4] & 0xff00) == 0x8a00 ? u8(m_pipeline_word[4]) : m_pipeline_operand_address[4];
+		u16 const destination = m_pipeline_operand_address[4];
 		if ((m_pipeline_word[4] & 0xff00) == 0x8b00 && destination == 0x1d && m_pipeline_block_active && m_pipeline_operand[4] != m_pmst)
 		{
 			// The active-context contract covers restoration without remapping.
@@ -5333,10 +5346,11 @@ void tms320c54x_device::pipeline_step()
 		}
 		else if ((m_op & 0xff00) == 0x8a00)
 		{
-			if (u8(m_op) < 0x10 || u8(m_op) > 0x19 || m_pipeline_early_write_deferred[5])
+			u16 const destination = m_pipeline_operand_address[5];
+			if (destination < 0x10 || destination > 0x19 || m_pipeline_early_write_deferred[5])
 			{
-				data_write(u8(m_op), m_pipeline_operand[5]);
-				if (u8(m_op) == 0x18) pipeline_delay_compiler_sp(m_pipeline_direct_sp[5]);
+				data_write(destination, m_pipeline_operand[5]);
+				if (destination == 0x18) pipeline_delay_compiler_sp(m_pipeline_direct_sp[5]);
 			}
 		}
 		else if ((m_op & 0xff00) == 0x8b00)

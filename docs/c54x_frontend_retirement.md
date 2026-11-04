@@ -15,8 +15,8 @@ through an expression: 241 lines and 39,048 cases. Counts describe entire
 sections, not atomic-only case counts. Helpers and firmware integration sources
 are additional migration work. The common case defaults to staged.
 
-Current validated progress: 122 sections (11,278 cases plus restores) migrated;
-15 of the original explicitly atomic sections remain, containing 201 cases.
+Current validated progress: 123 sections (11,282 cases plus restores) migrated;
+14 of the original explicitly atomic sections remain, containing 197 cases.
 The baseline counts
 describe the retirement scope, not the current number of atomic assignments.
 The seven originally paired sections are now staged-only: 24,040 cases remain
@@ -76,6 +76,12 @@ gates and documentation also expose frontend variants.
 ## Section work queue
 
 ### Validated migrations
+
+`indirect_popm` retains all four masked/preincrement/postincrement/CMPT/SP
+cases on staged, including exact stack reads, resolved MMR writes and final
+pointer/stack/status values. Access retains the resolved AR/SP destination;
+Read performs stack increment/publication once, with Execute using that
+destination rather than reinterpreting the encoded mode byte.
 
 `atomic_mapped_moves` keeps all four MVMD/MVDM progression cases plus a DP=0,
 mid-repeat restore regression (five current). Short direct AR-source MVMD and
@@ -345,7 +351,6 @@ expectation is not automatically correct where implementations disagree.
 Additional shared-contract queue (original atomic sections retained):
 
 - `block_repeat_control`: first case AR1 is 4, expected 1; inspect block endpoint/count behavior.
-- `indirect_popm` case 0 hits staged admission limits.
 
 Sizing columns below record the retirement baseline; current case counts live
 in `fixtures/c54x_sections.json`. Dispositions are updated by isolated execution
@@ -365,7 +370,7 @@ sections independently; do not run the complete suite after every edit.
 | `atomic_delayed_call` | 9 | 32 | Migrated; page/frame/predicate assertions retained, OVA clearance checked. |
 | `conditional_register_store` | 2,304 | 42 | Migrate independent assertions; check staged admission |
 | `zero_bk` | 208 | 27 | Migrated; pointer wrap preserved, MPY reads/result/T/IMR/IFR explicitly checked. |
-| `indirect_popm` | 4 | 27 | Migrate independent assertions; check staged admission |
+| `indirect_popm` | 4 | 27 | Migrated; all masked/pre/post/CMPT/SP results, bus events and restores retained. |
 | `block_repeat_control` | 8 | 46 | Re-derive timing/order; retain assertions |
 | `clock_control` | 17 | 36 | Migrated; clock field/readback/reload assertions retained with separated peripheral reads. |
 | `accumulator_call` | 2 | 23 | Re-derive timing/order; retain assertions |

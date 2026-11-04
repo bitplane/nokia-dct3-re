@@ -50,7 +50,13 @@ inline std::vector<clocked_register_case> section_cases()
 		auto final = observation("reject-before-source-or-stack-effect", {{r::STATE_A,0x123456789aULL},
 			{r::STATE_B,0xfedcba9876ULL},{r::STATE_T,0xbeef},{r::STATE_ST0,0xa608},{r::STATE_ST1,0x4900},{r::STATE_SP,0x3000}});
 		final.expected.pop_back(); final.expected.push_back({r::STATE_ILLEGAL,1});
-		clocked_register_case c{{{0,std::move(initial)},{3,std::move(final)}},encoding & 1 ? 7U : 4U,16};
+		for (unsigned reg = 0; reg < 8; ++reg) {
+			initial.initial.push_back({int(r::STATE_AR0)+int(reg),0});
+			final.expected.push_back({int(r::STATE_AR0)+int(reg),0});
+		}
+		// Indirect POPM must resolve its destination before the bounded AR/SP guard.
+		unsigned const rejected_at = pop && address >= 0x80 && address < 0xe0 ? 4 : 3;
+		clocked_register_case c{{{0,std::move(initial)},{rejected_at,std::move(final)}},encoding & 1 ? 7U : 4U,16};
 		c.require_idle = false; c.forbid_data_access = true;
 		cases.push_back(std::move(c));
 	}

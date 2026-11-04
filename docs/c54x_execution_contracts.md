@@ -2328,6 +2328,21 @@ composition remain outside this admission.
 
 ### Indirect MMR addressing and DAGEN latency
 
+Short-indirect POPM resolves and retains its MMR destination in Access using
+the existing page-zero addressing/update rules, including CMPT and upper-bit
+clearing (SPRU131G 5.6). Admission is bounded to AR0..AR7/SP destinations;
+an unqualified destination rolls back the address preview before rejection.
+Read retains the stack word and increments SP once. AR/SP destinations use
+the existing Read-owned publication and compiler-SP latency handling;
+Execute uses the retained destination, not the encoded mode byte.
+`indirect_popm` preserves all four independent pre/post/mask/CMPT/SP cases,
+exact source/destination bus events and replay.
+The page-zero exclusion matrix now resolves admitted indirect POPM forms at
+Access (clock 4), rather than expecting Decode rejection at 3. It still forbids
+all bus accesses and stack/status changes, and additionally checks all eight
+ARs remain unchanged after a rejected preview. Other exclusion clocks remain
+unchanged.
+
 STM BRC/RSA/REA (`0x771a..0x771c`) shares the retained literal/early-write
 path for loop-register setup; in-body mutation of these registers remains
 rejected. `atomic_mmr_burst` retains both twelve-register initialize/pop/push
