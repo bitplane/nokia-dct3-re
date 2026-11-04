@@ -10,7 +10,7 @@ inline std::vector<clocked_register_case> section_cases()
 	for (unsigned variant = 0; variant != 6; ++variant) {
 		bool const repeat = variant == 4, load = variant == 5;
 		std::vector<u16> words{0x75f8,0x100,0x124};
-		if (repeat) words.insert(words.end(),{0xec0c,0x6d10,0xe80f});
+		if (repeat) words.insert(words.end(),{0xec0c,0x6d90,0xe80f});
 		else if (load) words.insert(words.end(),{0x13f8,0x120});
 		else words.push_back(opcodes[variant]);
 		words.insert(words.end(),{0x75f8,0x100,0x124,0xf4e1});
@@ -26,10 +26,11 @@ inline std::vector<clocked_register_case> section_cases()
 		for (unsigned ar = 0; ar != 8; ++ar) final.expected.push_back({int(r::STATE_AR0+ar),
 			repeat && !ar ? 13U : !repeat && !load && ar == destinations[variant] ? variant == 3 ? 0xcafeU : 0xbeefU : 0U});
 		final.expected_data = initial.data;
-		clocked_register_case c{{{0,std::move(initial)},{1,observation("before-register-markers",{{STATE_GENPC,0x601}})},
+		clocked_register_case c{{{0,std::move(initial)},{1,observation("before-register-markers",{{STATE_GENPC,0x600}})},
 			{2,observation("register-markers-running",{})},{64,std::move(final)}},3,64};
-		c.pipeline_frontend = false; c.observed_data_space = AS_IO;
-		c.data_events = std::vector<clocked_data_event>{{true,0x124,0x1111,0,false},{true,0x124,0x1111,0,false,{},repeat ? 18U : load ? 5U : 4U}};
+		c.pipeline_frontend = true; c.observed_data_space = AS_IO;
+		// The modeled repeat tail refills Prefetch; steady MAR retirement remains one clock.
+		c.data_events = std::vector<clocked_data_event>{{true,0x124,0x1111,0,false},{true,0x124,0x1111,0,false,{},repeat ? 22U : load ? 5U : 4U}};
 		cases.push_back(std::move(c));
 	}
 	return cases;

@@ -6,8 +6,8 @@ inline std::vector<clocked_register_case> section_cases()
 {
 	std::vector<clocked_register_case> cases;
 	for (unsigned variant = 0; variant != 4; ++variant) {
-		std::vector<u16> const words = variant == 0 ? std::vector<u16>{0xf062,0x1234,0x4ef8,0x90c,0xe800,0xf070,2,0x6d10} :
-			variant == 1 ? std::vector<u16>{0xf171,1,0x6d10} : variant == 2 ?
+		std::vector<u16> const words = variant == 0 ? std::vector<u16>{0xf062,0x1234,0x4ef8,0x90c,0xe800,0xf070,2,0x6d90} :
+			variant == 1 ? std::vector<u16>{0xf171,1,0x6d90} : variant == 2 ?
 			std::vector<u16>{0x47f8,0x918,0x6bf8,0x91a,1} : std::vector<u16>{0xf070,1,0x7d92,0x924};
 		auto initial = initial_case("basic-repeat-and-transfer-sequences",{0xf495});
 		for (unsigned i = 0; i != words.size(); ++i) initial.program[1 + i].value = words[i];
@@ -22,18 +22,23 @@ inline std::vector<clocked_register_case> section_cases()
 			initial.data = {{0x90c,0xbeef},{0x90d,0xcafe}}; final.expected_data = {{0x90c,0x1234},{0x90d,0}};
 			events = {{true,0x90c,0x1234,0,false},{true,0x90d,0,0,false}};
 		} else if (variant == 2) {
-			initial.data = {{0x918,1},{0x91a,0}}; final.expected_data = {{0x918,1},{0x91a,2}};
-			events = {{false,0x918,1,0,false},{false,0x91a,0,0,false},{true,0x91a,1,0,false},
-				{false,0x91a,1,0,false},{true,0x91a,2,0,false}};
+			// SPRU172C 4-9: ADDM is not repeatable. Do not bless undefined output.
+			initial.data = {{0x918,1},{0x91a,0}};
+			final = observation("nonrepeatable-ADDM-fails-closed",{{r::STATE_ILLEGAL,1},
+				{r::STATE_A,0},{r::STATE_B,0},{r::STATE_AR0,0},{r::STATE_AR2,0x920}},{{0x918,1},{0x91a,0}});
+			final.expected.pop_back(); // Replace the normal no-illegal observation policy.
+			events = {{false,0x918,1,0,false}};
 		} else if (variant == 3) {
 			initial.data = {{0x920,0xaaaa},{0x921,0xbbbb}}; final.expected_data = initial.data;
 			initial.program.insert(initial.program.end(),{{0x924,0},{0x925,0}}); final.expected_program = {{0x924,0xaaaa},{0x925,0xbbbb}};
 			events = {{false,0x920,0xaaaa,0,false},{false,0x921,0xbbbb,0,false}};
 			program = {{true,0x924,0xaaaa,0,false},{true,0x925,0xbbbb,0,false}};
 		}
-		clocked_register_case c{{{0,std::move(initial)},{1,observation("pre-sequence-snapshot",{{STATE_GENPC,0x601}})},
+		clocked_register_case c{{{0,std::move(initial)},{1,observation("pre-sequence-snapshot",{{STATE_GENPC,0x600}})},
 			{2,observation("sequence-running",{})},{64,std::move(final)}},1,64};
-		c.pipeline_frontend = false; c.data_events = std::move(events); c.program_events = std::move(program); cases.push_back(std::move(c));
+		c.pipeline_frontend = true; c.data_events = std::move(events); c.program_events = std::move(program);
+		if (variant == 2) { c.require_idle = false; c.states[2].observation.expected.clear(); }
+		cases.push_back(std::move(c));
 	}
 	{
 		auto initial = initial_case("basic-absolute-store-load-complement-and-XOR",{0xf495,0x76f8,0x910,0x5678,0x7214,0x912,
@@ -42,9 +47,9 @@ inline std::vector<clocked_register_case> section_cases()
 		initial.data = {{0x910,0},{0x912,0xabcd},{0x914,0x1234},{0x915,0x5678}};
 		auto final = observation("independent-mixed-sequence-results",{{STATE_GENPC,0x611},{r::STATE_A,0xff0f00},
 			{r::STATE_B,0xffedcba987ULL},{r::STATE_AR4,0xabcd}},{{0x910,0x5678},{0x912,0xabcd},{0x914,0x1234},{0x915,0x5678}});
-		clocked_register_case c{{{0,std::move(initial)},{1,observation("pre-mixed-sequence-snapshot",{{STATE_GENPC,0x601}})},
+		clocked_register_case c{{{0,std::move(initial)},{1,observation("pre-mixed-sequence-snapshot",{{STATE_GENPC,0x600}})},
 			{2,observation("mixed-sequence-running",{})},{64,std::move(final)}},1,64};
-		c.pipeline_frontend = false;
+		c.pipeline_frontend = true;
 		c.data_events = std::vector<clocked_data_event>{{true,0x910,0x5678,0,false},{false,0x912,0xabcd,0,false},
 			{true,0x14,0xabcd,0,false},{false,0x914,0x1234,0,false},{false,0x915,0x5678,0,false}};
 		cases.push_back(std::move(c));

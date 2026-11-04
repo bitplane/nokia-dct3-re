@@ -523,11 +523,20 @@ configured `--target=tic54x` and assembled using `gas/as-new -al`:
 | `xorm #0x1234, *ar3(2)` | `6ae3 0002 1234` |
 | `addm #0x1234, *ar3(2)` | `6be3 0002 1234` |
 | `mac *(0x0200), #4, a, b` | `65f8 0200 0004` |
+| `mar *ar0+` | `6d90` |
 
 The assembler listing displays little-endian bytes within each word. It is an
 encoding oracle, not evidence for pipeline clocks or arithmetic results.
 Legacy atomic fixtures that reversed the two words must correct the stimulus,
 not swap their independently expected source address or arithmetic result.
+
+SPRU172C page 4-9 explicitly marks ADDM nonrepeatable; GNU as 2.43 also warns
+that `rpt *(0x0918)` followed by `addm #1, *(0x091a)` is undefined.
+`atomic_basic_repeat_sequences` therefore replaces its former expected
+repeated-ADDM success with a fail-closed emulator check: the count source is
+read once, ILLEGAL latches and the ADDM destination remains unchanged. This
+is an admission policy, not a claimed silicon trap. Legitimate memory-count
+repeats retain their positive coverage in `atomic_conditional_repeat`.
 
 `memory_immediate_product` owns 7,424 independent cases/replays. Numerical
 coverage uses one RAM form: all 64 word/literal pairs, FRCT/OVM for MPY,

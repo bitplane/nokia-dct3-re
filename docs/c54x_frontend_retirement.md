@@ -15,8 +15,9 @@ through an expression: 241 lines and 39,048 cases. Counts describe entire
 sections, not atomic-only case counts. Helpers and firmware integration sources
 are additional migration work. The common case defaults to staged.
 
-Current validated progress: 97 sections (10,621 cases plus restores) migrated;
-40 of the original explicitly atomic sections remain. The baseline counts
+Current validated progress: 100 sections (10,641 cases plus restores) migrated;
+37 of the original explicitly atomic sections remain, containing 828 cases.
+The baseline counts
 describe the retirement scope, not the current number of atomic assignments.
 The seven originally paired sections are now staged-only: 24,040 cases remain
 from their 39,048-case baseline. Their original staged stimuli, assertions and
@@ -210,6 +211,19 @@ These three sections and eight repeat/admission controls pass 26,428
 cases/restores. The 354 CPU-tool checks, four EFR codec/replay profiles and
 ordinary 5110 menu/save gates also pass.
 
+`atomic_basic_repeat_sequences`, `atomic_compatibility_memory` and
+`atomic_port_register_examples` now run staged (20 cases/restores). The first
+and third correct intended `MAR *AR0+` words from `6d10` to assembler-confirmed
+`6d90`, preserving their pointer/count results. One basic-sequence assertion
+is deliberately not preserved: repeated ADDM's expected success was undefined
+under SPRU172C 4-9 (also diagnosed by GNU as). It becomes a fail-closed emulator
+guard check, retaining the count-source Read and proving no ADDM data effects;
+this does not claim a hardware illegal-instruction trap. Positive memory-count
+repeat behavior remains covered by `atomic_conditional_repeat`. The marked MAR
+stream's interval accounts for the modeled repeat-tail Prefetch refill, not
+atomic scheduling. Compatibility arithmetic/flags and remaining values stay
+unchanged. No CPU behavior changes accompany these three fixture corrections.
+
 ### Unresolved migration contrasts
 
 `atomic_register_copy_sequences` remains atomic. It writes `7728` under the
@@ -348,7 +362,7 @@ sections independently; do not run the complete suite after every edit.
 | `atomic_dual_add_sub_literals` | 8 | 38 | Migrate independent assertions; check staged admission |
 | `atomic_immediate_product_literals` | 11 | 41 | Migrate independent assertions; check staged admission |
 | `atomic_asm_arithmetic` | 523 | 51 | Migrate independent assertions; check staged admission |
-| `atomic_basic_repeat_sequences` | 5 | 54 | Atomic retained; first staged contrast: C54x case basic-repeat-and-transfer-sequences/0: register 22 actual=1 expected=0 mask=ffffffffffffffff |
+| `atomic_basic_repeat_sequences` | 5 | 54 | Staged validated; MAR encoding corrected; undefined repeated-ADDM success replaced by explicit fail-closed check |
 | `atomic_basic_control_sequences` | 13 | 53 | Validated staged migration; assertions retained |
 | `atomic_basic_alu_control` | 10 | 49 | Validated staged migration; assertions retained |
 | `atomic_basic_parallel_block` | 9 | 51 | Validated staged migration; assertions retained |
@@ -357,7 +371,7 @@ sections independently; do not run the complete suite after every edit.
 | `atomic_port_timing` | 15 | 65 | Validated staged migration after RND/circular PORTW admission; assertions retained |
 | `atomic_mac_saturation` | 7 | 44 | Migrate independent assertions; check staged admission |
 | `atomic_port_marked_operations` | 22 | 83 | Validated staged migration after RND/circular PORTW admission; assertions retained |
-| `atomic_compatibility_memory` | 9 | 55 | Atomic retained; first staged contrast: C54x case atomic-compatibility-memory-and-fixed-ADDM-boundaries/2: register 22 actual=1 expected=0 mask=ffffffffffffffff |
+| `atomic_compatibility_memory` | 9 | 55 | Staged validated; compatibility pointers, arithmetic/flags, RAM and marker intervals retained |
 | `atomic_port_marked_memory` | 11 | 48 | Atomic retained; first staged contrast: C54x case atomic-port-marked-load-store-ALU-and-repeat/9: register 22 actual=1 expected=0 mask=ffffffffffffffff |
 | `atomic_port_loads` | 6 | 40 | Validated staged migration after RND/circular PORTW admission; assertions retained |
 | `atomic_port_marked_transfers` | 9 | 42 | Validated staged migration after RND/circular PORTW admission; assertions retained |
@@ -367,7 +381,7 @@ sections independently; do not run the complete suite after every edit.
 | `atomic_memory_route_literals` | 26 | 85 | Atomic retained; first staged contrast: C54x case reada-long-preupdated-destination/16: register 22 actual=1 expected=0 mask=ffffffffffffffff |
 | `atomic_short_immediate` | 520 | 30 | Migrate independent assertions; check staged admission |
 | `atomic_port_delayed_branch` | 6 | 30 | Atomic retained; first staged contrast: C54x register sequence case=1 tick=17 replay=0: relative data-bus clock interval |
-| `atomic_port_register_examples` | 6 | 37 | Atomic retained; first staged contrast: C54x case atomic-port-marked-register-store-repeat-and-LDU/4: register 22 actual=1 expected=0 mask=ffffffffffffffff |
+| `atomic_port_register_examples` | 6 | 37 | Staged validated; MAR encoding corrected and modeled repeat-tail interval derived; values retained |
 | `atomic_port_low_store` | 6 | 37 | Validated staged migration; assertions retained |
 | `atomic_port_indirect_output` | 5 | 30 | Validated staged migration; assertions retained |
 | `atomic_port_control_examples` | 6 | 37 | Atomic retained; first staged contrast: C54x case atomic-absolute-marked-return-branch-and-repeat/2: register 22 actual=1 expected=0 mask=ffffffffffffffff |
