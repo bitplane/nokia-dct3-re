@@ -19,9 +19,9 @@ inline std::vector<clocked_register_case> section_cases()
 		final.expected.insert(final.expected.end(),expected.begin(),expected.end()); final.expected_data = initial.data;
 		for (auto const &word : results)
 			for (auto &value : final.expected_data) if (value.address == word.address) value.value = word.value;
-		clocked_register_case c{{{0,std::move(initial)},{1,observation("pre-pair-snapshot",{{STATE_GENPC,0x601}})},
+		clocked_register_case c{{{0,std::move(initial)},{1,observation("pre-pair-snapshot",{{STATE_GENPC,0x600}})},
 			{2,observation("pair-running",{})},{48,std::move(final)}},1,48};
-		c.pipeline_frontend = false; c.data_events = std::move(events); cases.push_back(std::move(c));
+		c.pipeline_frontend = true; c.data_events = std::move(events); cases.push_back(std::move(c));
 	};
 	add("store-decrement-feeds-store-increment",{0x768a,0xabcd,0x8092},
 		{{r::STATE_A,0x12345678},{r::STATE_AR2,0xd80},{r::STATE_ST1,0}},{{r::STATE_A,0x12345678},{r::STATE_AR2,0xd80}},
@@ -29,7 +29,8 @@ inline std::vector<clocked_register_case> section_cases()
 	add("dual-move-increment-feeds-circular-source",{0xe5a8,0xe5ca},
 		{{r::STATE_AR0,1},{r::STATE_AR2,0xd02},{r::STATE_AR4,0xe00}},{{r::STATE_AR0,1},{r::STATE_AR2,0xd00},{r::STATE_AR4,0xe02}},
 		{{0xe00,0x1357},{0xd03,0x2468}},{{0xd02,0x1357},{0xe01,0x2468}},
-		{{false,0xe00,0x1357,0,false},{true,0xd02,0x1357,0,false},{false,0xd03,0x2468,0,false},{true,0xe01,0x2468,0,false}});
+		// The second Read shares a clock with the first Execute write.
+		{{false,0xe00,0x1357,6},{false,0xd03,0x2468,7},{true,0xd02,0x1357,7},{true,0xe01,0x2468,8}});
 	add("unsigned-absolute-and-decrement-loads",{0x12f8,0xd40,0x138b},
 		{{r::STATE_AR3,0xd50}},{{r::STATE_A,0x8001},{r::STATE_B,0xff80},{r::STATE_AR3,0xd4f}},
 		{{0xd40,0x8001},{0xd50,0xff80}},{},{{false,0xd40,0x8001,0,false},{false,0xd50,0xff80,0,false}});

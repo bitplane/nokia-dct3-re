@@ -16,7 +16,7 @@ inline std::vector<clocked_register_case> section_cases()
 		initial.initial.insert(initial.initial.end(), {{r::STATE_A,0x5678},{r::STATE_ST0,0},{r::STATE_ST1,0x900},
 			{r::STATE_AR0,offset},{int(r::STATE_AR0 + ar),address}});
 		clocked_register_case c{{{0,std::move(initial)}},index & 1 ? 3U : 1U,24};
-		c.pipeline_frontend = false;
+		c.pipeline_frontend = true;
 		c.states.push_back({24,observation("reverse-bit-order-carry-or-borrow", {{int(r::STATE_AR0 + ar),next},{r::STATE_AR0,offset},
 			{r::STATE_A,kind == 1 ? 0x1234U : 0x5678U},{STATE_GENPC,0x602}},{{address,u16(kind == 2 ? 0x5678 : 0x1234)}})});
 		c.data_events = std::vector<clocked_data_event>{};
@@ -31,7 +31,7 @@ inline std::vector<clocked_register_case> section_cases()
 		put(0x630,0xf4e1);
 		initial.initial.insert(initial.initial.end(),{{r::STATE_ST1,0x900},{r::STATE_AR0,8},{r::STATE_AR3,0x60}});
 		clocked_register_case c{{{0,std::move(initial)}},subtract ? 25U : 7U,256};
-		c.pipeline_frontend = false;
+		c.pipeline_frontend = true;
 		auto final = observation("full-cycle-wrap", {{r::STATE_AR3,0x60},{STATE_GENPC,0x631}});
 		c.data_events = std::vector<clocked_data_event>{};
 		for (unsigned i = 0; i < 16; ++i) {

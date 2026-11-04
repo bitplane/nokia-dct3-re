@@ -2173,6 +2173,19 @@ Non-power-of-two index meaning, producer latency, interrupt composition
 and physical phase timing are unvalidated. The existing 3,072-case
 `mar-index` profile also passes on this source.
 
+The `reverse_carry` section now runs staged for MAR, LD and STL: 2,688
+independent bit-reversal/address/result cases plus two full 16-position
+traversals. LD retains its Access-owned address/update and STL its Read-owned
+address/update; neither repeats the modification at Execute. Newly admitted
+reverse-address LD/ST forms reject mapped/low-page operands. The two explicit
+traversals retain their original register snapshots and ordered bus events.
+
+LDR (`16xx/17xx`, SPRU172C page 4-78) retains the source and SXM and produces
+the shifted word with low half `8000`, without altering arithmetic flags.
+`rounded_load` retains all 64 cases/restores across signed/unsigned extension,
+both destinations, four source patterns and direct, indirect, decrement and
+absolute addressing, including a direct peripheral-window source.
+
 ### Post-loop BRC write ownership
 
 STM BRC uses the existing zero-latency Access publication before a new

@@ -568,9 +568,8 @@ constexpr bool staged_accumulator_arithmetic(u16 word)
 
 constexpr bool decode_staged_memory_load(u16 word)
 {
-	return (((word & 0xfc00) == 0x1000 &&
-		(BIT(word, 9) || u8(word) < 0xa0 || (u8(word) >= 0xa8 && u8(word) < 0xb8) || u8(word) >= 0xc0)) ||
-		(word & 0xfe00) == 0x1400 || (word & 0xfe00) == 0x4400) && u8(word) <= 0xf8 && (word & 0xf8) != 0x98;
+	return ((word & 0xfc00) == 0x1000 ||
+		(word & 0xfc00) == 0x1400 || (word & 0xfe00) == 0x4400) && u8(word) <= 0xf8 && (word & 0xf8) != 0x98;
 }
 
 constexpr bool decode_staged_shifted_smem(u16 word)
@@ -631,9 +630,7 @@ constexpr bool staged_asm_store(u16 word)
 
 constexpr bool decode_staged_store(u16 word)
 {
-	return ((word & 0xfc00) == 0x8000 && u8(word) < 0xa0) ||
-		((word & 0xfc00) == 0x8000 && u8(word) >= 0xa8 && u8(word) < 0xb8) ||
-		((word & 0xfc00) == 0x8000 && u8(word) >= 0xc0 && u8(word) < 0xe0) ||
+	return ((word & 0xfc00) == 0x8000 && u8(word) < 0xe0) ||
 		((word & 0xfe00) == 0x8c00 && u8(word) < 0x98) || decode_staged_extended_store(word) || staged_asm_store(word);
 }
 
@@ -4129,7 +4126,7 @@ void tms320c54x_device::pipeline_step()
 			}
 			m_pipeline_immediate[4] = m_st1 & 0x1f;
 		}
-		if ((m_pipeline_word[4] & 0xfc00) == 0x8000 && ((mode >= 0xa8 && mode < 0xb8) || (mode >= 0xc0 && mode < 0xe0)) && m_pipeline_operand_address[4] < 0x60)
+		if ((m_pipeline_word[4] & 0xfc00) == 0x8000 && mode >= 0xa0 && mode < 0xe0 && m_pipeline_operand_address[4] < 0x60)
 		{
 			logerror("%s: staged AR0-indexed accumulator store low-page destination is unsupported\n", machine().describe_context()); m_illegal = true; return;
 		}
@@ -4426,8 +4423,8 @@ void tms320c54x_device::pipeline_step()
 		m_pipeline_operand_address[3] = offset_memory ? long_offset_address(mode, indirect_ar(mode, 3), s16(m_pipeline_immediate[3]), 3) :
 			extended_rmw ? long_offset_address(mode, indirect_ar(mode, 3), s16(m_pipeline_operand_address[3]), 3) :
 			absolute ? m_pipeline_immediate[3] : basic_address(3, mode);
-		bool const shifted_load = (m_pipeline_word[3] & 0xfe00) == 0x4400;
-		if ((m_pipeline_word[3] & 0xfe00) == 0x1000 && ((mode >= 0xa8 && mode < 0xb8) || (mode >= 0xc0 && mode < 0xe0)) && m_pipeline_operand_address[3] < 0x60)
+		bool const shifted_load = (m_pipeline_word[3] & 0xfe00) == 0x4400 || (m_pipeline_word[3] & 0xfe00) == 0x1600;
+		if ((m_pipeline_word[3] & 0xfe00) == 0x1000 && mode >= 0xa0 && mode < 0xe0 && m_pipeline_operand_address[3] < 0x60)
 		{
 			logerror("%s: staged indexed/circular LD mapped/peripheral source is unsupported\n", machine().describe_context()); m_illegal = true; return;
 		}
@@ -4438,10 +4435,10 @@ void tms320c54x_device::pipeline_step()
 		}
 		bool const unsigned_control = (m_pipeline_word[3] & 0xfe00) == 0x1200 &&
 			(m_pipeline_operand_address[3] == 0 || m_pipeline_operand_address[3] == 7);
-		bool const unsigned_peripheral = (m_pipeline_word[3] & 0xfe00) == 0x1200 &&
+		bool const plain_peripheral = ((m_pipeline_word[3] & 0xfe00) == 0x1200 || (m_pipeline_word[3] & 0xfe00) == 0x1600) &&
 			m_pipeline_operand_address[3] >= 0x20 && m_pipeline_operand_address[3] <= 0x5f && !offset_load;
 		if (staged_memory_load(m_pipeline_word[3]) && (BIT(m_pipeline_word[3], 9) || shifted_load) && m_pipeline_operand_address[3] < 0x60 &&
-			!unsigned_control && !unsigned_peripheral && (m_pipeline_operand_address[3] < (shifted_load ? 0x08 : 0x10) || m_pipeline_operand_address[3] > 0x17))
+			!unsigned_control && !plain_peripheral && (m_pipeline_operand_address[3] < (shifted_load ? 0x08 : 0x10) || m_pipeline_operand_address[3] > 0x17))
 		{
 			logerror("%s: staged memory load control/peripheral source is unsupported instruction=%06x word=%04x source=%04x\n", machine().describe_context(), unsigned(m_pipeline_address[3]), m_pipeline_word[3], m_pipeline_operand_address[3]);
 			m_illegal = true; return;
@@ -5174,8 +5171,9 @@ void tms320c54x_device::pipeline_step()
 		{
 			u16 const status = m_st1;
 			m_st1 = (m_st1 & ~u16(0x011f)) | m_pipeline_alu_mode[5];
-			u64 const value = BIT(m_op, 9) ? m_pipeline_operand[5] : data_operand(m_pipeline_operand[5]);
+			u64 const value = (m_op & 0xfe00) == 0x1200 ? m_pipeline_operand[5] : data_operand(m_pipeline_operand[5]);
 			accumulator(BIT(m_op, 8)) = (m_op & 0xfe00) == 0x1400 ? shifted_by_t(m_pipeline_operand[5], m_pipeline_immediate[5]) :
+				(m_op & 0xfe00) == 0x1600 ? ((value << 16) | 0x8000) & ACC_MASK :
 				(m_op & 0xfe00) == 0x4400 ? (value << 16) & ACC_MASK : value;
 			m_st1 = status;
 			if (staged_offset_load(m_op) || staged_absolute_load(m_op)) ++m_pc;

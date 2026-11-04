@@ -24,10 +24,13 @@ inline std::vector<clocked_register_case> section_cases()
 			unsigned i = 0;
 			for (unsigned ar : {2U,3U,4U,7U}) {
 				initial.data.push_back({0xf40 + i,0}); final.expected_data.push_back({0xf40 + i,u16(0x8000 + ar)});
-				events.push_back({false,0x10 + ar,u16(0x8000 + ar),0,false});
-				events.push_back({true,0xf40 + i,u16(0x8000 + ar),0,false}); ++i;
+				events.push_back({false,0x10 + ar,u16(0x8000 + ar),6+2*i});
+				// Read of the next LDM precedes the older STL's same-clock Write.
+				if (i) events.push_back({true,0xf40+i-1,u16(0x8000+std::array<unsigned,4>{2,3,4,7}[i-1]),6+2*i});
+				++i;
 			}
-			events.push_back({false,0x10,0x8000,0,false});
+			events.push_back({false,0x10,0x8000,14});
+			events.push_back({true,0xf43,0x8007,14});
 		} else if (variant == 1) {
 			initial.initial.insert(initial.initial.end(),{{r::STATE_A,0x1234},{r::STATE_B,0x100}});
 			final.expected.insert(final.expected.end(),{{r::STATE_A,0xfe},{r::STATE_B,0x100}});
@@ -44,9 +47,9 @@ inline std::vector<clocked_register_case> section_cases()
 			events = {{false,0xf22,0x8001,0,false},{false,8,0x8001,0,false},{true,0xf50,0x8001,0,false},
 				{false,0x13,0xf31,0,false},{true,0xf51,0xf31,0,false},{true,0xf52,0x5a5a,0,false}};
 		}
-		clocked_register_case c{{{0,std::move(initial)},{1,observation("pre-sequence-snapshot", {{STATE_GENPC,0x601}})},
+		clocked_register_case c{{{0,std::move(initial)},{1,observation("pre-sequence-snapshot", {{STATE_GENPC,0x600}})},
 			{2,observation("sequence-running", {})},{48,std::move(final)}},1,48};
-		c.pipeline_frontend = false; c.data_events = std::move(events); cases.push_back(std::move(c));
+		c.pipeline_frontend = true; c.data_events = std::move(events); cases.push_back(std::move(c));
 	}
 	return cases;
 }
