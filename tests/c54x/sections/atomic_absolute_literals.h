@@ -18,9 +18,9 @@ inline std::vector<clocked_register_case> section_cases()
 			initial.data.push_back({e.address,e.value});
 			if (std::none_of(events.begin(),events.end(),[&](auto const &w) { return w.write && w.address == e.address; })) final.expected_data.push_back({e.address,e.value});
 		}
-		clocked_register_case c{{{0,std::move(initial)},{1,observation("pre-absolute-literal-snapshot", {{STATE_GENPC,0x600}})},
+		clocked_register_case c{{{0,std::move(initial)},{1,observation("pre-absolute-literal-snapshot", {{STATE_GENPC,0x5ff}})},
 			{2,observation("literal-running", {})},{48,std::move(final)}},1,48};
-		c.pipeline_frontend = false; c.data_events = std::move(events); cases.push_back(std::move(c));
+		c.pipeline_frontend = true; c.data_events = std::move(events); cases.push_back(std::move(c));
 	};
 	append("LD-small-B-retains-A",{0xe908},{{r::STATE_A,0x123456},{r::STATE_B,0xffffffffffULL}},{{r::STATE_B,8},{r::STATE_A,0x123456}});
 	append("LDM-AR4-B-unsigned",{0x4914},{{r::STATE_AR4,0x8001},{r::STATE_A,0x123456}},
@@ -47,7 +47,8 @@ inline std::vector<clocked_register_case> section_cases()
 	append("ADD-signed-stationary",{0x0083},{{r::STATE_A,1},{r::STATE_AR3,0xf52}},{{r::STATE_A,0xffffffffffULL},{r::STATE_AR3,0xf52}},{{false,0xf52,0xfffe,0,false}});
 	append("MVMM-auxiliary",{0xe726},{{r::STATE_AR2,0x4567},{r::STATE_AR6,0}},{{r::STATE_AR2,0x4567},{r::STATE_AR6,0x4567}},
 		{{false,0x12,0x4567,0,false},{true,0x16,0x4567,0,false}});
-	append("TCR-store-readback",{0x7726,0x10,0x4826},{},{{r::STATE_A,0x10}},{{true,0x26,0x10,0,false},{false,0x26,0x10,0,false}});
+	// Check completed TCR write/read semantics, not unqualified simultaneous peripheral access.
+	append("TCR-store-readback",{0x7726,0x10,0xf495,0x4826},{},{{r::STATE_A,0x10}},{{true,0x26,0x10,0,false},{false,0x26,0x10,0,false}});
 	append("MAC-fractional-negative",{0x2883},{{r::STATE_A,5},{r::STATE_AR3,0xf52},{r::STATE_T,0xfffe},{r::STATE_ST1,0x40}},
 		{{r::STATE_A,0xfffffffff9ULL},{r::STATE_AR3,0xf52},{r::STATE_T,0xfffe}},{{false,0xf52,3,0,false}});
 	append("MPY-dual-fractional",{0xa43a},{{r::STATE_AR5,0xf60},{r::STATE_AR4,0xf70},{r::STATE_ST1,0x40}},

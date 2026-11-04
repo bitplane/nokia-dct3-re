@@ -12,7 +12,8 @@ inline std::vector<clocked_register_case> section_cases()
 		if (variant == 2) words.insert(words.end(),{0x1df8,0xf21});
 		if (variant == 3) words.insert(words.end(),{0x80d3,0x818d,0x81d2,0x8395});
 		if (variant == 4 || variant == 5) words.push_back(variant == 4 ? 0x808c : 0x80d2);
-		if (variant == 6) words.insert(words.end(),{0x8815,0xe552,0xe754});
+		// STLM-to-AR has two-word DAGEN latency (SPRU131G table 7-3).
+		if (variant == 6) words.insert(words.end(),{0x8815,0xe552,0xf495,0xe754});
 		words.push_back(0xf4e1);
 		auto initial = initial_case("MPYA-SUB-XOR-store-and-mapped-move-literals", {0xf495}); initial.program.clear();
 		for (unsigned i = 0; i != words.size(); ++i) initial.program.push_back({0x600 + i,words[i]});
@@ -47,12 +48,12 @@ inline std::vector<clocked_register_case> section_cases()
 			final.expected_data = {{0xf22,0xbeef},{0xf23,0x1234},{0xf24,0xcafe}}; events = {{true,0xf23,0x1234,0,false}};
 		} else {
 			initial.data = {{0xf23,0xcafe},{0xf26,0}}; final.expected_data = {{0xf23,0xcafe},{0xf26,0xcafe}};
-			events = {{true,0x15,0xf25,0,false},{false,0xf23,0xcafe,0,false},{true,0xf26,0xcafe,0,false},
-				{false,0x15,0xf25,0,false},{true,0x14,0xf25,0,false}};
+			events = {{false,0xf23,0xcafe,7},{true,0x15,0xf25,7},
+				{false,0x15,0xf25,7},{true,0xf26,0xcafe,8},{true,0x14,0xf25,8}};
 		}
-		clocked_register_case c{{{0,std::move(initial)},{1,observation("pre-sequence-snapshot", {{STATE_GENPC,0x601}})},
+		clocked_register_case c{{{0,std::move(initial)},{1,observation("pre-sequence-snapshot", {{STATE_GENPC,0x600}})},
 			{2,observation("sequence-running", {})},{32,std::move(final)}},1,32};
-		c.pipeline_frontend = false; c.data_events = std::move(events); cases.push_back(std::move(c));
+		c.pipeline_frontend = true; c.data_events = std::move(events); cases.push_back(std::move(c));
 	}
 	return cases;
 }

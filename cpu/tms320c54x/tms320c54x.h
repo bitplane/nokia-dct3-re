@@ -150,7 +150,7 @@ private:
 	void finish_smem_access(u8 mode);
 	u16 indirect_read(u8 mode);
 	u16 immediate_smem_read(u8 mode, u16 &immediate);
-	u16 mmr_address(u8 mode);
+	u16 mmr_address(u8 mode, unsigned stage = 6);
 	void indirect_write(u8 mode, u16 value);
 	u16 long_offset_address(u8 mode);
 	u16 long_offset_address(u8 mode, unsigned ar, s16 offset, unsigned stage = 6);

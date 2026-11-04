@@ -15,8 +15,8 @@ through an expression: 241 lines and 39,048 cases. Counts describe entire
 sections, not atomic-only case counts. Helpers and firmware integration sources
 are additional migration work. The common case defaults to staged.
 
-Current validated progress: 106 sections (10,819 cases plus restores) migrated;
-31 of the original explicitly atomic sections remain, containing 654 cases.
+Current validated progress: 108 sections (10,856 cases plus restores) migrated;
+29 of the original explicitly atomic sections remain, containing 617 cases.
 The baseline counts
 describe the retirement scope, not the current number of atomic assignments.
 The seven originally paired sections are now staged-only: 24,040 cases remain
@@ -76,6 +76,14 @@ gates and documentation also expose frontend variants.
 ## Section work queue
 
 ### Validated migrations
+
+`atomic_absolute_literals` retains all 30 results/events on staged, adding
+indirect LDM and AR-destination STLM with page-zero addressing and pointer
+high-bit clearing. Its TCR read follows the completed write across a NOP;
+simultaneous peripheral read/write arbitration is not qualified by this literal
+test. `atomic_multiply_move_literals` retains all seven results. Its STLM/MVMM
+sequence now obeys the two-word AR latency in SPRU131G table 7-3 (one inserted
+NOP), with explicit interleaved Read/Execute/Decode/Access bus clocks.
 
 `atomic_delayed_call` retains all nine page/stack/predicate-before-delay cases.
 Staged CC[D] additionally admits the combined AGT+AOV condition (`0x76`),
@@ -368,7 +376,7 @@ sections independently; do not run the complete suite after every edit.
 | `atomic_transfer_literals` | 34 | 85 | Staged validated; repeated-copy cadence/interleaving explicit; values and counts retained |
 | `atomic_mmr_burst` | 2 | 43 | Atomic retained; first staged contrast: C54x case MMR-burst-initialize-and-push/0: register 22 actual=1 expected=0 mask=ffffffffffffffff |
 | `atomic_memory_sequences` | 3 | 40 | Validated staged migration; assertions retained |
-| `atomic_absolute_literals` | 30 | 78 | Atomic retained; first staged contrast: C54x case TCR-store-readback/17: register 22 actual=1 expected=0 mask=ffffffffffffffff |
+| `atomic_absolute_literals` | 30 | 78 | Migrated; indirect MMR addressing and completed TCR readback qualified. |
 | `atomic_condition_edges` | 6 | 30 | Migrate independent assertions; check staged admission |
 | `atomic_alu_store_literals` | 8 | 37 | Migrate independent assertions; check staged admission |
 | `atomic_high_store_literals` | 5 | 28 | Migrate independent assertions; check staged admission |
@@ -377,7 +385,7 @@ sections independently; do not run the complete suite after every edit.
 | `atomic_logic_pointer_literals` | 18 | 57 | Migrate independent assertions; check staged admission |
 | `atomic_logic_program_literals` | 5 | 40 | Migrate independent assertions; check staged admission |
 | `atomic_accumulator_add_literals` | 7 | 31 | Migrate independent assertions; check staged admission |
-| `atomic_multiply_move_literals` | 7 | 59 | Migrate independent assertions; check staged admission |
+| `atomic_multiply_move_literals` | 7 | 59 | Migrated; results retained, AR latency corrected to TI contract. |
 | `atomic_conditional_slot_literals` | 10 | 55 | Validated staged migration; assertions retained |
 | `atomic_mapped_load_sequences` | 4 | 53 | Staged validated; same-clock Read/Write ordering made explicit; values retained |
 | `atomic_register_copy_sequences` | 4 | 43 | Migrate independent assertions; check staged admission |
