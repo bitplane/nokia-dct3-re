@@ -156,6 +156,16 @@ consumers are qualified or their redundant comparison entry points retired.
 
 ### Remaining engine-removal prerequisites
 
+The fresh InitDisk corruption is resolved by the existing on-chip RAM bypass
+contract (SPRU131G section 7.3.2). MVDK captures its source in Access, not Read;
+it must use the same pending-write forwarding as Read-stage consumers. An
+adjacent ADDM/MVDK pair previously captured the old metadata offset. The new
+`rmw_move_bypass` section covers 160 alias/nonalias, addressing, logical/additive,
+gap and restore contrasts; reverting only the MVDK forwarding call fails its
+first case. Eleven affected move/forwarding sections pass, and fresh MU4 setup
+now passes all six complete-file comparisons and the native entry assertions.
+Full reset/retained-media qualification is still required before promotion.
+
 MU4 is not yet safe to promote globally. An ordinary atomic `setup` run passes
 the six complete-file comparisons and native serial-setup assertions. Its
 staged counterpart passes erased/flush/template/scan controls, two serial

@@ -191,7 +191,7 @@ private:
 	u64 data_operand(u16 value) const;
 	u64 shifted_by_t(u16 memory, u16 t) const;
 	u16 add_memory_word(u16 value, u16 immediate, bool publish_status = true);
-	u16 pipeline_read_data(u16 address);
+	u16 pipeline_read_data(u16 address, unsigned stage = 4);
 	u16 pipeline_observed_read(u16 address, unsigned stage);
 	u16 pipeline_store_word() const;
 	bool pipeline_mapped_accumulator_write(u16 address) const;

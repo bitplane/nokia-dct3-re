@@ -114,6 +114,7 @@
   "logical_immediate": 480,
   "memory_add_immediate": 256,
   "memory_logic": 252,
+  "rmw_move_bypass": 160,
   "mu4_name_copy": 16,
   "logic_composition": 5,
   "bit_immediate": 512,

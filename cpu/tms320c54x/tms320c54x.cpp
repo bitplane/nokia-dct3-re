@@ -4477,7 +4477,7 @@ void tms320c54x_device::pipeline_step()
 		m_pipeline_operand_address[3] = source;
 		bool const mapped_write = pipeline_mapped_accumulator_write(source) ||
 			(m_pipeline_valid[5] && staged_mvmd_cleared_source(m_pipeline_word[3], m_pipeline_word[5]));
-		if (!mapped_write) m_pipeline_operand[3] = pipeline_observed_read(source, 3);
+		if (!mapped_write) m_pipeline_operand[3] = pipeline_read_data(source, 3);
 		// Retain the old-address sample, update the source AR, then publish
 		// the destination; source/destination AR aliasing must not re-read RAM.
 		if (BIT(mode, 7) && !extended) indirect_modify(mode, false, 3);
@@ -6402,7 +6402,7 @@ bool tms320c54x_device::observe_staged_mvdd_write(u16 address, u32 &instruction,
 	return true;
 }
 
-u16 tms320c54x_device::pipeline_read_data(u16 address)
+u16 tms320c54x_device::pipeline_read_data(u16 address, unsigned stage)
 {
 	// SPRU131G 7.3.2: a same-location on-chip read can bypass a pending
 	// write through an internal bus. Preserve the real EB write and flags;
@@ -6417,7 +6417,7 @@ u16 tms320c54x_device::pipeline_read_data(u16 address)
 	}
 	if (address >= 0x60 && m_pipeline_valid[5] && address == m_pipeline_operand_address[5] &&
 		(staged_data_copy(m_pipeline_word[5]) || staged_port_read(m_pipeline_word[5]) ||
-		(staged_mvdd(m_pipeline_word[5]) && !staged_mvdd(m_pipeline_word[4]))))
+		(staged_mvdd(m_pipeline_word[5]) && !staged_mvdd(m_pipeline_word[stage]))))
 		// Copies and PORTR already retained their Read sample. An adjacent
 		// consumer must not see the old RAM word while EB is still pending.
 		// Forward the sample without another I/O access; preserve the EB write.
@@ -6433,7 +6433,7 @@ u16 tms320c54x_device::pipeline_read_data(u16 address)
 		return (m_pipeline_word[5] & 0xff00) == 0x6b00 ? add_memory_word(value, immediate, false) :
 			(m_pipeline_word[5] & 0xff00) == 0x6a00 ? value ^ immediate : BIT(m_pipeline_word[5], 8) ? value | immediate : value & immediate;
 	}
-	return pipeline_observed_read(address, 4);
+	return pipeline_observed_read(address, stage);
 }
 
 u16 tms320c54x_device::pipeline_observed_read(u16 address, unsigned stage)
