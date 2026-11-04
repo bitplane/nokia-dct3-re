@@ -17,9 +17,9 @@ inline std::vector<clocked_register_case> section_cases()
 		auto final = observation("only-taken-call-return-owns-stack", {{STATE_GENPC,taken ? 0x701U : control == 2 ? 0x602U : 0x603U},
 			{r::STATE_A,a},{r::STATE_SP,control == 1 && taken ? 0x2ffU : control == 2 && !taken ? 0x2ffU : 0x300U}},
 			{{0x2ff,u16(control == 1 && taken ? 0x602 : control == 2 ? 0x700 : 0xa55a)}});
-		clocked_register_case c{{{0,std::move(initial)},{1,observation("pre-condition-snapshot", {{STATE_GENPC,0x600}})},
+		clocked_register_case c{{{0,std::move(initial)},{1,observation("pre-condition-snapshot", {{STATE_GENPC,0x5ff}})},
 			{2,observation("condition-running", {})},{32,std::move(final)}},1,32};
-		c.pipeline_frontend = false; c.data_events = std::vector<clocked_data_event>{};
+		c.pipeline_frontend = true; c.data_events = std::vector<clocked_data_event>{};
 		if (control == 1 && taken) c.data_events->push_back({true,0x2ff,0x602,0,false});
 		if (control == 2 && taken) c.data_events->push_back({false,0x2ff,0x700,0,false});
 		if (taken) c.program_events = {{false,0x700,0xf4e1,0,false}};

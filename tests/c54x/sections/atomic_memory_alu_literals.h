@@ -30,9 +30,9 @@ inline std::vector<clocked_register_case> section_cases()
 			{r::STATE_A,v.out_a},{r::STATE_B,v.out_b},{r::STATE_AR1,0xf21},{r::STATE_AR2,v.increment ? 0xf23U : 0xf22U},
 			{r::STATE_AR4,0xf24},{r::STATE_ST0,v.flags},{r::STATE_ST1,v.st1}});
 		final.expected_data = initial.data;
-		clocked_register_case c{{{0,std::move(initial)},{1,observation("pre-ALU-snapshot", {{STATE_GENPC,0x601}})},
+		clocked_register_case c{{{0,std::move(initial)},{1,observation("pre-ALU-snapshot", {{STATE_GENPC,0x600}})},
 			{2,observation("ALU-running", {})},{32,std::move(final)}},1,32};
-		c.pipeline_frontend = false; c.data_events = std::vector<clocked_data_event>{{false,v.address,v.operand,0,false}};
+		c.pipeline_frontend = true; c.data_events = std::vector<clocked_data_event>{{false,v.address,v.operand,0,false}};
 		cases.push_back(std::move(c));
 	}
 	return cases;

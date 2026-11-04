@@ -16,7 +16,7 @@ inline std::vector<clocked_register_case> section_cases()
 		auto final = observation(name,checks); final.expected.push_back({STATE_GENPC,0x601 + unsigned(words.size())});
 		final.expected.insert(final.expected.end(),{{r::STATE_A,0x12345678},{r::STATE_B,0x87654321},
 			{r::STATE_AR2,0xd00},{r::STATE_AR3,0xd10}});
-		clocked_register_case c{{},1,32}; c.pipeline_frontend = false;
+		clocked_register_case c{{},1,32}; c.pipeline_frontend = true;
 		c.data_events = std::vector<clocked_data_event>{{false,address,operand,0,false}};
 		if (written) {
 			u16 const target = destination.value_or(address);
@@ -25,7 +25,7 @@ inline std::vector<clocked_register_case> section_cases()
 			final.expected_data.push_back({target,*written});
 		}
 		if (!written || destination) final.expected_data.push_back({address,operand});
-		c.states = {{0,std::move(initial)},{1,observation("pre-memory-test-snapshot", {{STATE_GENPC,0x600}})},
+		c.states = {{0,std::move(initial)},{1,observation("pre-memory-test-snapshot", {{STATE_GENPC,0x5ff}})},
 			{2,observation("memory-test-running", {})},{32,std::move(final)}};
 		cases.push_back(std::move(c));
 	};

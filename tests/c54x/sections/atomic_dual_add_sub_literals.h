@@ -25,9 +25,9 @@ inline std::vector<clocked_register_case> section_cases()
 		if (special) final.expected.push_back({r::STATE_ST0,0x800,0xc00});
 		if (memory) final.expected.push_back({r::STATE_ST0,0xc00});
 		final.expected_data = initial.data; if (memory) final.expected_data[1].value = 0x8000;
-		clocked_register_case c{{{0,std::move(initial)},{1,observation("pre-ALU-snapshot",{{STATE_GENPC,0x601}})},
+		clocked_register_case c{{{0,std::move(initial)},{1,observation("pre-ALU-snapshot",{{STATE_GENPC,0x600}})},
 			{2,observation("ALU-running",{})},{32,std::move(final)}},1,32};
-		c.pipeline_frontend = false;
+		c.pipeline_frontend = true;
 		c.data_events = memory ? std::vector<clocked_data_event>{{false,0x100,0x8007,0,false},{true,0x100,0x8000,0,false}} :
 			special ? std::vector<clocked_data_event>{{false,0xf94,0xfffb,0,false},{false,0xf95,7,0,false}} :
 			std::vector<clocked_data_event>{{false,0xf90,0x55,0,false},{false,0xf91,0xaa,0,false}};

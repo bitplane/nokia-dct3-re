@@ -19,9 +19,9 @@ inline std::vector<clocked_register_case> section_cases()
 		auto final = observation("fixed-product-sign-rounding-and-dual-address-results",{{STATE_GENPC,0x603},
 			{r::STATE_A,v.out_a},{r::STATE_B,v.out_b},{r::STATE_T,v.out_t},{r::STATE_ST1,v.st1},
 			{r::STATE_AR4,v.out4},{r::STATE_AR5,v.out5}},{{0xf90,v.x},{0xf91,v.y}});
-		clocked_register_case c{{{0,std::move(initial)},{1,observation("pre-dual-operation-snapshot",{{STATE_GENPC,0x601}})},
+		clocked_register_case c{{{0,std::move(initial)},{1,observation("pre-dual-operation-snapshot",{{STATE_GENPC,0x600}})},
 			{2,observation("dual-operation-running",{})},{32,std::move(final)}},1,32};
-		c.pipeline_frontend = false; c.data_events = std::vector<clocked_data_event>{{false,0xf90,v.x,0,false},{false,0xf91,v.y,0,false}};
+		c.pipeline_frontend = true; c.data_events = std::vector<clocked_data_event>{{false,0xf90,v.x,0,false},{false,0xf91,v.y,0,false}};
 		cases.push_back(std::move(c));
 	}
 	return cases;

@@ -83,6 +83,13 @@ Also validated: `atomic_guard_conditions`, `atomic_status_xf`,
 `atomic_logic_pointer_literals` and `atomic_mac_literals`. Status/XF publication,
 guard conditions, pointer changes, literal MAC results and replay remain checked.
 
+The staged set also includes `atomic_memory_tests`, `atomic_condition_edges`,
+`atomic_parallel_load_literals`, `atomic_move_modify_literals`,
+`atomic_logic_program_literals`, `atomic_memory_alu_literals`,
+`atomic_dual_arithmetic_literals`, `atomic_dual_add_sub_literals` and
+`atomic_asm_arithmetic`. Their semantic and bus assertions are unchanged;
+only cold first-clock PC expectations are retimed where present.
+
 ### Unresolved migration contrasts
 
 `atomic_product_literals` remains atomic: after accounting for cold Prefetch,
@@ -108,6 +115,13 @@ Further preserved atomic sections after isolated staged trials:
 | `atomic_memory_address_literals` | Case 16, repeated ADD, sets ILLEGAL | Audit repeated-body admission and ownership |
 | `atomic_accumulator_calls` | Case 0 observes stack read `02ff=0602` at clock 15 rather than its retained bus sequence | Decode staged call/return ordering before retiming |
 | `atomic_memory_literals` | Case 0, ABDST, sets ILLEGAL after cold-Prefetch correction | Audit ABDST admission |
+| `atomic_shift_literals` | Case 20 sets ILLEGAL | Identify the unadmitted shift/compare/normalize form |
+| `atomic_zero_repeat` | Case 2 fetches `0602=f495` at clock 7 outside the expected sequence | Derive staged repeat-prefetch expectations |
+| `atomic_transfer_literals` | Case 13 reads `0d91=2222` as event 1 at clock 9 | Resolve transfer bus order |
+| `atomic_multiply_move_literals` | Case 6 reads mapped `0015=0000` as event 0 at clock 6 | Resolve mapped-source sampling |
+| `atomic_mapped_load_sequences` | Case 0 reads mapped `0013=8003` as event 1 at clock 8 | Resolve mapped-load bus order |
+| `atomic_mmr_transfer_literals` | Case 3 reads peripheral `0020=9abc` as event 4 at clock 13 | Resolve MMR/peripheral transfer order |
+| `atomic_memory_pairs` | Case 1 reads `0d03=2468` as event 1 at clock 7 | Resolve paired-memory operand order |
 
 These are migration blockers, not established silicon defects. An atomic
 expectation is not automatically correct where implementations disagree.
