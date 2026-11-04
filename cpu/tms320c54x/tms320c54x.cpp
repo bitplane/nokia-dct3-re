@@ -172,6 +172,11 @@ constexpr bool staged_ram_stm(u16 word)
 	return staged_direct_ram_stm(word) || staged_indirect_ram_stm(word);
 }
 
+constexpr bool staged_immediate_loop_register(u16 word)
+{
+	return word >= 0x771a && word <= 0x771c; // BRC, RSA, REA.
+}
+
 constexpr bool decode_staged_pipelined_repeat(u16 word)
 {
 	bool const short_mar = (word & 0xff00) == 0x6d00 && u8(word) >= 0x80 && u8(word) < 0xe0 && (word & 0xf8) != 0x98;
@@ -1441,7 +1446,7 @@ u8 decode_staged_extensions(u16 word)
 		staged_extended_store(word) || staged_extended_dst(word) || staged_extended_long_arithmetic(word) ||
 		staged_data_copy(word) || staged_immediate_repeat(word) || staged_block_repeat(word) || word == 0xf073 ||
 		word == 0xf273 || word == 0x46f8 || staged_ram_stm(word) || staged_accumulator_stm(word) || word == 0x7707 ||
-		word == 0x771d || word == 0x771a || word == 0x7700 ||
+		word == 0x771d || staged_immediate_loop_register(word) || word == 0x7700 ||
 		((word >= 0x7724 && word <= 0x7726) || (word == 0x7721 || word == 0x7722) || (word == 0x7758)) || word == 0x770e ||
 		((word & 0xff00) == 0x7700 && u8(word) >= 0x10 && u8(word) <= 0x19) ||
 		((word & 0xff00) == 0x7600 && (u8(word) == 0xf8 || u8(word) < 0xa0 || staged_indexed_immediate_store(word) || staged_extended_immediate_store(word))) ||
@@ -1526,7 +1531,7 @@ bool decode_staged_supported(u16 word, bool extended_program)
 		staged_accumulator_near_branch(word) || (extended_program && (staged_far_branch(word) || staged_far_call(word) ||
 		staged_accumulator_far_call(word) || staged_accumulator_far_branch(word)));
 	bool const dagen_immediate = (word & 0xff00) == 0x7700 && u8(word) >= 0x10 && u8(word) <= 0x19;
-	bool const immediate_brc = word == 0x771a;
+	bool const immediate_loop = staged_immediate_loop_register(word);
 	bool const immediate_t = word == 0x770e;
 	bool const immediate_control = staged_ram_stm(word) || staged_accumulator_stm(word) || word == 0x7707 || word == 0x771d ||
 		word == 0x7700 || ((word >= 0x7724 && word <= 0x7726) || (word == 0x7721 || word == 0x7722) || (word == 0x7758));
@@ -1534,7 +1539,7 @@ bool decode_staged_supported(u16 word, bool extended_program)
 		staged_immediate_arp(word) || staged_immediate_asm(word) || staged_immediate_repeat(word) || word == 0xf495 ||
 		staged_idle(word) || (word & 0xfcf8) == 0xf4a8 || staged_memory_logic(word) || staged_mar(word) || staged_xc(word) ||
 		fast_return || plain_return || delayed_return || far_return || status_bit || immediate_dp || immediate_alu || branch ||
-		dagen_immediate || immediate_brc || immediate_t || immediate_control || (word & 0xff00) == 0xe800 || (word & 0xff00) == 0xe900 ||
+		dagen_immediate || immediate_loop || immediate_t || immediate_control || (word & 0xff00) == 0xe800 || (word & 0xff00) == 0xe900 ||
 		short_repeat || frame || direct_push || data_push || data_pop || direct_pop || direct_long_load || direct_long_store ||
 		long_arithmetic || register_alu || direct_mmr_load || mmr_move || memory_dp || direct_move || data_copy || program_move ||
 		read_a || short_load || direct_store || immediate_store || long_load || rmw || staged_xmem_bit(word) || staged_xmem_load(word) ||
@@ -3866,14 +3871,14 @@ void tms320c54x_device::pipeline_step()
 		bool const internal_memory_repeat = staged_memory_repeat(word) &&
 			m_pipeline_address[2] + (word == 0x47f8 ? 2 : 1) <= m_pipeline_block_end_address;
 		if (m_pipeline_valid[2] && block_word && ((branch && !internal_block_branch && !forward_block_exit && !delayed_forward_block_exit && !internal_delayed_block_branch && !block_far_call && !block_conditional_call && !block_near_call) || software_intr || block_setup || plain_return || delayed_return || far_return || fast_return ||
-			staged_immediate_repeat(word) || (staged_memory_repeat(word) && !internal_memory_repeat) || word == 0x771a || (short_repeat && m_pipeline_address[2] == m_pipeline_block_end_address) || (staged_xc(word) && !internal_block_xc) || staged_idle(word) ||
+			staged_immediate_repeat(word) || (staged_memory_repeat(word) && !internal_memory_repeat) || staged_immediate_loop_register(word) || (short_repeat && m_pipeline_address[2] == m_pipeline_block_end_address) || (staged_xc(word) && !internal_block_xc) || staged_idle(word) ||
 			((word & 0xfe00) == 0x8800 && u8(word) >= 0x1a) || (word & 0xfdff) == 0xf6bf))
 		{
 			logerror("%s: staged block control/count modification is unsupported instruction=%06x word=%04x block=%06x..%06x\n",
 				machine().describe_context(), unsigned(m_pipeline_address[2]), word, unsigned(m_pipeline_block_start), unsigned(m_pipeline_block_end_address)); m_illegal = true; return;
 		}
 		bool const dagen_immediate = (word & 0xff00) == 0x7700 && u8(word) >= 0x10 && u8(word) <= 0x19;
-		bool const immediate_brc = word == 0x771a;
+		bool const immediate_loop = staged_immediate_loop_register(word);
 		bool const immediate_t = word == 0x770e;
 		if (m_pipeline_valid[2] && !BIT(staged_opcode_descriptor[word], m_extended_program ? 5 : 4) && !staged_bus_control(word))
 		{
@@ -3950,7 +3955,7 @@ void tms320c54x_device::pipeline_step()
 			if (plain_return || (far_return && !delayed) || (staged_accumulator_transfer(word) && !delayed)) m_pipeline_flush_front = true;
 			if (delayed_return) m_pipeline_retd_stage = 1;
 		}
-		if (m_pipeline_valid[2] && (dagen_immediate || immediate_brc || immediate_t || direct_move)) m_pipeline_early_write_deferred[2] = false;
+		if (m_pipeline_valid[2] && (dagen_immediate || immediate_loop || immediate_t || direct_move)) m_pipeline_early_write_deferred[2] = false;
 		if (m_pipeline_valid[2])
 		{
 			// SPRU131G table 7-16: retain CMPT before the older full-status
@@ -4043,7 +4048,7 @@ void tms320c54x_device::pipeline_step()
 		// 7-39's zero T latency; T is not subject to the DAGEN-bank deferral.
 		// BRC likewise has zero latency before RPTB (table 7-24), without
 		// inheriting DAGEN-bank arbitration. In-loop BRC writes stay excluded.
-		bool const older_store = m_pipeline_word[3] != 0x770e && m_pipeline_word[3] != 0x771a && m_pipeline_valid[5] &&
+		bool const older_store = m_pipeline_word[3] != 0x770e && !staged_immediate_loop_register(m_pipeline_word[3]) && m_pipeline_valid[5] &&
 			(staged_store(m_pipeline_word[5]) || staged_accumulator_mmr_store(m_pipeline_word[5]) || staged_rmw(m_pipeline_word[5]) || staged_shifted_memory_store(m_pipeline_word[5], m_pipeline_immediate[5])) &&
 			m_pipeline_operand_address[5] >= 0x10 && m_pipeline_operand_address[5] <= 0x19;
 		m_pipeline_early_write_deferred[3] = older_store;
@@ -4766,8 +4771,11 @@ void tms320c54x_device::pipeline_step()
 		// Read-owned SP allocation is a declared partial stage model;
 		// indirect PSHM and stack/DAGEN conflicts are not enabled here.
 		late_pushm_address = u8(m_pipeline_word[4]);
-		late_pushm_read = late_pushm_address >= 0x60 && m_pipeline_valid[5] &&
+		bool const stack_alias = late_pushm_address >= 0x60 && m_pipeline_valid[5] &&
 			staged_direct_push(m_pipeline_word[5]) && m_pipeline_operand_address[5] == late_pushm_address;
+		bool const t_publication = late_pushm_address == 0x0e && m_pipeline_valid[5] &&
+			(m_pipeline_word[5] == 0x8a0e || (m_pipeline_word[5] & 0xfeff) == 0x880e);
+		late_pushm_read = stack_alias || t_publication;
 		if (!late_pushm_read) m_pipeline_operand[4] = data_read(late_pushm_address);
 		m_pipeline_operand_address[4] = --m_sp;
 	}
@@ -5613,8 +5621,8 @@ void tms320c54x_device::pipeline_step()
 		// ordinary ST1 writes retain the pre-Execute Read sample (table 7-22).
 		m_pipeline_immediate[4] = m_st1 & 0x1f;
 	if (late_pushm_read)
-		// SPRU131G 7.3.2: as for PSHM->POPM, preserve the older EB
-		// publication and consume it once rather than sampling stale RAM.
+		// SPRU131G 7.3.2 resolves the RAM alias; table 7-13 gives PSHM
+		// zero T latency. Consume the older publication exactly once.
 		m_pipeline_operand[4] = data_read(late_pushm_address);
 	if (late_popm_read)
 	{

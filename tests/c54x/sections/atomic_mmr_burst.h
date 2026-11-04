@@ -21,22 +21,28 @@ inline std::vector<clocked_register_case> section_cases()
 		if (restore) for (unsigned i = std::size(mmrs); i != 0; --i) {
 			initial.program.push_back({pc++,u16(0x8a00 | mmrs[i - 1])});
 			events.push_back({false,0x300 - i,u16(0x4000 + i - 1),0,false});
-			events.push_back({true,mmrs[i - 1],u16(0x4000 + i - 1),0,false});
+			// DAGEN destinations publish in Read; other MMRs publish in Execute.
+			if (mmrs[i-1] >= 0x10 && mmrs[i-1] <= 0x19)
+				events.push_back({true,mmrs[i-1],u16(0x4000+i-1),0,false});
+			if (i < std::size(mmrs) && (mmrs[i] < 0x10 || mmrs[i] > 0x19))
+				events.push_back({true,mmrs[i],u16(0x4000+i),0,false});
 		}
+		if (restore) events.push_back({true,mmrs[0],0x4000,0,false});
 		for (unsigned i = 0; i != std::size(mmrs); ++i) {
 			initial.program.push_back({pc++,u16(0x4a00 | mmrs[i])});
 			events.push_back({false,mmrs[i],u16(0x4000 + i),0,false});
-			events.push_back({true,0x2ff - i,u16(0x4000 + i),0,false});
+			if (i) events.push_back({true,0x300-i,u16(0x4000+i-1),0,false});
 		}
+		events.push_back({true,0x300-std::size(mmrs),u16(0x4000+std::size(mmrs)-1),0,false});
 		initial.program.push_back({pc++,0xf4e1});
 		auto final = observation("twelve-owned-registers-and-descending-stack", {{STATE_GENPC,pc},{r::STATE_SP,0x2f4}});
 		for (unsigned i = 0; i != std::size(mmrs); ++i) {
 			final.expected_data.push_back({mmrs[i],u16(0x4000 + i)});
 			final.expected_data.push_back({0x2ff - i,u16(0x4000 + i)});
 		}
-		clocked_register_case c{{{0,std::move(initial)},{1,observation("pre-burst-snapshot", {{STATE_GENPC,0x600}})},
+		clocked_register_case c{{{0,std::move(initial)},{1,observation("pre-burst-snapshot", {{STATE_GENPC,0x5ff}})},
 			{2,observation("burst-running", {})},{128,std::move(final)}},1,128};
-		c.pipeline_frontend = false; c.data_events = std::move(events); cases.push_back(std::move(c));
+		c.pipeline_frontend = true; c.data_events = std::move(events); cases.push_back(std::move(c));
 	}
 	return cases;
 }

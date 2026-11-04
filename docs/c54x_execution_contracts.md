@@ -2283,6 +2283,21 @@ composition remain outside this admission.
 
 ### Indirect MMR addressing and DAGEN latency
 
+STM BRC/RSA/REA (`0x771a..0x771c`) shares the retained literal/early-write
+path for loop-register setup; in-body mutation of these registers remains
+rejected. `atomic_mmr_burst` retains both twelve-register initialize/pop/push
+cases, including complete restored register and stack-word comparisons.
+PSHM T is not a Category-I consumer, so an older POPM/STLM T publication must
+precede its retained Read (SPRU131G table 7-13). This forwarding reuses the
+existing late PSHM Read path and performs one real read, not a synthesized
+bus response. RAM stack-alias forwarding remains unchanged.
+
+The burst's ordered events distinguish Read-owned DAGEN POPM writes from
+Execute-owned T/BRC/RSA/REA writes and interleave successive PSHM reads and
+stack writes. `initial_control_sequences` similarly retains its call frames,
+terminal repeats and exact three-copy results while checking Read-before-Write
+overlap at RET and in repeated MVDD. Neither claims physical cycle timing.
+
 Staged LDM admits short indirect modes `0x80..0x97`; STLM admits those modes
 only when the resolved destination is AR0..AR7. Access retains the page-zero
 address, modifies the selected pointer once and clears its upper nine bits

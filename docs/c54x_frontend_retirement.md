@@ -15,8 +15,8 @@ through an expression: 241 lines and 39,048 cases. Counts describe entire
 sections, not atomic-only case counts. Helpers and firmware integration sources
 are additional migration work. The common case defaults to staged.
 
-Current validated progress: 113 sections (11,197 cases plus restores) migrated;
-24 of the original explicitly atomic sections remain, containing 277 cases.
+Current validated progress: 115 sections (11,202 cases plus restores) migrated;
+22 of the original explicitly atomic sections remain, containing 272 cases.
 The baseline counts
 describe the retirement scope, not the current number of atomic assignments.
 The seven originally paired sections are now staged-only: 24,040 cases remain
@@ -76,6 +76,14 @@ gates and documentation also expose frontend variants.
 ## Section work queue
 
 ### Validated migrations
+
+`atomic_mmr_burst` retains both 12-register initialize/overwrite/pop/push
+cases. Staged STM now admits inactive RSA/REA setup alongside BRC, with
+in-body loop-control mutation still rejected. PSHM T consumes older POPM/STLM
+T publication with zero latency (SPRU131G table 7-13); the burst checks the
+restored T and every stack/register word. `initial_control_sequences` retains
+all three call/repeat/copy results. Both fixtures now assert interleaved bus
+events by Read/Execute ownership rather than atomic instruction serialization.
 
 `zero_bk` retains all 208 linear-wrap pointer cases on staged. Its dual-MPY
 rows now also assert explicitly initialized source words, both Read events,
@@ -395,7 +403,7 @@ sections independently; do not run the complete suite after every edit.
 | `atomic_program_transfers` | 8 | 46 | Validated staged migration; assertions retained |
 | `atomic_conditional_repeat` | 4 | 32 | Staged validated; baseline cases plus three extended count-source poison/replay checks (7 current cases) |
 | `atomic_transfer_literals` | 34 | 85 | Staged validated; repeated-copy cadence/interleaving explicit; values and counts retained |
-| `atomic_mmr_burst` | 2 | 43 | Atomic retained; first staged contrast: C54x case MMR-burst-initialize-and-push/0: register 22 actual=1 expected=0 mask=ffffffffffffffff |
+| `atomic_mmr_burst` | 2 | 43 | Migrated; RSA/REA setup, zero-latency T push and all register/stack words retained. |
 | `atomic_memory_sequences` | 3 | 40 | Validated staged migration; assertions retained |
 | `atomic_absolute_literals` | 30 | 78 | Migrated; indirect MMR addressing and completed TCR readback qualified. |
 | `atomic_condition_edges` | 6 | 30 | Migrate independent assertions; check staged admission |
@@ -466,7 +474,7 @@ sections independently; do not run the complete suite after every edit.
 | `idle3_pll` | 1 | 34 | Validated staged migration; terminal idle cleanup explicit where needed |
 | `repeat_endpoints` | 12 | 44 | Atomic retained; first staged contrast: C54x case repeat-final-copy-protected-at-page-endpoints/0: register 22 actual=1 expected=0 mask=ffffffffffffffff |
 | `block_repeat_pages` | 96 | 37 | Validated staged subset; atomic dimension removed |
-| `initial_control_sequences` | 3 | 32 | Atomic retained; first staged contrast: C54x case=0 event=1 write=0 address=2fff value=602 clock=11 |
+| `initial_control_sequences` | 3 | 32 | Migrated; call frames, loop counts and copy words retained with explicit bus overlap. |
 | `receive_ring_copy` | 4 | 20 | Validated staged subset; atomic dimension removed |
 | `disassembly` | 1 | 13 | Validated staged migration; terminal idle cleanup explicit where needed |
 | `instruction_observer` | 24 | 25 | Validated staged subset; atomic dimension removed |
