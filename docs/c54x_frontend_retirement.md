@@ -15,8 +15,8 @@ through an expression: 241 lines and 39,048 cases. Counts describe entire
 sections, not atomic-only case counts. Helpers and firmware integration sources
 are additional migration work. The common case defaults to staged.
 
-Current validated progress: 75 sections (7,010 cases plus restores) migrated;
-62 of the original explicitly atomic sections remain. The baseline counts
+Current validated progress: 78 sections (7,301 cases plus restores) migrated;
+59 of the original explicitly atomic sections remain. The baseline counts
 describe the retirement scope, not the current number of atomic assignments.
 The seven originally paired sections are now staged-only: 24,040 cases remain
 from their 39,048-case baseline. Their original staged stimuli, assertions and
@@ -136,15 +136,20 @@ software-reentry stimulus, not with observed CPU results. Both frontends pass.
 
 ### Unresolved migration contrasts
 
-`atomic_product_literals` remains atomic: after accounting for cold Prefetch,
-case 14 (`MAC offset extension order`, `65e3 0004 0002`) reads `0204` on staged
-where the retained atomic fixture expects `0202`. Do not change the expected
-address or delete this case to obtain parity. Resolve the long-offset addressing
-contract against independent evidence before migrating this section.
+`atomic_product_literals`, `atomic_long_offset_literals` and `atomic_xorm`
+now select staged. Their long-offset word streams are corrected against an
+independent assembler, not against observed CPU output: the offset precedes the
+literal. All expected arithmetic, resolved addresses, flags, pointer effects
+and ordered bus events remain. The shared atomic reader and disassembler are
+corrected too; their former agreement was not independent evidence. Staged
+XORM now admits the tested RAM forms, including circular and long-offset modes;
+DELAY now retains its absolute/long-offset source in Access, samples in Read
+and writes source+1 in Execute. Repeat/block/XC restrictions remain.
+The nine focused sections pass 43,584 cases plus restores; the 354 host tests,
+four atomic/staged EFR codec/replay profiles and ordinary 5110 menu/save gates
+also pass. This is selected regression evidence, not a full-suite certificate.
 
-`atomic_xorm` and `atomic_register_copy_sequences` also remain atomic after
-staged trials set STATE_ILLEGAL in case 0. The former includes `6a05`, beyond
-the staged XOR admission of absolute `6af8`; the latter writes `7728` under the
+`atomic_register_copy_sequences` remains atomic. It writes `7728` under the
 legacy default bus profile. A standard-SWWSR trial of the register-copy sequence
 passes admission but rejects simultaneous staged peripheral arbitration:
 `4858` reads CLKMD at PC `0607` while `7758` writes it at PC `0605`.
@@ -231,7 +236,7 @@ sections independently; do not run the complete suite after every edit.
 | `compact_store` | 640 | 43 | Validated staged migration; assertions retained |
 | `reverse_carry` | 2,690 | 46 | Atomic retained; first staged contrast: C54x case reverse-carry-address/1: register 22 actual=1 expected=0 mask=ffffffffffffffff |
 | `interrupt_entry` | 12 | 53 | Atomic retained; first staged contrast: C54x case=0 event=1 write=0 address=700 value=0 clock=15 |
-| `atomic_xorm` | 256 | 33 | Migrate independent assertions; check staged admission |
+| `atomic_xorm` | 256 | 33 | Staged validated; assembler-confirmed long-offset encoding; result/status/pointer/bus/replay retained |
 | `scalar_boundaries` | 34 | 66 | Validated staged migration; assertions retained |
 | `atomic_repeat_irq` | 2 | 34 | Atomic retained; first staged contrast: C54x case atomic-repeat-pending-IRQ/0: register 22 actual=1 expected=0 mask=ffffffffffffffff |
 | `atomic_subtract` | 384 | 53 | Migrate independent assertions; check staged admission |
@@ -244,7 +249,7 @@ sections independently; do not run the complete suite after every edit.
 | `atomic_shift_literals` | 25 | 54 | Validated staged migration after RND/circular PORTW admission; assertions retained |
 | `atomic_register_shift` | 36 | 61 | Migrate independent assertions; check staged admission |
 | `atomic_register_logic` | 20 | 45 | Migrate independent assertions; check staged admission |
-| `atomic_product_literals` | 21 | 63 | Migrate independent assertions; check staged admission |
+| `atomic_product_literals` | 21 | 63 | Staged validated; corrected MAC encoding and extended DELAY admission; independent results retained |
 | `atomic_conditional_control` | 12 | 39 | Re-derive timing/order; retain assertions |
 | `atomic_far_edges` | 23 | 66 | Migrate independent assertions; check staged admission |
 | `atomic_extended_interactions` | 3 | 55 | Migrate independent assertions; check staged admission |
@@ -307,7 +312,7 @@ sections independently; do not run the complete suite after every edit.
 | `atomic_port_marked_transfers` | 9 | 42 | Validated staged migration after RND/circular PORTW admission; assertions retained |
 | `atomic_port_marked_counter` | 8 | 40 | Validated staged migration; assertions retained |
 | `atomic_absolute_arithmetic` | 16 | 49 | Validated staged migration; assertions retained |
-| `atomic_long_offset_literals` | 14 | 60 | Atomic retained; first staged contrast: C54x case andm-immediate-before-long-offset/5: data[f05]=ff00 expected=f00 |
+| `atomic_long_offset_literals` | 14 | 60 | Staged validated; corrected ANDM/ORM encoding; resolved addresses, results and marker intervals retained |
 | `atomic_memory_route_literals` | 26 | 85 | Atomic retained; first staged contrast: C54x case reada-long-preupdated-destination/16: register 22 actual=1 expected=0 mask=ffffffffffffffff |
 | `atomic_short_immediate` | 520 | 30 | Migrate independent assertions; check staged admission |
 | `atomic_port_delayed_branch` | 6 | 30 | Atomic retained; first staged contrast: C54x register sequence case=1 tick=17 replay=0: relative data-bus clock interval |

@@ -495,8 +495,7 @@ fractional and rounded products, MMR addressing and timer-control readback
 references. Legacy branch/call/return tests between its three segments remain
 separate; running the bank alone does not qualify those control compositions.
 The ninth group contrasts long-offset/address updates and extension ordering:
-ADDM/ST place the offset before the literal, while ANDM/ORM place their
-immediate before the offset. It retains carry-clear/set and circular-wrap
+ADDM/ST/ANDM/ORM place the offset before the literal. It retains carry-clear/set and circular-wrap
 examples. The tenth group retains NOP-primed immediate shifts, pointer and
 status-preserving memory logic, signed/unsigned loads and an ANDM-to-ORM RAM
 dependency under circular markers. Its NOP is stimulus, not the reported
@@ -511,6 +510,24 @@ The independent binary runs with an empty ROM directory and lists only the
 root and C54x CPU. Sharing the third group removes 10,285 C++ bytes/289 lines,
 including its new literal bank and routing. Every instruction case is retained;
 no runtime, all-ISA or physical-timing claim follows.
+
+Long-offset MAC and memory-immediate logic encode **offset, then literal**.
+This is independently checked with [GNU binutils 2.43](https://ftp.gnu.org/gnu/binutils/binutils-2.43.tar.xz),
+configured `--target=tic54x` and assembled using `gas/as-new -al`:
+
+| Assembly | Instruction words |
+| --- | --- |
+| `mac *ar3(2), #4, a, b` | `65e3 0002 0004` |
+| `andm #0x1234, *ar3(2)` | `68e3 0002 1234` |
+| `orm #0x1234, *ar3(2)` | `69e3 0002 1234` |
+| `xorm #0x1234, *ar3(2)` | `6ae3 0002 1234` |
+| `addm #0x1234, *ar3(2)` | `6be3 0002 1234` |
+| `mac *(0x0200), #4, a, b` | `65f8 0200 0004` |
+
+The assembler listing displays little-endian bytes within each word. It is an
+encoding oracle, not evidence for pipeline clocks or arithmetic results.
+Legacy atomic fixtures that reversed the two words must correct the stimulus,
+not swap their independently expected source address or arithmetic result.
 
 `memory_immediate_product` owns 7,424 independent cases/replays. Numerical
 coverage uses one RAM form: all 64 word/literal pairs, FRCT/OVM for MPY,

@@ -338,7 +338,7 @@ constexpr bool decode_staged_data_copy(u16 word)
 
 constexpr bool staged_delay_copy(u16 word)
 {
-	return (word & 0xff00) == 0x4d00 && u8(word) < 0x98;
+	return (word & 0xff00) == 0x4d00 && (u8(word) < 0x98 || (u8(word) >= 0xe0 && u8(word) <= 0xf8));
 }
 
 constexpr bool staged_extended_program_move(u16 word)
@@ -602,7 +602,14 @@ constexpr bool decode_staged_xc(u16 word)
 
 constexpr bool decode_staged_rmw(u16 word)
 {
-	return (word & 0xfe00) == 0x6800 || (word & 0xff00) == 0x6b00 || word == 0x6af8;
+	return (word & 0xfc00) == 0x6800;
+}
+
+constexpr bool staged_rmw_addressing(u16 word)
+{
+	u8 const mode = u8(word);
+	return mode < 0x98 || (mode >= 0xe0 && mode <= 0xf8) ||
+		((word & 0xff00) == 0x6a00 && mode >= 0xc0 && mode < 0xe0);
 }
 
 constexpr bool staged_extended_rmw(u16 word)
@@ -1078,9 +1085,8 @@ public:
 			((family & 0xfc00) != 0x6800 || (mode & 0xf8) != 0x98))
 		{
 			bool const extended = family != 0x7700 && mode >= 0xe0;
-			bool const immediate_first = (family == 0x6800 || family == 0x6900 || family == 0x6a00) && mode >= 0xe0 && mode < 0xf8;
-			u16 const immediate = next_word(extended && !immediate_first ? 2 : 1);
-			u16 const offset = extended ? next_word(immediate_first ? 2 : 1) : 0;
+			u16 const immediate = next_word(extended ? 2 : 1);
+			u16 const offset = extended ? next_word(1) : 0;
 			char const *const name = family == 0x6800 ? "ANDM" : family == 0x6900 ? "ORM" : family == 0x6a00 ? "XORM" : family == 0x6b00 ? "ADDM" : family == 0x7600 ? "ST" : "STM";
 			util::stream_format(stream, "%-8s#$%04X, ", name, immediate);
 			smem(offset);
@@ -1415,7 +1421,7 @@ bool staged_offset_load(u16 word)
 // other extension counts are a pure function of the fetched opcode.
 u8 decode_staged_extensions(u16 word)
 {
-	if (staged_data_to_program(word) || staged_extended_push(word) || (staged_write_a(word) && u8(word) >= 0xe0) ||
+	if ((staged_delay_copy(word) && u8(word) >= 0xe0) || staged_data_to_program(word) || staged_extended_push(word) || (staged_write_a(word) && u8(word) >= 0xe0) ||
 		staged_shifted_smem(word) || staged_extended_dld(word) || staged_offset_load(word) || staged_bitfield(word) ||
 		staged_extended_smem_arithmetic(word) || staged_extended_smem_special(word) || staged_port_read(word) ||
 		staged_port_write(word) || staged_absolute_add(word) || word == 0x47f8 || staged_banz(word) || word == 0x7ef8 ||
@@ -1430,7 +1436,7 @@ u8 decode_staged_extensions(u16 word)
 		((word >= 0x7724 && word <= 0x7726) || (word == 0x7721 || word == 0x7722) || (word == 0x7758)) || word == 0x770e ||
 		((word & 0xff00) == 0x7700 && u8(word) >= 0x10 && u8(word) <= 0x19) ||
 		((word & 0xff00) == 0x7600 && (u8(word) == 0xf8 || u8(word) < 0xa0 || staged_indexed_immediate_store(word) || staged_extended_immediate_store(word))) ||
-		(staged_rmw(word) && (staged_extended_rmw(word) || u8(word) == 0xf8 || u8(word) < 0x98)))
+		(staged_rmw(word) && staged_rmw_addressing(word)))
 	{
 		return (staged_extended_program_move(word) || (staged_data_to_program(word) && u8(word) >= 0xe0) ||
 		((staged_shifted_smem(word) || staged_memory_immediate_multiply(word)) && u8(word) >= 0xe0) ||
@@ -1453,7 +1459,7 @@ u8 decode_staged_retired_words(u16 word)
 	if (staged_port_read(word)) return u8(word) == 0xf8 ? 3 : 2;
 	if (staged_extended_immediate_store(word)) return 3;
 	if (staged_data_copy(word)) return 2;
-	if (staged_banz(word) || staged_extended_dld(word) || staged_offset_load(word) || staged_bitfield(word) ||
+	if ((staged_delay_copy(word) && u8(word) >= 0xe0) || staged_banz(word) || staged_extended_dld(word) || staged_offset_load(word) || staged_bitfield(word) ||
 		staged_absolute_add(word) || staged_extended_smem_arithmetic(word) || staged_extended_smem_special(word) ||
 		staged_shifted_smem(word) || staged_extended_store(word) || staged_extended_dst(word) ||
 		staged_extended_long_arithmetic(word)) return 2;
@@ -1492,7 +1498,7 @@ bool decode_staged_supported(u16 word, bool extended_program)
 	bool const immediate_store = (word & 0xff00) == 0x7600 && (u8(word) == 0xf8 || u8(word) < 0xa0 ||
 		staged_indexed_immediate_store(word) || staged_extended_immediate_store(word));
 	bool const long_load = (word & 0xfef0) == 0xf020 || (word & 0xfeff) == 0xf062;
-	bool const rmw = staged_rmw(word) && (staged_extended_rmw(word) || u8(word) == 0xf8 || u8(word) < 0x98);
+	bool const rmw = staged_rmw(word) && staged_rmw_addressing(word);
 	bool const fast_return = word == 0xf49b || word == 0xf69b;
 	bool const plain_return = word == 0xfc00 || word == 0xf4eb || staged_conditional_return(word);
 	bool const delayed_return = word == 0xfe00 || staged_delayed_conditional_return(word);
@@ -2813,17 +2819,8 @@ u16 tms320c54x_device::indirect_read(u8 mode)
 
 u16 tms320c54x_device::immediate_smem_read(u8 mode, u16 &immediate)
 {
-	u16 address;
-	if (mode >= 0xe0 && mode < 0xf8)
-	{
-		immediate = fetch();
-		address = prepare_smem_address(mode);
-	}
-	else
-	{
-		address = prepare_smem_address(mode);
-		immediate = fetch();
-	}
+	u16 const address = prepare_smem_address(mode);
+	immediate = fetch();
 	const u16 value = data_read(address);
 	finish_smem_access(mode);
 	return value;
@@ -3792,7 +3789,7 @@ void tms320c54x_device::pipeline_step()
 			return;
 		}
 		bool const immediate_store = (word & 0xff00) == 0x7600 && (u8(word) == 0xf8 || u8(word) < 0xa0 || staged_indexed_immediate_store(word) || staged_extended_immediate_store(word));
-		bool const rmw = staged_rmw(word) && (staged_extended_rmw(word) || u8(word) == 0xf8 || u8(word) < 0x98);
+		bool const rmw = staged_rmw(word) && staged_rmw_addressing(word);
 		bool const fast_return = word == 0xf49b || word == 0xf69b;
 		bool const addm_brc = word == 0x6bf8 && m_pipeline_operand_address[2] == 0x1a;
 		if (m_pipeline_valid[2] && addm_brc && (m_pipeline_block_active || BIT(m_st1, 15) || m_pipeline_repeat_active || m_pipeline_delay_decode_words))
@@ -4206,13 +4203,15 @@ void tms320c54x_device::pipeline_step()
 	if (m_pipeline_valid[3] && staged_delay_copy(m_pipeline_word[3]))
 	{
 		u8 const mode = m_pipeline_word[3];
-		u16 const source = basic_address(3, mode);
+		bool const extended = mode >= 0xe0;
+		u16 const source = mode == 0xf8 ? m_pipeline_immediate[3] : extended ?
+			long_offset_address(mode, indirect_ar(mode, 3), s16(m_pipeline_immediate[3]), 3) : basic_address(3, mode);
 		if (source < 0x60 || source == 0xffff)
 		{
 			logerror("%s: staged LTD/DELAY mapped or wrapping operand is unsupported\n", machine().describe_context()); m_illegal = true; return;
 		}
 		m_pipeline_operand_address[3] = source;
-		if (BIT(mode, 7)) indirect_modify(mode, false, 3);
+		if (!extended && BIT(mode, 7)) indirect_modify(mode, false, 3);
 	}
 	if (m_pipeline_valid[4] && staged_delay_copy(m_pipeline_word[4]))
 		m_pipeline_operand[4] = pipeline_read_data(m_pipeline_operand_address[4]);
@@ -5155,6 +5154,7 @@ void tms320c54x_device::pipeline_step()
 		else if (staged_delay_copy(m_op))
 		{
 			data_write(u16(m_pipeline_operand_address[5] + 1), m_pipeline_operand[5]);
+			m_pc += u8(m_op) >= 0xe0;
 		}
 		else if (staged_data_copy(m_op))
 		{
@@ -5266,7 +5266,7 @@ void tms320c54x_device::pipeline_step()
 		{
 			m_pc += staged_extended_rmw(m_op) || u8(m_op) == 0xf8 ? 2 : 1;
 			data_write(m_pipeline_operand_address[5], (m_op & 0xff00) == 0x6b00
-				? add_memory_word(m_pipeline_operand[5], m_pipeline_immediate[5]) : m_op == 0x6af8
+				? add_memory_word(m_pipeline_operand[5], m_pipeline_immediate[5]) : (m_op & 0xff00) == 0x6a00
 				? m_pipeline_operand[5] ^ m_pipeline_immediate[5] : BIT(m_op, 8)
 				? m_pipeline_operand[5] | m_pipeline_immediate[5]
 				: m_pipeline_operand[5] & m_pipeline_immediate[5]);
@@ -6089,7 +6089,7 @@ u16 tms320c54x_device::pipeline_read_data(u16 address)
 	{
 		u16 const value = m_pipeline_operand[5], immediate = m_pipeline_immediate[5];
 		return (m_pipeline_word[5] & 0xff00) == 0x6b00 ? add_memory_word(value, immediate, false) :
-			m_pipeline_word[5] == 0x6af8 ? value ^ immediate : BIT(m_pipeline_word[5], 8) ? value | immediate : value & immediate;
+			(m_pipeline_word[5] & 0xff00) == 0x6a00 ? value ^ immediate : BIT(m_pipeline_word[5], 8) ? value | immediate : value & immediate;
 	}
 	return pipeline_observed_read(address, 4);
 }
@@ -7116,8 +7116,8 @@ void tms320c54x_device::execute_one(u16 op)
 		u16 immediate;
 		if (low >= 0xe0 && low < 0xf8)
 		{
-			immediate = fetch();
 			address = long_offset_address(low);
+			immediate = fetch();
 		}
 		else
 		{

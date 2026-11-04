@@ -76,7 +76,7 @@ observed-word inventory. Their fixture-only classification and the current
 idle/Menu/power inventory remain separate.
 The immediate-MAC fixtures also assert absolute extension
 order, preincrement timing, T publication, and DARAM cycle cost. A long-offset
-fixture verifies immediate-before-offset fetch and the extra cycle; a separate
+fixture verifies offset-before-immediate fetch and the extra cycle; a separate
 FRCT/OVM fixture verifies saturation and OVB for the immediate form. The shared
 Smem/immediate operand reader preserves the corresponding MPY behavior.
 The `ADD/SUB #lk,16` fixtures assert the TI table-2-1/2-2 two-word,

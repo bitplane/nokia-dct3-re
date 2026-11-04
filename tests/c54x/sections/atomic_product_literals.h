@@ -15,9 +15,9 @@ inline std::vector<clocked_register_case> section_cases()
 		for (auto const &event : events) if (!event.write) initial.data.push_back({event.address,event.value});
 		auto final = observation(name,checks); final.expected.push_back({STATE_GENPC,0x601 + unsigned(words.size())});
 		for (auto const &event : events) if (event.write) final.expected_data.push_back({event.address,event.value});
-		clocked_register_case c{{{0,std::move(initial)},{1,observation("pre-product-snapshot", {{STATE_GENPC,0x600}})},
+		clocked_register_case c{{{0,std::move(initial)},{1,observation("pre-product-snapshot", {{STATE_GENPC,0x5ff}})},
 			{2,observation("product-running", {})},{32,std::move(final)}},1,32};
-		c.pipeline_frontend = false; c.data_events = std::move(events); cases.push_back(std::move(c));
+		c.pipeline_frontend = true; c.data_events = std::move(events); cases.push_back(std::move(c));
 	};
 	append("MPYA signed17",{0xf58c},{{r::STATE_A,0x80000000},{r::STATE_B,0},{r::STATE_T,2}},
 		{{r::STATE_A,0x80000000},{r::STATE_B,0x10000},{r::STATE_T,2}});
@@ -44,7 +44,7 @@ inline std::vector<clocked_register_case> section_cases()
 	append("SUB immediate shift16 carry",{0xf361,1},{{r::STATE_A,0x1234},{r::STATE_B,0x20000},{r::STATE_ST1,0x100}},
 		{{r::STATE_A,0x1234},{r::STATE_B,0x10000},{r::STATE_ST0,0x800,0x800}});
 	append("ADD unsigned overflow",{0xf060,0xffff},{{r::STATE_A,0}},{{r::STATE_A,0xffff0000},{r::STATE_ST0,0x400,0x400}});
-	append("MAC offset extension order",{0x65e3,4,2},{{r::STATE_A,0x10},{r::STATE_B,0}},
+	append("MAC offset extension order",{0x65e3,2,4},{{r::STATE_A,0x10},{r::STATE_B,0}},
 		{{r::STATE_A,0x10},{r::STATE_B,0x1c},{r::STATE_T,3},{r::STATE_AR3,0x200}},{{false,0x202,3,0,false}});
 	append("MAC fractional saturation",{0xf167,0x8000},{{r::STATE_A,0},{r::STATE_B,0},{r::STATE_T,0x8000},{r::STATE_ST1,0x240}},
 		{{r::STATE_A,0},{r::STATE_B,0x7fffffff},{r::STATE_ST0,0x200,0x200}});

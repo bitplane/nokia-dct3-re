@@ -20,9 +20,9 @@ inline std::vector<clocked_register_case> section_cases()
 		final.expected.insert(final.expected.end(),expected.begin(),expected.end());
 		final.expected.push_back({STATE_GENPC,0x601+program.size()});
 		final.expected_data = std::move(expected_data);
-		clocked_register_case c{{{0,std::move(initial)},{1,observation("before-offset-markers",{{STATE_GENPC,0x601}})},
+		clocked_register_case c{{{0,std::move(initial)},{1,observation("before-offset-markers",{{STATE_GENPC,0x600}})},
 			{2,observation("offset-markers-running",{})},{48,std::move(final)}},3,48};
-		c.pipeline_frontend = false; c.observed_data_space = AS_IO;
+		c.pipeline_frontend = true; c.observed_data_space = AS_IO;
 		c.data_events = std::vector<clocked_data_event>{{true,0x124,0x1111,0,false},{true,0x124,0x1111,0,false,{},interval}};
 		cases.push_back(std::move(c));
 	};
@@ -36,9 +36,9 @@ inline std::vector<clocked_register_case> section_cases()
 			{{r::STATE_AR2, 0x0f0e}}, {{0x0f0e, 0}}, 5, {{0x0f0e, 0x5678}});
 		add("addm-long-offset-before-immediate", {0x6bea, 5, 1}, {{r::STATE_AR2, 0x0f00}, {r::STATE_ST0, 0}, {r::STATE_ST1, 0x0100}},
 			{{r::STATE_AR2, 0x0f05}}, {{0x0f05, 3}}, 6, {{0x0f05, 4}});
-		add("andm-immediate-before-long-offset", {0x68e2, 0x0f0f, 5}, {{r::STATE_AR2, 0x0f00}, {r::STATE_ST0, 0x0800}},
+		add("andm-long-offset-before-immediate", {0x68e2, 5, 0x0f0f}, {{r::STATE_AR2, 0x0f00}, {r::STATE_ST0, 0x0800}},
 			{{r::STATE_AR2, 0x0f00}, {r::STATE_ST0, 0x0800, 0x0800}}, {{0x0f05, 0xff00}}, 6, {{0x0f05, 0x0f00}});
-		add("orm-long-circular-retains-carry", {0x69f2, 0x8000, 2}, {{r::STATE_AR2, 0x0f03}, {r::STATE_BK, 4}, {r::STATE_ST0, 0x0800}},
+		add("orm-long-circular-retains-carry", {0x69f2, 2, 0x8000}, {{r::STATE_AR2, 0x0f03}, {r::STATE_BK, 4}, {r::STATE_ST0, 0x0800}},
 			{{r::STATE_AR2, 0x0f01}, {r::STATE_ST0, 0x0800, 0x0800}}, {{0x0f01, 1}}, 6, {{0x0f01, 0x8001}});
 		add("store-long-offset-before-literal", {0x76ea, 5, 0xcafe}, {{r::STATE_AR2, 0x0f00}},
 			{{r::STATE_AR2, 0x0f05}}, {{0x0f05, 0}}, 6, {{0x0f05, 0xcafe}});
