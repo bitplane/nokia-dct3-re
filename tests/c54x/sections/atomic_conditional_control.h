@@ -27,9 +27,9 @@ inline std::vector<clocked_register_case> section_cases()
 			{r::STATE_SP,0x3000U + (returning ? taken : 0) - (call ? taken : 0)},
 			{r::STATE_AR2,family == 5 ? taken : 0x1200U},{r::STATE_AR7,family == 4 ? u16(taken - 1) : 0x1234U}},
 			{{0x2fff,call && taken ? u16(0x602) : u16(0xbeef)}});
-		clocked_register_case c{{{0,std::move(initial)},{1,observation("pre-control-snapshot", {{STATE_GENPC,0x600}})},
+		clocked_register_case c{{{0,std::move(initial)},{1,observation("pre-control-snapshot", {{STATE_GENPC,0x5ff}})},
 			{2,observation("control-running", {})},{32,std::move(final)}},1,32};
-		c.pipeline_frontend = false; c.data_events = std::vector<clocked_data_event>{};
+		c.pipeline_frontend = true; c.data_events = std::vector<clocked_data_event>{};
 		if (taken && returning) c.data_events->push_back({false,0x3000,0x700,0,false});
 		if (taken && call) c.data_events->push_back({true,0x2fff,0x602,0,false});
 		cases.push_back(std::move(c));

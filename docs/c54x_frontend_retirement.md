@@ -15,8 +15,8 @@ through an expression: 241 lines and 39,048 cases. Counts describe entire
 sections, not atomic-only case counts. Helpers and firmware integration sources
 are additional migration work. The common case defaults to staged.
 
-Current validated progress: 28 sections (1,710 cases plus restores) migrated;
-109 of the original explicitly atomic sections remain. The baseline counts
+Current validated progress: 31 sections (1,831 cases plus restores) migrated;
+106 of the original explicitly atomic sections remain. The baseline counts
 describe the retirement scope, not the current number of atomic assignments.
 
 ## Disposition rules
@@ -99,6 +99,12 @@ Also migrated with unchanged literal results and bus events:
 `atomic_parallel_literals`, `atomic_dual_address`, `atomic_double_stores`,
 `atomic_address_literals` and `atomic_shifted_loads`.
 
+Control-flow migrations validated with unchanged final results, stack/data bus
+assertions and restore checks: `atomic_conditional_return`,
+`atomic_conditional_control` and `atomic_program_mapping`. Cold initial-PC
+observations in the mapping section retain the pre-Prefetch logical address,
+including nonzero XPC pages; final page/overlay/ARP/DP expectations are unchanged.
+
 ### Unresolved migration contrasts
 
 `atomic_product_literals` remains atomic: after accounting for cold Prefetch,
@@ -134,6 +140,13 @@ Further preserved atomic sections after isolated staged trials:
 | `atomic_coefficient_fir_literals` | Case 0, MACP `788b`, sets ILLEGAL | Audit program-coefficient multiply admission |
 | `atomic_stack_literals` | Case 2 reads `0061=abcd` as event 1 at clock 7 | Resolve stack operand sampling/order |
 | `atomic_mapped_moves` | Case 2, MVMD/DAR progression, sets ILLEGAL | Audit mapped-move destination admission |
+| `atomic_overflow_branch` | Case 8 ST0 is `1c05` rather than `1805` | Resolve overflow-test flag consumption |
+| `atomic_delayed_call` | Case 4 sets ILLEGAL | Audit delayed-call composition admission |
+| `atomic_near_control` | Case 9 reads `0063=5678` as event 1 at clock 7 | Resolve near-control operand order |
+| `atomic_far_edges` | Case 2, FBACCD, sets ILLEGAL after cold-PC correction | Audit accumulator far-branch admission |
+| `atomic_extended_interactions` | Case 2 IRQ checkpoint has PC `10604` rather than `10605` | Derive staged interrupt checkpoint and input timing |
+| `atomic_fast_return` | RETF checkpoint has PC `20702` rather than `20683` | Audit program replacement and retained-prefetch lifecycle |
+| `atomic_pending_far` | Delay-word checkpoint has PC `10602` rather than `10603` | Derive the staged active-transfer snapshot boundary |
 
 These are migration blockers, not established silicon defects. An atomic
 expectation is not automatically correct where implementations disagree.

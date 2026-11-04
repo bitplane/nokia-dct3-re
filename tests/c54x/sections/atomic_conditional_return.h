@@ -20,7 +20,7 @@ inline std::vector<clocked_register_case> section_cases()
 		initial.initial.insert(initial.initial.end(), {{STATE_GENPC,base + 0x600},{r::STATE_A,a},{r::STATE_B,b},{r::STATE_ST0,0x1e05}});
 		initial.data = {{0x1000,0x700}};
 		clocked_register_case c{{{0,std::move(initial)}},(condition + pattern) & 1 ? 5U : 1U,24};
-		c.pipeline_frontend = false;
+		c.pipeline_frontend = true;
 		c.states.push_back({24,observation("conditional-stack-ownership", {{r::STATE_A,taken ? 0x22U : 0x11U},{r::STATE_B,b},
 			{r::STATE_SP,0x1000 + unsigned(taken)},{STATE_GENPC,base + (taken ? 0x702U : 0x603U)},{r::STATE_XPC,base >> 16},
 			{r::STATE_ST0,0x1e05},{r::STATE_ST1,0x800}})});
