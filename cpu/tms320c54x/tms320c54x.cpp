@@ -455,7 +455,7 @@ constexpr bool extended_repeat_transfer(u16 word)
 constexpr bool decode_staged_memory_repeat(u16 word)
 {
 	// SPRU131G table 5-4: short MOD=3 preincrement is write-only.
-	return (word & 0xff00) == 0x4700 && (u8(word) < 0x98 || word == 0x47f8);
+	return (word & 0xff00) == 0x4700 && (u8(word) < 0x98 || (u8(word) >= 0xe0 && u8(word) <= 0xf8));
 }
 
 constexpr bool staged_extended_push(u16 word)
@@ -1422,7 +1422,7 @@ u8 decode_staged_extensions(u16 word)
 	if ((staged_delay_copy(word) && u8(word) >= 0xe0) || staged_data_to_program(word) || staged_extended_push(word) || (staged_write_a(word) && u8(word) >= 0xe0) ||
 		staged_shifted_smem(word) || staged_extended_dld(word) || staged_offset_load(word) || staged_bitfield(word) ||
 		staged_extended_smem_arithmetic(word) || staged_extended_smem_special(word) || staged_port_read(word) ||
-		staged_port_write(word) || staged_absolute_add(word) || word == 0x47f8 || staged_banz(word) || word == 0x7ef8 ||
+		staged_port_write(word) || staged_absolute_add(word) || (staged_memory_repeat(word) && u8(word) >= 0xe0) || staged_banz(word) || word == 0x7ef8 ||
 		staged_program_move(word) || staged_far_call(word) || (staged_absolute_load(word) || staged_extended_logic(word)) ||
 		staged_far_branch(word) || staged_long_mar(word) || staged_move(word) || staged_call(word) ||
 		staged_conditional_branch(word) || staged_immediate_alu(word) || (word & 0xfef0) == 0xf020 ||
@@ -1450,7 +1450,7 @@ u8 decode_staged_extensions(u16 word)
 // their existing admitted-form rules distinct from the decode extension count.
 u8 decode_staged_retired_words(u16 word)
 {
-	if (word == 0x46f8) return 2;
+	if (word == 0x46f8 || (staged_memory_repeat(word) && u8(word) >= 0xe0)) return 2;
 	if (((staged_shifted_smem(word) || staged_memory_immediate_multiply(word)) && u8(word) >= 0xe0) ||
 		staged_extended_banz(word) || staged_extended_bitfield(word) || staged_extended_rmw(word) ||
 		staged_extended_move(word) || staged_extended_data_copy(word)) return 3;
@@ -4836,16 +4836,18 @@ void tms320c54x_device::pipeline_step()
 	{
 		u8 const mode = m_pipeline_word[4];
 		// Class 5A/5B samples RC once in Read, not once per body iteration.
-		u16 const source = mode == 0xf8 ? m_pipeline_immediate[4] : basic_address(4, mode);
+		bool const extended = mode >= 0xe0;
+		u16 const source = mode == 0xf8 ? m_pipeline_immediate[4] : extended ?
+			long_offset_address(mode, indirect_ar(mode, 4), s16(m_pipeline_immediate[4]), 4) : basic_address(4, mode);
 		if (source < 0x60 && (source < 8 || source > 0x19))
 		{
 			logerror("%s: staged RPT control/peripheral source is unsupported\n", machine().describe_context()); m_illegal = true; return;
 		}
 		m_pipeline_operand[4] = pipeline_read_data(source);
 		if (m_pipeline_repeat_body_latched && staged_pipelined_repeat(m_pipeline_repeat_word) &&
-			m_pipeline_repeat_address == ((m_pipeline_address[4] & 0x7f0000) | u16(m_pipeline_address[4] + (mode == 0xf8 ? 2 : 1))))
+			m_pipeline_repeat_address == ((m_pipeline_address[4] & 0x7f0000) | u16(m_pipeline_address[4] + (extended ? 2 : 1))))
 			m_pipeline_repeat_issue_remaining = m_pipeline_operand[4];
-		if (mode != 0xf8 && BIT(mode, 7)) indirect_modify(mode, false, 4);
+		if (!extended && BIT(mode, 7)) indirect_modify(mode, false, 4);
 		m_pipeline_memory_repeat_wait = 2; // Class 5A/5B's extra clocks; placement is partial.
 	}
 	if (m_pipeline_valid[4] && staged_data_to_program(m_pipeline_word[4]))
@@ -4995,7 +4997,7 @@ void tms320c54x_device::pipeline_step()
 			if ((m_op & 0xfeff) == 0xf071) accumulator(BIT(m_op, 8)) = 0;
 			m_rptc = staged_memory_repeat(m_op) ? m_pipeline_operand[5] : m_pipeline_immediate[5];
 			m_rpt_iteration = 0;
-			if (staged_immediate_repeat(m_op) || m_op == 0x47f8) ++m_pc;
+			if (staged_immediate_repeat(m_op) || (staged_memory_repeat(m_op) && u8(m_op) >= 0xe0)) ++m_pc;
 		}
 		else if (staged_block_repeat(m_op))
 			++m_pc; // Setup belongs to complete Decode, not an atomic operand fetch.

@@ -2204,6 +2204,16 @@ with indirect/absolute memory-sourced counts sampled once. Their final RC,
 count+1 pointer effects, continuation and replay predicates are unchanged.
 This does not qualify direct/long-offset MAR or all interrupt compositions.
 
+The RPT **count source**, independently of its MAR body, now supports
+long-offset stationary/preupdate/circular forms. Read consumes the retained
+offset once, samples the count and performs the source's owned AR update;
+it must not also apply a short-mode modification. Absolute/long count headers
+have two words for retirement/protection as well as Decode. Three added count
+cases in `atomic_conditional_repeat` check a clock-7 Read, pointer results,
+source poisoning after Read, and replay from that captured-count boundary.
+The two original memory-count forms and XC carry cases remain. Count-Read
+holds and repeat-tail refill are declared model timing, not silicon measurements.
+
 LDR (`16xx/17xx`, SPRU172C page 4-78) retains the source and SXM and produces
 the shifted word with low half `8000`, without altering arithmetic flags.
 `rounded_load` retains all 64 cases/restores across signed/unsigned extension,

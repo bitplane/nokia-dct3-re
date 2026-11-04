@@ -15,8 +15,8 @@ through an expression: 241 lines and 39,048 cases. Counts describe entire
 sections, not atomic-only case counts. Helpers and firmware integration sources
 are additional migration work. The common case defaults to staged.
 
-Current validated progress: 100 sections (10,641 cases plus restores) migrated;
-37 of the original explicitly atomic sections remain, containing 828 cases.
+Current validated progress: 101 sections (10,650 cases plus restores) migrated;
+36 of the original explicitly atomic sections remain, containing 822 cases.
 The baseline counts
 describe the retirement scope, not the current number of atomic assignments.
 The seven originally paired sections are now staged-only: 24,040 cases remain
@@ -197,7 +197,7 @@ Seven BIO/control/admission sections pass 24,709 cases/restores, and the
 transfer section passes another 34; host CPU-tool checks pass 354 tests.
 
 `atomic_transfer_repeat_literals` and `atomic_conditional_repeat` retain all
-269 cases on staged. Short indirect MAR now uses the existing pipelined repeat
+269 baseline cases on staged. Short indirect MAR now uses the existing pipelined repeat
 engine and its Access-owned pointer update; no data transaction or second
 Execute update is added. All 256 eight-bit counts retain count+1 effects,
 terminal RC and continuation, alongside indirect/absolute memory-count sampling
@@ -223,6 +223,17 @@ repeat behavior remains covered by `atomic_conditional_repeat`. The marked MAR
 stream's interval accounts for the modeled repeat-tail Prefetch refill, not
 atomic scheduling. Compatibility arithmetic/flags and remaining values stay
 unchanged. No CPU behavior changes accompany these three fixture corrections.
+
+`atomic_port_control_examples` now retains all six cases on staged. The last
+intended AR0 postincrement words are corrected to `6d90`; extended RPT count
+sources now retain and consume their offset once in Read, without treating the
+offset as a count or a second short AR update. The extended count header also
+has a two-word retirement span. Three additional `atomic_conditional_repeat`
+cases cover stationary, preupdate and circular count sources, with a clock-7
+Read followed by source poison and save/replay. All original four cases remain
+(seven current cases). Marked repeat intervals follow the declared count-Read
+hold and Prefetch refill, not the atomic schedule. Ten focused sections pass
+25,089 cases/restores; host checks pass 354 CPU-tool and 84 runner tests.
 
 ### Unresolved migration contrasts
 
@@ -331,7 +342,7 @@ sections independently; do not run the complete suite after every edit.
 | `atomic_memory_tests` | 10 | 44 | Migrate independent assertions; check staged admission |
 | `atomic_zero_repeat` | 3 | 26 | Staged validated; once-only logical body execution replaces atomic fetch-count convention |
 | `atomic_program_transfers` | 8 | 46 | Validated staged migration; assertions retained |
-| `atomic_conditional_repeat` | 4 | 32 | Staged validated; XC carry spans, once-only memory count and MAR body effects retained |
+| `atomic_conditional_repeat` | 4 | 32 | Staged validated; baseline cases plus three extended count-source poison/replay checks (7 current cases) |
 | `atomic_transfer_literals` | 34 | 85 | Staged validated; repeated-copy cadence/interleaving explicit; values and counts retained |
 | `atomic_mmr_burst` | 2 | 43 | Atomic retained; first staged contrast: C54x case MMR-burst-initialize-and-push/0: register 22 actual=1 expected=0 mask=ffffffffffffffff |
 | `atomic_memory_sequences` | 3 | 40 | Validated staged migration; assertions retained |
@@ -384,7 +395,7 @@ sections independently; do not run the complete suite after every edit.
 | `atomic_port_register_examples` | 6 | 37 | Staged validated; MAR encoding corrected and modeled repeat-tail interval derived; values retained |
 | `atomic_port_low_store` | 6 | 37 | Validated staged migration; assertions retained |
 | `atomic_port_indirect_output` | 5 | 30 | Validated staged migration; assertions retained |
-| `atomic_port_control_examples` | 6 | 37 | Atomic retained; first staged contrast: C54x case atomic-absolute-marked-return-branch-and-repeat/2: register 22 actual=1 expected=0 mask=ffffffffffffffff |
+| `atomic_port_control_examples` | 6 | 37 | Staged validated; extended RPT source, corrected MAR words and modeled marker clocks; values retained |
 | `atomic_offset_transports` | 6 | 42 | Atomic retained; first staged contrast: C54x case atomic-offset-transport-or-stationary-AR0-load/0: register 22 actual=1 expected=0 mask=ffffffffffffffff |
 | `atomic_shift_peripheral_literals` | 10 | 52 | Validated staged migration; assertions retained |
 | `atomic_xc_word_boundary` | 3 | 37 | Atomic retained; first staged contrast: C54x case=2 event=2 write=0 address=100 value=1111 clock=14 |

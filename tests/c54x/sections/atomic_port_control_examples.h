@@ -10,9 +10,9 @@ inline std::vector<clocked_register_case> section_cases()
 		bool const taken = variant == 0 || variant == 3;
 		std::vector<u16> words{0x75f8,0x100,0x124};
 		if (returning) words.push_back(0xfc4d);
-		else if (variant == 2) words.insert(words.end(),{0x47e2,5,0x6d10});
+		else if (variant == 2) words.insert(words.end(),{0x47e2,5,0x6d90});
 		else if (branch) words.insert(words.end(),{0xf84e,0x700});
-		else words.insert(words.end(),{0xec01,0x6d10});
+		else words.insert(words.end(),{0xec01,0x6d90});
 		words.insert(words.end(),{0x75f8,0x101,0x124,0xf4e1});
 		auto initial = initial_case("atomic-absolute-marked-return-branch-and-repeat",{0xf495});
 		for (unsigned i = 0; i != words.size(); ++i) initial.program[1+i].value = words[i];
@@ -25,11 +25,12 @@ inline std::vector<clocked_register_case> section_cases()
 			{r::STATE_A,0},{r::STATE_B,b},{r::STATE_SP,returning && !taken ? 0x2ffU : 0x300U},
 			{r::STATE_AR0,variant == 2 ? 3U : variant == 5 ? 0x122U : 0U},{r::STATE_AR2,0x120},{r::STATE_RC,0}});
 		final.expected_data = initial.data;
-		clocked_register_case c{{{0,std::move(initial)},{1,observation("before-control-markers",{{STATE_GENPC,0x601}})},
+		clocked_register_case c{{{0,std::move(initial)},{1,observation("before-control-markers",{{STATE_GENPC,0x600}})},
 			{2,observation("control-markers-running",{})},{64,std::move(final)}},3,64};
-		c.pipeline_frontend = false; c.observed_data_space = AS_IO;
-		c.data_events = std::vector<clocked_data_event>{{true,0x124,0x1111,0,false},
-			{true,0x124,u16(taken ? 0x3333 : 0x2222),0,false,{},variant == 2 ? 10U : taken ? 8U : 6U}};
+		c.pipeline_frontend = true; c.observed_data_space = AS_IO;
+		// RPT count-Read holds and repeat-tail Prefetch refill belong to the staged schedule.
+		c.data_events = std::vector<clocked_data_event>{{true,0x124,0x1111,9},
+			{true,0x124,u16(taken ? 0x3333 : 0x2222),0,false,{},variant == 2 ? 15U : variant == 5 ? 10U : taken ? 8U : 6U}};
 		cases.push_back(std::move(c));
 	}
 	return cases;

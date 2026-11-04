@@ -212,7 +212,7 @@
   "atomic_memory_tests": 10,
   "atomic_zero_repeat": 3,
   "atomic_program_transfers": 8,
-  "atomic_conditional_repeat": 4,
+  "atomic_conditional_repeat": 7,
   "atomic_transfer_literals": 34,
   "atomic_mmr_burst": 2,
   "atomic_memory_sequences": 3,
