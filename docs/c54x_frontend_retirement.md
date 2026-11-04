@@ -15,8 +15,8 @@ through an expression: 241 lines and 39,048 cases. Counts describe entire
 sections, not atomic-only case counts. Helpers and firmware integration sources
 are additional migration work. The common case defaults to staged.
 
-Current validated progress: 123 sections (11,282 cases plus restores) migrated;
-14 of the original explicitly atomic sections remain, containing 197 cases.
+Current validated progress: 124 sections (11,305 cases plus restores) migrated;
+13 of the original explicitly atomic sections remain, containing 174 cases.
 The baseline counts
 describe the retirement scope, not the current number of atomic assignments.
 The seven originally paired sections are now staged-only: 24,040 cases remain
@@ -76,6 +76,14 @@ gates and documentation also expose frontend variants.
 ## Section work queue
 
 ### Validated migrations
+
+`atomic_far_edges` retains all 23 transfer/frame/delay/page-wrap cases on staged.
+FB[D] and BACC[D]/FBACC[D] share captured target/redirect handling, with only
+calls owning frame words. The former mapped-XPC-write page-switch expectation
+is corrected: SPRU131G table 6-3 explicitly limits XPC loads to reset/far control
+operations. The replacement checks the attempted bus write, unchanged page
+and XPC readback; debugger XPC redirects remain separate. Other independent
+results and stack/frame assertions are unchanged.
 
 `indirect_popm` retains all four masked/preincrement/postincrement/CMPT/SP
 cases on staged, including exact stack reads, resolved MMR writes and final
@@ -339,13 +347,7 @@ passes admission but rejects simultaneous staged peripheral arbitration:
 Resolve opcode admission and peripheral arbitration respectively, rather than
 weakening the illegal-state check or inserting gaps into the original sequence.
 
-Further preserved atomic sections after isolated staged trials:
-
-| Section | First observed contrast | Follow-up |
-| --- | --- | --- |
-| `atomic_far_edges` | Case 2, FBACCD, sets ILLEGAL after cold-PC correction | Audit accumulator far-branch admission |
-
-These are migration blockers, not established silicon defects. An atomic
+These are migration questions, not established silicon defects. An atomic
 expectation is not automatically correct where implementations disagree.
 
 Additional shared-contract queue (original atomic sections retained):
@@ -411,7 +413,7 @@ sections independently; do not run the complete suite after every edit.
 | `atomic_register_logic` | 20 | 45 | Migrate independent assertions; check staged admission |
 | `atomic_product_literals` | 21 | 63 | Staged validated; corrected MAC encoding and extended DELAY admission; independent results retained |
 | `atomic_conditional_control` | 12 | 39 | Re-derive timing/order; retain assertions |
-| `atomic_far_edges` | 23 | 66 | Migrate independent assertions; check staged admission |
+| `atomic_far_edges` | 23 | 66 | Migrated; all transfers/frames retained, XPC write expectation corrected to TI table 6-3. |
 | `atomic_extended_interactions` | 3 | 55 | Staged validated; physical IRQ moved after real IDLE; page/frame/transfer predicates retained |
 | `atomic_fast_return` | 1 | 26 | Migrated; RTN and stack poison retained, settled continuation retimed. |
 | `atomic_pending_far` | 2 | 38 | Staged validated; first-delay retirement checkpoint derived; pending transfer replay retained |

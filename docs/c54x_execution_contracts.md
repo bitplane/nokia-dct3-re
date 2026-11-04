@@ -2260,6 +2260,24 @@ family includes cross-accumulator MAC, rounded MACR and MAS/MASR; physical
 bank timing and interrupt/repeat composition remain unvalidated. Execution
 of the original MAC is not proof of valid recording or audio.
 
+### Far branches, delay slots and XPC
+
+FB/FBD and BACC/BACCD/FBACC/FBACCD reuse the retained target and two-word
+delay handling already used by calls. Accumulator targets are captured in
+Read before delay words can replace the source. Delayed transfers redirect
+Prefetch while preserving the caller's page for the delay instructions;
+branches reserve no stack frame. Nested control transfers in delay slots
+remain rejected. `atomic_far_edges` retains all 23 encoding/mask/page/frame/
+delay cases; neighboring pending-call, return and IRQ cases guard shared paths.
+
+The memory-mapped XPC view is modeled read-only to ordinary guest data writes.
+SPRU131G table 6-3 (page 6-5) lists reset and far control operations that load
+XPC and explicitly excludes other instructions. The legacy fixture's immediate
+page switch from `STM #ffffh,XPC` therefore lacked an architectural basis.
+Its replacement records the attempted write and checks unchanged page/XPC
+readback; debugger XPC assignment remains an explicit architectural redirect.
+This is a manual-derived model correction, not a captured silicon observation.
+
 ### FIRS coefficient and sum pipeline
 
 Standalone FIRS retains two RAM addresses in Access and X/Y values in Read.

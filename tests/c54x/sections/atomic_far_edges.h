@@ -14,9 +14,9 @@ inline std::vector<clocked_register_case> section_cases()
 		initial.initial.insert(initial.initial.end(), {{STATE_GENPC,start - 1},{r::STATE_SP,0x400},{r::STATE_ST0,0},{r::STATE_ST1,0x800}});
 		initial.initial.insert(initial.initial.end(),setup.begin(),setup.end());
 		auto final = observation(name,checks,memory);
-		clocked_register_case c{{{0,std::move(initial)},{1,observation("pre-far-snapshot", {{STATE_GENPC,start}})},
+		clocked_register_case c{{{0,std::move(initial)},{1,observation("pre-far-snapshot", {{STATE_GENPC,start-1}})},
 			{2,observation("far-running", {})},{48,std::move(final)}},1,48};
-		c.pipeline_frontend = false; c.data_events = std::move(events); cases.push_back(std::move(c));
+		c.pipeline_frontend = true; c.data_events = std::move(events); cases.push_back(std::move(c));
 	};
 	for (unsigned delayed = 0; delayed < 2; ++delayed) {
 		std::vector<memory_word> program{{0x20600,u16(delayed ? 0xfb83 : 0xf983)},{0x20601,0x700},
@@ -37,8 +37,8 @@ inline std::vector<clocked_register_case> section_cases()
 		{{false,0x3fe,0x82,0,false},{false,0x3ff,0x800,0,false}});
 	append("sequential-PC-wrap-keeps-XPC",0x2ffff,{{0x2ffff,0xe803},{0x20000,0xf4e1},{0x30000,0xe809}},
 		{}, {},{{r::STATE_A,3},{STATE_GENPC,0x20001},{r::STATE_XPC,2}},{});
-	append("mapped-XPC-write-affects-next-fetch",0x20600,{{0x20600,0x771e},{0x20601,0xffff},{0x7f0602,0x481e},{0x7f0603,0xf4e1}},
-		{}, {},{{r::STATE_A,0x7f},{STATE_GENPC,0x7f0604},{r::STATE_XPC,0x7f}},{{true,0x1e,0xffff,0,false},{false,0x1e,0x7f,0,false}});
+	append("mapped-XPC-write-cannot-change-page",0x20600,{{0x20600,0x771e},{0x20601,0xffff},{0x20602,0x481e},{0x20603,0xf4e1}},
+		{}, {},{{r::STATE_A,2},{STATE_GENPC,0x20604},{r::STATE_XPC,2}},{{true,0x1e,0xffff,0,false},{false,0x1e,2,0,false}});
 	for (u16 opcode : {0xf882U,0xfa82U,0xf4e6U,0xf5e6U,0xf6e6U,0xf7e6U,
 		0xf982U,0xfb82U,0xf4e7U,0xf5e7U,0xf6e7U,0xf7e7U,0xf4e4U,0xf6e4U,0xf4e5U,0xf6e5U}) {
 		bool const immediate = (opcode & 0xfc80) == 0xf880, returning = (opcode & 0xfdfe) == 0xf4e4;
