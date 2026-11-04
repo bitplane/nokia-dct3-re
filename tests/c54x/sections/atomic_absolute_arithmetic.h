@@ -38,9 +38,9 @@ inline std::vector<clocked_register_case> section_cases()
 			{r::STATE_A,v.out_a},{r::STATE_B,v.out_b},{r::STATE_ST0,v.carry,0x800},{r::STATE_ST1,0x100},
 			{r::STATE_AR2,v.opcode == 0x6dea ? 0xff9U : 0x120U},{r::STATE_AR4,0x120},{r::STATE_AR7,0x120}});
 		final.expected_data = initial.data;
-		clocked_register_case c{{{0,std::move(initial)},{1,observation("before-arithmetic-markers",{{STATE_GENPC,0x601}})},
+		clocked_register_case c{{{0,std::move(initial)},{1,observation("before-arithmetic-markers",{{STATE_GENPC,0x600}})},
 			{2,observation("arithmetic-markers-running",{})},{48,std::move(final)}},3,48};
-		c.pipeline_frontend = false; c.observed_data_space = AS_IO;
+		c.pipeline_frontend = true; c.observed_data_space = AS_IO;
 		c.data_events = std::vector<clocked_data_event>{{true,0x124,0x1111,0,false},{true,0x124,0x1111,0,false,{},v.interval}};
 		cases.push_back(std::move(c));
 	}

@@ -15,8 +15,8 @@ through an expression: 241 lines and 39,048 cases. Counts describe entire
 sections, not atomic-only case counts. Helpers and firmware integration sources
 are additional migration work. The common case defaults to staged.
 
-Current validated progress: 57 sections (6,777 cases plus restores) migrated;
-80 of the original explicitly atomic sections remain. The baseline counts
+Current validated progress: 62 sections (6,822 cases plus restores) migrated;
+75 of the original explicitly atomic sections remain. The baseline counts
 describe the retirement scope, not the current number of atomic assignments.
 
 ## Disposition rules
@@ -279,31 +279,31 @@ sections independently; do not run the complete suite after every edit.
 | `atomic_basic_parallel_block` | 9 | 51 | Validated staged migration; assertions retained |
 | `atomic_accumulator_calls` | 3 | 31 | Re-derive timing/order; retain assertions |
 | `atomic_bus_timing` | 3 | 37 | Atomic retained; first staged contrast: Section IRQ case=0 line=2 clock=15 data_events=3 previous_case=0 return_pc=0701 |
-| `atomic_port_timing` | 15 | 65 | Re-derive timing/order; retain assertions |
+| `atomic_port_timing` | 15 | 65 | Atomic retained; first staged contrast: C54x case atomic-port-address-value-wrap-and-clock-interval/2: register 22 actual=1 expected=0 mask=ffffffffffffffff |
 | `atomic_mac_saturation` | 7 | 44 | Migrate independent assertions; check staged admission |
-| `atomic_port_marked_operations` | 22 | 83 | Re-derive timing/order; retain assertions |
-| `atomic_compatibility_memory` | 9 | 55 | Migrate independent assertions; check staged admission |
-| `atomic_port_marked_memory` | 11 | 48 | Re-derive timing/order; retain assertions |
-| `atomic_port_loads` | 6 | 40 | Re-derive timing/order; retain assertions |
-| `atomic_port_marked_transfers` | 9 | 42 | Re-derive timing/order; retain assertions |
-| `atomic_port_marked_counter` | 8 | 40 | Re-derive timing/order; retain assertions |
-| `atomic_absolute_arithmetic` | 16 | 49 | Migrate independent assertions; check staged admission |
-| `atomic_long_offset_literals` | 14 | 60 | Migrate independent assertions; check staged admission |
-| `atomic_memory_route_literals` | 26 | 85 | Migrate independent assertions; check staged admission |
+| `atomic_port_marked_operations` | 22 | 83 | Atomic retained; first staged contrast: C54x case atomic-port-marked-condition-immediate-or-NOP/0: register 22 actual=1 expected=0 mask=ffffffffffffffff |
+| `atomic_compatibility_memory` | 9 | 55 | Atomic retained; first staged contrast: C54x case atomic-compatibility-memory-and-fixed-ADDM-boundaries/2: register 22 actual=1 expected=0 mask=ffffffffffffffff |
+| `atomic_port_marked_memory` | 11 | 48 | Atomic retained; first staged contrast: C54x case atomic-port-marked-load-store-ALU-and-repeat/0: register 22 actual=1 expected=0 mask=ffffffffffffffff |
+| `atomic_port_loads` | 6 | 40 | Atomic retained; first staged contrast: C54x case atomic-stationary-port-or-doubleword-load/0: register 22 actual=1 expected=0 mask=ffffffffffffffff |
+| `atomic_port_marked_transfers` | 9 | 42 | Atomic retained; first staged contrast: C54x case atomic-port-marked-MVDM-MVKD-MVDK/7: register 22 actual=1 expected=0 mask=ffffffffffffffff |
+| `atomic_port_marked_counter` | 8 | 40 | Validated staged migration; assertions retained |
+| `atomic_absolute_arithmetic` | 16 | 49 | Validated staged migration; assertions retained |
+| `atomic_long_offset_literals` | 14 | 60 | Atomic retained; first staged contrast: C54x case andm-immediate-before-long-offset/5: data[f05]=ff00 expected=f00 |
+| `atomic_memory_route_literals` | 26 | 85 | Atomic retained; first staged contrast: C54x case reada-long-preupdated-destination/16: register 22 actual=1 expected=0 mask=ffffffffffffffff |
 | `atomic_short_immediate` | 520 | 30 | Migrate independent assertions; check staged admission |
-| `atomic_port_delayed_branch` | 6 | 30 | Re-derive timing/order; retain assertions |
-| `atomic_port_register_examples` | 6 | 37 | Re-derive timing/order; retain assertions |
-| `atomic_port_low_store` | 6 | 37 | Re-derive timing/order; retain assertions |
-| `atomic_port_indirect_output` | 5 | 30 | Re-derive timing/order; retain assertions |
-| `atomic_port_control_examples` | 6 | 37 | Re-derive timing/order; retain assertions |
-| `atomic_offset_transports` | 6 | 42 | Re-derive timing/order; retain assertions |
-| `atomic_shift_peripheral_literals` | 10 | 52 | Migrate independent assertions; check staged admission |
-| `atomic_xc_word_boundary` | 3 | 37 | Re-derive timing/order; retain assertions |
-| `bio_atomic` | 29 | 50 | Migrate independent assertions; check staged admission |
-| `peripheral_cost_classes` | 20 | 36 | Migrate independent assertions; check staged admission |
-| `atomic_operand_order` | 46 | 63 | Migrate independent assertions; check staged admission |
-| `atomic_intm_follower` | 3 | 33 | Migrate independent assertions; check staged admission |
-| `atomic_xc_interrupt` | 8 | 40 | Re-derive timing/order; retain assertions |
+| `atomic_port_delayed_branch` | 6 | 30 | Atomic retained; first staged contrast: C54x register sequence case=1 tick=17 replay=0: relative data-bus clock interval |
+| `atomic_port_register_examples` | 6 | 37 | Atomic retained; first staged contrast: C54x case atomic-port-marked-register-store-repeat-and-LDU/4: register 22 actual=1 expected=0 mask=ffffffffffffffff |
+| `atomic_port_low_store` | 6 | 37 | Validated staged migration; assertions retained |
+| `atomic_port_indirect_output` | 5 | 30 | Validated staged migration; assertions retained |
+| `atomic_port_control_examples` | 6 | 37 | Atomic retained; first staged contrast: C54x case atomic-absolute-marked-return-branch-and-repeat/2: register 22 actual=1 expected=0 mask=ffffffffffffffff |
+| `atomic_offset_transports` | 6 | 42 | Atomic retained; first staged contrast: C54x case atomic-offset-transport-or-stationary-AR0-load/0: register 22 actual=1 expected=0 mask=ffffffffffffffff |
+| `atomic_shift_peripheral_literals` | 10 | 52 | Validated staged migration; assertions retained |
+| `atomic_xc_word_boundary` | 3 | 37 | Atomic retained; first staged contrast: C54x case=2 event=2 write=0 address=100 value=1111 clock=14 |
+| `bio_atomic` | 29 | 50 | Atomic retained; first staged contrast: C54x case atomic-BIO-NBIO-control-forms-at-both-levels/0: register -1 actual=10900 expected=10901 mask=ffffffffffffffff |
+| `peripheral_cost_classes` | 20 | 36 | Atomic retained; first staged contrast: C54x case atomic-CPU-peripheral-and-scratch-cost-classes/2: register 22 actual=1 expected=0 mask=ffffffffffffffff |
+| `atomic_operand_order` | 46 | 63 | Atomic retained; first staged contrast: C54x case extensions-before-data-IO-and-program-operands/10: register 22 actual=1 expected=0 mask=ffffffffffffffff |
+| `atomic_intm_follower` | 3 | 33 | Atomic retained; first staged contrast: Section IRQ case=0 line=0 clock=10 data_events=0 previous_case=0 return_pc=09d5 |
+| `atomic_xc_interrupt` | 8 | 40 | Atomic retained; first staged contrast: Section IRQ case=0 line=2 clock=12 data_events=0 previous_case=0 return_pc=0804 |
 | `atomic_waited_io_control` | 12 | 36 | Re-derive timing/order; retain assertions |
 | `stopped_timer_reload` | 48 | 26 | Re-derive timing/order; retain assertions |
 | `source_admission` | 38,464 | 54 | Trim paired dimension; preserve staged contrasts |

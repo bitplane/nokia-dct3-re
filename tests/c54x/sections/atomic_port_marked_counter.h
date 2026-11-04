@@ -28,9 +28,9 @@ inline std::vector<clocked_register_case> section_cases()
 			{r::STATE_AR4,variant == 1 ? 0xffffU : variant < 3 ? 0U : 1U},
 			{r::STATE_AR3,variant == 3 ? 0U : variant == 4 ? 0xffffU : 1U}});
 		final.expected_data = initial.data;
-		clocked_register_case c{{{0,std::move(initial)},{1,observation("before-counter-markers",{{STATE_GENPC,0x601}})},
+		clocked_register_case c{{{0,std::move(initial)},{1,observation("before-counter-markers",{{STATE_GENPC,0x600}})},
 			{2,observation("counter-markers-running",{})},{48,std::move(final)}},3,48};
-		c.pipeline_frontend = false; c.observed_data_space = AS_IO;
+		c.pipeline_frontend = true; c.observed_data_space = AS_IO;
 		c.data_events = std::vector<clocked_data_event>{{true,0x124,0x1111,0,false},
 			{true,0x124,u16(taken ? 0x3333 : 0x2222),0,false,{},store ? 4U : variant >= 5 ? taken ? 8U : 6U : taken ? 7U : 5U}};
 		cases.push_back(std::move(c));
