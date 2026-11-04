@@ -15,8 +15,8 @@ through an expression: 241 lines and 39,048 cases. Counts describe entire
 sections, not atomic-only case counts. Helpers and firmware integration sources
 are additional migration work. The common case defaults to staged.
 
-Current validated progress: 109 sections (10,921 cases plus restores) migrated;
-28 of the original explicitly atomic sections remain, containing 553 cases.
+Current validated progress: 112 sections (10,989 cases plus restores) migrated;
+25 of the original explicitly atomic sections remain, containing 485 cases.
 The baseline counts
 describe the retirement scope, not the current number of atomic assignments.
 The seven originally paired sections are now staged-only: 24,040 cases remain
@@ -76,6 +76,15 @@ gates and documentation also expose frontend variants.
 ## Section work queue
 
 ### Validated migrations
+
+`clock_control` (17 cases) and `stopped_timer_reload` (48) retain all protected
+clock-field, reload, read-only PSC, bus-value and restore assertions on staged.
+NOP separation makes readback observe a completed peripheral write; it does
+not qualify simultaneous peripheral arbitration. The stopped-timer settled
+observation moves from clock 20 to 24. `atomic_intm_follower` retains all three
+protected complete-instruction cases. Frame continuations now follow the
+documented decoded-slot drain rather than atomic's immediate boundary;
+logical Execute events explicitly prove each drained slot before vector entry.
 
 `parallel_load_multiply` retains all 64 LD||MAC[R]/MAS[R] combinations on staged:
 both accumulators, rounding, subtract, SXM, FRCT and pointer updates. One added
@@ -324,7 +333,7 @@ sections independently; do not run the complete suite after every edit.
 | `zero_bk` | 208 | 27 | Migrate independent assertions; check staged admission |
 | `indirect_popm` | 4 | 27 | Migrate independent assertions; check staged admission |
 | `block_repeat_control` | 8 | 46 | Re-derive timing/order; retain assertions |
-| `clock_control` | 17 | 36 | Re-derive timing/order; retain assertions |
+| `clock_control` | 17 | 36 | Migrated; clock field/readback/reload assertions retained with separated peripheral reads. |
 | `accumulator_call` | 2 | 23 | Re-derive timing/order; retain assertions |
 | `instruction_examples` | 50 | 21 | Migrate independent assertions; check staged admission |
 | `shifted_arithmetic` | 104 | 34 | Migrate independent assertions; check staged admission |
@@ -438,10 +447,10 @@ sections independently; do not run the complete suite after every edit.
 | `bio_atomic` | 29 | 50 | Staged validated; physical predicate samples, control results and logical polling loop retained |
 | `peripheral_cost_classes` | 20 | 36 | Atomic retained; first staged contrast: C54x case atomic-CPU-peripheral-and-scratch-cost-classes/2: register 22 actual=1 expected=0 mask=ffffffffffffffff |
 | `atomic_operand_order` | 46 | 63 | Atomic retained; first staged contrast: C54x case extensions-before-data-IO-and-program-operands/10: register 22 actual=1 expected=0 mask=ffffffffffffffff |
-| `atomic_intm_follower` | 3 | 33 | Atomic retained; first staged contrast: Section IRQ case=0 line=0 clock=10 data_events=0 previous_case=0 return_pc=09d5 |
+| `atomic_intm_follower` | 3 | 33 | Migrated; exact decoded drain, frame and whole-follower completion checked. |
 | `atomic_xc_interrupt` | 8 | 40 | Atomic retained; first staged contrast: Section IRQ case=0 line=2 clock=12 data_events=0 previous_case=0 return_pc=0804 |
 | `atomic_waited_io_control` | 12 | 36 | Atomic retained; first staged contrast: C54x case waited-port-control-defers-pending-IRQ/0: register 22 actual=1 expected=0 mask=ffffffffffffffff |
-| `stopped_timer_reload` | 48 | 26 | Atomic retained; first staged contrast: C54x case stopped-timer-TRB-reloads-TIM-and-readonly-PSC/16: register 22 actual=1 expected=0 mask=ffffffffffffffff |
+| `stopped_timer_reload` | 48 | 26 | Migrated; all divider/reload/PSC cases and restores retained with completed-RMW readback. |
 | `source_admission` | 38,464 | 54 | Validated staged subset; atomic dimension removed |
 | `idle_nmi` | 12 | 35 | Validated staged migration; terminal idle cleanup explicit where needed |
 | `idle_wake` | 6 | 36 | Validated staged migration; terminal idle cleanup explicit where needed |

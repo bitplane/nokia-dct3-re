@@ -655,10 +655,12 @@ halt behavior. The legacy setup/checker branches and private snapshot are gone.
 
 `stopped_timer_reload` owns 48 independently initialized cases and replays:
 all sixteen TDDR/PSC values, reload-only, identity ORM and attempted read-only
-PSC writes. Original atomic instruction words produce the PRD/TCR bus writes;
+PSC writes. Guest instructions produce the PRD/TCR bus writes;
 TRB reloads TIM and PSC while stopped, reads back zero, and later writes cannot
 change PSC. Exact bus values/order and final TIM/PRD/TCR/A are checked.
-Snapshot coverage is new; no physical clock claim is added. The legacy setup
+Staged readback follows a NOP after ORM, avoiding unqualified simultaneous
+peripheral arbitration; the settled observation is at clock 24 rather than 20.
+Snapshot coverage is retained; no physical clock claim is added. The legacy setup
 and phase branch are removed, not kept as an executable predecessor chain.
 
 `immediate_subtract` owns 4,656 immediate SUB/shift-16 ADD cases/replays:
@@ -2320,12 +2322,17 @@ TRAP shares Decode-owned RTN, vector redirection and frame delivery with INTR,
 but leaves INTM and IFR unchanged (SPRU172C 4-193). This broader functional
 coverage does not substitute for `software_intr_pipeline`'s publication clocks.
 
-`atomic_intm_follower` retains all three complete-follower cases after INTM
-clear: one-word LD, three-word ST and RET. Exact ordered data events, logical
-continuation, stack effects and vector entry establish that the pending latch
-is not accepted before the full follower completes. This atomic contract is
-separate from the pipeline `interrupt_mask` section. Neither measures silicon
-interrupt timing. Both sections have explicit reset/setup and save/replay;
+`atomic_intm_follower` retains all three complete-follower cases on staged after
+INTM clear: one-word LD, three-word ST and RET. SPRU131G 6.10.7 requires the
+decoded pipeline to drain, excluding Prefetch/Fetch; it does not require
+atomic's immediate-next-instruction return boundary. The staged frame returns
+at `0x9d5`/`0x9d7` after LD/ST plus three decoded NOPs, or at RET's `0x9e0`
+target before any target instruction executes. Exact logical Execute sequences,
+data events, frame words and register state prove those boundaries through
+save/replay, rather than merely accepting a larger frame-address range.
+The separate `interrupt_mask` section covers adjacent INTM changes and all
+one/two/three-word followers. Neither measures silicon interrupt timing.
+Both sections have explicit reset/setup and save/replay;
 their old phase-chain setup/result owners are removed.
 
 ### Stack operation and interrupt entry

@@ -11,6 +11,7 @@ inline std::vector<clocked_register_case> section_cases()
 		unsigned pc = 0;
 		auto write = [&](u16 word) { initial.program[pc++].value = 0x7758; initial.program[pc++].value = word; };
 		auto capture = [&](u16 address) {
+			initial.program[pc++].value = 0xf495; // Observe completed CLKMD writes, not overlapping peripheral arbitration.
 			initial.program[pc++].value = 0x4858; initial.program[pc++].value = 0x80f8; initial.program[pc++].value = address;
 		};
 		write(0); write(first | 2); capture(0x501);
@@ -18,7 +19,7 @@ inline std::vector<clocked_register_case> section_cases()
 		write(replacement); write(replacement | 2); capture(0x503);
 		initial.program[pc].value = 0xf4e1;
 		clocked_register_case c{{{0,std::move(initial)}},index & 1 ? 12U : 1U,96};
-		c.pipeline_frontend = false;
+		c.pipeline_frontend = true;
 		c.states.push_back({96,observation("div-protected-fields", {},
 			{{0x501,u16(first | 3)},{0x502,u16(first | 3)},{0x503,u16(replacement | 3)}})});
 		cases.push_back(std::move(c));
