@@ -154,6 +154,33 @@ the complete step-3 acceptance above is not a renewed full-suite claim for this
 source revision. Atomic scheduling/state remains until the remaining firmware
 consumers are qualified or their redundant comparison entry points retired.
 
+### Remaining engine-removal prerequisites
+
+MU4 is not yet safe to promote globally. An ordinary atomic `setup` run passes
+the six complete-file comparisons and native serial-setup assertions. Its
+staged counterpart passes erased/flush/template/scan controls, two serial
+receives, initialization, the complete 741,916-byte transfer and mount, but its
+first directory record has damaged fields and zero length. Do not reinterpret
+the successful transfer checksum as a full media-content proof.
+
+With an identical retained NAND created by the successful atomic run, staged
+execution passes all six complete-file comparisons and the original loader's
+3,254 records/51,921 words. Thus the damaged-record investigation belongs
+upstream of that directory reader, in fresh InitDisk media creation. The
+retained consumer also requires the C5416-compatible bus-register profile
+(`7728/7729`). With that profile selected, native startup reaches an unqualified
+repeated XOR (`1c91` at `03:928d`), not the retained atomic endpoint. These are
+distinct remaining contracts; neither permits dropping MU4's assertions or
+deleting the engine underneath them. Experimental MU4 selections and write taps
+are removed; its existing execution configuration stays unchanged.
+
+The new IDLE-loop regression also fails with the old control-span arithmetic
+and passes after restoring the correction, independently of the full MU4 run.
+Remaining work is MU4 producer/consumer and AAC qualification, other uploaded
+application boundaries, retirement of explicit atomic comparison aliases, and
+then removal of atomic scheduling/state. Shared `execute_one` instruction
+semantics remain required by staged execution.
+
 ## Section work queue
 
 ### Validated migrations

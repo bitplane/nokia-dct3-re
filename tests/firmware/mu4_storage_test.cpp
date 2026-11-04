@@ -5731,10 +5731,15 @@ private:
 			auto &data = m_cpu->space(AS_DATA);
 			if (!m_cpu->state_int(tms320c54x_device::STATE_IDLE) ||
 				m_cpu->state_int(tms320c54x_device::STATE_SP) != 0x1200)
-				fatalerror("MU4 serial ISR did not return to idle phase=%u pc=%04x sp=%04x illegal=%u", m_phase,
+				fatalerror("MU4 serial ISR did not return to idle phase=%u pc=%04x sp=%04x illegal=%u st1=%04x ifr=%04x imr=%04x rtn=%04x cycles=%llu", m_phase,
 					unsigned(m_cpu->state_int(tms320c54x_device::STATE_PC)),
 					unsigned(m_cpu->state_int(tms320c54x_device::STATE_SP)),
-					unsigned(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL)));
+					unsigned(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL)),
+					unsigned(m_cpu->state_int(tms320c54x_device::STATE_ST1)),
+					unsigned(m_cpu->state_int(tms320c54x_device::STATE_IFR)),
+					unsigned(m_cpu->state_int(tms320c54x_device::STATE_IMR)),
+					unsigned(m_cpu->state_int(tms320c54x_device::STATE_RTN)),
+					static_cast<unsigned long long>(m_cpu->pipeline_cycles()));
 			if (m_phase == 14)
 			{
 				if (data.read_word(0x4bbf) != 0xff || data.read_word(0x4bc0) != 0xff)
