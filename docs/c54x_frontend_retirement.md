@@ -2,11 +2,43 @@
 
 ## Decision and scope
 
-Target one staged execution model, but do not delete atomic before migrating its
-unique assertions and the ordinary native 5110 composition. Step 3's qualified
-fixture migration is complete; this is not an all-ISA or atomic-clock-equivalence
-certificate. No section is approved for
+Steps 1-4 are complete: one stage-owned execution model, with the atomic
+scheduler/state and live comparison machines removed after fixture and native
+consumer migration. Step 5 is compatibility naming/API and documentation
+cleanup. This is not an all-ISA or physical-clock-equivalence certificate.
+No section is approved for
 deletion solely because of its name or similarity to another section.
+
+## Step 4 acceptance
+
+All 520 registered sections pass on the single-engine composition: 507 generic
+CPU sections (1,460,151 cases) and thirteen copied-firmware sections (1,786),
+totaling 1,461,937 cases and restores. Registration-manifest SHA-256:
+`9ddb5649e17b77ab0b3909f40c52fd5fadf6bd3c79803fa22b9095d2ba182fcc`.
+The complete sequential build/run took 4,103.172 seconds, including pauses
+for independent native-fixture rebuilds. It is final acceptance, not the
+per-edit workflow.
+
+Renewed acceptance also passes:
+
+- Ordinary 5110 menu, late input, short/long power and save-state/serial replay.
+- ROM4 entry/cold boot and 358 linked context cases/restores; CRC, FR/EFR
+  packing, 32-frame FR codecs and 163-frame bit-exact EFR codecs with RAM replay.
+- Serial/pin audio, clocked boot, wire replay and opcode fingerprints.
+- 3310/6210/8210/7110 uploaded-program verifier fixtures.
+- MU4 fresh provisioning, six complete-file comparisons, reset/reload,
+  fresh-process retained media, original bootstrap, mid-byte replay and full
+  uploaded-software restart. The stored NAND hash remains unchanged.
+- Native backend BSP/pins, simultaneous-source priority, save/replay, reset
+  and sixteen slot-request cases.
+- 354 C54x host checks and 85 runner checks, plus focused MU4/backend checks.
+
+The CPU implementation is 978 net lines smaller than the step-3 checkpoint,
+including the added fidelity fixes. Shared instruction effects remain; there
+is no atomic execution fallback. Compatibility `-pipe` names and the true-only
+pipeline-reset API are step-5 work, not alternate engines.
+
+## Retirement baseline
 
 The retirement baseline has 518 registered sections, 18,148 source lines and
 1,477,911 registered cases. Its 137 sections explicitly assigning
@@ -31,7 +63,7 @@ cases cover both bus profiles, with 288 duplicate short-form executions removed.
 Its unique 1,152 extended/mapped cases retain waits, READY, IRQ/NMI, poisoning and
 replay. The additional helper-owned physical-IACK-disabled IRQ case is staged.
 
-## Step 3 acceptance
+## Step 3 acceptance snapshot
 
 All 518 registered sections pass: 506 generic CPU sections (1,459,919 cases)
 and twelve copied-firmware sections (1,770 cases), totaling 1,461,689 cases and
@@ -152,10 +184,9 @@ retaining the existing result values and PC assertion. Host input providers are
 disabled in these headless fixtures. This is not full application qualification
 for every uploaded-program product composition.
 
-These twelve added cases change the current catalogue from the step-3 snapshot;
-the complete step-3 acceptance above is not a renewed full-suite claim for this
-source revision. Atomic scheduling/state remains until the remaining firmware
-consumers are qualified or their redundant comparison entry points retired.
+The added cases change the catalogue from the step-3 snapshot. Current complete
+acceptance is recorded under step 4 above; the old snapshot is not the current
+registration count.
 
 ### MU4 migration contracts
 
@@ -201,9 +232,14 @@ RX-first selection, exactly one saved frame, the return word and pending TX
 bit across replay; it must not mistake an invalid terminal IDLE assumption for
 lost interrupt priority. Pin, joined-clock, pending-I/O and reset checks remain.
 
-Complete catalogue acceptance and fresh MU4 reset/retained qualification are
-being renewed on the single-engine composition. The step-3 snapshot above is
-not a renewed claim for this revision.
+Fresh MU4 reset/retained qualification passes on the single-engine composition.
+Both legs retain all six uploads and four original settings files and complete
+the exact 11-word receive/14-word transmit status exchange. Full bootstrap
+uses Execute-owned entry counts and ACKs four additional validated selector-02
+notifications: 23 received words and 78 transmitted words. Both mid-byte replay
+legs compare 1,339 registered emulation-state items exactly. The full uploaded
+startup/reset fixture also passes. These do not establish physical board reset,
+mask-ROM behavior or music decoding.
 
 ## Section work queue
 
@@ -652,7 +688,7 @@ the complete suite after every edit.
 4. Run the full CPU suite and affected handset/firmware acceptance once on the
    final composition. Static parity and codec success alone are insufficient.
 
-Net line savings remain unproven: the affected 6,232 section lines contain useful
-assertions that must survive. Immediate code-removal scope is scheduling/state,
-not the shared roughly 2,000-line instruction executor. Resolve admission and timing gaps
-before promising a deletion count or completion date.
+All four exit gates are satisfied by step-4 acceptance. Shared instruction
+effects and independent assertions remain required; engine retirement is not
+permission to delete them wholesale. The true-only reset API must retain its
+pipeline-reset behavior when its compatibility name is removed in step 5.
