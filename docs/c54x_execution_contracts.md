@@ -5294,6 +5294,14 @@ instruction latency. Offset READA repeat/control compositions remain excluded.
 
 ## Mapped TRN publication and protected interrupt drain
 
+`peripheral_cost_classes` retains its twenty two-access STM/ANDM/ORM/ST/LD
+contrasts at AR2, PRD, board-owned `005f` and scratch `0060`. Direct STM to
+`005f` reaches the board mapping and pays the peripheral-window clock; no CPU
+register is invented there. RMW reads and writes are separate staged clocks,
+preserving the original total between successive reads instead of asserting
+atomic same-clock Read/Write. All stored values and unrelated state remain
+checked with save/restore.
+
 Adjacent STM CLKMD / LDM CLKMD is qualified without inserting a separating
 instruction. Both peripheral wait clocks are paid, the older Write completes,
 and a saved pending Read holds its slot for the next bus clock. IRQ acceptance

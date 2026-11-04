@@ -20,14 +20,14 @@ inline std::vector<clocked_register_case> section_cases()
 		initial.data = {{target,0xff00}};
 		auto final = observation("two-real-accesses-at-the-specified-cost",{{STATE_GENPC,0x601+words.size()},
 			{r::STATE_A,read ? 0xff00U : 0x5678U},{r::STATE_AR2,0xff00},{r::STATE_PRD,0xff00}},{{target,0xff00}});
-		clocked_register_case c{{{0,std::move(initial)},{1,observation("before-cost-program",{{STATE_GENPC,0x601}})},
+		clocked_register_case c{{{0,std::move(initial)},{1,observation("before-cost-program",{{STATE_GENPC,0x600}})},
 			{2,observation("cost-program-running",{})},{48,std::move(final)}},(family+kind)&1 ? 3U : 1U,48};
-		c.pipeline_frontend = false;
+		c.pipeline_frontend = true;
 		unsigned const cost = (read ? 1U : 2U) + unsigned(kind == 1 || kind == 2);
 		c.data_events = std::vector<clocked_data_event>{};
 		for (unsigned i = 0; i != 2; ++i) {
-			if (rmw) c.data_events->push_back({false,target,0xff00,0,false,{},i ? std::optional<unsigned>(cost) : std::nullopt});
-			c.data_events->push_back({!read,target,0xff00,0,false,{},rmw ? std::optional<unsigned>(0) : i ? std::optional<unsigned>(cost) : std::nullopt});
+			if (rmw) c.data_events->push_back({false,target,0xff00,0,false,{},i ? std::optional<unsigned>(cost-1) : std::nullopt});
+			c.data_events->push_back({!read,target,0xff00,0,false,{},rmw ? std::optional<unsigned>(1) : i ? std::optional<unsigned>(cost) : std::nullopt});
 		}
 		cases.push_back(std::move(c));
 	}

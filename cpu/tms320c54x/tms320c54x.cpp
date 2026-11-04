@@ -179,7 +179,9 @@ constexpr bool staged_indirect_ram_stm(u16 word)
 
 constexpr bool staged_direct_ram_stm(u16 word)
 {
-	return (word & 0xffe0) == 0x7760;
+	// 5f is the unowned boundary word of the peripheral window: its board
+	// mapping supplies storage/side effects, not a fabricated CPU register.
+	return (word & 0xffe0) == 0x7760 || word == 0x775f;
 }
 
 constexpr bool staged_ram_stm(u16 word)
@@ -3366,7 +3368,7 @@ void tms320c54x_device::pipeline_step()
 		(staged_mvdd(m_pipeline_word[3]) || staged_parallel_load(m_pipeline_word[3]))));
 	bool const write_peripheral = m_pipeline_valid[4] &&
 		((m_pipeline_operand_address[4] >= 0x20 && m_pipeline_operand_address[4] <= 0x5f &&
-		(staged_store(m_pipeline_word[4]) || staged_accumulator_mmr_store(m_pipeline_word[4]) || staged_rmw(m_pipeline_word[4]) || staged_data_copy(m_pipeline_word[4]) || staged_mvdd(m_pipeline_word[4]) || (m_pipeline_word[4] & 0xff00) == 0x7600)) || staged_bus_control(m_pipeline_word[4]) || (staged_timer_control(m_pipeline_word[4]) || staged_serial_control(m_pipeline_word[4]) || staged_clock_control(m_pipeline_word[4])));
+		(staged_ram_stm(m_pipeline_word[4]) || staged_store(m_pipeline_word[4]) || staged_accumulator_mmr_store(m_pipeline_word[4]) || staged_rmw(m_pipeline_word[4]) || staged_data_copy(m_pipeline_word[4]) || staged_mvdd(m_pipeline_word[4]) || (m_pipeline_word[4] & 0xff00) == 0x7600)) || staged_bus_control(m_pipeline_word[4]) || (staged_timer_control(m_pipeline_word[4]) || staged_serial_control(m_pipeline_word[4]) || staged_clock_control(m_pipeline_word[4])));
 	bool const move_peripheral = m_pipeline_valid[3] && staged_clock_destination_move(m_pipeline_word[3], m_pipeline_immediate[3]);
 	// Class 19A/B owns its retained write one stage earlier than STM. Pay
 	// the peripheral clock before advancing Access to that write stage.

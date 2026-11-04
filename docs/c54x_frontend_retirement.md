@@ -15,8 +15,8 @@ through an expression: 241 lines and 39,048 cases. Counts describe entire
 sections, not atomic-only case counts. Helpers and firmware integration sources
 are additional migration work. The common case defaults to staged.
 
-Current validated progress: 135 sections (11,462 cases plus restores) migrated;
-2 of the original explicitly atomic sections remain, containing 32 cases.
+Current validated progress: 136 sections (11,482 cases plus restores) migrated;
+1 of the original explicitly atomic sections remains, containing 12 cases.
 The baseline counts
 describe the retirement scope, not the current number of atomic assignments.
 The seven originally paired sections are now staged-only: 24,040 cases remain
@@ -348,8 +348,9 @@ specific peripheral conflict after the older Write. Two added replay prefixes
 cover either side of the Read; an added separated BRC-copy contrast checks the
 new word while the original adjacent copy explicitly reads the old word.
 The seven current cases preserve the original values outside that documented
-Read-before-Execute distinction. Remaining original atomic sections cover
-peripheral cost classes and waited I/O/control composition.
+Read-before-Execute distinction. The remaining original atomic section covers
+waited I/O/control composition; the helper-selected extended I/O matrix also
+still needs migration.
 
 These are migration questions, not established silicon defects. An atomic
 expectation is not automatically correct where implementations disagree.
@@ -492,7 +493,7 @@ sections independently; do not run the complete suite after every edit.
 | `atomic_shift_peripheral_literals` | 10 | 52 | Validated staged migration; assertions retained |
 | `atomic_xc_word_boundary` | 3 | 37 | Migrated; two-word selection and decoded PORTW drain checked before the IRQ frame. |
 | `bio_atomic` | 29 | 50 | Staged validated; physical predicate samples, control results and logical polling loop retained |
-| `peripheral_cost_classes` | 20 | 36 | Atomic retained; first staged contrast: C54x case atomic-CPU-peripheral-and-scratch-cost-classes/2: register 22 actual=1 expected=0 mask=ffffffffffffffff |
+| `peripheral_cost_classes` | 20 | 36 | Migrated; all values/accesses retained; separate Read/Write phases preserve total RMW interval. |
 | `atomic_operand_order` | 46 | 63 | Migrated; all independent bus/program order assertions retained using assembler-checked extension order. |
 | `atomic_intm_follower` | 3 | 33 | Migrated; exact decoded drain, frame and whole-follower completion checked. |
 | `atomic_xc_interrupt` | 8 | 40 | Migrated; speculative loop prefetch distinguished from two actual body executions; IRQ/NMI, selection and exact drained frames retained. |
