@@ -2326,8 +2326,9 @@ u16 tms320c54x_device::data_read(u16 address)
 
 void tms320c54x_device::data_write(u16 address, u16 value, unsigned owner_stage)
 {
+	bool const early_braf_clear = m_pipeline_frontend && address == 7 && pipeline_early_braf_clear(owner_stage, value);
 	if (m_pipeline_frontend && m_pipeline_valid[owner_stage] && m_pipeline_block_body[owner_stage] &&
-		((address >= 0x1a && address <= 0x1c) || (address == 7 && ((value ^ m_st1) & ST1_BRAF))))
+		((address >= 0x1a && address <= 0x1c) || (address == 7 && ((value ^ m_st1) & ST1_BRAF) && !early_braf_clear)))
 	{
 		logerror("%s: staged in-block loop-register write is unsupported (instruction=%06x word=%04x destination=%04x value=%04x block=%06x..%06x brc=%04x rsa=%04x rea=%04x)\n",
 			machine().describe_context(), m_pipeline_address[owner_stage], m_pipeline_word[owner_stage], address, value,
@@ -2335,7 +2336,11 @@ void tms320c54x_device::data_write(u16 address, u16 value, unsigned owner_stage)
 		m_illegal = true; return;
 	}
 	m_peripheral_mmr_access |= address >= 0x20 && address <= 0x5f;
+	bool const braf_before = bool(m_st1 & ST1_BRAF);
 	m_data.write_word(address, value);
+	if (m_pipeline_frontend && address == 7 && m_pipeline_valid[owner_stage] &&
+		bool(m_st1 & ST1_BRAF) != braf_before)
+		pipeline_update_braf(m_pipeline_address[owner_stage]);
 }
 
 void tms320c54x_device::internal_data_map(address_map &map)
@@ -3782,8 +3787,9 @@ void tms320c54x_device::pipeline_step()
 		// Other memory/control forms need Access/Read/redirect ownership first.
 		bool const short_load = staged_memory_load(word);
 		bool const direct_store = staged_store(word) || staged_accumulator_mmr_store(word);
+		bool const early_braf_clear = word == 0x7707 && pipeline_early_braf_clear(2, m_pipeline_immediate[2]);
 		if (m_pipeline_valid[2] && ((word & 0xfeff) == 0x8807 || word == 0x7707) &&
-			(m_pipeline_delay_decode_words || m_pipeline_repeat_active || m_pipeline_xc_active || m_pipeline_block_body[2]))
+			(m_pipeline_delay_decode_words || m_pipeline_repeat_active || m_pipeline_xc_active || (m_pipeline_block_body[2] && !early_braf_clear)))
 		{
 			logerror("%s: staged STLM ST1 control/repeat composition is unsupported instruction=%06x word=%04x delay=%u repeat=%u xc=%u xc_end=%06x block=%u body=%u range=%06x..%06x\n", machine().describe_context(), unsigned(m_pipeline_address[2]), word, m_pipeline_delay_decode_words, unsigned(m_pipeline_repeat_active), unsigned(m_pipeline_xc_active), unsigned(m_pipeline_xc_end), unsigned(m_pipeline_block_active), unsigned(m_pipeline_block_body[2]), unsigned(m_pipeline_block_start), unsigned(m_pipeline_block_end_address)); m_illegal = true; return;
 		}
@@ -3909,9 +3915,10 @@ void tms320c54x_device::pipeline_step()
 		bool const internal_block_xc = staged_xc(word) && m_pipeline_address[2] + (BIT(word, 9) ? 2 : 1) <= m_pipeline_block_end_address;
 		bool const internal_memory_repeat = staged_memory_repeat(word) &&
 			m_pipeline_address[2] + (word == 0x47f8 ? 2 : 1) <= m_pipeline_block_end_address;
+		bool const internal_immediate_repeat = word == 0xf070 && m_pipeline_address[2] + 2 <= m_pipeline_block_end_address;
 		if (m_pipeline_valid[2] && block_word && ((branch && !internal_block_branch && !forward_block_exit && !delayed_forward_block_exit && !internal_delayed_block_branch && !block_far_call && !block_conditional_call && !block_near_call) || software_intr || block_setup || plain_return || delayed_return || far_return || fast_return ||
-			staged_immediate_repeat(word) || (staged_memory_repeat(word) && !internal_memory_repeat) || staged_immediate_loop_register(word) || (short_repeat && m_pipeline_address[2] == m_pipeline_block_end_address) || (staged_xc(word) && !internal_block_xc) || staged_idle(word) ||
-			((word & 0xfe00) == 0x8800 && u8(word) >= 0x1a) || (word & 0xfdff) == 0xf6bf))
+			(staged_immediate_repeat(word) && !internal_immediate_repeat) || (staged_memory_repeat(word) && !internal_memory_repeat) || staged_immediate_loop_register(word) || (short_repeat && m_pipeline_address[2] == m_pipeline_block_end_address) || (staged_xc(word) && !internal_block_xc) || staged_idle(word) ||
+			((word & 0xfe00) == 0x8800 && u8(word) >= 0x1a)))
 		{
 			logerror("%s: staged block control/count modification is unsupported instruction=%06x word=%04x block=%06x..%06x\n",
 				machine().describe_context(), unsigned(m_pipeline_address[2]), word, unsigned(m_pipeline_block_start), unsigned(m_pipeline_block_end_address)); m_illegal = true; return;
@@ -5093,6 +5100,7 @@ void tms320c54x_device::pipeline_step()
 		m_pc = u16(address);
 		m_xpc = (address >> 16) & 0x7f;
 		m_op = m_pipeline_word[5];
+		bool const braf_before = bool(m_st1 & ST1_BRAF);
 		debugger_instruction_hook(address);
 		// XC's replacement NOP consumes a slot, not an original instruction entry.
 		if (!m_pipeline_annulled[5] && !m_instruction_observer_cb.isunset()) m_instruction_observer_cb(address, m_op);
@@ -5679,6 +5687,7 @@ void tms320c54x_device::pipeline_step()
 		}
 		else if (!staged_xc(m_op))
 			execute_one(m_op);
+		if ((m_op & 0xfeff) == 0xf6bf && bool(m_st1 & ST1_BRAF) != braf_before) pipeline_update_braf(address);
 		if (staged_pipelined_repeat(m_op) && m_pipeline_repeat_active && m_pipeline_repeat_body_latched && address == m_pipeline_repeat_address)
 		{
 			if (m_rptc) { --m_rptc; ++m_rpt_iteration; }
@@ -6068,6 +6077,37 @@ void tms320c54x_device::pipeline_restore_block_on_return(u32 address)
 	m_pipeline_block_fetch_remaining = u32(m_brc) + 1;
 	m_pipeline_block_active = m_pipeline_block_fetch_enabled = true;
 	if (m_pipeline_fetch_address == after_end) m_pipeline_fetch_address = restored_start;
+}
+
+bool tms320c54x_device::pipeline_early_braf_clear(unsigned stage, u16 value) const
+{
+	return m_pipeline_valid[stage] && m_pipeline_block_body[stage] &&
+		(m_pipeline_word[stage] == 0x7707 || m_pipeline_word[stage] == 0x8a07) &&
+		!(value & ST1_BRAF) && (value & ~ST1_BRAF) == (m_st1 & ~ST1_BRAF) &&
+		u16(m_pipeline_block_end_address - m_pipeline_address[stage]) >= 6;
+}
+
+void tms320c54x_device::pipeline_update_braf(u32 address)
+{
+	if (!(m_st1 & ST1_BRAF))
+	{
+		// Software disables future loop prediction, not words already fetched.
+		m_pipeline_block_active = m_pipeline_block_fetch_enabled = false;
+		m_pipeline_block_fetch_remaining = 0;
+		return;
+	}
+	if (m_pipeline_block_active) return;
+	u32 const start = (address & 0x7f0000) | m_rsa;
+	u32 const end = (address & 0x7f0000) | m_rea;
+	if ((m_pipeline_fetch_address & 0x7f0000) != (address & 0x7f0000) ||
+		m_pipeline_fetch_address > start || start > end)
+		// Context restoration can enable BRAF outside its body; the return
+		// boundary separately reconstructs that predictor from RSA/REA/BRC.
+		return;
+	m_pipeline_block_start = start;
+	m_pipeline_block_end_address = end;
+	m_pipeline_block_fetch_remaining = u32(m_brc) + 1;
+	m_pipeline_block_active = m_pipeline_block_fetch_enabled = true;
 }
 
 void tms320c54x_device::pipeline_request_coefficient(u16 address)

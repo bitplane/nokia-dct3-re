@@ -5277,11 +5277,14 @@ It does not establish upload completion, RF acquisition or handset boot.
 ## STLM suspension of an interrupted loop
 
 Outside-body STLM to ST1 is admitted without delay/RPT/XC composition.
-An Execute-owned BRAF clear retires the private loop predictor only when
-no younger loop-body words remain in flight. Architectural BRC/RSA/REA
-are preserved for software save/restore. In-body writes and overlapping
-control compositions remain guarded; the six-word in-body BRAF latency
-is not newly qualified.
+Software BRAF clears retire future loop prediction without flushing words
+already fetched. Architectural BRC/RSA/REA are preserved for software
+save/restore. `block_repeat_control` qualifies BRAF-only STM/POPM ST1 clears
+at least six words before REA (SPRU131G 7.5.8.2); other in-body status and
+loop-register writes remain guarded. STM publishes at Read, POPM and RSBX at
+their owning stages, rather than waiting for an unrelated Execute edge.
+Manual activation is qualified only with sufficient Prefetch lead before RSA;
+return-based context reconstruction remains a separate boundary.
 
 `stlm_repeat_restore` owns320 independent cases/restores: outer counts
 0/1/2/7/56, inner counts 0/1/3/63, IRQ/NMI, two pages, two stack alignments,

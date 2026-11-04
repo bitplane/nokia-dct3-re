@@ -179,6 +179,8 @@ private:
 	void pipeline_begin_repeat_stream();
 	void pipeline_resume_after_repeat();
 	void pipeline_request_coefficient(u16 address);
+	void pipeline_update_braf(u32 address);
+	bool pipeline_early_braf_clear(unsigned stage, u16 value) const;
 	void pipeline_restore_block_on_return(u32 address);
 	void enter_idle(u8 mode);
 	void finish_repeats();
