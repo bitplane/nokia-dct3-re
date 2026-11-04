@@ -3,8 +3,9 @@
 ## Decision and scope
 
 Target one staged execution model, but do not delete atomic before migrating its
-unique assertions and the ordinary native 5110 composition. This is a migration inventory with selected execution evidence, not a complete
-staged parity certificate. No section is approved for
+unique assertions and the ordinary native 5110 composition. Step 3's qualified
+fixture migration is complete; this is not an all-ISA or atomic-clock-equivalence
+certificate. No section is approved for
 deletion solely because of its name or similarity to another section.
 
 The retirement baseline has 518 registered sections, 18,148 source lines and
@@ -17,9 +18,8 @@ cases in total. Counts describe entire
 sections, not atomic-only case counts. Helpers and firmware integration sources
 are additional migration work. The common case defaults to staged.
 
-Current isolated progress: all 137 original explicitly atomic sections migrated
+Completed migration: all 137 original explicitly atomic sections migrated
 (11,502 current cases plus restores, including 34 added regression contrasts).
-Step 3 still requires final composition acceptance before being marked complete.
 The baseline counts
 describe the retirement scope, not the current number of atomic assignments.
 The twelve originally paired families are now staged-only: 25,000 cases remain
@@ -30,6 +30,34 @@ The extended I/O helper now selects operand forms, not a frontend: 1,440 staged
 cases cover both bus profiles, with 288 duplicate short-form executions removed.
 Its unique 1,152 extended/mapped cases retain waits, READY, IRQ/NMI, poisoning and
 replay. The additional helper-owned physical-IACK-disabled IRQ case is staged.
+
+## Step 3 acceptance
+
+All 518 registered sections pass: 506 generic CPU sections (1,459,919 cases)
+and twelve copied-firmware sections (1,770 cases), totaling 1,461,689 cases and
+restores. The runner rejects any atomic-selected case before execution.
+Catalogue SHA-256: `5974553ecdac8e67ee6a9383113dbc5bbd1f400d8966cc8f776c3dffc4980cda`.
+
+Acceptance covers a 445-section prefix and disjoint 73-section tail. The guard
+found the shared delay/repeat comparison loop between them; only that tail's
+helper and counts changed, with no CPU or accepted-prefix dependency change.
+Total build/run wall time is 3,773.430 seconds (62.89 minutes). This is final
+catalogue acceptance, not the per-edit workflow.
+
+Reproduce the current complete catalogue with:
+
+```sh
+python3 tools/run_c54x_section.py all --scope all --jobs 8
+```
+
+The linked ROM4 context gate passes 358 cases/restores with digest
+`ce54ab5aff19dbc0`. Ordinary native 5110 menu, save-state/serial replay, late Menu
+input and short/long power lifecycles pass. Four EFR comparison profiles retain
+163 bit-exact frames apiece and RAM replay. Host checks pass 354 C54x and 84
+runner tests. No atomic scheduling/state or comparison alias is deleted here;
+that is stage 4, followed by naming/alias cleanup in stage 5.
+The paired serial-codec and clocked pin-boot/replay gates also pass. Their
+explicit laboratory clock wiring is not a physical timing-validation claim.
 
 ## Disposition rules
 
@@ -48,7 +76,7 @@ replay. The additional helper-owned physical-IACK-disabled IRQ case is staged.
 
 ## Implementation and integration dependencies
 
-`execute_one` is approximately 2,077 lines but is shared: staged Execute falls
+`execute_one` is roughly 2,000 lines but is shared: staged Execute falls
 back to it and accelerated staged repeats also call it. Retain shared instruction
 semantics. The clear retirement surface is `retire_atomic_instruction`, the
 atomic arm of `execute_run`, atomic pending-I/O/XC state and conditional branches
@@ -353,7 +381,7 @@ publication against an older STLM-to-T Execute write. It fails on the former
 early publication, checks T immediately after the shared clock and restores
 before the successor RAM write. All 24 baseline cases remain (25 current).
 
-### Unresolved migration contrasts
+### Resolved migration boundaries
 
 `atomic_register_copy_sequences` now uses the standard SWWSR profile and keeps
 its adjacent CLKMD store/load intact. A saved pending Read serializes that
@@ -362,10 +390,9 @@ cover either side of the Read; an added separated BRC-copy contrast checks the
 new word while the original adjacent copy explicitly reads the old word.
 The seven current cases preserve the original values outside that documented
 Read-before-Execute distinction. Waited I/O/control and the helper-selected
-extended I/O matrix are now migrated; remaining work is final composition
-acceptance, not another known atomic fixture family.
+extended I/O matrix are now migrated and covered by final acceptance.
 
-These are migration questions, not established silicon defects. An atomic
+These corrections are not established silicon defects. An atomic
 expectation is not automatically correct where implementations disagree.
 
 `block_repeat_control` retains all eight cases on staged. Software BRAF clears
@@ -375,9 +402,9 @@ Prefetch lead before RSA. Nested short/long RPT counts and loop counters remain
 independently checked.
 
 Sizing columns below record the retirement baseline; current case counts live
-in `fixtures/c54x_sections.json`. Dispositions are updated by isolated execution
-evidence; untested entries remain routing priorities, not equivalence claims. Validate migrated
-sections independently; do not run the complete suite after every edit.
+in `fixtures/c54x_sections.json`. Dispositions are covered by the acceptance
+above. For future edits, validate affected sections independently; do not run
+the complete suite after every edit.
 
 | Section | Cases | Lines | Disposition |
 | --- | ---: | ---: | --- |
@@ -538,5 +565,5 @@ sections independently; do not run the complete suite after every edit.
 
 Net line savings remain unproven: the affected 6,232 section lines contain useful
 assertions that must survive. Immediate code-removal scope is scheduling/state,
-not the shared 2,077-line instruction executor. Resolve admission and timing gaps
+not the shared roughly 2,000-line instruction executor. Resolve admission and timing gaps
 before promising a deletion count or completion date.
