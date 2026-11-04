@@ -1813,6 +1813,13 @@ caller XPC, transfer through source bits 22-0, and execute two following
 words. Its Class 30B delayed cadence is four cycles, versus six for
 nondelayed FCALA. Neither form may be repeated or placed inside RPTB.
 
+Near CALAD (SPRU172C page 4-25) uses the same retained two-word delay span
+and PC+3 return, but takes only source bits 15-0 on the caller's page and
+pushes no XPC word. It now shares the delayed accumulator-transfer path.
+`atomic_accumulator_calls` retains CALA A/B and CALAD A's independent target,
+frame, delay-overwrite, return and replay checks. RET's Read and its preceding
+literal store's Execute are observed in that order within their shared clock.
+
 The staged model samples the 23-bit target in Read, redirects Prefetch and
 discards the already fetched continuation after the delay span. PC+3 publishes
 in Read and caller XPC in Execute, without the nondelayed held clock. Two

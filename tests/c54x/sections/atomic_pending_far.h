@@ -7,7 +7,8 @@ inline std::vector<clocked_register_case> section_cases()
 	std::vector<clocked_register_case> cases;
 	for (unsigned returning = 0; returning < 2; ++returning) {
 		u32 const origin = returning ? 0x30600 : 0x10600;
-		unsigned const checkpoint = returning ? 6 : 4;
+		// FRETD is one word; FCALLD also decodes its target extension.
+		unsigned const checkpoint = returning ? 8 : 9;
 		u32 const paused = origin + (returning ? 2 : 3);
 		auto initial = initial_case("atomic-pending-far-transfer-replay", {0xf495});
 		initial.program = {{origin - 1,0xf495},{origin,u16(returning ? 0xf6e4 : 0xfb82)},
@@ -25,7 +26,7 @@ inline std::vector<clocked_register_case> section_cases()
 			{checkpoint,observation("exactly-one-delay-word-retired", {{STATE_GENPC,paused},{r::STATE_A,1},{r::STATE_B,0},
 				{r::STATE_SP,returning ? 0x400U : 0x3feU}},{{0x3fe,1},{0x3ff,0x604}})},
 			{checkpoint + 1,observation("remaining-delay-running", {})},{48,std::move(final)}},checkpoint,48};
-		c.pipeline_frontend = false;
+		c.pipeline_frontend = true;
 		// Poison completed CPU/stack state before automatic restore of the pending transfer.
 		c.actions = {{48,{{STATE_GENPC,0x10900},{r::STATE_SP,0x500},{r::STATE_A,99},{r::STATE_B,88}},false,{},{},{{0x3fe,0x7f},{0x3ff,0xbad}}}};
 		c.data_events = std::vector<clocked_data_event>{};

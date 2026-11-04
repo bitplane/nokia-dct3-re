@@ -15,8 +15,8 @@ through an expression: 241 lines and 39,048 cases. Counts describe entire
 sections, not atomic-only case counts. Helpers and firmware integration sources
 are additional migration work. The common case defaults to staged.
 
-Current validated progress: 86 sections (10,255 cases plus restores) migrated;
-51 of the original explicitly atomic sections remain. The baseline counts
+Current validated progress: 92 sections (10,286 cases plus restores) migrated;
+45 of the original explicitly atomic sections remain. The baseline counts
 describe the retirement scope, not the current number of atomic assignments.
 The seven originally paired sections are now staged-only: 24,040 cases remain
 from their 39,048-case baseline. Their original staged stimuli, assertions and
@@ -172,6 +172,19 @@ These four sections plus five focused load/store/admission controls pass
 43,529 cases/restores. The 354 CPU-tool tests, four EFR codec/replay profiles
 and ordinary 5110 menu/save gates also pass.
 
+Six further sections run staged: stack literals, mixed MMR transfers, near
+control, accumulator calls, pending far transfers and extended interactions.
+All 31 cases retain their values, frame/stack ordering, page, delay-slot and
+replay predicates. Bus interleaving follows the existing Read/Execute owners;
+an aliasing PSHM/POPM pair retains its deferred same-address read. CALAD now
+shares the retained delayed accumulator-call path, captures its target before
+delay-slot overwrites and stacks PC+3 without a far-page word (SPRU172C 4-25).
+The pending snapshots move to the first delay Execute: clock 8 for one-word
+FRETD, 9 for two-word FCALLD. The extended IRQ fixture now asserts its physical
+input after cold startup reaches IDLE, not during Prefetch. Its expected frame
+and ISR behavior are unchanged. Thirteen focused sections pass 24,171
+cases/restores; host CPU-tool checks pass 354 tests.
+
 ### Unresolved migration contrasts
 
 `atomic_register_copy_sequences` remains atomic. It writes `7728` under the
@@ -186,20 +199,14 @@ Further preserved atomic sections after isolated staged trials:
 | Section | First observed contrast | Follow-up |
 | --- | --- | --- |
 | `atomic_memory_address_literals` | Case 16, repeated ADD, sets ILLEGAL | Audit repeated-body admission and ownership |
-| `atomic_accumulator_calls` | Case 0 observes stack read `02ff=0602` at clock 15 rather than its retained bus sequence | Decode staged call/return ordering before retiming |
 | `atomic_zero_repeat` | Case 2 fetches `0602=f495` at clock 7 outside the expected sequence | Derive staged repeat-prefetch expectations |
 | `atomic_transfer_literals` | Case 13 reads `0d91=2222` as event 1 at clock 9 | Resolve transfer bus order |
 | `atomic_multiply_move_literals` | Case 6 reads mapped `0015=0000` as event 0 at clock 6 | Resolve mapped-source sampling |
-| `atomic_mmr_transfer_literals` | Case 3 reads peripheral `0020=9abc` as event 4 at clock 13 | Resolve MMR/peripheral transfer order |
 | `atomic_coefficient_fir_literals` | Case 0, MACP `788b`, sets ILLEGAL | Audit program-coefficient multiply admission |
-| `atomic_stack_literals` | Case 2 reads `0061=abcd` as event 1 at clock 7 | Resolve stack operand sampling/order |
 | `atomic_mapped_moves` | Case 2, MVMD/DAR progression, sets ILLEGAL | Audit mapped-move destination admission |
 | `atomic_delayed_call` | Case 4 sets ILLEGAL | Audit delayed-call composition admission |
-| `atomic_near_control` | Case 9 reads `0063=5678` as event 1 at clock 7 | Resolve near-control operand order |
 | `atomic_far_edges` | Case 2, FBACCD, sets ILLEGAL after cold-PC correction | Audit accumulator far-branch admission |
-| `atomic_extended_interactions` | Case 2 IRQ checkpoint has PC `10604` rather than `10605` | Derive staged interrupt checkpoint and input timing |
 | `atomic_fast_return` | RETF checkpoint has PC `20702` rather than `20683` | Audit program replacement and retained-prefetch lifecycle |
-| `atomic_pending_far` | Delay-word checkpoint has PC `10602` rather than `10603` | Derive the staged active-transfer snapshot boundary |
 
 These are migration blockers, not established silicon defects. An atomic
 expectation is not automatically correct where implementations disagree.
@@ -262,7 +269,7 @@ sections independently; do not run the complete suite after every edit.
 | `atomic_repeat_irq` | 2 | 34 | Atomic retained; first staged contrast: C54x case atomic-repeat-pending-IRQ/0: register 22 actual=1 expected=0 mask=ffffffffffffffff |
 | `atomic_subtract` | 384 | 53 | Migrate independent assertions; check staged admission |
 | `square_literals` | 6 | 38 | Validated staged migration; assertions retained |
-| `atomic_near_control` | 10 | 50 | Re-derive timing/order; retain assertions |
+| `atomic_near_control` | 10 | 50 | Staged validated; original stack stimulus/results, delay decisions and explicit bus clocks |
 | `long_literals` | 33 | 68 | Staged validated; all baseline cases plus one T-poison/replay check (34 current cases) |
 | `atomic_mac_literals` | 39 | 47 | Migrate independent assertions; check staged admission |
 | `atomic_dual_address` | 11 | 46 | Migrate independent assertions; check staged admission |
@@ -273,16 +280,16 @@ sections independently; do not run the complete suite after every edit.
 | `atomic_product_literals` | 21 | 63 | Staged validated; corrected MAC encoding and extended DELAY admission; independent results retained |
 | `atomic_conditional_control` | 12 | 39 | Re-derive timing/order; retain assertions |
 | `atomic_far_edges` | 23 | 66 | Migrate independent assertions; check staged admission |
-| `atomic_extended_interactions` | 3 | 55 | Migrate independent assertions; check staged admission |
+| `atomic_extended_interactions` | 3 | 55 | Staged validated; physical IRQ moved after real IDLE; page/frame/transfer predicates retained |
 | `atomic_fast_return` | 1 | 26 | Re-derive timing/order; retain assertions |
-| `atomic_pending_far` | 2 | 38 | Migrate independent assertions; check staged admission |
+| `atomic_pending_far` | 2 | 38 | Staged validated; first-delay retirement checkpoint derived; pending transfer replay retained |
 | `atomic_program_mapping` | 13 | 68 | Migrate independent assertions; check staged admission |
 | `coefficient_mac_literals` | 6 | 38 | Atomic retained; first staged contrast: C54x case MACP-coefficient-no-store/0: register 22 actual=1 expected=0 mask=ffffffffffffffff |
 | `atomic_memory_literals` | 24 | 91 | Staged validated; ABDST/LTD/SUBB and original arithmetic/status/bus assertions retained |
 | `atomic_double_stores` | 8 | 40 | Migrate independent assertions; check staged admission |
 | `atomic_address_literals` | 4 | 33 | Migrate independent assertions; check staged admission |
 | `atomic_shifted_loads` | 7 | 36 | Migrate independent assertions; check staged admission |
-| `atomic_stack_literals` | 9 | 53 | Migrate independent assertions; check staged admission |
+| `atomic_stack_literals` | 9 | 53 | Staged validated; original stack/accumulator fields retained with Read/Write clocks |
 | `atomic_mapped_moves` | 4 | 36 | Migrate independent assertions; check staged admission |
 | `atomic_memory_tests` | 10 | 44 | Migrate independent assertions; check staged admission |
 | `atomic_zero_repeat` | 3 | 26 | Re-derive timing/order; retain assertions |
@@ -306,7 +313,7 @@ sections independently; do not run the complete suite after every edit.
 | `atomic_register_copy_sequences` | 4 | 43 | Migrate independent assertions; check staged admission |
 | `atomic_guard_conditions` | 18 | 41 | Migrate independent assertions; check staged admission |
 | `atomic_memory_alu_literals` | 9 | 40 | Migrate independent assertions; check staged admission |
-| `atomic_mmr_transfer_literals` | 4 | 45 | Migrate independent assertions; check staged admission |
+| `atomic_mmr_transfer_literals` | 4 | 45 | Staged validated; same-clock peripheral Read/older Write order explicit; results retained |
 | `atomic_transfer_repeat_literals` | 265 | 55 | Atomic retained; first staged contrast: C54x case RPT-every-eight-bit-count-with-MAR-body/9: register 22 actual=1 expected=0 mask=ffffffffffffffff |
 | `atomic_status_xf` | 8 | 29 | Migrate independent assertions; check staged admission |
 | `atomic_single_slot_conditions` | 8 | 27 | Migrate independent assertions; check staged admission |
@@ -322,7 +329,7 @@ sections independently; do not run the complete suite after every edit.
 | `atomic_basic_control_sequences` | 13 | 53 | Validated staged migration; assertions retained |
 | `atomic_basic_alu_control` | 10 | 49 | Validated staged migration; assertions retained |
 | `atomic_basic_parallel_block` | 9 | 51 | Validated staged migration; assertions retained |
-| `atomic_accumulator_calls` | 3 | 31 | Re-derive timing/order; retain assertions |
+| `atomic_accumulator_calls` | 3 | 31 | Staged validated; CALAD admission, frame/target/delay predicates and same-clock RET/ST order |
 | `atomic_bus_timing` | 3 | 37 | Atomic retained; first staged contrast: Section IRQ case=0 line=2 clock=15 data_events=3 previous_case=0 return_pc=0701 |
 | `atomic_port_timing` | 15 | 65 | Validated staged migration after RND/circular PORTW admission; assertions retained |
 | `atomic_mac_saturation` | 7 | 44 | Migrate independent assertions; check staged admission |

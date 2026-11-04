@@ -268,7 +268,7 @@ constexpr bool staged_accumulator_far_call(u16 word)
 
 constexpr bool staged_accumulator_near_call(u16 word)
 {
-	return (word & 0xfeff) == 0xf4e3; // Nondelayed CALA A/B only.
+	return (word & 0xfcff) == 0xf4e3; // CALA/CALAD A/B.
 }
 
 constexpr bool staged_accumulator_call(u16 word)
@@ -3927,7 +3927,7 @@ void tms320c54x_device::pipeline_step()
 		}
 		if (m_pipeline_valid[2] && (fast_return || plain_return || delayed_return || far_return || branch || block_setup))
 		{
-			bool const delayed = delayed_return || word == 0xf69b || word == 0xf272 || word == 0xf273 || word == 0xf274 || (staged_accumulator_far_call(word) && BIT(word, 9)) || (staged_far_call(word) && BIT(word, 9)) || (staged_banz(word) && BIT(word, 9)) || (staged_conditional_branch(word) && BIT(word, 9)) || (far_return && BIT(word, 9));
+			bool const delayed = delayed_return || word == 0xf69b || word == 0xf272 || word == 0xf273 || word == 0xf274 || (staged_accumulator_call(word) && BIT(word, 9)) || (staged_far_call(word) && BIT(word, 9)) || (staged_banz(word) && BIT(word, 9)) || (staged_conditional_branch(word) && BIT(word, 9)) || (far_return && BIT(word, 9));
 			// Example 7-17 has one empty prefetch slot, unlike unconditional BD.
 			prefetch_bubble = staged_conditional_branch(word);
 			m_pipeline_control_address = m_pipeline_address[2];
@@ -5086,11 +5086,11 @@ void tms320c54x_device::pipeline_step()
 		{
 			m_pipeline_flush_front = false;
 			m_pipeline_decode_flush = 0;
-			if (staged_accumulator_far_call(m_op) && BIT(m_op, 9))
+			if (staged_accumulator_call(m_op) && BIT(m_op, 9))
 			{
-				// FCALAD publishes the second frame word without the
-				// nondelayed hold; Read already redirected target Prefetch.
-				data_write(m_pipeline_far_call_stack[5], m_pipeline_far_call_page[5], 5);
+				// Delayed accumulator calls already redirected Prefetch in Read;
+				// only FCALAD owns a second frame word.
+				if (staged_accumulator_far_call(m_op)) data_write(m_pipeline_far_call_stack[5], m_pipeline_far_call_page[5], 5);
 				m_pc = u16(address + 1);
 			}
 			else
@@ -5628,7 +5628,7 @@ void tms320c54x_device::pipeline_step()
 	if (m_pipeline_valid[3] && staged_accumulator_call(m_pipeline_word[3]))
 	{
 		m_pipeline_operand_address[3] = --m_sp;
-		m_pipeline_immediate[3] = u16(m_pipeline_address[3] + ((staged_accumulator_far_call(m_pipeline_word[3]) && BIT(m_pipeline_word[3], 9)) ? 3 : 1));
+		m_pipeline_immediate[3] = u16(m_pipeline_address[3] + (BIT(m_pipeline_word[3], 9) ? 3 : 1));
 	}
 	if (m_pipeline_valid[4] && staged_accumulator_transfer(m_pipeline_word[4]))
 	{
@@ -5641,7 +5641,7 @@ void tms320c54x_device::pipeline_step()
 			else m_rtn = m_pipeline_immediate[4];
 			data_write(m_pipeline_operand_address[4], m_pipeline_immediate[4], 4);
 		}
-		if (staged_accumulator_far_call(m_pipeline_word[4]) && BIT(m_pipeline_word[4], 9))
+		if (staged_accumulator_call(m_pipeline_word[4]) && BIT(m_pipeline_word[4], 9))
 		{
 			m_pipeline_fetch_address = m_pipeline_acc_transfer_target;
 			m_pipeline_decode_flush = 1; // Discard sequential Fetch after the two delay words.

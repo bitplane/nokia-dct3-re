@@ -25,24 +25,25 @@ inline std::vector<clocked_register_case> section_cases()
 		auto final = observation("delay-overwrite-does-not-change-decision", {{STATE_GENPC,v.taken ? 0x701U : 0x601 + cursor},
 			{r::STATE_A,v.b ? 0x1234U : v.output},{r::STATE_B,v.b ? v.output : 0x1234U},
 			{r::STATE_SP,0x3000U + unsigned(v.returning && v.taken)}});
-		clocked_register_case c{{{0,std::move(initial)},{1,observation("pre-control-snapshot", {{STATE_GENPC,0x600}})},
+		clocked_register_case c{{{0,std::move(initial)},{1,observation("pre-control-snapshot", {{STATE_GENPC,0x5ff}})},
 			{2,observation("control-running", {})},{32,std::move(final)}},1,32};
-		c.pipeline_frontend = false; c.data_events = std::vector<clocked_data_event>{};
+		c.pipeline_frontend = true; c.data_events = std::vector<clocked_data_event>{};
 		if (v.returning && v.taken) c.data_events->push_back({false,0x3000,0x700,0,false});
 		cases.push_back(std::move(c));
 	}
 	{
-		auto initial = initial_case("atomic-two-push-two-pop-page-zero", {0x4a62,0x4a63,0x8a62,0x8a63,0xf4e1});
+		auto initial = initial_case("two-push-two-pop-page-zero", {0x4a62,0x4a63,0x8a62,0x8a63,0xf4e1});
 		initial.program.push_back({0x5ff,0xf495}); initial.data = {{0x62,0x1234},{0x63,0x5678}};
 		initial.initial.insert(initial.initial.end(), {{STATE_GENPC,0x5ff},{r::STATE_SP,0x3000}});
 		auto final = observation("stack-order-swaps-encoded-RAM-words", {{STATE_GENPC,0x605},{r::STATE_SP,0x3000}},
 			{{0x2fff,0x1234},{0x2ffe,0x5678},{0x62,0x5678},{0x63,0x1234}});
 		clocked_register_case c{{{0,std::move(initial)},{1,observation("pre-stack-snapshot", {{r::STATE_SP,0x3000}})},
 			{2,observation("stack-running", {})},{32,std::move(final)}},1,32};
-		c.pipeline_frontend = false;
-		c.data_events = std::vector<clocked_data_event>{{false,0x62,0x1234,0,false},{true,0x2fff,0x1234,0,false},
-			{false,0x63,0x5678,0,false},{true,0x2ffe,0x5678,0,false},{false,0x2ffe,0x5678,0,false},
-			{true,0x62,0x5678,0,false},{false,0x2fff,0x1234,0,false},{true,0x63,0x1234,0,false}};
+		c.pipeline_frontend = true;
+		// Aliasing POPM reads after the older PSHM write; other Reads precede EB.
+		c.data_events = std::vector<clocked_data_event>{{false,0x62,0x1234,6},{false,0x63,0x5678,7},
+			{true,0x2fff,0x1234,7},{true,0x2ffe,0x5678,8},{false,0x2ffe,0x5678,8},
+			{false,0x2fff,0x1234,9},{true,0x62,0x5678,9},{true,0x63,0x1234,10}};
 		cases.push_back(std::move(c));
 	}
 	return cases;

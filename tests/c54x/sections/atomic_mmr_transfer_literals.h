@@ -34,11 +34,11 @@ inline std::vector<clocked_register_case> section_cases()
 		} else {
 			initial.data = {{0x20,0x9abc},{0x21,0}}; final.expected_data = {{0x20,0x9abc},{0x21,0x1234}};
 			events = {{true,0x16,0x1234,0,false},{true,0x17,0x1234,0,false},{true,0x21,0x1234,0,false},
-				{true,0x10,0x5678,0,false},{true,0x11,0x5678,0,false},{false,0x20,0x9abc,0,false}};
+				{true,0x10,0x5678,0,false},{false,0x20,0x9abc,13},{true,0x11,0x5678,13}};
 		}
-		clocked_register_case c{{{0,std::move(initial)},{1,observation("pre-transfer-snapshot", {{STATE_GENPC,0x601}})},
+		clocked_register_case c{{{0,std::move(initial)},{1,observation("pre-transfer-snapshot", {{STATE_GENPC,0x600}})},
 			{2,observation("transfer-running", {})},{48,std::move(final)}},1,48};
-		c.pipeline_frontend = false; c.data_events = std::move(events); cases.push_back(std::move(c));
+		c.pipeline_frontend = true; c.data_events = std::move(events); cases.push_back(std::move(c));
 	}
 	return cases;
 }
