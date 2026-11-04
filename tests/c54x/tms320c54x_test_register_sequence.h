@@ -136,7 +136,7 @@ public:
 				m_ready_level=m_saved_ready_level;
 				++m_restores; m_cpu.suspend(SUSPEND_REASON_DISABLE, true); m_resume = true; m_timer.enable(true); return false;
 			}
-			m_data_tap.remove(); m_io_tap.remove(); m_fetch_tap.remove(); m_program_tap.remove(); m_cpu.set_pipeline_frontend(false);
+			m_data_tap.remove(); m_io_tap.remove(); m_fetch_tap.remove(); m_program_tap.remove();
 			m_coverage.add(m_input.identity.value_or(m_case));
 			if (++m_case < m_cases) { begin(); return false; }
 			return true;

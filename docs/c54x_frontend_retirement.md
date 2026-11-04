@@ -184,7 +184,13 @@ directory corruption. This is an added firmware section, not generic ISA scope.
 
 The new IDLE-loop regression also fails with the old control-span arithmetic
 and passes after restoring the correction, independently of the full MU4 run.
-Remaining work is MU4 producer/consumer and AAC qualification, other uploaded
+AAC's ABI fixture already selects staged unconditionally in `machine_reset`
+before any CPU time; its constructor default is not an atomic execution path.
+The native Nokia DSP backend also selects staged/standard directly, rather
+than depending on handset wrappers. The isolated runner's former false-mode
+teardown call is removed; it scheduled no atomic instructions between cases.
+
+Remaining work is MU4 producer/consumer qualification, other uploaded
 application boundaries, retirement of explicit atomic comparison aliases, and
 then removal of atomic scheduling/state. Shared `execute_one` instruction
 semantics remain required by staged execution.
