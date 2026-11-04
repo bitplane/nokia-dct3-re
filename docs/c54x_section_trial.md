@@ -3,6 +3,10 @@
 The generic legacy phase chain is retired. Independent sections are the
 executable authority; retained firmware adapters remain separate.
 
+Current frontend migration and acceptance are recorded in
+[c54x_frontend_retirement.md](c54x_frontend_retirement.md). The checkpoint below
+is the replacement-suite baseline before atomic retirement, not current counts.
+
 ## Validation checkpoint
 
 At source revision `0471a6a2`, the complete generic catalogue passes all 506

@@ -10,8 +10,10 @@ deletion solely because of its name or similarity to another section.
 The retirement baseline has 518 registered sections, 18,148 source lines and
 1,477,911 registered cases. Its 137 sections explicitly assigning
 `pipeline_frontend = false` contain 5,991 source
-lines and 11,468 registered cases. Seven additional sections select the frontend
-through an expression: 241 lines and 39,048 cases. Counts describe entire
+lines and 11,468 registered cases. Seven directly paired sections contain
+241 baseline lines and 39,048 cases. Five more use the shared delay/repeat
+helper and contain 1,920 baseline cases: twelve paired families and 40,968
+cases in total. Counts describe entire
 sections, not atomic-only case counts. Helpers and firmware integration sources
 are additional migration work. The common case defaults to staged.
 
@@ -20,9 +22,9 @@ Current isolated progress: all 137 original explicitly atomic sections migrated
 Step 3 still requires final composition acceptance before being marked complete.
 The baseline counts
 describe the retirement scope, not the current number of atomic assignments.
-The seven originally paired sections are now staged-only: 24,040 cases remain
-from their 39,048-case baseline. Their original staged stimuli, assertions and
-checkpoints are unchanged; 15,008 atomic-side executions/replays are removed.
+The twelve originally paired families are now staged-only: 25,000 cases remain
+from their 40,968-case baseline. Their original staged stimuli, assertions and
+checkpoints are unchanged; 15,968 atomic-side executions/replays are removed.
 Source admission retains all 23,748 staged cases, not an assumed half split.
 The extended I/O helper now selects operand forms, not a frontend: 1,440 staged
 cases cover both bus profiles, with 288 duplicate short-form executions removed.
@@ -379,36 +381,36 @@ sections independently; do not run the complete suite after every edit.
 
 | Section | Cases | Lines | Disposition |
 | --- | ---: | ---: | --- |
-| `signed_conditions` | 389 | 56 | Migrate independent assertions; check staged admission |
+| `signed_conditions` | 389 | 56 | Staged validated; independent assertions retained. |
 | `return_barrier` | 12 | 29 | Validated staged subset; atomic dimension removed |
 | `xc_status` | 64 | 30 | Validated staged subset; atomic dimension removed |
 | `xc_latency` | 384 | 46 | Validated staged subset; atomic dimension removed |
-| `atomic_conditional_return` | 96 | 33 | Re-derive timing/order; retain assertions |
+| `atomic_conditional_return` | 96 | 33 | Staged validated; ordering re-derived, assertions retained. |
 | `atomic_overflow_branch` | 32 | 31 | Validated staged migration; assertions retained |
-| `carry_branch` | 8 | 26 | Migrate independent assertions; check staged admission |
+| `carry_branch` | 8 | 26 | Staged validated; independent assertions retained. |
 | `repeat_status` | 1 | 14 | Migrated; TI Decode-owned BRAF timing replaces atomic endpoint timing, exact loop sequence checked. |
 | `atomic_delayed_call` | 9 | 32 | Migrated; page/frame/predicate assertions retained, OVA clearance checked. |
-| `conditional_register_store` | 2,304 | 42 | Migrate independent assertions; check staged admission |
+| `conditional_register_store` | 2,304 | 42 | Staged validated; independent assertions retained. |
 | `zero_bk` | 208 | 27 | Migrated; pointer wrap preserved, MPY reads/result/T/IMR/IFR explicitly checked. |
 | `indirect_popm` | 4 | 27 | Migrated; all masked/pre/post/CMPT/SP results, bus events and restores retained. |
 | `block_repeat_control` | 8 | 46 | Migrated; qualified early BRAF changes and nested RPT preserve loop-count assertions. |
 | `clock_control` | 17 | 36 | Migrated; clock field/readback/reload assertions retained with separated peripheral reads. |
-| `accumulator_call` | 2 | 23 | Re-derive timing/order; retain assertions |
-| `instruction_examples` | 50 | 21 | Migrate independent assertions; check staged admission |
-| `shifted_arithmetic` | 104 | 34 | Migrate independent assertions; check staged admission |
+| `accumulator_call` | 2 | 23 | Staged validated; ordering re-derived, assertions retained. |
+| `instruction_examples` | 50 | 21 | Staged validated; independent assertions retained. |
+| `shifted_arithmetic` | 104 | 34 | Staged validated; independent assertions retained. |
 | `rounding` | 64 | 31 | Validated staged migration after RND/circular PORTW admission; assertions retained |
-| `square_difference` | 40 | 46 | Migrate independent assertions; check staged admission |
+| `square_difference` | 40 | 46 | Staged validated; independent assertions retained. |
 | `firs_sum` | 32 | 35 | Migrated; all baseline cases plus two coefficient hold/capture poison/replays (34 current). |
 | `arithmetic_boundaries` | 80 | 47 | Staged validated; ABDST/POLY boundaries, flags and old-source assertions retained |
-| `conditional_accumulator_store` | 168 | 50 | Migrate independent assertions; check staged admission |
-| `rounded_multiply` | 104 | 67 | Migrate independent assertions; check staged admission |
-| `store_shift` | 120 | 41 | Migrate independent assertions; check staged admission |
-| `smul_control` | 192 | 42 | Re-derive timing/order; retain assertions |
-| `bit_immediate` | 512 | 26 | Migrate independent assertions; check staged admission |
+| `conditional_accumulator_store` | 168 | 50 | Staged validated; independent assertions retained. |
+| `rounded_multiply` | 104 | 67 | Staged validated; independent assertions retained. |
+| `store_shift` | 120 | 41 | Staged validated; independent assertions retained. |
+| `smul_control` | 192 | 42 | Staged validated; ordering re-derived, assertions retained. |
+| `bit_immediate` | 512 | 26 | Staged validated; independent assertions retained. |
 | `parallel_load_multiply` | 64 | 30 | Migrated; baseline cases plus one retained-T poison/replay check (65 current). |
 | `rounded_load` | 64 | 29 | Staged validated; SXM/result/flags/addressing/read/replay assertions retained |
-| `shifted_high_store` | 128 | 27 | Migrate independent assertions; check staged admission |
-| `offset_memory_test` | 8 | 24 | Migrate independent assertions; check staged admission |
+| `shifted_high_store` | 128 | 27 | Staged validated; independent assertions retained. |
+| `offset_memory_test` | 8 | 24 | Staged validated; independent assertions retained. |
 | `software_interrupt` | 128 | 35 | Migrated; TRAP preserves INTM/IFR while sharing vector/frame delivery. |
 | `compact_load` | 28 | 32 | Validated staged migration; assertions retained |
 | `stack_address_dependency` | 24 | 33 | Validated staged migration; assertions retained |
@@ -419,31 +421,31 @@ sections independently; do not run the complete suite after every edit.
 | `atomic_xorm` | 256 | 33 | Staged validated; assembler-confirmed long-offset encoding; result/status/pointer/bus/replay retained |
 | `scalar_boundaries` | 34 | 66 | Validated staged migration; assertions retained |
 | `atomic_repeat_irq` | 2 | 34 | Migrated; body reads/count and deferred IRQ frame/return retained. |
-| `atomic_subtract` | 384 | 53 | Migrate independent assertions; check staged admission |
+| `atomic_subtract` | 384 | 53 | Staged validated; independent assertions retained. |
 | `square_literals` | 6 | 38 | Validated staged migration; assertions retained |
 | `atomic_near_control` | 10 | 50 | Staged validated; original stack stimulus/results, delay decisions and explicit bus clocks |
 | `long_literals` | 33 | 68 | Staged validated; all baseline cases plus one T-poison/replay check (34 current cases) |
-| `atomic_mac_literals` | 39 | 47 | Migrate independent assertions; check staged admission |
-| `atomic_dual_address` | 11 | 46 | Migrate independent assertions; check staged admission |
-| `atomic_parallel_literals` | 10 | 54 | Migrate independent assertions; check staged admission |
+| `atomic_mac_literals` | 39 | 47 | Staged validated; independent assertions retained. |
+| `atomic_dual_address` | 11 | 46 | Staged validated; independent assertions retained. |
+| `atomic_parallel_literals` | 10 | 54 | Staged validated; independent assertions retained. |
 | `atomic_shift_literals` | 25 | 54 | Validated staged migration after RND/circular PORTW admission; assertions retained |
-| `atomic_register_shift` | 36 | 61 | Migrate independent assertions; check staged admission |
-| `atomic_register_logic` | 20 | 45 | Migrate independent assertions; check staged admission |
+| `atomic_register_shift` | 36 | 61 | Staged validated; independent assertions retained. |
+| `atomic_register_logic` | 20 | 45 | Staged validated; independent assertions retained. |
 | `atomic_product_literals` | 21 | 63 | Staged validated; corrected MAC encoding and extended DELAY admission; independent results retained |
-| `atomic_conditional_control` | 12 | 39 | Re-derive timing/order; retain assertions |
+| `atomic_conditional_control` | 12 | 39 | Staged validated; ordering re-derived, assertions retained. |
 | `atomic_far_edges` | 23 | 66 | Migrated; all transfers/frames retained, XPC write expectation corrected to TI table 6-3. |
 | `atomic_extended_interactions` | 3 | 55 | Staged validated; physical IRQ moved after real IDLE; page/frame/transfer predicates retained |
 | `atomic_fast_return` | 1 | 26 | Migrated; RTN and stack poison retained, settled continuation retimed. |
 | `atomic_pending_far` | 2 | 38 | Staged validated; first-delay retirement checkpoint derived; pending transfer replay retained |
-| `atomic_program_mapping` | 13 | 68 | Migrate independent assertions; check staged admission |
+| `atomic_program_mapping` | 13 | 68 | Staged validated; independent assertions retained. |
 | `coefficient_mac_literals` | 6 | 38 | Migrated; canonical assembler-confirmed offset order and all independent results retained. |
 | `atomic_memory_literals` | 24 | 91 | Staged validated; baseline assertions plus LTD/STLM T-publication replay regression (25 current cases) |
-| `atomic_double_stores` | 8 | 40 | Migrate independent assertions; check staged admission |
-| `atomic_address_literals` | 4 | 33 | Migrate independent assertions; check staged admission |
-| `atomic_shifted_loads` | 7 | 36 | Migrate independent assertions; check staged admission |
+| `atomic_double_stores` | 8 | 40 | Staged validated; independent assertions retained. |
+| `atomic_address_literals` | 4 | 33 | Staged validated; independent assertions retained. |
+| `atomic_shifted_loads` | 7 | 36 | Staged validated; independent assertions retained. |
 | `atomic_stack_literals` | 9 | 53 | Staged validated; original stack/accumulator fields retained with Read/Write clocks |
 | `atomic_mapped_moves` | 4 | 36 | Migrated; all baseline cases plus DP=0/mid-repeat restore (five current). |
-| `atomic_memory_tests` | 10 | 44 | Migrate independent assertions; check staged admission |
+| `atomic_memory_tests` | 10 | 44 | Staged validated; independent assertions retained. |
 | `atomic_zero_repeat` | 3 | 26 | Staged validated; once-only logical body execution replaces atomic fetch-count convention |
 | `atomic_program_transfers` | 8 | 46 | Validated staged migration; assertions retained |
 | `atomic_conditional_repeat` | 4 | 32 | Staged validated; baseline cases plus three extended count-source poison/replay checks (7 current cases) |
@@ -451,32 +453,32 @@ sections independently; do not run the complete suite after every edit.
 | `atomic_mmr_burst` | 2 | 43 | Migrated; RSA/REA setup, zero-latency T push and all register/stack words retained. |
 | `atomic_memory_sequences` | 3 | 40 | Validated staged migration; assertions retained |
 | `atomic_absolute_literals` | 30 | 78 | Migrated; indirect MMR addressing and completed TCR readback qualified. |
-| `atomic_condition_edges` | 6 | 30 | Migrate independent assertions; check staged admission |
-| `atomic_alu_store_literals` | 8 | 37 | Migrate independent assertions; check staged admission |
-| `atomic_high_store_literals` | 5 | 28 | Migrate independent assertions; check staged admission |
-| `atomic_parallel_load_literals` | 8 | 46 | Migrate independent assertions; check staged admission |
-| `atomic_move_modify_literals` | 9 | 60 | Migrate independent assertions; check staged admission |
-| `atomic_logic_pointer_literals` | 18 | 57 | Migrate independent assertions; check staged admission |
-| `atomic_logic_program_literals` | 5 | 40 | Migrate independent assertions; check staged admission |
-| `atomic_accumulator_add_literals` | 7 | 31 | Migrate independent assertions; check staged admission |
+| `atomic_condition_edges` | 6 | 30 | Staged validated; independent assertions retained. |
+| `atomic_alu_store_literals` | 8 | 37 | Staged validated; independent assertions retained. |
+| `atomic_high_store_literals` | 5 | 28 | Staged validated; independent assertions retained. |
+| `atomic_parallel_load_literals` | 8 | 46 | Staged validated; independent assertions retained. |
+| `atomic_move_modify_literals` | 9 | 60 | Staged validated; independent assertions retained. |
+| `atomic_logic_pointer_literals` | 18 | 57 | Staged validated; independent assertions retained. |
+| `atomic_logic_program_literals` | 5 | 40 | Staged validated; independent assertions retained. |
+| `atomic_accumulator_add_literals` | 7 | 31 | Staged validated; independent assertions retained. |
 | `atomic_multiply_move_literals` | 7 | 59 | Migrated; results retained, AR latency corrected to TI contract. |
 | `atomic_conditional_slot_literals` | 10 | 55 | Validated staged migration; assertions retained |
 | `atomic_mapped_load_sequences` | 4 | 53 | Staged validated; same-clock Read/Write ordering made explicit; values retained |
 | `atomic_register_copy_sequences` | 4 | 43 | Migrated; seven current cases cover serialized CLKMD Read, pending replay and adjacent/separated BRC copies. |
-| `atomic_guard_conditions` | 18 | 41 | Migrate independent assertions; check staged admission |
-| `atomic_memory_alu_literals` | 9 | 40 | Migrate independent assertions; check staged admission |
+| `atomic_guard_conditions` | 18 | 41 | Staged validated; independent assertions retained. |
+| `atomic_memory_alu_literals` | 9 | 40 | Staged validated; independent assertions retained. |
 | `atomic_mmr_transfer_literals` | 4 | 45 | Staged validated; same-clock peripheral Read/older Write order explicit; results retained |
 | `atomic_transfer_repeat_literals` | 265 | 55 | Staged validated; all eight-bit MAR repeat counts and original transfer/literal predicates retained |
-| `atomic_status_xf` | 8 | 29 | Migrate independent assertions; check staged admission |
-| `atomic_single_slot_conditions` | 8 | 27 | Migrate independent assertions; check staged admission |
+| `atomic_status_xf` | 8 | 29 | Staged validated; independent assertions retained. |
+| `atomic_single_slot_conditions` | 8 | 27 | Staged validated; independent assertions retained. |
 | `atomic_memory_pairs` | 13 | 70 | Staged validated; adjacent MVDD Read/Write clocks explicit; results retained |
 | `atomic_memory_address_literals` | 28 | 84 | Migrated; independent results/events retained, cold PC retimed. |
 | `atomic_memory_arithmetic` | 45 | 97 | Staged validated; T-based long-word arithmetic and original literal/bus assertions retained |
-| `atomic_dual_arithmetic_literals` | 3 | 29 | Migrate independent assertions; check staged admission |
+| `atomic_dual_arithmetic_literals` | 3 | 29 | Staged validated; independent assertions retained. |
 | `atomic_coefficient_fir_literals` | 5 | 45 | Migrated; baseline cases plus two coefficient/successor poison/replays (seven current). |
-| `atomic_dual_add_sub_literals` | 8 | 38 | Migrate independent assertions; check staged admission |
-| `atomic_immediate_product_literals` | 11 | 41 | Migrate independent assertions; check staged admission |
-| `atomic_asm_arithmetic` | 523 | 51 | Migrate independent assertions; check staged admission |
+| `atomic_dual_add_sub_literals` | 8 | 38 | Staged validated; independent assertions retained. |
+| `atomic_immediate_product_literals` | 11 | 41 | Staged validated; independent assertions retained. |
+| `atomic_asm_arithmetic` | 523 | 51 | Staged validated; independent assertions retained. |
 | `atomic_basic_repeat_sequences` | 5 | 54 | Staged validated; MAR encoding corrected; undefined repeated-ADDM success replaced by explicit fail-closed check |
 | `atomic_basic_control_sequences` | 13 | 53 | Validated staged migration; assertions retained |
 | `atomic_basic_alu_control` | 10 | 49 | Validated staged migration; assertions retained |
@@ -484,7 +486,7 @@ sections independently; do not run the complete suite after every edit.
 | `atomic_accumulator_calls` | 3 | 31 | Staged validated; CALAD admission, frame/target/delay predicates and same-clock RET/ST order |
 | `atomic_bus_timing` | 3 | 37 | Migrated; exact operand intervals retained, decoded target IDLE drains before IRQ entry. |
 | `atomic_port_timing` | 15 | 65 | Validated staged migration after RND/circular PORTW admission; assertions retained |
-| `atomic_mac_saturation` | 7 | 44 | Migrate independent assertions; check staged admission |
+| `atomic_mac_saturation` | 7 | 44 | Staged validated; independent assertions retained. |
 | `atomic_port_marked_operations` | 22 | 83 | Validated staged migration after RND/circular PORTW admission; assertions retained |
 | `atomic_compatibility_memory` | 9 | 55 | Staged validated; compatibility pointers, arithmetic/flags, RAM and marker intervals retained |
 | `atomic_port_marked_memory` | 11 | 48 | Migrated; all results retained, repeated ADD markers explicitly retimed. |
@@ -494,7 +496,7 @@ sections independently; do not run the complete suite after every edit.
 | `atomic_absolute_arithmetic` | 16 | 49 | Validated staged migration; assertions retained |
 | `atomic_long_offset_literals` | 14 | 60 | Staged validated; corrected ANDM/ORM encoding; resolved addresses, results and marker intervals retained |
 | `atomic_memory_route_literals` | 26 | 85 | Migrated; offset READA admitted and CMPM/MVPD encoding corrected, values and marker intervals retained. |
-| `atomic_short_immediate` | 520 | 30 | Migrate independent assertions; check staged admission |
+| `atomic_short_immediate` | 520 | 30 | Staged validated; independent assertions retained. |
 | `atomic_port_delayed_branch` | 6 | 30 | Migrated; all conditions, slot effects and port values retained, taken marker interval is nine staged clocks. |
 | `atomic_port_register_examples` | 6 | 37 | Staged validated; MAR encoding corrected and modeled repeat-tail interval derived; values retained |
 | `atomic_port_low_store` | 6 | 37 | Validated staged migration; assertions retained |

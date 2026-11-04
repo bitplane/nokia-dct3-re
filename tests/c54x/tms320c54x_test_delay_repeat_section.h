@@ -7,8 +7,9 @@ namespace c54x_test {
 inline std::vector<clocked_register_case> delay_repeat_cases(unsigned owner)
 {
 	std::vector<clocked_register_case> cases;
+	constexpr bool staged=true;
 	for(unsigned kind=0;kind<3;++kind)for(unsigned count : {0U,1U,8U,39U,255U})for(unsigned pattern=0;pattern<4;++pattern)
-	for(bool staged : {false,true})for(unsigned condition=0;condition<(owner==3 ? 12U : 1U);++condition){
+	for(unsigned condition=0;condition<(owner==3 ? 12U : 1U);++condition){
 		unsigned const selector=kind+count+pattern+condition;
 		unsigned const following=std::array<unsigned,3>{0,2,7}[selector%3];
 		u32 const base=selector&1 ? 0x20000 : 0;
