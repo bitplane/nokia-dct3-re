@@ -2,6 +2,10 @@
 
 Address-level native-loader execution, staged/atomic comparisons and bus/timing evidence. [C54x execution contracts](c54x_execution_contracts.md) owns current processor qualification; [the ROM4 loader](rom4_dsp_loader.md) owns handset lifecycle. Older bounded captures are not renewed by a later focused test.
 
+Execution is now staged-only; atomic comparisons below are archived evidence,
+not selectable engines or current machine configurations. The
+[retirement contract](c54x_frontend_retirement.md) owns migration acceptance.
+
 ## ST1 memory-access constraints
 
 [SPRU131G table 4-2](https://www.ti.com/lit/ug/spru131g/spru131g.pdf)

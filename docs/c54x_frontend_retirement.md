@@ -74,14 +74,15 @@ explicit laboratory clock wiring is not a physical timing-validation claim.
   inputs, observable effects and restore contract. None is established by this
   scan; this inventory deliberately does not equate similar names with parity.
 
-## Implementation and integration dependencies
+## Execution boundary
 
-`execute_one` is roughly 2,000 lines but is shared: staged Execute falls
-back to it and accelerated staged repeats also call it. Retain shared instruction
-semantics. The clear retirement surface is `retire_atomic_instruction`, the
-atomic arm of `execute_run`, atomic pending-I/O/XC state and conditional branches
-on `m_pipeline_frontend`; branch-local helpers require a call-site audit before
-removal. Header state, save registration, reset and restore must change together.
+Execution is stage-owned only. The atomic scheduler, pending-I/O continuation,
+XC history, delayed-control/repeat scheduler, stack-address history and their
+reset/save registrations are removed. Control flow, bus transactions and clock
+accounting belong to the pipeline. `execute_one` retains shared instruction
+effects, without the duplicate control handlers or instruction-level timing
+debits. `set_pipeline_frontend(true)` remains a compatibility reset entry point;
+false is rejected, not an alternate execution mode. Naming/API cleanup is step 5.
 
 Ordinary `noki5110` now explicitly selects staged and standard SWWSR decoding.
 The frontend-only trial rejected firmware STM `7728`; standard decoding is
@@ -91,14 +92,16 @@ Validate ordinary boot/menu, codecs, peripheral/audio integration, power/reset
 and save/restore without inheriting unrelated research overrides.
 Other HLE-backed products do not establish native DSP parity.
 
-MU4 laboratory defaults remain the unresolved reference consumers. ROM4
+MU4 laboratory defaults now select staged with the C5416-compatible bus profile.
+Isolated routine wrappers explicitly initialize zero I/O waits because they
+bypass the original memory-interface setup; native startup retains its own
+SWWSR/SWCR initializer. This does not establish physical bank or READY wiring.
+ROM4
 integration now selects staged at reset for ordinary
 profile names as well as the retained `-pipe` aliases. Both cold names use the
 same mask-only Prefetch assertion; the unreachable atomic cold phase is removed.
-Generic-section migration does not qualify those full
-firmware applications on staged. Stage 4 must promote their required contracts
-or retire comparison-only entry points before removing the engine; do not infer
-that deleting the unit-test dimension alone makes that deletion safe.
+Generic-section migration is separate from full firmware-application acceptance;
+the qualification results below establish the exercised application contracts.
 
 Production promotion acceptance passes menu hash/input, late input, short/long
 power presses and idle save/load replay. The audio harness uses `nse1obs`, an
@@ -154,7 +157,7 @@ the complete step-3 acceptance above is not a renewed full-suite claim for this
 source revision. Atomic scheduling/state remains until the remaining firmware
 consumers are qualified or their redundant comparison entry points retired.
 
-### Remaining engine-removal prerequisites
+### MU4 migration contracts
 
 The fresh InitDisk corruption is resolved by the existing on-chip RAM bypass
 contract (SPRU131G section 7.3.2). MVDK captures its source in Access, not Read;
@@ -164,28 +167,13 @@ adjacent ADDM/MVDK pair previously captured the old metadata offset. The new
 gap and restore contrasts; reverting only the MVDK forwarding call fails its
 first case. Eleven affected move/forwarding sections pass, and fresh MU4 setup
 now passes all six complete-file comparisons and the native entry assertions.
-Full reset/retained-media qualification is still required before promotion.
-
-MU4 is not yet safe to promote globally. An ordinary atomic `setup` run passes
-the six complete-file comparisons and native serial-setup assertions. Its
-staged counterpart passes erased/flush/template/scan controls, two serial
-receives, initialization, the complete 741,916-byte transfer and mount, but its
-first directory record has damaged fields and zero length. Do not reinterpret
-the successful transfer checksum as a full media-content proof.
-
-With an identical retained NAND created by the successful atomic run, staged
-execution passes all six complete-file comparisons and the original loader's
-3,254 records/51,921 words. Thus the damaged-record investigation belongs
-upstream of that directory reader, in fresh InitDisk media creation. The
-retained consumer also requires the C5416-compatible bus-register profile
-(`7728/7729`). Repeated short RAM logic is now qualified by sixty additional
-generic cases, including the XOR form (`1c91` at `03:928d`). The retained
-consumer reaches its native status/pin transaction; the setup-generated seed
-has no settings files and cannot satisfy the stronger retained-media gate.
-Fresh media creation and full retained acceptance are distinct remaining
-contracts; neither permits dropping MU4's assertions or
-deleting the engine underneath them. Experimental MU4 selections and write taps
-are removed; its existing execution configuration stays unchanged.
+The original loader transfers 3,254 records/51,921 words. The retained consumer
+uses the C5416-compatible bus-register profile (`7728/7729`). Repeated short RAM
+logic has sixty additional generic cases, including the XOR form (`1c91` at
+`03:928d`). Fresh setup media has no settings files; the stronger reset/retained
+gate must create and preserve those four files through original firmware.
+It is not interchangeable with the setup-only gate. Diagnostic write taps and
+temporary media-dump probes are removed.
 
 The original InitDisk name-copy helper `491e..492a` passes sixteen isolated
 copied-firmware cases with empty/short/eight/twelve-character inputs and four
@@ -206,10 +194,9 @@ control, and keeps the same boot, demand, bus, opcode and replay assertions.
 RF/call command-line runners cannot select a retired atomic machine; archived
 capture metadata remains parseable for existing checker fixtures only.
 
-Remaining work is MU4 producer/consumer qualification, other uploaded
-application boundaries, and
-then removal of atomic scheduling/state. Shared `execute_one` instruction
-semantics remain required by staged execution.
+Complete catalogue acceptance and fresh MU4 reset/retained qualification are
+being renewed on the single-engine composition. The step-3 snapshot above is
+not a renewed claim for this revision.
 
 ## Section work queue
 

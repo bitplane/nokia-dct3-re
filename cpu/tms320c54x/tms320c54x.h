@@ -29,8 +29,8 @@ public:
 	auto clkout_divisor_cb() { return m_clkout_divisor_cb.bind(); }
 	auto iack_enable_cb() { return m_iack_enable_cb.bind(); }
 	auto ready_in_cb() { return m_ready_in_cb.bind(); }
-	// Experimental stage-owned frontend; unsupported instruction forms stop,
-	// rather than falling back to instruction-boundary interrupt recognition.
+	// Compatibility reset entry point: only true is accepted. Execution is
+	// always stage-owned; unsupported instruction forms stop without fallback.
 	void set_pipeline_frontend(bool enabled);
 	u64 pipeline_cycles() const { return m_pipeline_cycles; }
 	auto bio_in_cb() { return m_bio_in_cb.bind(); }
@@ -137,7 +137,6 @@ private:
 		return m_extended_program && BIT(m_pmst, 5) && !(address & 0x8000) ? address & 0xffff : address;
 	}
 	u32 program_address(u16 address) const { return physical_program_address(logical_program_address(address)); }
-	void far_transfer(u32 address, bool delayed);
 	u16 data_read(u16 address);
 	void data_write(u16 address, u16 value, unsigned owner_stage = 5);
 	void internal_data_map(address_map &map);
@@ -167,9 +166,6 @@ private:
 	// BDXR retains its immediate until Execute, like BSPC. It must not use
 	// the address-generator STM early-write path. Peripheral phase is partial.
 	bool staged_serial_control(u16 op) const { return op == 0x7721 || op == 0x7722; }
-	void retire_atomic_instruction(u16 instruction_pc, u16 previous_sp,
-		bool repeat_was_armed, bool delayed, bool xc_guarded);
-	bool service_interrupt();
 	bool accept_interrupt();
 	void interrupt_entry_step();
 	void reset_pipeline();
@@ -185,7 +181,6 @@ private:
 	bool pipeline_early_braf_clear(unsigned stage, u16 value) const;
 	void pipeline_restore_block_on_return(u32 address);
 	void enter_idle(u8 mode);
-	void finish_repeats();
 	void push(u16 value);
 	u16 pop();
 	u64 data_operand(u16 value) const;
@@ -237,9 +232,6 @@ private:
 	u16 m_t = 0;
 	u16 m_trn = 0;
 	u16 m_sp = 0;
-	u16 m_sp_address_base = 0;
-	bool m_sp_address_pending = false;
-	bool m_sp_address_late = false;
 	u16 m_st0 = 0;
 	u16 m_st1 = 0;
 	u16 m_pmst = 0;
@@ -250,27 +242,10 @@ private:
 	u16 m_rea = 0;
 	u16 m_rtn = 0;
 	u16 m_rptc = 0;
-	u16 m_rpt_address = 0;
-	static constexpr u32 REPEAT_END_UNSET = 0x10000;
-	u32 m_rpt_end = REPEAT_END_UNSET; // Every 16-bit PC is a valid repeat endpoint.
 	u16 m_rpt_iteration = 0;
-	bool m_rpt_armed = false;
-	u16 m_delayed_target = 0;
-	u8 m_delayed_xpc = 0;
-	bool m_delayed_far = false;
-	u8 m_delayed_words = 0;
-	u8 m_xc_guard = 0;
-	std::array<u64, 2> m_atomic_xc_a{}, m_atomic_xc_b{};
-	std::array<u16, 2> m_atomic_xc_st0{};
-	u8 m_atomic_xc_valid = 0;
-	u8 m_atomic_condition_words = 0;
-	bool m_atomic_condition_redirect = false;
-	u64 m_atomic_condition_before_a = 0, m_atomic_condition_before_b = 0;
-	u16 m_atomic_condition_before_st0 = 0;
 	bool m_pipeline_xc_active = false;
 	u32 m_pipeline_xc_end = 0;
 	u8 m_pipeline_xc_skip_words = 0;
-	u8 m_intm_guard = 0;
 	u16 m_ifr = 0;
 	u16 m_imr = 0;
 	bool m_nmi_pending = false;
@@ -316,23 +291,6 @@ private:
 	u8 m_idle_mode = 0;
 	u64 m_idle_timer_ticks = 0;
 	bool m_illegal = false;
-	// Synchronous peripheral-MMR accounting, reset before each instruction.
-	bool m_peripheral_mmr_access = false;
-	// External I/O owns its saved continuation until the bus transfer retires.
-	bool m_atomic_io_pending = false;
-	bool m_atomic_io_write = false;
-	bool m_atomic_io_ready_required = false;
-	u8 m_atomic_io_wait_remaining = 0;
-	u16 m_atomic_io_address = 0;
-	u16 m_atomic_io_port = 0;
-	u16 m_atomic_io_value = 0;
-	u8 m_atomic_io_mode = 0;
-	u16 m_atomic_io_instruction_pc = 0;
-	u16 m_atomic_io_previous_sp = 0;
-	bool m_atomic_io_repeat_armed = false;
-	bool m_atomic_io_delayed = false;
-	bool m_atomic_io_xc_guarded = false;
-	bool m_pipeline_frontend = false;
 	// Prefetch, Fetch, Decode, Access, Read, Execute. Addresses and words are
 	// owned by their slots; no speculative instruction executes at acceptance.
 	std::array<u32, 6> m_pipeline_address = {};
@@ -439,9 +397,6 @@ private:
 	// Verbose-only observations, not architectural state or prefetched operands.
 	struct extension_observation { u32 first_pc; u32 count = 0; };
 	std::map<std::array<u16, 4>, extension_observation> m_extension_observations;
-	std::array<u16, 3> m_instruction_words = {};
-	u16 m_instruction_word_count = 0;
-	bool m_capture_extensions = false;
 	int m_icount = 0;
 };
 

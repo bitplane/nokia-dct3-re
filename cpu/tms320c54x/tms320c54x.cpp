@@ -1720,28 +1720,6 @@ void tms320c54x_device::device_start()
 	state_add(STATE_EXECPC, "EXECPC", m_debug_pipeline_pc).readonly().callexport().formatstr("%08X");
 
 	save_item(NAME(m_pc));
-	save_item(NAME(m_atomic_io_pending));
-	save_item(NAME(m_atomic_xc_a));
-	save_item(NAME(m_atomic_xc_b));
-	save_item(NAME(m_atomic_xc_st0));
-	save_item(NAME(m_atomic_xc_valid));
-	save_item(NAME(m_atomic_condition_words));
-	save_item(NAME(m_atomic_condition_redirect));
-	save_item(NAME(m_atomic_condition_before_a));
-	save_item(NAME(m_atomic_condition_before_b));
-	save_item(NAME(m_atomic_condition_before_st0));
-	save_item(NAME(m_atomic_io_write));
-	save_item(NAME(m_atomic_io_ready_required));
-	save_item(NAME(m_atomic_io_wait_remaining));
-	save_item(NAME(m_atomic_io_address));
-	save_item(NAME(m_atomic_io_port));
-	save_item(NAME(m_atomic_io_value));
-	save_item(NAME(m_atomic_io_mode));
-	save_item(NAME(m_atomic_io_instruction_pc));
-	save_item(NAME(m_atomic_io_previous_sp));
-	save_item(NAME(m_atomic_io_repeat_armed));
-	save_item(NAME(m_atomic_io_delayed));
-	save_item(NAME(m_atomic_io_xc_guarded));
 	save_item(NAME(m_xpc));
 	save_item(NAME(m_op));
 	save_item(NAME(m_a));
@@ -1749,9 +1727,6 @@ void tms320c54x_device::device_start()
 	save_item(NAME(m_t));
 	save_item(NAME(m_trn));
 	save_item(NAME(m_sp));
-	save_item(NAME(m_sp_address_base));
-	save_item(NAME(m_sp_address_pending));
-	save_item(NAME(m_sp_address_late));
 	save_item(NAME(m_st0));
 	save_item(NAME(m_st1));
 	save_item(NAME(m_pmst));
@@ -1762,15 +1737,7 @@ void tms320c54x_device::device_start()
 	save_item(NAME(m_rea));
 	save_item(NAME(m_rtn));
 	save_item(NAME(m_rptc));
-	save_item(NAME(m_rpt_address));
-	save_item(NAME(m_rpt_end));
 	save_item(NAME(m_rpt_iteration));
-	save_item(NAME(m_rpt_armed));
-	save_item(NAME(m_delayed_target));
-	save_item(NAME(m_delayed_xpc));
-	save_item(NAME(m_delayed_far));
-	save_item(NAME(m_delayed_words));
-	save_item(NAME(m_xc_guard));
 	save_item(NAME(m_pipeline_xc_active));
 	save_item(NAME(m_pipeline_xc_end));
 	save_item(NAME(m_pipeline_xc_skip_words));
@@ -1895,7 +1862,6 @@ void tms320c54x_device::device_start()
 	save_item(NAME(m_idle));
 	save_item(NAME(m_idle_mode));
 	save_item(NAME(m_idle_timer_ticks));
-	save_item(NAME(m_intm_guard));
 	save_item(NAME(m_illegal));
 }
 
@@ -1960,9 +1926,6 @@ void tms320c54x_device::device_stop()
 
 void tms320c54x_device::device_reset()
 {
-	m_atomic_io_pending = false;
-	m_atomic_io_wait_remaining = 0;
-	m_atomic_io_ready_required = false;
 	m_pc = 0xff80;
 	m_xpc = 0;
 	m_op = 0;
@@ -1990,18 +1953,7 @@ void tms320c54x_device::device_reset()
 	m_rea = 0;
 	m_rtn = 0;
 	m_rptc = 0;
-	m_rpt_address = 0;
-	m_rpt_end = REPEAT_END_UNSET;
 	m_rpt_iteration = 0;
-	m_rpt_armed = false;
-	m_delayed_target = 0;
-	m_delayed_xpc = 0;
-	m_delayed_far = false;
-	m_delayed_words = 0;
-	m_xc_guard = 0;
-	m_intm_guard = 0;
-	m_sp_address_base = 0;
-	m_sp_address_pending = m_sp_address_late = false;
 	m_ifr = 0;
 	m_nmi_pending = false;
 	m_nmi_asserted = false;
@@ -2222,7 +2174,6 @@ void tms320c54x_device::device_clock_changed()
 
 u16 tms320c54x_device::fetch()
 {
-	if (!m_pipeline_frontend) ++m_atomic_condition_words;
 	u16 value;
 	if (m_vector_prefetch_valid)
 	{
@@ -2232,12 +2183,6 @@ u16 tms320c54x_device::fetch()
 	}
 	else
 		value = m_cache.read_word(program_address(m_pc++));
-	if (m_capture_extensions)
-	{
-		if (m_instruction_word_count < m_instruction_words.size())
-			m_instruction_words[m_instruction_word_count] = value;
-		++m_instruction_word_count;
-	}
 	return value;
 }
 
@@ -2305,7 +2250,7 @@ void tms320c54x_device::state_export(const device_state_entry &entry)
 	{
 		unsigned const stage = entry.index() == STATE_READPC ? 4 : 5;
 		// Derived observation only: PC can already point beyond a bus owner.
-		m_debug_pipeline_pc = m_pipeline_frontend && m_pipeline_valid[stage] && !m_pipeline_annulled[stage]
+		m_debug_pipeline_pc = m_pipeline_valid[stage] && !m_pipeline_annulled[stage]
 				? m_pipeline_address[stage] : 0xffffffff;
 	}
 	else if (entry.index() == STATE_GENPC || entry.index() == STATE_GENPCBASE)
@@ -2314,33 +2259,15 @@ void tms320c54x_device::state_export(const device_state_entry &entry)
 		m_debug_timer = data_read(0x24 + entry.index() - STATE_TIM);
 }
 
-void tms320c54x_device::far_transfer(u32 address, bool delayed)
-{
-	if (delayed)
-	{
-		m_delayed_target = u16(address);
-		m_delayed_xpc = (address >> 16) & 0x7f;
-		m_delayed_far = true;
-		m_delayed_words = 2;
-	}
-	else
-	{
-		m_pc = u16(address);
-		m_xpc = (address >> 16) & 0x7f;
-		m_atomic_condition_redirect = true;
-	}
-}
-
 u16 tms320c54x_device::data_read(u16 address)
 {
-	m_peripheral_mmr_access |= address >= 0x20 && address <= 0x5f;
 	return m_data.read_word(address);
 }
 
 void tms320c54x_device::data_write(u16 address, u16 value, unsigned owner_stage)
 {
-	bool const early_braf_clear = m_pipeline_frontend && address == 7 && pipeline_early_braf_clear(owner_stage, value);
-	if (m_pipeline_frontend && m_pipeline_valid[owner_stage] && m_pipeline_block_body[owner_stage] &&
+	bool const early_braf_clear = address == 7 && pipeline_early_braf_clear(owner_stage, value);
+	if (m_pipeline_valid[owner_stage] && m_pipeline_block_body[owner_stage] &&
 		((address >= 0x1a && address <= 0x1c) || (address == 7 && ((value ^ m_st1) & ST1_BRAF) && !early_braf_clear)))
 	{
 		logerror("%s: staged in-block loop-register write is unsupported (instruction=%06x word=%04x destination=%04x value=%04x block=%06x..%06x brc=%04x rsa=%04x rea=%04x)\n",
@@ -2348,10 +2275,9 @@ void tms320c54x_device::data_write(u16 address, u16 value, unsigned owner_stage)
 			m_pipeline_block_start, m_pipeline_block_end_address, m_brc, m_rsa, m_rea);
 		m_illegal = true; return;
 	}
-	m_peripheral_mmr_access |= address >= 0x20 && address <= 0x5f;
 	bool const braf_before = bool(m_st1 & ST1_BRAF);
 	m_data.write_word(address, value);
-	if (m_pipeline_frontend && address == 7 && m_pipeline_valid[owner_stage] &&
+	if (address == 7 && m_pipeline_valid[owner_stage] &&
 		bool(m_st1 & ST1_BRAF) != braf_before)
 		pipeline_update_braf(m_pipeline_address[owner_stage]);
 }
@@ -2832,9 +2758,9 @@ u16 tms320c54x_device::mmr_address(u8 mode, unsigned stage)
 
 u16 tms320c54x_device::direct_address(u8 mode) const
 {
-	// SPRU131G 7.5.5.1: compiler-mode DAGEN can precede the
-	// previous stack operation's SP update. Extended-shift operands are later.
-	u16 const sp = m_sp_address_pending && !m_sp_address_late ? m_sp_address_base : m_sp;
+	// Stage-owned callers retain compiler-mode SP where required by
+	// SPRU131G 7.5.5.1; this semantic helper uses architectural state.
+	u16 const sp = m_sp;
 	return BIT(m_st1, 14) ? u16(sp + (mode & 0x7f)) :
 			u16(((m_st0 & 0x01ff) << 7) | (mode & 0x7f));
 }
@@ -2914,75 +2840,15 @@ u16 tms320c54x_device::long_offset_address(u8 mode, unsigned ar, s16 offset, uns
 	return address;
 }
 
-void tms320c54x_device::finish_repeats()
-{
-	// This is the first retirement of the repeated body.  Capture its extent
-	// now that its instruction length is known; #n executes the body n+1 times.
-	if (m_rpt_armed)
-	{
-		m_rpt_armed = false;
-		m_rpt_end = m_pc;
-		if (m_rptc)
-		{
-			--m_rptc;
-			++m_rpt_iteration;
-			m_pc = m_rpt_address;
-			return;
-		}
-		else
-		{
-			m_rpt_end = REPEAT_END_UNSET;
-			m_rpt_iteration = 0;
-		}
-		// RPT #0 still retires a body instruction. If it ends an active
-		// block repeat, the outer boundary must be processed below too.
-	}
-
-	if (m_rptc)
-	{
-		if (m_rpt_end == REPEAT_END_UNSET)
-			m_rpt_end = m_pc;
-		if (m_pc == m_rpt_end)
-		{
-			--m_rptc;
-			++m_rpt_iteration;
-			m_pc = m_rpt_address;
-		}
-	}
-	else if (m_rpt_end != REPEAT_END_UNSET && m_pc == m_rpt_end)
-	{
-		m_rpt_end = REPEAT_END_UNSET;
-		m_rpt_iteration = 0;
-	}
-
-	// REA names the last program word in the block. This also covers a
-	// multiword CALL at the end of the block after its RET restores REA+1.
-	// SPRU131G 6.8: software-visible BRAF is the loop's activation control.
-	if ((m_st1 & ST1_BRAF) && m_pc == u16(m_rea + 1))
-	{
-		if (m_brc)
-		{
-			--m_brc;
-			m_pc = m_rsa;
-		}
-		else
-		{
-			m_st1 &= ~ST1_BRAF;
-		}
-	}
-}
-
 void tms320c54x_device::interrupt_entry_step()
 {
-	// SPRU131G example 7-18: these entry operations are shared by both
-	// execution frontends; only the staged frontend also drains older slots.
+	// SPRU131G example 7-18: entry drains the older pipeline slots.
 	switch (m_interrupt_entry_stage++)
 	{
 	case 1: m_rtn = m_pc; break; // INTR Decode, before stack Access.
 	case 2:
 		// Staged Access shares a clock with older foreground Read operations;
 		// pipeline_step reserves its slot after those older SP updates.
-		if (!m_pipeline_frontend) m_interrupt_stack_address = --m_sp;
 		break;
 	case 3:
 		// SPRU131G 6.10.4/6.10.8 tie IFR clearance and maskable INTM
@@ -3005,19 +2871,6 @@ void tms320c54x_device::interrupt_entry_step()
 	}
 }
 
-bool tms320c54x_device::service_interrupt()
-{
-	if (m_interrupt_entry_stage)
-	{
-		interrupt_entry_step();
-		--m_icount;
-		return true;
-	}
-	if (!accept_interrupt()) return false;
-	--m_icount;
-	return true;
-}
-
 bool tms320c54x_device::accept_interrupt()
 {
 	if (m_vector_prefetch_valid) return false; // Finish the accepted entry before recognizing another source.
@@ -3027,11 +2880,9 @@ bool tms320c54x_device::accept_interrupt()
 	// The C54x does not recognize an interrupt between a delayed control
 	// transfer and its two delay words, nor between RPT/RPTZ and the repeated
 	// instruction. IFR remains set and is reconsidered at the next legal
-	// instruction boundary. Taking it inside either atomic sequence can skip a
-	// vector prologue's context-save slots and corrupt the return stack.
-	const bool single_repeat_active = m_rpt_armed || m_rptc || m_rpt_end != REPEAT_END_UNSET;
-	if ((!m_nmi_pending && (BIT(m_st1, 11) || !pending || m_intm_guard)) ||
-			m_delayed_words || m_xc_guard || single_repeat_active)
+	// instruction boundary. pipeline_accept_interrupt owns these guards;
+	// this helper selects a source only after that boundary is qualified.
+	if (!m_nmi_pending && (BIT(m_st1, 11) || !pending))
 		return false;
 
 	unsigned vector = 1; // SPRU131G table 6-20: NMI, independent of IFR/IMR.
@@ -3051,18 +2902,12 @@ bool tms320c54x_device::accept_interrupt()
 	m_interrupt_vector_pc = (m_pmst & 0xff80) | (vector << 2);
 	m_interrupt_ack_source = acknowledged_source;
 	m_interrupt_entry_stage = 1;
-	m_atomic_xc_valid = 0;
 	leave_idle();
 	return true;
 }
 
 void tms320c54x_device::reset_pipeline()
 {
-	m_atomic_xc_a = {}; m_atomic_xc_b = {}; m_atomic_xc_st0 = {};
-	m_atomic_xc_valid = m_atomic_condition_words = 0;
-	m_atomic_condition_redirect = false;
-	m_atomic_condition_before_a = m_atomic_condition_before_b = 0;
-	m_atomic_condition_before_st0 = 0;
 	m_pipeline_block_first_final.fill(false);
 	m_pipeline_block_end.fill(false);
 	m_pipeline_block_body.fill(false);
@@ -3146,7 +2991,7 @@ void tms320c54x_device::reset_pipeline()
 
 void tms320c54x_device::set_pipeline_frontend(bool enabled)
 {
-	m_pipeline_frontend = enabled;
+	if (!enabled) fatalerror("C54x atomic frontend has been retired");
 	m_vector_prefetch_valid = false;
 	m_interrupt_entry_stage = 0;
 	reset_pipeline();
@@ -6304,7 +6149,7 @@ void tms320c54x_device::pipeline_accept_interrupt()
 {
 	// No pipeline hazard can make an absent or masked source acceptable.
 	// Check after this clock's publications, just as accept_interrupt does.
-	if (!m_nmi_pending && ((m_st1 & ST1_INTM) || !(m_ifr & m_imr) || m_intm_guard))
+	if (!m_nmi_pending && ((m_st1 & ST1_INTM) || !(m_ifr & m_imr)))
 		return;
 	// Acceptance occurs after this cycle's Decode. Retain decoded slots,
 	// replace the next Decode with INTR, and drain the prefetched bus word.
@@ -6468,8 +6313,9 @@ u16 tms320c54x_device::add_memory_word(u16 value, u16 immediate, bool publish_st
 
 void tms320c54x_device::execute_one(u16 op)
 {
+	// Instruction effects only. Stage-owned decoding handles control flow,
+	// bus transactions and timing before dispatching the remaining ALU work.
 	const u8 low = op;
-	const auto transfer_pc = [this](u16 destination) { m_pc = destination; m_atomic_condition_redirect = true; };
 	// SPRU131G table 5-4: short MOD=3 is write-only, including RMW
 	// exclusions. f8 alone is the admitted absolute form; f9..ff remain
 	// unvalidated aliases, not a claim about silicon traps. Reject before any
@@ -6483,90 +6329,9 @@ void tms320c54x_device::execute_one(u16 op)
 		m_illegal = true;
 		return;
 	}
-	if (invalid_mmr_long_form(op) || ((m_rpt_armed || m_rpt_end != REPEAT_END_UNSET) && extended_repeat_transfer(op)))
+	if (invalid_mmr_long_form(op))
 	{
 		m_illegal = true;
-		return;
-	}
-	if ((op & 0xffe0) == 0xf4c0) // TRAP K (SPRU172C 4-195): no status changes.
-	{
-		push(m_pc);
-		transfer_pc((m_pmst & 0xff80) | ((op & 31) << 2));
-		m_icount -= 2;
-		return;
-	}
-	if ((op & 0xffe0) == 0xf7c0) // INTR K, independent of IMR/INTM (SPRU172C 4-65).
-	{
-		unsigned const vector = op & 31;
-		m_rtn = m_pc; // SPRU131G example 7-6: software INTR also loads RTN.
-		push(m_pc);
-		if (vector >= 16) m_ifr &= ~u16(1U << (vector - 16));
-		m_st1 |= 0x0800;
-		transfer_pc((m_pmst & 0xff80) | (vector << 2));
-		m_icount -= 2;
-		return;
-	}
-	// SPRU172C: far calls push PC then XPC; delayed transfers retain the
-	// caller's page while the two delay words execute.
-	if (m_extended_program && (op & 0xfc80) == 0xf880) // FB[D] / FCALL[D] extpmad
-	{
-		const u32 destination = (u32(op & 0x7f) << 16) | fetch();
-		const bool delayed = BIT(op, 9);
-		if (BIT(op, 8))
-		{
-			push(u16(m_pc + (delayed ? 2 : 0)));
-			push(m_xpc);
-		}
-		far_transfer(destination, delayed);
-		m_icount -= delayed ? 1 : 3;
-		return;
-	}
-	if (m_extended_program && (op & 0xfcfe) == 0xf4e6) // FBACC[D] / FCALA[D] A/B
-	{
-		const u32 destination = accumulator(BIT(op, 8)) & 0x7fffff;
-		const bool delayed = BIT(op, 9);
-		if (BIT(op, 0))
-		{
-			push(u16(m_pc + (delayed ? 2 : 0)));
-			push(m_xpc);
-		}
-		far_transfer(destination, delayed);
-		m_icount -= delayed ? 3 : 5;
-		return;
-	}
-	if (m_extended_program && (op & 0xfdfe) == 0xf4e4) // FRET[D] / FRETE[D]
-	{
-		const u32 page = pop() & 0x7f;
-		const u32 destination = (page << 16) | pop();
-		if (BIT(op, 0))
-			m_st1 &= ~u16(0x0800);
-		const bool delayed = BIT(op, 9);
-		far_transfer(destination, delayed);
-		m_icount -= delayed ? 3 : 5;
-		return;
-	}
-	const auto branch_if = [this, &transfer_pc](bool condition)
-	{
-		const u16 destination = fetch();
-		if (condition)
-			transfer_pc(destination);
-		m_icount -= condition ? 4 : 2;
-	};
-	if ((op & 0xfdfe) == 0xf802) // BC[D] pmad, BIO/NBIO (SPRU172C).
-	{
-		const u16 destination = fetch();
-		const bool take = BIT(op, 0) ? !m_bio_in_cb() : bool(m_bio_in_cb());
-		if (take)
-		{
-			if (BIT(op, 9))
-			{
-				m_delayed_target = destination;
-				m_delayed_words = 2;
-			}
-			else
-				transfer_pc(destination);
-		}
-		m_icount -= BIT(op, 9) ? 2 : take ? 4 : 2;
 		return;
 	}
 	if ((op & 0xfff8) == 0xf4a0) // LD #k3,ARP (SPRU172C syntax 5).
@@ -6579,71 +6344,6 @@ void tms320c54x_device::execute_one(u16 op)
 		u16 const left = m_ar[op & 7], right = m_ar[0];
 		bool const conditions[] = {left == right, left < right, left > right, left != right};
 		m_st0 = (m_st0 & ~u16(0x1000)) | (conditions[(op >> 8) & 3] ? 0x1000 : 0);
-		return;
-	}
-	if ((op & 0xfdfb) == 0xf808) // BC[D] pmad, C/NC (SPRU172C condition codes).
-	{
-		const u16 destination = fetch();
-		const bool take = BIT(m_st0, 11) == BIT(op, 2);
-		if (take)
-		{
-			if (BIT(op, 9))
-			{
-				m_delayed_target = destination;
-				m_delayed_words = 2;
-			}
-			else
-				transfer_pc(destination);
-		}
-		m_icount -= BIT(op, 9) ? 2 : take ? 4 : 2;
-		return;
-	}
-	if ((op & 0xfde7) == 0xf860) // BC[D] pmad, AOV/ANOV/BOV/BNOV
-	{
-		const u16 destination = fetch();
-		const u16 mask = u16(1U << (10 - BIT(op, 3)));
-		const bool take = bool(m_st0 & mask) == BIT(op, 4);
-		// SPRU131G table 4-1: testing OV/NOV consumes the selected sticky flag.
-		m_st0 &= ~mask;
-		if (take)
-		{
-			if (BIT(op, 9))
-			{
-				m_delayed_target = destination;
-				m_delayed_words = 2;
-			}
-			else
-				transfer_pc(destination);
-		}
-		m_icount -= BIT(op, 9) ? 2 : take ? 4 : 2;
-		return;
-	}
-	if ((op & 0xfcff) == 0xf4e1 && op != 0xf7e1) // IDLE 1/2/3; NN=11 is reserved.
-	{
-		// SPRU172C encodes K=2 as NN=10 and K=3 as NN=01.
-		u8 const mode = BIT(op, 9) ? 2 : BIT(op, 8) ? 3 : 1;
-		enter_idle(mode);
-		m_icount -= 3; // Four-cycle minimum before the idle interval (SPRU172C).
-		return;
-	}
-	if ((op & 0xfdf0) == 0xf5b0) // SSBX bit, ST0/ST1
-	{
-		u16 &status = BIT(op, 9) ? m_st1 : m_st0;
-		status |= u16(1) << (low & 0x0f);
-		if (BIT(op, 9)) status &= ~ST1_RESERVED;
-		// SPRU131G 6.10.7 protects this instruction and the following
-		// complete instruction (not merely one program word).
-		if (BIT(op, 9) && (low & 0x0f) == 11)
-			m_intm_guard = 2;
-		return;
-	}
-	if ((op & 0xfdf0) == 0xf4b0) // RSBX bit, ST0/ST1
-	{
-		u16 &status = BIT(op, 9) ? m_st1 : m_st0;
-		status &= ~(u16(1) << (low & 0x0f));
-		if (BIT(op, 9)) status &= ~ST1_RESERVED;
-		if (BIT(op, 9) && (low & 0x0f) == 11)
-			m_intm_guard = 2;
 		return;
 	}
 	if ((op & 0xfcff) == 0xf485) // ABS src, dst
@@ -6663,71 +6363,10 @@ void tms320c54x_device::execute_one(u16 op)
 		m_st0 = (m_st0 & ~0x0800) | (result == 0 ? 0x0800 : 0);
 		return;
 	}
-	if ((op & 0xfd00) == 0xfd00) // XC n, condition
-	{
-		const unsigned words = BIT(op, 9) ? 2 : 1;
-		// SPRU131G 7.1.4: Access evaluates XC before either preceding
-		// program word's Execute publication. Keep the sampled view separate
-		// from live registers; later instructions still observe real writes.
-		unsigned const sample = m_atomic_xc_valid ? m_atomic_xc_valid - 1 : 0;
-		const u64 a = !m_pipeline_frontend && m_atomic_xc_valid ? m_atomic_xc_a[sample] : m_a;
-		const u64 b_value = !m_pipeline_frontend && m_atomic_xc_valid ? m_atomic_xc_b[sample] : m_b;
-		const u16 status = !m_pipeline_frontend && m_atomic_xc_valid ? m_atomic_xc_st0[sample] : m_st0;
-		bool execute = false;
-		if (BIT(low, 6))
-		{
-			const bool b = BIT(low, 3);
-			const u64 value = b ? b_value : a;
-			const s64 signed_value = s64(value << 24) >> 24;
-			execute = true;
-			switch (low & 7)
-			{
-			case 0: break;
-			case 2: execute = signed_value >= 0; break;
-			case 3: execute = signed_value < 0; break;
-			case 4: execute = value != 0; break;
-			case 5: execute = value == 0; break;
-			case 6: execute = signed_value > 0; break;
-			case 7: execute = signed_value <= 0; break;
-			default: execute = false; break;
-			}
-			if (BIT(low, 5))
-			{
-				const bool overflow = BIT(status, b ? 9 : 10);
-				execute = execute && (BIT(low, 4) ? overflow : !overflow);
-			}
-		}
-		else
-		{
-			execute = true;
-			if (low & 0x30)
-				execute = execute && ((low & 0x30) == 0x30
-						? BIT(status, 12) : !BIT(status, 12));
-			if (low & 0x0c)
-				execute = execute && ((low & 0x0c) == 0x0c
-						? BIT(status, 11) : !BIT(status, 11));
-			if (low & 0x03)
-			{
-				execute = execute && ((low & 3) == 3 ? !m_bio_in_cb() : (low & 3) == 2 && m_bio_in_cb());
-			}
-		}
-		if (!execute)
-		{
-			m_pc += words;
-			if (!m_pipeline_frontend) m_atomic_condition_words += words;
-			m_icount -= words; // Rejected slots execute as NOPs.
-			m_xc_guard = 2 - words;
-		}
-		else
-			// SPRU172C 4-199 protects two following words even for XC 1.
-			m_xc_guard = 2;
-		return;
-	}
 	if ((op & 0xfcf0) == 0xf050) // XOR #lk, shift, source, destination
 	{
 		const u64 value = u64(fetch()) << (low & 0x0f);
 		accumulator(BIT(op, 8)) = (accumulator(BIT(op, 9)) ^ value) & ACC_MASK;
-		--m_icount;
 		return;
 	}
 	if ((op & 0xfce0) == 0xf420) // SUB source accumulator, shift, destination accumulator
@@ -6889,13 +6528,12 @@ void tms320c54x_device::execute_one(u16 op)
 			m_illegal = true;
 			return;
 		}
-		m_icount -= low >= 0xe0 ? 2 : 1;
 		return;
 	}
 	if ((op & 0xff00) == 0xe000) // FIRS Xmem, Ymem, pmad
 	{
-		const bool repeated = (m_rptc || m_rpt_end != REPEAT_END_UNSET) &&
-			u16(m_pc - 1) == m_rpt_address;
+		const bool repeated = m_pipeline_repeat_active &&
+			logical_program_address(u16(m_pc - 1)) == m_pipeline_repeat_address;
 		const u8 x = op >> 4;
 		const u8 y = op;
 		const unsigned xar = 2 + (x & 3);
@@ -6915,8 +6553,6 @@ void tms320c54x_device::execute_one(u16 op)
 		dual_modify(x);
 		if (xar != yar)
 			dual_modify(y);
-		if (!repeated || !m_rpt_iteration)
-			m_icount -= 2;
 		return;
 	}
 	if ((op & 0xff00) == 0xe100) // LMS Xmem, Ymem
@@ -6960,7 +6596,6 @@ void tms320c54x_device::execute_one(u16 op)
 		case 4: destination = source | operand; break;
 		case 5: destination = source ^ operand; break;
 		}
-		--m_icount; // Long-immediate ALU instructions take two cycles.
 		return;
 	}
 	if ((op & 0xfcfe) == 0xf060) // ADD/SUB #lk,16,source,destination
@@ -6968,7 +6603,6 @@ void tms320c54x_device::execute_one(u16 op)
 		const u64 operand = (data_operand(fetch()) << 16) & ACC_MASK;
 		accumulator(BIT(op, 8)) = add_sub(accumulator(BIT(op, 9)), operand,
 				BIT(op, 0), BIT(op, 8));
-		--m_icount;
 		return;
 	}
 	if ((op & 0xfcff) >= 0xf063 && (op & 0xfcff) <= 0xf065)
@@ -6976,7 +6610,6 @@ void tms320c54x_device::execute_one(u16 op)
 		u64 const operand = u64(fetch()) << 16;
 		u64 const source = accumulator(BIT(op, 9));
 		accumulator(BIT(op, 8)) = (op & 7) == 3 ? source & operand : (op & 7) == 4 ? source | operand : source ^ operand;
-		--m_icount;
 		return;
 	}
 	if ((op & 0xfeff) == 0xf066) // MPY #lk, A/B
@@ -6986,7 +6619,6 @@ void tms320c54x_device::execute_one(u16 op)
 		if (BIT(m_st1, 6))
 			product *= 2;
 		accumulator(BIT(op, 8)) = multiply_result(product, BIT(op, 8));
-		--m_icount;
 		return;
 	}
 	if ((op & 0xfcff) == 0xf067) // MAC #lk, source, destination
@@ -6999,7 +6631,6 @@ void tms320c54x_device::execute_one(u16 op)
 		const u64 source = accumulator(BIT(op, 9)) & ACC_MASK;
 		accumulator(BIT(op, 8)) = multiply_result((s64(source << 24) >> 24) + product,
 				BIT(op, 8));
-		--m_icount;
 		return;
 	}
 	if (op == 0x70f8) // MVKD dmad, Smem (absolute destination form)
@@ -7007,7 +6638,6 @@ void tms320c54x_device::execute_one(u16 op)
 		const u16 destination = fetch();
 		const u16 source = fetch();
 		data_write(destination, data_read(source));
-		m_icount -= 2;
 		return;
 	}
 	if ((op & 0xfce0) == 0xf460) // SFTA src, SHIFT, dst
@@ -7055,34 +6685,28 @@ void tms320c54x_device::execute_one(u16 op)
 	}
 	const auto alu_smem = [this, low]()
 	{
-		m_icount -= low >= 0xe0;
 		return indirect_read(low);
 	};
 	switch (op & 0xff00)
 	{
 	case 0x1000: // LD Smem, A
 		m_a = data_operand(indirect_read(low));
-		m_icount -= low >= 0xe0;
 		return;
 	case 0x1100: // LD Smem, B
 		m_b = data_operand(indirect_read(low));
-		m_icount -= low >= 0xe0;
 		return;
 	case 0x4000: case 0x4100: case 0x4200: case 0x4300: // SUB Smem, 16, src, dst
 	{
 		const u64 operand = (data_operand(indirect_read(low)) << 16) & ACC_MASK;
 		accumulator(BIT(op, 8)) = add_sub(accumulator(BIT(op, 9)), operand,
 				true, BIT(op, 8), true);
-		m_icount -= low >= 0xe0;
 		return;
 	}
 	case 0x1200: // LD uns(Smem), A
 		m_a = indirect_read(low);
-		m_icount -= low >= 0xe0;
 		return;
 	case 0x1300: // LD uns(Smem), B
 		m_b = indirect_read(low);
-		m_icount -= low >= 0xe0;
 		return;
 	case 0x3000: case 0x3100: case 0x3200: case 0x3300:
 	case 0x3400: case 0x3500: case 0x3600: case 0x3700:
@@ -7091,7 +6715,6 @@ void tms320c54x_device::execute_one(u16 op)
 	{
 		const unsigned family = (op >> 8) & 0x0f;
 		const u16 memory = indirect_read(low);
-		m_icount -= low >= 0xe0;
 		if (family == 0)
 		{
 			m_t = memory;
@@ -7243,7 +6866,6 @@ void tms320c54x_device::execute_one(u16 op)
 		if ((op & 0xfe00) == 0x2600) m_t = memory;
 		u64 &destination = accumulator(BIT(op, 8));
 		destination = memory_t_multiply(op, memory, m_t, destination);
-		m_icount -= low >= 0xe0;
 		return;
 	}
 	case 0x6200: case 0x6300: // MPY Smem, #lk, A/B
@@ -7258,7 +6880,6 @@ void tms320c54x_device::execute_one(u16 op)
 		if (BIT(m_st1, 6))
 			product *= 2;
 		accumulator(BIT(op, 8)) = multiply_result(product, BIT(op, 8));
-		m_icount -= low >= 0xe0 ? 2 : 1;
 		return;
 	}
 	case 0x6400: case 0x6500: case 0x6600: case 0x6700: // MAC Smem, #lk, src, dst
@@ -7275,35 +6896,22 @@ void tms320c54x_device::execute_one(u16 op)
 		const u64 source = accumulator(BIT(op, 9)) & ACC_MASK;
 		accumulator(BIT(op, 8)) = multiply_result((s64(source << 24) >> 24) + product,
 				BIT(op, 8));
-		m_icount -= low >= 0xe0 ? 2 : 1;
 		return;
 	}
 	case 0x4600: // LD Smem,DP (SPRU172C syntax 2, three cycles).
 	{
 		const u16 value = indirect_read(low);
 		m_st0 = (m_st0 & ~u16(0x01ff)) | (value & 0x01ff);
-		m_icount -= 2 + (low >= 0xe0);
 		return;
 	}
 	case 0x4400: // LD Smem, 16, A
 		m_a = (data_operand(indirect_read(low)) << 16) & ACC_MASK;
-		m_icount -= low >= 0xe0;
 		return;
 	case 0x4500: // LD Smem, 16, B
 		m_b = (data_operand(indirect_read(low)) << 16) & ACC_MASK;
-		m_icount -= low >= 0xe0;
-		return;
-	case 0x4700: // RPT Smem
-		m_rptc = indirect_read(low);
-		m_rpt_address = m_pc;
-		m_rpt_end = REPEAT_END_UNSET;
-		m_rpt_iteration = 0;
-		m_rpt_armed = true;
-		m_icount -= low >= 0xe0 ? 3 : 2;
 		return;
 	case 0x4b00: // PSHD Smem
 		push(indirect_read(low));
-		m_icount -= low >= 0xe0;
 		return;
 	case 0x4c00: // LTD Smem
 	case 0x4d00: // DELAY Smem
@@ -7320,13 +6928,11 @@ void tms320c54x_device::execute_one(u16 op)
 			m_t = value;
 		if (low >= 0x80 && low < 0xe0)
 			indirect_modify(low);
-		m_icount -= low >= 0xe0;
 		return;
 	}
 	case 0x8c00: // ST T, Smem
 	case 0x8d00: // ST TRN, Smem (SPRU172C 4-167)
 		indirect_write(low, BIT(op, 8) ? m_trn : m_t);
-		m_icount -= low >= 0xe0;
 		return;
 	case 0x8b00: // POPD Smem
 	{
@@ -7334,17 +6940,14 @@ void tms320c54x_device::execute_one(u16 op)
 		const u16 value = pop();
 		data_write(destination, value);
 		finish_smem_access(low);
-		m_icount -= low >= 0xe0;
 		return;
 	}
 	case 0x7f00: // WRITA Smem
 	{
-		const bool repeated = (m_rptc || m_rpt_end != REPEAT_END_UNSET) &&
-			u16(m_pc - 1) == m_rpt_address;
+		const bool repeated = m_pipeline_repeat_active &&
+			logical_program_address(u16(m_pc - 1)) == m_pipeline_repeat_address;
 		m_program.write_word(physical_program_address(m_a + (repeated ? m_rpt_iteration : 0)),
 				indirect_read(low));
-		if (!repeated || !m_rpt_iteration)
-			m_icount -= low >= 0xe0 ? 5 : 4;
 		return;
 	}
 	case 0x9400: case 0x9500: // LD Xmem, SHFT, dst (SPRU172C syntax 5).
@@ -7370,7 +6973,6 @@ void tms320c54x_device::execute_one(u16 op)
 		const u16 value = data_read(address);
 		finish_smem_access(low);
 		m_st0 = (m_st0 & ~0x1000) | ((value & mask) ? 0x1000 : 0);
-		m_icount -= low >= 0xe0 ? 2 : 1;
 		return;
 	}
 	case 0x6000: // CMPM Smem, #lk
@@ -7380,7 +6982,6 @@ void tms320c54x_device::execute_one(u16 op)
 		const u16 value = data_read(address);
 		finish_smem_access(low);
 		m_st0 = (m_st0 & ~0x1000) | (value == immediate ? 0x1000 : 0);
-		m_icount -= low >= 0xe0 ? 2 : 1;
 		return;
 	}
 	case 0x4800: // LDM MMR, A
@@ -7403,7 +7004,6 @@ void tms320c54x_device::execute_one(u16 op)
 		data_write(address ^ 1, u16(value));
 		if (low >= 0x80 && !extended && !preincrement)
 			indirect_modify(low, true);
-		m_icount -= extended ? 2 : 1;
 		return;
 	}
 	case 0x5000: case 0x5100: case 0x5200: case 0x5300: // DADD Lmem, src, dst
@@ -7424,7 +7024,6 @@ void tms320c54x_device::execute_one(u16 op)
 		if (low >= 0x80 && !extended && !preincrement)
 			indirect_modify(low, true);
 		long_word_arithmetic(op, high, low_word, m_t);
-		m_icount -= extended;
 		return;
 	}
 	case 0x5600: // DLD Lmem, A
@@ -7447,7 +7046,6 @@ void tms320c54x_device::execute_one(u16 op)
 		accumulator(BIT(op, 8)) = value;
 		if (low >= 0x80 && !extended && !preincrement)
 			indirect_modify(low, true);
-		m_icount -= extended;
 		return;
 	}
 	case 0x6800: // ANDM #lk, Smem
@@ -7471,7 +7069,6 @@ void tms320c54x_device::execute_one(u16 op)
 				? value & immediate : (op & 0xff00) == 0x6900 ? value | immediate : value ^ immediate);
 		if (low >= 0x80 && low < 0xe0)
 			indirect_modify(low);
-		m_icount -= low >= 0xe0 ? 2 : 1;
 		return;
 	}
 	case 0x6b00: // ADDM #lk, Smem
@@ -7492,51 +7089,19 @@ void tms320c54x_device::execute_one(u16 op)
 		data_write(address, add_memory_word(value, immediate));
 		if (low >= 0x80 && low < 0xe0)
 			indirect_modify(low);
-		m_icount -= low >= 0xe0 ? 2 : 1;
-		return;
-	}
-	case 0x6c00: // BANZ pmad, *ARx modification
-	{
-		const unsigned ar = indirect_ar(low);
-		const bool extended = low >= 0xe0 && low < 0xf8;
-		const bool branch = (extended ? long_offset_address(low) : m_ar[ar]) != 0;
-		if (!extended) indirect_modify(low);
-		const u16 destination = fetch();
-		if (branch)
-			transfer_pc(destination);
-		m_icount -= (branch ? 3 : 1) + unsigned(extended);
-		return;
-	}
-	case 0x6e00: // BANZD pmad, *ARx modification
-	{
-		const unsigned ar = indirect_ar(low);
-		const bool extended = low >= 0xe0 && low < 0xf8;
-		const bool branch = (extended ? long_offset_address(low) : m_ar[ar]) != 0;
-		if (!extended) indirect_modify(low);
-		const u16 destination = fetch();
-		if (branch)
-		{
-			m_delayed_target = destination;
-			m_delayed_words = 2;
-		}
-		m_icount -= 1 + unsigned(extended);
 		return;
 	}
 	case 0x8000: // STL A, Smem
 		indirect_write(low, u16(saturated_store(m_a)));
-		m_icount -= low >= 0xe0;
 		return;
 	case 0x8100: // STL B, Smem
 		indirect_write(low, u16(saturated_store(m_b)));
-		m_icount -= low >= 0xe0;
 		return;
 	case 0x8200: // STH A, Smem
 		indirect_write(low, u16(saturated_store(m_a) >> 16));
-		m_icount -= low >= 0xe0;
 		return;
 	case 0x8300: // STH B, Smem
 		indirect_write(low, u16(saturated_store(m_b) >> 16));
-		m_icount -= low >= 0xe0;
 		return;
 	case 0x8400: case 0x8500: // STL src, ASM, Smem
 	case 0x8600: case 0x8700: // STH src, ASM, Smem
@@ -7547,7 +7112,6 @@ void tms320c54x_device::execute_one(u16 op)
 			? (BIT(m_st1, 8) ? arithmetic_shift_right(source, -shift) : source >> -shift)
 			: (source << shift) & ACC_MASK;
 		indirect_write(low, u16(saturated_store(shifted) >> (BIT(op, 9) ? 16 : 0)));
-		m_icount -= low >= 0xe0;
 		return;
 	}
 	case 0xe800: // LD #k, A
@@ -7571,98 +7135,47 @@ void tms320c54x_device::execute_one(u16 op)
 		return;
 	case 0x7100: // MVDK Smem, dmad
 	{
-		const bool repeated = (m_rptc || m_rpt_end != REPEAT_END_UNSET) &&
-			u16(m_pc - 1) == m_rpt_address;
+		const bool repeated = m_pipeline_repeat_active &&
+			logical_program_address(u16(m_pc - 1)) == m_pipeline_repeat_address;
 		const u16 address = prepare_smem_address(low);
 		const u16 destination = fetch() + (repeated ? m_rpt_iteration : 0);
 		const u16 value = data_read(address);
 		finish_smem_access(low);
 		data_write(destination, value);
-		if (!repeated || !m_rpt_iteration)
-			m_icount -= low >= 0xe0 ? 2 : 1;
 		return;
 	}
 	case 0x7300: // MVMD MMR, dmad
 	{
-		const bool repeated = (m_rptc || m_rpt_end != REPEAT_END_UNSET) &&
-			u16(m_pc - 1) == m_rpt_address;
+		const bool repeated = m_pipeline_repeat_active &&
+			logical_program_address(u16(m_pc - 1)) == m_pipeline_repeat_address;
 		const u16 destination = fetch() + (repeated ? m_rpt_iteration : 0);
 		data_write(destination, data_read(mmr_address(low)));
-		m_icount -= !repeated || !m_rpt_iteration;
-		return;
-	}
-	case 0x7400: // PORTR port, Smem
-	{
-		u16 const address = prepare_smem_address(low), port = fetch();
-		if (software_wait_enabled())
-		{
-			m_atomic_io_pending = true;
-			m_atomic_io_write = false;
-			m_atomic_io_address = address;
-			m_atomic_io_port = port;
-			m_atomic_io_mode = low;
-			m_atomic_io_wait_remaining = external_io_wait_states();
-			m_atomic_io_ready_required = m_atomic_io_wait_remaining >= 2;
-			m_atomic_io_wait_remaining += low >= 0xe0;
-			m_atomic_io_wait_remaining += address >= 0x20 && address <= 0x5f;
-		}
-		else
-		{
-			data_write(address, m_io.read_word(port));
-			finish_smem_access(low);
-		}
-		if (!software_wait_enabled()) m_icount -= low >= 0xe0 ? 2 : 1;
-		return;
-	}
-	case 0x7500: // PORTW Smem, port
-	{
-		u16 const address = prepare_smem_address(low), port = fetch();
-		const u16 value = data_read(address);
-		finish_smem_access(low);
-		if (software_wait_enabled())
-		{
-			m_atomic_io_pending = true;
-			m_atomic_io_write = true;
-			m_atomic_io_address = address;
-			m_atomic_io_port = port;
-			m_atomic_io_value = value;
-			m_atomic_io_wait_remaining = external_io_wait_states();
-			m_atomic_io_ready_required = m_atomic_io_wait_remaining >= 2;
-			m_atomic_io_wait_remaining += low >= 0xe0;
-			m_atomic_io_wait_remaining += address >= 0x20 && address <= 0x5f;
-		}
-		else m_io.write_word(port, value);
-		if (!software_wait_enabled()) m_icount -= low >= 0xe0 ? 2 : 1;
 		return;
 	}
 	case 0x7000: // MVKD dmad, Smem
 	{
-		const bool repeated = (m_rptc || m_rpt_end != REPEAT_END_UNSET) &&
-			u16(m_pc - 1) == m_rpt_address;
+		const bool repeated = m_pipeline_repeat_active &&
+			logical_program_address(u16(m_pc - 1)) == m_pipeline_repeat_address;
 		if (low >= 0xe0 && low < 0xf8)
 		{
 			const u16 destination = prepare_smem_address(low);
 			const u16 source = fetch() + (repeated ? m_rpt_iteration : 0);
 			data_write(destination, data_read(source));
 			finish_smem_access(low);
-			if (!repeated || !m_rpt_iteration) m_icount -= 2;
 			return;
 		}
 		const u16 source = fetch() + (repeated ? m_rpt_iteration : 0);
 		const u16 destination = prepare_smem_address(low);
 		data_write(destination, data_read(source));
 		finish_smem_access(low);
-		if (!repeated || !m_rpt_iteration)
-			m_icount -= low >= 0xe0 ? 2 : 1;
 		return;
 	}
 	case 0x7200: // MVDM dmad, MMR
 	{
-		const bool repeated = (m_rptc || m_rpt_end != REPEAT_END_UNSET) &&
-			u16(m_pc - 1) == m_rpt_address;
+		const bool repeated = m_pipeline_repeat_active &&
+			logical_program_address(u16(m_pc - 1)) == m_pipeline_repeat_address;
 		const u16 source = fetch() + (repeated ? m_rpt_iteration : 0);
 		data_write(mmr_address(low), data_read(source));
-		m_icount -= !repeated || !m_rpt_iteration;
 		return;
 	}
 	case 0x7600: // ST #lk, Smem
@@ -7684,14 +7197,12 @@ void tms320c54x_device::execute_one(u16 op)
 		}
 		else
 			indirect_write(low, fetch());
-		m_icount -= low >= 0xe0 ? 2 : 1;
 		return;
 	case 0x7700: // STM #lk, MMR
 	{
 		const u16 value = fetch();
 		const u16 reg = mmr_address(low);
 		data_write(reg, value);
-		m_icount -= 1;
 		return;
 	}
 	case 0x7800: case 0x7900: // MACP Smem, pmad, A/B
@@ -7701,8 +7212,8 @@ void tms320c54x_device::execute_one(u16 op)
 		// SPRU131G 5.5.3.1 excludes short preincrement from source reads.
 		// Keep unadmitted f9..ff aliases distinct from canonical absolute f8.
 		if ((low & 0xf8) == 0x98 || low > 0xf8) { m_illegal = true; return; }
-		const bool repeated = (m_rptc || m_rpt_end != REPEAT_END_UNSET) &&
-			u16(m_pc - 1) == m_rpt_address;
+		const bool repeated = m_pipeline_repeat_active &&
+			logical_program_address(u16(m_pc - 1)) == m_pipeline_repeat_address;
 		u16 coefficient_address;
 		u16 address;
 		if (low >= 0xe0 && low < 0xf8)
@@ -7732,46 +7243,38 @@ void tms320c54x_device::execute_one(u16 op)
 			data_write(u16(address + 1), value);
 		if (low >= 0x80 && low < 0xe0 && (low & 0x78) != 0x18)
 			indirect_modify(low);
-		if (!repeated || !m_rpt_iteration)
-			m_icount -= low >= 0xe0 ? 3 : 2;
 		return;
 	}
 	case 0x7d00: // MVDP Smem, pmad
 	{
-		const bool repeated = (m_rptc || m_rpt_end != REPEAT_END_UNSET) &&
-			u16(m_pc - 1) == m_rpt_address;
+		const bool repeated = m_pipeline_repeat_active &&
+			logical_program_address(u16(m_pc - 1)) == m_pipeline_repeat_address;
 		u16 const address = prepare_smem_address(low);
 		u16 const destination = fetch() + (repeated ? m_rpt_iteration : 0);
 		const u16 value = data_read(address);
 		finish_smem_access(low);
 		m_program.write_word(program_address(destination), value);
-		if (!repeated || !m_rpt_iteration)
-			m_icount -= low >= 0xe0 ? 4 : 3;
 		return;
 	}
 	case 0x7c00: // MVPD pmad, Smem
 	{
-		const bool repeated = (m_rptc || m_rpt_end != REPEAT_END_UNSET) &&
-			u16(m_pc - 1) == m_rpt_address;
+		const bool repeated = m_pipeline_repeat_active &&
+			logical_program_address(u16(m_pc - 1)) == m_pipeline_repeat_address;
 		u16 const destination = prepare_smem_address(low), source = fetch();
 		const u16 value = m_program.read_word(program_address(u16(source + (repeated ? m_rpt_iteration : 0))));
 		data_write(destination, value);
 		finish_smem_access(low);
-		if (!repeated || !m_rpt_iteration)
-			m_icount -= low >= 0xe0 ? 3 : 2;
 		return;
 	}
 	case 0x7e00: // READA Smem
 	{
-		const bool repeated = (m_rptc || m_rpt_end != REPEAT_END_UNSET) &&
-			u16(m_pc - 1) == m_rpt_address;
+		const bool repeated = m_pipeline_repeat_active &&
+			logical_program_address(u16(m_pc - 1)) == m_pipeline_repeat_address;
 		const u16 destination = prepare_smem_address(low);
 		const u16 value = m_program.read_word(physical_program_address(m_a +
 				(repeated ? m_rpt_iteration : 0)));
 		data_write(destination, value);
 		finish_smem_access(low);
-		if (!repeated || !m_rpt_iteration)
-			m_icount -= low >= 0xe0 ? 5 : 4;
 		return;
 	}
 	case 0xe700: // MVMM MMRx, MMRy
@@ -8076,200 +7579,8 @@ void tms320c54x_device::execute_one(u16 op)
 			dual_modify(y);
 		return;
 	}
-	if ((op & 0xfd80) == 0xf900) // CC[D] pmad, condition (SPRU172C 4-29)
-	{
-		const bool delayed = BIT(op, 9);
-		const u8 condition = op;
-		const u16 destination = fetch();
-		bool take = false;
-		if (BIT(condition, 6))
-		{
-			const bool b = BIT(condition, 3);
-			const u64 raw = accumulator(b) & ACC_MASK;
-			const s64 value = s64(raw << 24) >> 24;
-			switch (condition & 7)
-			{
-			case 2: take = value >= 0; break;
-			case 3: take = value < 0; break;
-			case 4: take = raw != 0; break;
-			case 5: take = raw == 0; break;
-			case 6: take = value > 0; break;
-			case 7: take = value <= 0; break;
-			default: take = true; break;
-			}
-			if ((condition & 0x70) == 0x70)
-				take = take && BIT(m_st0, b ? 9 : 10);
-			else if ((condition & 0x70) == 0x60)
-				take = take && !BIT(m_st0, b ? 9 : 10);
-		}
-		else
-		{
-			take = true;
-			if (condition & 0x30)
-				take = take && ((condition & 0x30) == 0x30 ? BIT(m_st0, 12) : !BIT(m_st0, 12));
-			if (condition & 0x0c)
-				take = take && ((condition & 0x0c) == 0x0c ? BIT(m_st0, 11) : !BIT(m_st0, 11));
-			if (condition & 3)
-				take = take && ((condition & 3) == 3 ? !m_bio_in_cb() : (condition & 3) == 2 && m_bio_in_cb());
-		}
-		m_icount -= 2;
-		if (take)
-		{
-			push(u16(m_pc + (delayed ? 2 : 0)));
-			if (delayed)
-			{
-				m_delayed_target = destination;
-				m_delayed_words = 2;
-			}
-			else
-			{
-				transfer_pc(destination);
-				m_icount -= 2;
-			}
-		}
-		return;
-	}
-
-	const auto return_if = [this, &transfer_pc](bool take)
-	{
-		// Non-delayed RC drains the older condition pipeline even when untaken.
-		m_atomic_condition_redirect = true;
-		if (take)
-		{
-			transfer_pc(pop());
-			m_icount -= 4;
-		}
-		else
-			m_icount -= 2;
-	};
-	if ((op & 0xfdfe) == 0xfc02) // RC[D] BIO/NBIO.
-	{
-		const bool take = BIT(op, 0) ? !m_bio_in_cb() : bool(m_bio_in_cb());
-		if (!BIT(op, 9))
-			return_if(take);
-		else
-		{
-			if (take)
-			{
-				m_delayed_target = pop();
-				m_delayed_words = 2;
-			}
-			m_icount -= 2;
-		}
-		return;
-	}
-	if ((op & 0xfdf0) == 0xfc40 && (op & 7) >= 2) // RC[D] accumulator conditions (SPRU172C 4-133)
-	{
-		const u64 raw = accumulator(BIT(op, 3)) & ACC_MASK;
-		const s64 value = s64(raw << 24) >> 24;
-		bool take = false;
-		switch (op & 7)
-		{
-		case 2: take = value >= 0; break;
-		case 3: take = value < 0; break;
-		case 4: take = raw != 0; break;
-		case 5: take = raw == 0; break;
-		case 6: take = value > 0; break;
-		case 7: take = value <= 0; break;
-		}
-		if (!BIT(op, 9))
-			return_if(take);
-		else
-		{
-			if (take)
-			{
-				m_delayed_target = pop();
-				m_delayed_words = 2;
-			}
-			m_icount -= 2;
-		}
-		return;
-	}
 	switch (op)
 	{
-	case 0xfc00: // RET
-		transfer_pc(pop());
-		m_icount -= 4;
-		return;
-	case 0xf4eb: // RETE
-		transfer_pc(pop());
-		m_st1 &= ~0x0800;
-		m_icount -= 4;
-		return;
-	case 0xf49b: // RETF
-		transfer_pc(m_rtn);
-		++m_sp; // SPRU172C: RTN supplies PC; no stack-memory read occurs.
-		m_st1 &= ~0x0800;
-		m_icount -= 2;
-		return;
-	case 0xf69b: // RETFD
-		m_delayed_target = m_rtn;
-		m_delayed_words = 2;
-		++m_sp;
-		m_st1 &= ~0x0800;
-		return;
-	case 0xfc30: // RETC TC
-		return_if(m_st0 & 0x1000);
-		return;
-	case 0xfc20: // RETC NTC
-		return_if(!(m_st0 & 0x1000));
-		return;
-	case 0xf072: // RPTB pmad
-		m_rsa = u16(m_pc + 1);
-		m_rea = fetch();
-		m_st1 |= ST1_BRAF;
-		m_icount -= 3;
-		return;
-	case 0xf272: // RPTBD pmad
-		m_rea = fetch();
-		// The two words after the two-word instruction are delay slots.  The
-		// repeated block begins immediately after them.
-		m_rsa = u16(m_pc + 2);
-		m_st1 |= ST1_BRAF;
-		--m_icount;
-		return;
-	case 0xf071: // RPTZ A, #lk
-	case 0xf171: // RPTZ B, #lk
-		accumulator(BIT(op, 8)) = 0;
-		m_rptc = fetch();
-		m_rpt_address = m_pc;
-		m_rpt_end = REPEAT_END_UNSET;
-		m_rpt_iteration = 0;
-		m_rpt_armed = true;
-		--m_icount;
-		return;
-	case 0xf074: // CALL pmad
-	{
-		const u16 destination = fetch();
-		m_rtn = m_pc; // SPRU131G 7.1.2: CALL loads RTN before stacking it.
-		push(m_pc);
-		transfer_pc(destination);
-		m_icount -= 3;
-		return;
-	}
-	case 0xf073: // B pmad
-		transfer_pc(fetch());
-		m_icount -= 3;
-		return;
-	case 0xf4e2: // BACC A
-	case 0xf5e2: // BACC B
-		transfer_pc(u16(accumulator(BIT(op, 8))));
-		m_icount -= 5;
-		return;
-	case 0xf4e3: // CALA A
-	case 0xf5e3: // CALA B
-		m_rtn = m_pc;
-		push(m_pc);
-		transfer_pc(u16(accumulator(BIT(op, 8))));
-		m_icount -= 5;
-		return;
-	case 0xf6e3: // CALAD A
-	case 0xf7e3: // CALAD B
-		push(u16(m_pc + 2));
-		m_delayed_target = u16(accumulator(BIT(op, 8)));
-		m_delayed_words = 2;
-		m_icount -= 3;
-		return;
 	case 0xf493: // CMPL source accumulator, destination accumulator
 	case 0xf593:
 	case 0xf693:
@@ -8282,63 +7593,6 @@ void tms320c54x_device::execute_one(u16 op)
 	case 0xf365:
 		accumulator(BIT(op, 8)) =
 				(accumulator(BIT(op, 9)) ^ (u64(fetch()) << 16)) & ACC_MASK;
-		--m_icount;
-		return;
-	case 0xf274: // CALLD pmad
-	{
-		const u16 destination = fetch();
-		push(u16(m_pc + 2));
-		m_delayed_target = destination;
-		m_delayed_words = 2;
-		m_icount -= 1;
-		return;
-	}
-	case 0xf273: // BD pmad
-		m_delayed_target = fetch();
-		m_delayed_words = 2;
-		m_icount -= 1;
-		return;
-	case 0xfa45: // BCD pmad, AEQ
-	case 0xfa44: // BCD pmad, ANEQ
-	case 0xfa43: // BCD pmad, ALT
-	case 0xfa42: // BCD pmad, AGEQ
-	case 0xfa46: // BCD pmad, AGT
-	case 0xfa47: // BCD pmad, ALEQ
-	case 0xfa20: // BCD pmad, NTC
-	case 0xfa30: // BCD pmad, TC
-	case 0xfa4d: // BCD pmad, BEQ
-	case 0xfa4c: // BCD pmad, BNEQ
-	case 0xfa4a: // BCD pmad, BGEQ
-	case 0xfa4b: // BCD pmad, BLT
-	case 0xfa4e: // BCD pmad, BGT
-	case 0xfa4f: // BCD pmad, BLEQ
-	{
-		const u16 destination = fetch();
-		const bool condition = op == 0xfa45 ? (m_a & ACC_MASK) == 0 :
-				op == 0xfa44 ? (m_a & ACC_MASK) != 0 :
-				op == 0xfa43 ? (s64(m_a << 24) >> 24) < 0 :
-				op == 0xfa42 ? (s64(m_a << 24) >> 24) >= 0 :
-				op == 0xfa46 ? (s64(m_a << 24) >> 24) > 0 :
-				op == 0xfa47 ? (s64(m_a << 24) >> 24) <= 0 :
-				op == 0xfa4d ? (m_b & ACC_MASK) == 0 :
-				op == 0xfa4c ? (m_b & ACC_MASK) != 0 :
-				op == 0xfa4a ? (s64(m_b << 24) >> 24) >= 0 :
-				op == 0xfa4b ? (s64(m_b << 24) >> 24) < 0 :
-				op == 0xfa4e ? (s64(m_b << 24) >> 24) > 0 :
-				op == 0xfa4f ? (s64(m_b << 24) >> 24) <= 0 :
-				op == 0xfa30 ? bool(m_st0 & 0x1000) : !(m_st0 & 0x1000);
-		m_icount -= 2;
-		if (condition)
-		{
-			m_delayed_target = destination;
-			m_delayed_words = 2;
-		}
-		return;
-	}
-	case 0xfe00: // RETD
-		m_delayed_target = pop();
-		m_delayed_words = 2;
-		m_icount -= 2;
 		return;
 	case 0xf495: // NOP
 		return;
@@ -8347,53 +7601,6 @@ void tms320c54x_device::execute_one(u16 op)
 		return;
 	case 0xf2a0: // OR B, A
 		m_a = (m_a | m_b) & ACC_MASK;
-		return;
-	case 0xff45: // XC 2, AEQ
-		if ((m_a & ACC_MASK) != 0)
-			m_pc += 2;
-		return;
-	case 0xff20: // XC 2, NTC
-		if (m_st0 & 0x1000)
-			m_pc += 2;
-		return;
-	case 0xf846: // BC pmad, AGT
-		branch_if((s64(m_a << 24) >> 24) > 0);
-		return;
-	case 0xf843: // BC pmad, ALT
-		branch_if((s64(m_a << 24) >> 24) < 0);
-		return;
-	case 0xf820: // BC pmad, NTC
-		branch_if(!(m_st0 & 0x1000));
-		return;
-	case 0xf830: // BC pmad, TC
-		branch_if(m_st0 & 0x1000);
-		return;
-	case 0xf847: // BC pmad, ALEQ
-		branch_if((s64(m_a << 24) >> 24) <= 0);
-		return;
-	case 0xf845: // BC pmad, AEQ
-		branch_if((m_a & ACC_MASK) == 0);
-		return;
-	case 0xf844: // BC pmad, ANEQ
-		branch_if((m_a & ACC_MASK) != 0);
-		return;
-	case 0xf84c: // BC pmad, BNEQ
-		branch_if((m_b & ACC_MASK) != 0);
-		return;
-	case 0xf84d: // BC pmad, BEQ
-		branch_if((m_b & ACC_MASK) == 0);
-		return;
-	case 0xf84e: // BC pmad, BGT
-		branch_if((s64(m_b << 24) >> 24) > 0);
-		return;
-	case 0xf84a: // BC pmad, BGEQ
-		branch_if((s64(m_b << 24) >> 24) >= 0);
-		return;
-	case 0xf84b: // BC pmad, BLT
-		branch_if((s64(m_b << 24) >> 24) < 0);
-		return;
-	case 0xf84f: // BC pmad, BLEQ
-		branch_if((s64(m_b << 24) >> 24) <= 0);
 		return;
 	case 0xf48d: // SQUR A,A
 	case 0xf58d: // SQUR A,B
@@ -8404,13 +7611,9 @@ void tms320c54x_device::execute_one(u16 op)
 		accumulator(BIT(op, 8)) = multiply_result(product, BIT(op, 8));
 		return;
 	}
-	case 0xf842: // BC pmad, AGEQ
-		branch_if((s64(m_a << 24) >> 24) >= 0);
-		return;
 	case 0xf062: // LD #lk, 16, A
 	case 0xf162: // LD #lk, 16, B
 		accumulator(BIT(op, 8)) = (data_operand(fetch()) << 16) & ACC_MASK;
-		--m_icount;
 		return;
 	case 0xf491: // ROL A through carry
 	case 0xf591: // ROL B through carry
@@ -8458,24 +7661,6 @@ void tms320c54x_device::execute_one(u16 op)
 			data_write(destination, pop());
 			return;
 		}
-		if ((op & 0xff00) == 0xec00) // RPT #k
-		{
-			m_rptc = low;
-			m_rpt_address = m_pc;
-			m_rpt_end = REPEAT_END_UNSET;
-			m_rpt_iteration = 0;
-			m_rpt_armed = true;
-			return;
-		}
-		if (op == 0xf070) // RPT #lk
-		{
-			m_rptc = fetch();
-			m_rpt_address = m_pc;
-			m_rpt_end = REPEAT_END_UNSET;
-			m_rpt_iteration = 0;
-			m_rpt_armed = true;
-			return;
-		}
 		if ((op & 0xff00) == 0x6d00) // MAR indirect auxiliary-register modification
 		{
 			const unsigned mod = (low >> 3) & 0x0f;
@@ -8489,7 +7674,6 @@ void tms320c54x_device::execute_one(u16 op)
 					circular_modify(ar, s16(offset));
 				if (BIT(m_st1, 5) && (low & 7))
 					m_st0 = (m_st0 & ~u16(0xe000)) | u16((low & 7) << 13);
-				--m_icount;
 			}
 			else
 				indirect_modify(low);
@@ -8503,144 +7687,19 @@ void tms320c54x_device::execute_one(u16 op)
 	m_illegal = true;
 }
 
-void tms320c54x_device::retire_atomic_instruction(u16 instruction_pc, u16 previous_sp,
-	bool repeat_was_armed, bool delayed, bool xc_guarded)
-{
-	update_xf();
-	// Calls/returns use architectural SP, not the stack-operation DAGEN snapshot.
-	m_sp_address_pending = (m_op & 0xff00) == 0xee00 ||
-		((m_op & 0xff00) == 0x4a00) ||
-		((m_op & 0xff80) == 0x8a00 && (m_op & 0x7f) != 0x18);
-	if (m_sp_address_pending) m_sp_address_base = previous_sp;
-	if (m_illegal) return;
-	if (m_idle || m_atomic_condition_redirect || m_pc != u16(instruction_pc + m_atomic_condition_words))
-		m_atomic_xc_valid = 0; // Immediate redirects and idle drain the older pipeline.
-	else
-		for (unsigned word = 0; word < std::min<unsigned>(m_atomic_condition_words, 2); ++word)
-		{
-			m_atomic_xc_a[1] = m_atomic_xc_a[0]; m_atomic_xc_b[1] = m_atomic_xc_b[0]; m_atomic_xc_st0[1] = m_atomic_xc_st0[0];
-			m_atomic_xc_a[0] = m_atomic_condition_before_a;
-			m_atomic_xc_b[0] = m_atomic_condition_before_b;
-			m_atomic_xc_st0[0] = m_atomic_condition_before_st0;
-			m_atomic_xc_valid = std::min<unsigned>(m_atomic_xc_valid + 1, 2);
-		}
-	if (m_intm_guard) --m_intm_guard;
-	// Count executed words before repeat redirection changes the continuation.
-	const unsigned words = u16(m_pc - instruction_pc);
-	// Repeat setup arms its body; setup retirement must not consume an iteration.
-	if (repeat_was_armed || !m_rpt_armed) finish_repeats();
-	// A repeated body occupies its delay slot until the final iteration.
-	// Do not redirect after the first copy in BD/RETD; ROM4 uses RPT there.
-	const bool repeated_body_continues = m_rpt_end != REPEAT_END_UNSET && m_pc == m_rpt_address;
-	if (delayed && !repeated_body_continues)
-	{
-		m_delayed_words = words >= m_delayed_words ? 0 : m_delayed_words - words;
-		if (!m_delayed_words)
-		{
-			m_pc = m_delayed_target;
-			if (m_delayed_far) m_xpc = m_delayed_xpc;
-			m_delayed_far = false;
-		}
-	}
-	if (xc_guarded) m_xc_guard = words >= m_xc_guard ? 0 : m_xc_guard - words;
-}
-
 void tms320c54x_device::execute_run()
 {
 	while (m_icount > 0)
 	{
-		if (m_pipeline_frontend)
+		if (m_illegal || m_idle) { m_icount = 0; break; }
+		if (m_pipeline_idle_resume_pending)
 		{
-			if (m_illegal || m_idle) { m_icount = 0; break; }
-			if (m_pipeline_idle_resume_pending)
-			{
-				m_pipeline_idle_resume_pending = false;
-				if (!m_interrupt_entry_stage && !m_pipeline_vector_pending)
-					m_pipeline_fetch_address = m_pipeline_idle_resume_address;
-				pipeline_accept_interrupt();
-			}
-			pipeline_step();
-			--m_icount;
-			continue;
+			m_pipeline_idle_resume_pending = false;
+			if (!m_interrupt_entry_stage && !m_pipeline_vector_pending)
+				m_pipeline_fetch_address = m_pipeline_idle_resume_address;
+			pipeline_accept_interrupt();
 		}
-		if (m_atomic_io_pending)
-		{
-			if (m_atomic_io_wait_remaining)
-				--m_atomic_io_wait_remaining;
-			else if (!m_atomic_io_ready_required || m_ready_in_cb())
-			{
-				if (m_atomic_io_write) m_io.write_word(m_atomic_io_port, m_atomic_io_value);
-				else
-				{
-					data_write(m_atomic_io_address, m_io.read_word(m_atomic_io_port));
-					finish_smem_access(m_atomic_io_mode);
-				}
-				m_atomic_io_pending = false;
-				retire_atomic_instruction(m_atomic_io_instruction_pc, m_atomic_io_previous_sp,
-					m_atomic_io_repeat_armed, m_atomic_io_delayed, m_atomic_io_xc_guarded);
-			}
-			--m_icount;
-			continue;
-		}
-		if (service_interrupt())
-			continue;
-		if (m_idle)
-		{
-			m_icount = 0;
-			break;
-		}
-		debugger_instruction_hook(logical_program_address(m_pc));
-		if (m_illegal)
-		{
-			m_icount = 0;
-			break;
-		}
-
-		const bool delayed = m_delayed_words != 0;
-		const bool xc_guarded = m_xc_guard != 0;
-		const u16 instruction_pc = m_pc;
-		const u32 instruction_address = logical_program_address(instruction_pc);
-		const u16 previous_sp = m_sp;
-		const bool repeat_was_armed = m_rpt_armed;
-		m_atomic_condition_before_a = m_a; m_atomic_condition_before_b = m_b; m_atomic_condition_before_st0 = m_st0;
-		m_atomic_condition_words = 0;
-		m_atomic_condition_redirect = false;
-		m_op = fetch();
-		if (!m_instruction_observer_cb.isunset()) m_instruction_observer_cb(instruction_address, m_op);
-		m_capture_extensions = (m_op & 0xff00) == 0x6f00 && machine().options().verbose();
-		if (m_capture_extensions)
-		{
-			m_instruction_words = {m_op, 0, 0};
-			m_instruction_word_count = 1;
-		}
-		m_sp_address_late = (m_op & 0xff00) == 0x6f00;
-		if (m_opcode_first_pc[m_op] == 0xffff)
-			m_opcode_first_pc[m_op] = instruction_pc;
-		++m_opcode_count[m_op];
-		m_peripheral_mmr_access = false;
-		execute_one(m_op);
-		// SPRU172C memory-operand classes add one cycle for peripheral MMR
-		// access. SPRU131G maps peripherals at 20..5f; 60..7f is scratch DARAM.
-		// Charge once for an RMW instruction, not separately for read and write.
-		if (m_peripheral_mmr_access && !m_atomic_io_pending) --m_icount;
-		if (m_capture_extensions)
-		{
-			std::array<u16, 4> const words = {m_instruction_word_count,
-				m_instruction_words[0], m_instruction_words[1], m_instruction_words[2]};
-			auto entry = m_extension_observations.try_emplace(words,
-				extension_observation{instruction_address}).first;
-			++entry->second.count;
-			m_capture_extensions = false;
-		}
-		if (m_atomic_io_pending)
-		{
-			m_atomic_io_instruction_pc = instruction_pc;
-			m_atomic_io_previous_sp = previous_sp;
-			m_atomic_io_repeat_armed = repeat_was_armed;
-			m_atomic_io_delayed = delayed;
-			m_atomic_io_xc_guarded = xc_guarded;
-		}
-		else retire_atomic_instruction(instruction_pc, previous_sp, repeat_was_armed, delayed, xc_guarded);
+		pipeline_step();
 		--m_icount;
 	}
 }

@@ -1,7 +1,7 @@
 # ROM4 DSP loader contract
 
-The native boundary profiles and the staged-frontend prototype have different
-acceptance scopes. The staged frontend reaches the first organic
+The native boundary profiles have different acceptance scopes, but all execute
+on the stage-owned CPU frontend. It reaches the first organic
 host-packet decoder, records twenty-two consumer advances across observed
 initialization/service passes. The frame-buffer polling loop, delayed TC
 branch inside block `473c..4777`, conditional delayed return and uploaded
@@ -14,8 +14,8 @@ do not promote those claims. See
 [Current result](#current-result) for the established loader lifecycle and
 [Observed lifecycle](#observed-lifecycle) for the bounded live checkpoint.
 
-The staged profile remains opt-in. Next work is broader native lifecycle and
-frontend/bus comparison, rather than inventing a message to escape a CPU guard.
+Ordinary `noki5110` uses staged execution and standard SWWSR decoding. Retained
+research aliases select board/bus compositions, not another execution engine.
 Absolute data address `0012` is AR2, not external RAM.
 Parallel-store carry and physical bus phases remain unvalidated.
 
@@ -25,7 +25,7 @@ separately from this handset/loader boundary.
 
 ## Contract references
 
-- [Execution, staged/atomic comparison and timing maps](rom4_dsp_execution.md).
+- [Execution and timing maps](rom4_dsp_execution.md).
 - [Independent arithmetic and original-code controls](c54x_arithmetic_observations.md).
 - [RF/XF capture and vendor-reference methods](rom4_dsp_capture.md).
 - [Native bootstrap and assist-negative observation controls](rom4_native_observations.md).
@@ -34,10 +34,10 @@ separately from this handset/loader boundary.
 ## Current result
 
 The shared physical-input harness selects NSE-1 keypad/LCD handling from the
-declared `noki5110` parent, including research aliases. The atomic standard-bus
-profile (`nse1astd`) passes the unassisted Phone book menu gate. This does not
+declared `noki5110` parent, including research aliases. Ordinary `noki5110`
+passes the unassisted Phone book menu gate. This does not
 extend to staged/legacy `nse1plg`, whose existing loader guard remains open.
-On `nse1astd`, physical `1,1,2,Navi` reaches the firmware's "Attempting emergency
+In the retained standard-bus capture, physical `1,1,2,Navi` reaches the firmware's "Attempting emergency
 call" screen. An isolated 18-second run and an empty-input control both record
 zero entries to codec wrappers `9c4f/9cb9`, active mode `1836=0`, and no DSP
 illegal-instruction flag. This is call-attempt presentation, not registration,
@@ -60,8 +60,8 @@ unresolved. Read-time PC context is not an instruction-retirement or
 physical-timing claim.
 
 Reproduce this passive instrument with
-`.venv/bin/python tools/run_c54x_rom4_call_observe.py --machine nse1astd`;
-use `nse1pipe` for staged/standard execution and `--keys ''` for an empty-input
+`.venv/bin/python tools/run_c54x_rom4_call_observe.py --machine noki5110`;
+use `--keys ''` for an empty-input
 control. Each run has isolated generated storage, input/binary/observer hashes,
 its launch command, console, bus log and snapshots under `tmp/native-call-*`.
 Inherited DCT3 fixture/backend settings are removed. This is a manual research
@@ -71,7 +71,7 @@ summaries, wrong-machine/faulted completion, invalid masks/times and truncated
 or count-inconsistent bus captures. Each kind reports its total and 512 cap.
 Completeness is not semantic acceptance: independently inspect the physical
 input/screen and transaction evidence before drawing a behavioral conclusion.
-Both standard-bus frontends reproduce 68 post-boot host writes, 18 payload
+The archived atomic/staged comparison reproduced 68 post-boot host writes, 18 payload
 reads and 75 COBBA writes for this dial fixture, with zero codec entries and
 active mode zero. Equal counts do not establish physical timing parity.
 

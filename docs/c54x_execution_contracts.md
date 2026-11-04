@@ -8,6 +8,10 @@ uses `tests/c54x/sections/` and `tools/run_c54x_section.py`.
 the [disposition table](c54x_section_trial.md) owns replacement decisions,
 deliberate coverage reductions and validation limits.
 
+Execution is stage-owned only. Historical atomic comparisons below do not name
+a selectable engine; [frontend retirement](c54x_frontend_retirement.md) owns
+the migration and its independent firmware acceptance.
+
 Copied/acquired firmware integrations live in `tests/firmware/`.
 `tools/run_c54x_core.py` selects only `rom4-context` and `cold-pipeline`;
 codec and handset runners retain separate acceptance contracts.
