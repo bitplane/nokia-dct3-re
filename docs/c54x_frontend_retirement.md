@@ -15,8 +15,8 @@ through an expression: 241 lines and 39,048 cases. Counts describe entire
 sections, not atomic-only case counts. Helpers and firmware integration sources
 are additional migration work. The common case defaults to staged.
 
-Current validated progress: 131 sections (11,429 cases plus restores) migrated;
-6 of the original explicitly atomic sections remain, containing 62 cases.
+Current validated progress: 134 sections (11,455 cases plus restores) migrated;
+3 of the original explicitly atomic sections remain, containing 36 cases.
 The baseline counts
 describe the retirement scope, not the current number of atomic assignments.
 The seven originally paired sections are now staged-only: 24,040 cases remain
@@ -68,9 +68,11 @@ the retained drift checks. Related host validation passed 354 C54x tests,
 84 runner tests and 80 product/profile/PCM checks (overlapping selections).
 
 ROM4 fixtures in `tests/firmware/tms320c54x_test_rom4.cpp` select staged for paired
-codec profiles. `tms320c54x_test_rom4_context.cpp` switches back to atomic in
-multiple continuations: those linked fixture sequences need a separate migration,
-not just removal of codec BIOS aliases. Benchmark tools, machine registrations,
+codec profiles. The eight former false-mode assignments in
+`tms320c54x_test_rom4_context.cpp` were cleanup between staged cases, not atomic
+execution continuations; each successor reinitializes staged before scheduling
+CPU time. They are removed rather than counted as eight migrated code paths.
+Benchmark tools, machine registrations,
 gates and documentation also expose frontend variants.
 
 ## Section work queue
@@ -399,7 +401,7 @@ sections independently; do not run the complete suite after every edit.
 | `transition_register` | 20 | 40 | Migrated; twelve added separated-read contrasts (32 current) and indirect TRN PSHM preserve results. |
 | `compact_store` | 640 | 43 | Validated staged migration; assertions retained |
 | `reverse_carry` | 2,690 | 46 | Staged validated; independent reverse-carry addresses, RAM and full traversal assertions retained |
-| `interrupt_entry` | 12 | 53 | Atomic retained; first staged contrast: C54x case=0 event=1 write=0 address=700 value=0 clock=15 |
+| `interrupt_entry` | 12 | 53 | Migrated; exact entry stages, captured vector/stack and cancellation retained; unrelated enabled pending source masked before terminal IDLE. |
 | `atomic_xorm` | 256 | 33 | Staged validated; assembler-confirmed long-offset encoding; result/status/pointer/bus/replay retained |
 | `scalar_boundaries` | 34 | 66 | Validated staged migration; assertions retained |
 | `atomic_repeat_irq` | 2 | 34 | Migrated; body reads/count and deferred IRQ frame/return retained. |
@@ -479,7 +481,7 @@ sections independently; do not run the complete suite after every edit.
 | `atomic_long_offset_literals` | 14 | 60 | Staged validated; corrected ANDM/ORM encoding; resolved addresses, results and marker intervals retained |
 | `atomic_memory_route_literals` | 26 | 85 | Migrated; offset READA admitted and CMPM/MVPD encoding corrected, values and marker intervals retained. |
 | `atomic_short_immediate` | 520 | 30 | Migrate independent assertions; check staged admission |
-| `atomic_port_delayed_branch` | 6 | 30 | Atomic retained; first staged contrast: C54x register sequence case=1 tick=17 replay=0: relative data-bus clock interval |
+| `atomic_port_delayed_branch` | 6 | 30 | Migrated; all conditions, slot effects and port values retained, taken marker interval is nine staged clocks. |
 | `atomic_port_register_examples` | 6 | 37 | Staged validated; MAR encoding corrected and modeled repeat-tail interval derived; values retained |
 | `atomic_port_low_store` | 6 | 37 | Validated staged migration; assertions retained |
 | `atomic_port_indirect_output` | 5 | 30 | Validated staged migration; assertions retained |
@@ -491,7 +493,7 @@ sections independently; do not run the complete suite after every edit.
 | `peripheral_cost_classes` | 20 | 36 | Atomic retained; first staged contrast: C54x case atomic-CPU-peripheral-and-scratch-cost-classes/2: register 22 actual=1 expected=0 mask=ffffffffffffffff |
 | `atomic_operand_order` | 46 | 63 | Migrated; all independent bus/program order assertions retained using assembler-checked extension order. |
 | `atomic_intm_follower` | 3 | 33 | Migrated; exact decoded drain, frame and whole-follower completion checked. |
-| `atomic_xc_interrupt` | 8 | 40 | Atomic retained; first staged contrast: Section IRQ case=0 line=2 clock=12 data_events=0 previous_case=0 return_pc=0804 |
+| `atomic_xc_interrupt` | 8 | 40 | Migrated; speculative loop prefetch distinguished from two actual body executions; IRQ/NMI, selection and exact drained frames retained. |
 | `atomic_waited_io_control` | 12 | 36 | Atomic retained; first staged contrast: C54x case waited-port-control-defers-pending-IRQ/0: register 22 actual=1 expected=0 mask=ffffffffffffffff |
 | `stopped_timer_reload` | 48 | 26 | Migrated; all divider/reload/PSC cases and restores retained with completed-RMW readback. |
 | `source_admission` | 38,464 | 54 | Validated staged subset; atomic dimension removed |

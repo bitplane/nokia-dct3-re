@@ -5294,6 +5294,19 @@ instruction latency. Offset READA repeat/control compositions remain excluded.
 
 ## Mapped TRN publication and protected interrupt drain
 
+`interrupt_entry` retains twelve entry-stage/save/vector-poison/cancellation
+cases and checks the handler's logical Execute words. Its IMR poison deliberately
+enables another pending source during entry; that unrelated source is masked
+after the five captured-entry checks so the terminal IDLE can remain asleep.
+Leaving it enabled correctly wakes staged IDLE despite INTM, and is not evidence
+of failed interrupt restoration. `atomic_xc_interrupt` checks both IRQ and NMI,
+accepted/annulled words, two-word spans and loop wrap. Speculative second-loop
+Prefetch is recorded separately from exactly two body executions. Entry drains
+the already-decoded terminal IDLE; the non-loop return has a second IDLE as its
+valid continuation. `atomic_port_delayed_branch` retains all six condition/slot
+contrasts and actual marker values; both continuations are nine model clocks
+after the initial marker.
+
 The `transition_register` fixture distinguishes adjacent ST-to-TRN / LDM
 from a separated readback: staged Read sees the old TRN before the older
 Execute store in the shared clock; a separating word reads the stored value.

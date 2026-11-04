@@ -50,7 +50,9 @@ public:
 		if(!m_observing_outputs || !m_input.instruction_events)return;
 		require(m_instruction_cursor<m_input.instruction_events->size(),"instruction observation count");
 		auto const &expected=(*m_input.instruction_events)[m_instruction_cursor++];
-		require(address==expected.address && opcode==expected.value,"logical Execute address and captured opcode");
+		if (address!=expected.address || opcode!=expected.value)
+			throw emu_fatalerror("C54x Execute case=%u event=%u actual=%06x/%04x expected=%06x/%04x",m_case,m_instruction_cursor-1,
+				address,opcode,expected.address,expected.value);
 	}
 	u64 digest() const { return m_coverage.value; }
 	unsigned tick_count() const { return m_tick; }
@@ -262,8 +264,13 @@ private:
 					require(m_first_data_total && m_cpu.total_cycles() - *m_first_data_total == *expected->cycles_from_first, "first-to-current data-bus clock interval");
 				if (!accept_bus_event(*m_input.data_events, m_data_cursor,
 					{write, u32(at), word, unsigned(bus_clock())}))
-					throw emu_fatalerror("C54x case=%u event=%u write=%u address=%x value=%x clock=%llu",
-						m_case, m_data_cursor, unsigned(write), unsigned(at), word, (unsigned long long)m_cpu.pipeline_cycles());
+				{
+					u32 instruction=0; u16 opcode=0;
+					bool const staged=m_cpu.observe_staged_data_read(at,instruction,opcode);
+					throw emu_fatalerror("C54x case=%u event=%u write=%u address=%x value=%x clock=%llu staged=%u instruction=%06x/%04x pc=%06x",
+						m_case, m_data_cursor, unsigned(write), unsigned(at), word, (unsigned long long)m_cpu.pipeline_cycles(),
+						unsigned(staged),instruction,opcode,unsigned(m_cpu.state_int(STATE_GENPC)));
+				}
 				m_last_data_total = m_cpu.total_cycles();
 				if (!m_first_data_total) m_first_data_total = m_last_data_total;
 				if (m_data_observer) m_data_observer(write, u32(at), word);

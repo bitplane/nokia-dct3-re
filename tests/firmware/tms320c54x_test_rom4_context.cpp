@@ -496,7 +496,7 @@ bool tms320c54x_test_state::check_rom4_context_results()
 				expect(restore_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Restore overlapping original prologue sources and stack writes");
 				return restart_pipeline_observer(251480, checkpoint + 1);
 			}
-			m_pipeline_write_tap.remove(); m_pipeline_operand_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
+			m_pipeline_write_tap.remove(); m_pipeline_operand_tap.remove(); m_pipeline_fetch_tap.remove();
 			record_context_case(0, m_pipeline_peripheral_case);
 			if (m_pipeline_peripheral_case < 5) { start_pipeline_mu4_prologue(m_pipeline_peripheral_case + 1); return true; }
 			osd_printf_info("TMS320C54x staged original MU4 context: PASS words=37 cases=6 context_saves=8 context_restored=1 returned=4044 restore=6 full_handler_claim=0\n");
@@ -551,7 +551,7 @@ bool tms320c54x_test_state::check_rom4_context_results()
 				expect(restore_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Restore original worker roundtrip without duplicate stack or source ownership");
 				return restart_pipeline_observer(251840, checkpoint + 1);
 			}
-			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_vector_stack_tap.remove(); m_vector_prefetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
+			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_vector_stack_tap.remove(); m_vector_prefetch_tap.remove();
 			record_context_case(1, variant);
 			if (variant < 15) { start_pipeline_original_worker_roundtrip(variant + 1); return true; }
 			osd_printf_info("TMS320C54x staged original worker roundtrip: PASS cases=16 original_words=20 route=skip_body saved_intm_states=2 restore=16 duplicate_stack_reads=0 duplicate_source_reads=0\n");
@@ -596,7 +596,7 @@ bool tms320c54x_test_state::check_rom4_context_results()
 				expect(restore_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Restore complete context call route without duplicated saves or return fetch");
 				return restart_pipeline_observer(251860, checkpoint + 1);
 			}
-			m_pipeline_write_tap.remove(); m_pipeline_operand_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
+			m_pipeline_write_tap.remove(); m_pipeline_operand_tap.remove(); m_pipeline_fetch_tap.remove();
 			record_context_case(2, variant);
 			if (variant < 39) { start_pipeline_original_context_call(variant + 1); return true; }
 			osd_printf_info("TMS320C54x staged original context call route: PASS cases=40 original_words=67 pages=2 saved_intm_states=2 restore=40 context_restored=1 counter_increments=1 full_isr_claim=0\n");
@@ -647,7 +647,7 @@ bool tms320c54x_test_state::check_rom4_context_results()
 				return restart_pipeline_observer(252080, checkpoint + 1);
 			}
 			m_pipeline_write_tap.remove(); m_pipeline_operand_tap.remove(); m_pipeline_fetch_tap.remove();
-			m_vector_stack_tap.remove(); m_vector_prefetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
+			m_vector_stack_tap.remove(); m_vector_prefetch_tap.remove();
 			record_context_case(3, variant);
 			if (variant < 127) { start_pipeline_original_context_call(variant + 1, true); return true; }
 			osd_printf_info("TMS320C54x staged complete MU4 context body: PASS cases=128 original_words=89 pages=2 saved_intm_states=2 sxm_states=2 cmpr_outcomes=2 restore=128 context_restored=1 counter_increments=1 full_isr_claim=0\n");
@@ -702,7 +702,7 @@ bool tms320c54x_test_state::check_rom4_context_results()
 				m_check_timer->enable(true); return true;
 			}
 			m_pipeline_write_tap.remove(); m_pipeline_operand_tap.remove(); m_pipeline_fetch_tap.remove(); m_vector_prefetch_tap.remove();
-			m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10); m_cpu->set_pipeline_frontend(false);
+			m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
 			record_context_case(4, variant);
 			if (variant < 47) { start_pipeline_mu4_timer_context(variant + 1); return true; }
 			osd_printf_info("TMS320C54x staged original MU4 timer ISR: PASS cases=48 original_words=94 foreground_pages=2 sxm_states=2 cmpr_outcomes=2 restore=48 timer_vector=1 original_frete=1 foreground_retired=1\n");
@@ -778,7 +778,7 @@ bool tms320c54x_test_state::check_rom4_context_results()
 			expect(cycle == m_recurring_irq_end_cycle && m_pipeline_operand_reads == m_recurring_irq_end_writes,
 				"Recurring timer replay reproduces the exact eighth-return cycle and foreground effects");
 			m_pipeline_write_tap.remove(); m_pipeline_operand_tap.remove(); m_pipeline_fetch_tap.remove(); m_vector_prefetch_tap.remove();
-			m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10); m_cpu->set_pipeline_frontend(false);
+			m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
 			record_context_case(5, variant);
 			if (variant < 95) { start_pipeline_mu4_recurring_timer(variant + 1); return true; }
 			osd_printf_info("TMS320C54x staged recurring MU4 timer: PASS cases=96 returns_per_leg=8 periods=2 foreground_pages=2 sxm_states=2 control_outcomes=2 restore=96 exact_return_cycle=1 firmware_reseeding=0\n");
@@ -852,7 +852,7 @@ bool tms320c54x_test_state::check_rom4_context_results()
 				return restore_pipeline_at(252260, "Restore original idle call with retained timer and stack state");
 			}
 			m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_vector_prefetch_tap.remove();
-			m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10); m_cpu->set_pipeline_frontend(false);
+			m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
 			if (variant == 7) osd_printf_info("TMS320C54x staged original idle call: PASS cases=8 original_words=44 setup_paths=2 stack_alignments=2 restore=8 external_wake=1 isr_claim=0\n");
 			if (variant == 15) osd_printf_info("TMS320C54x staged original idle timer wake: PASS cases=8 idle_words=44 isr_words=94 stack_alignments=2 restore=8 original_vector=1 original_frete=1\n");
 			record_context_case(6, variant);
@@ -895,7 +895,7 @@ bool tms320c54x_test_state::check_rom4_context_results()
 				m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_expected_cycle = checkpoint + 1; m_phase = 252220;
 				m_check_timer->enable(true); return true;
 			}
-			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
+			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove();
 			record_context_case(7, m_pipeline_peripheral_case);
 			if (m_pipeline_peripheral_case < 3) { start_pipeline_idle_sp_tail(m_pipeline_peripheral_case + 1); return true; }
 			osd_printf_info("TMS320C54x staged original idle SP tail: PASS cases=4 original_words=4 restore=4 duplicate_reads=0 duplicate_sp_writes=0\n");

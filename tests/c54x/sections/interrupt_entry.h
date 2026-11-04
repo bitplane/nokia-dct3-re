@@ -1,5 +1,6 @@
 // license:BSD-3-Clause
 // copyright-holders:Gaz
+#define C54X_SECTION_INSTRUCTION_EVENTS
 #include "c54x_section_common.h"
 namespace c54x_test {
 inline std::vector<clocked_register_case> section_cases()
@@ -17,7 +18,8 @@ inline std::vector<clocked_register_case> section_cases()
 		initial.initial.insert(initial.initial.end(), {{STATE_GENPC,0x800},{r::STATE_ST1,nmi ? 0x800U : 0U},
 			{r::STATE_IMR,1},{r::STATE_IFR,3}});
 		clocked_register_case c{{{0,std::move(initial)}},checkpoint,24};
-		c.pipeline_frontend = false;
+		c.pipeline_frontend = true;
+		c.instruction_events = std::vector<memory_word>{{vector,0xf020},{u32(vector+2),0xf4e1}};
 		if (nmi) c.initial_input_lines = {{line,ASSERT_LINE},{line,CLEAR_LINE}};
 		for (unsigned tick = 1; tick <= 5; ++tick) c.states.push_back({tick,observation("entry-ownership-boundary", {
 			{r::STATE_SP,tick >= 3 ? 0xfffU : 0x1000U},{r::STATE_IFR,nmi || tick < 4 ? 3U : 2U},
@@ -25,6 +27,9 @@ inline std::vector<clocked_register_case> section_cases()
 		c.states.push_back({24,observation("accepted-source-and-retained-vector", {{STATE_GENPC,u64(vector + 3)},
 			{r::STATE_SP,0xfff},{r::STATE_IFR,nmi ? 3U : 2U},{r::STATE_A,0x1234}})});
 		c.actions = {{checkpoint,{{r::STATE_IMR,2}},false,checkpoint >= 4 ? std::vector<memory_word>{{vector,0xf4e1}} : std::vector<memory_word>{}}};
+		// A captured source is immutable; a different enabled pending source
+		// would nevertheless wake the terminal IDLE even with INTM set.
+		c.actions.push_back({6,{{r::STATE_IMR,0}}});
 		c.irqs = {{line,0,5,0,0x800}};
 		c.program_events = {{false,vector,0xf020,0,false},{false,u32(vector + 1),0x1234,0,false}};
 		c.data_events = std::vector<clocked_data_event>{{true,0xfff,0x800,0,false}};
@@ -40,9 +45,10 @@ inline std::vector<clocked_register_case> section_cases()
 			{4,observation("vector-captured-before-stack-write", {{r::STATE_SP,0xfff},{r::STATE_A,0}},{{0xfff,0xbeef}})},
 			{5,observation("entry-cancelled", {{r::STATE_A,0}})},
 			{24,observation("foreground-idle-not-vector", {{STATE_GENPC,0x801},{r::STATE_A,0}})}},2,24};
-		c.pipeline_frontend = false;
+		c.pipeline_frontend = true;
 		c.initial_input_lines = {{INPUT_LINE_NMI,ASSERT_LINE},{INPUT_LINE_NMI,CLEAR_LINE}};
 		c.actions = {{4,{{reset ? int(STATE_GENPC) : int(r::STATE_PC),0x800},{r::STATE_IDLE,0}},false,{},{},{},reset}};
+		c.actions.push_back({6,{{r::STATE_IMR,0}}});
 		c.program_events = {{false,4,0xf020,0,false}};
 		c.data_events = std::vector<clocked_data_event>{};
 		c.irqs = {{INPUT_LINE_NMI,0,5,0,0x800}};

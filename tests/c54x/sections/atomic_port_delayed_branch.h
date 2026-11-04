@@ -18,11 +18,11 @@ inline std::vector<clocked_register_case> section_cases()
 			auto final = observation("both-slots-execute-before-selected-continuation",{{STATE_GENPC,taken ? 0x704U : 0x60dU},
 				{r::STATE_A,taken ? 1U : 3U},{r::STATE_B,2},{r::STATE_ST0,st0},{r::STATE_ST1,0}});
 			final.expected_data = initial.data;
-			clocked_register_case c{{{0,std::move(initial)},{1,observation("before-delay-markers",{{STATE_GENPC,0x601}})},
+			clocked_register_case c{{{0,std::move(initial)},{1,observation("before-delay-markers",{{STATE_GENPC,0x600}})},
 				{2,observation("delay-markers-running",{})},{48,std::move(final)}},3,48};
-			c.pipeline_frontend = false; c.observed_data_space = AS_IO;
+			c.pipeline_frontend = true; c.observed_data_space = AS_IO;
 			c.data_events = std::vector<clocked_data_event>{{true,0x124,0x1111,0,false},
-				{true,0x124,u16(taken ? 0x3333 : 0x2222),0,false,{},taken ? 8U : 9U}};
+				{true,0x124,u16(taken ? 0x3333 : 0x2222),0,false,{},9}};
 			cases.push_back(std::move(c));
 		}
 	return cases;
