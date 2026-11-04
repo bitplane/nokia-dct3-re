@@ -2187,6 +2187,14 @@ address/update; neither repeats the modification at Execute. Newly admitted
 reverse-address LD/ST forms reject mapped/low-page operands. The two explicit
 traversals retain their original register snapshots and ordered bus events.
 
+Short indirect MAR also uses the pipelined single-repeat engine: each injected
+iteration modifies its pointer once in Access, with count retirement owned by
+Execute. `atomic_transfer_repeat_literals` retains all 256 eight-bit counts
+for postincrement AR1; `atomic_conditional_repeat` retains AR3 postincrement
+with indirect/absolute memory-sourced counts sampled once. Their final RC,
+count+1 pointer effects, continuation and replay predicates are unchanged.
+This does not qualify direct/long-offset MAR or all interrupt compositions.
+
 LDR (`16xx/17xx`, SPRU172C page 4-78) retains the source and SXM and produces
 the shifted word with low half `8000`, without altering arithmetic flags.
 `rounded_load` retains all 64 cases/restores across signed/unsigned extension,

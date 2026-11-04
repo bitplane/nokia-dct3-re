@@ -15,8 +15,8 @@ through an expression: 241 lines and 39,048 cases. Counts describe entire
 sections, not atomic-only case counts. Helpers and firmware integration sources
 are additional migration work. The common case defaults to staged.
 
-Current validated progress: 94 sections (10,349 cases plus restores) migrated;
-43 of the original explicitly atomic sections remain. The baseline counts
+Current validated progress: 97 sections (10,621 cases plus restores) migrated;
+40 of the original explicitly atomic sections remain. The baseline counts
 describe the retirement scope, not the current number of atomic assignments.
 The seven originally paired sections are now staged-only: 24,040 cases remain
 from their 39,048-case baseline. Their original staged stimuli, assertions and
@@ -195,6 +195,21 @@ streams with one-clock cadence and younger-read/older-write overlap explicit.
 Seven BIO/control/admission sections pass 24,709 cases/restores, and the
 transfer section passes another 34; host CPU-tool checks pass 354 tests.
 
+`atomic_transfer_repeat_literals` and `atomic_conditional_repeat` retain all
+269 cases on staged. Short indirect MAR now uses the existing pipelined repeat
+engine and its Access-owned pointer update; no data transaction or second
+Execute update is added. All 256 eight-bit counts retain count+1 effects,
+terminal RC and continuation, alongside indirect/absolute memory-count sampling
+and XC carry contrasts. Long-offset and direct MAR forms are not added here.
+
+`atomic_zero_repeat` retains its three zero-count RPTZ/RPTBD/RPTB cases on
+staged. Logical Execute sequences prove one body execution and the original
+continuations/register results. The former single-fetch assertion is retired:
+speculative Prefetch may revisit the block body without executing it twice.
+These three sections and eight repeat/admission controls pass 26,428
+cases/restores. The 354 CPU-tool checks, four EFR codec/replay profiles and
+ordinary 5110 menu/save gates also pass.
+
 ### Unresolved migration contrasts
 
 `atomic_register_copy_sequences` remains atomic. It writes `7728` under the
@@ -209,7 +224,6 @@ Further preserved atomic sections after isolated staged trials:
 | Section | First observed contrast | Follow-up |
 | --- | --- | --- |
 | `atomic_memory_address_literals` | Case 16, repeated ADD, sets ILLEGAL | Audit repeated-body admission and ownership |
-| `atomic_zero_repeat` | Case 2 fetches `0602=f495` at clock 7 outside the expected sequence | Derive staged repeat-prefetch expectations |
 | `atomic_multiply_move_literals` | Case 6 reads mapped `0015=0000` as event 0 at clock 6 | Resolve mapped-source sampling |
 | `atomic_coefficient_fir_literals` | Case 0, MACP `788b`, sets ILLEGAL | Audit program-coefficient multiply admission |
 | `atomic_mapped_moves` | Case 2, MVMD/DAR progression, sets ILLEGAL | Audit mapped-move destination admission |
@@ -301,9 +315,9 @@ sections independently; do not run the complete suite after every edit.
 | `atomic_stack_literals` | 9 | 53 | Staged validated; original stack/accumulator fields retained with Read/Write clocks |
 | `atomic_mapped_moves` | 4 | 36 | Migrate independent assertions; check staged admission |
 | `atomic_memory_tests` | 10 | 44 | Migrate independent assertions; check staged admission |
-| `atomic_zero_repeat` | 3 | 26 | Re-derive timing/order; retain assertions |
+| `atomic_zero_repeat` | 3 | 26 | Staged validated; once-only logical body execution replaces atomic fetch-count convention |
 | `atomic_program_transfers` | 8 | 46 | Validated staged migration; assertions retained |
-| `atomic_conditional_repeat` | 4 | 32 | Atomic retained; first staged contrast: C54x case RPT-memory-count-sampled-once/2: register 22 actual=1 expected=0 mask=ffffffffffffffff |
+| `atomic_conditional_repeat` | 4 | 32 | Staged validated; XC carry spans, once-only memory count and MAR body effects retained |
 | `atomic_transfer_literals` | 34 | 85 | Staged validated; repeated-copy cadence/interleaving explicit; values and counts retained |
 | `atomic_mmr_burst` | 2 | 43 | Atomic retained; first staged contrast: C54x case MMR-burst-initialize-and-push/0: register 22 actual=1 expected=0 mask=ffffffffffffffff |
 | `atomic_memory_sequences` | 3 | 40 | Validated staged migration; assertions retained |
@@ -323,7 +337,7 @@ sections independently; do not run the complete suite after every edit.
 | `atomic_guard_conditions` | 18 | 41 | Migrate independent assertions; check staged admission |
 | `atomic_memory_alu_literals` | 9 | 40 | Migrate independent assertions; check staged admission |
 | `atomic_mmr_transfer_literals` | 4 | 45 | Staged validated; same-clock peripheral Read/older Write order explicit; results retained |
-| `atomic_transfer_repeat_literals` | 265 | 55 | Atomic retained; first staged contrast: C54x case RPT-every-eight-bit-count-with-MAR-body/9: register 22 actual=1 expected=0 mask=ffffffffffffffff |
+| `atomic_transfer_repeat_literals` | 265 | 55 | Staged validated; all eight-bit MAR repeat counts and original transfer/literal predicates retained |
 | `atomic_status_xf` | 8 | 29 | Migrate independent assertions; check staged admission |
 | `atomic_single_slot_conditions` | 8 | 27 | Migrate independent assertions; check staged admission |
 | `atomic_memory_pairs` | 13 | 70 | Staged validated; adjacent MVDD Read/Write clocks explicit; results retained |
