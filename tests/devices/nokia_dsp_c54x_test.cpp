@@ -746,7 +746,11 @@ private:
 	}
 	void expect(bool condition, const char *message)
 	{
-		if (!condition) throw emu_fatalerror("C54x backend BSP: %s", message);
+		if (!condition) throw emu_fatalerror("C54x backend BSP: %s (stage=%u case=%u pc=%06x sp=%04x ifr=%04x idle=%u)", message,
+			m_stage, m_case, unsigned(m_cpu->state_int(STATE_GENPC)),
+			unsigned(m_cpu->state_int(tms320c54x_device::STATE_SP)),
+			unsigned(m_cpu->state_int(tms320c54x_device::STATE_IFR)),
+			unsigned(m_cpu->state_int(tms320c54x_device::STATE_IDLE)));
 	}
 	void check_slot_request()
 	{
@@ -904,7 +908,10 @@ private:
 			m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0x00a0);
 			auto &data = m_cpu->space(AS_DATA);
 			data.write_word(0x0800, 0xf4e1);
-			data.write_word(0x00d0, 0xf4e1);
+			// With TX still pending, IDLE may wake without accepting it while
+			// INTM is set. Keep the RX-first case in a branch sink instead.
+			data.write_word(0x00d0, m_case == 2 ? 0xf073 : 0xf4e1);
+			data.write_word(0x00d1, 0x00d0);
 			data.write_word(0x00d4, 0xf4e1);
 			data.write_word(0x0022, m_case == 0 ? 0x0080 : m_case == 1 ? 0x0040 : 0x00c0);
 			if (m_case != 0) data.write_word(0x0021, 0x1234);
@@ -954,7 +961,10 @@ private:
 		}
 		else if (m_stage == 4 || m_stage == 5)
 		{
-			expect(m_cpu->state_int(STATE_GENPC) == (m_case == 1 ? 0x00d5 : 0x00d1) &&
+			u16 const pc = m_cpu->state_int(STATE_GENPC);
+			bool const at_vector = m_case == 2 ? pc >= 0x00d0 && pc <= 0x00d2 : pc == (m_case == 1 ? 0x00d5 : 0x00d1);
+			expect(at_vector && m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x0fff &&
+				m_cpu->space(AS_DATA).read_word(0x0fff) == 0x0801 &&
 				m_cpu->state_int(tms320c54x_device::STATE_IFR) == (m_case == 2 ? 0x20 : 0),
 				"backend vector and simultaneous receive priority");
 			if (m_case != 1)

@@ -74,6 +74,9 @@ def main():
     run = Path(tempfile.mkdtemp(prefix='c54x-backend-bsp-', dir=args.output_root.resolve()))
     command = [str(args.mame.resolve()), 'tms54bsp', '-video', 'none',
                '-sound', 'none', '-nothrottle', '-noreadconfig', '-log',
+               '-joystickprovider', 'none', '-midiprovider', 'none',
+               '-keyboardprovider', 'none', '-mouseprovider', 'none',
+               '-lightgunprovider', 'none',
                '-seconds_to_run', '1']
     if args.coverage:
         command.append('-verbose')

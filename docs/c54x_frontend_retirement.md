@@ -194,6 +194,13 @@ control, and keeps the same boot, demand, bus, opcode and replay assertions.
 RF/call command-line runners cannot select a retired atomic machine; archived
 capture metadata remains parseable for existing checker fixtures only.
 
+Native backend BSP and slot-request gates pass. The simultaneous RX/TX fixture
+holds the RX vector in a synthetic branch sink: its pending TX source can wake
+IDLE even with INTM set, as independently covered by `idle_wake`. It retains
+RX-first selection, exactly one saved frame, the return word and pending TX
+bit across replay; it must not mistake an invalid terminal IDLE assumption for
+lost interrupt priority. Pin, joined-clock, pending-I/O and reset checks remain.
+
 Complete catalogue acceptance and fresh MU4 reset/retained qualification are
 being renewed on the single-engine composition. The step-3 snapshot above is
 not a renewed claim for this revision.
