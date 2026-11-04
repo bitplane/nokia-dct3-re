@@ -13,6 +13,7 @@ inline std::vector<clocked_register_case> section_cases()
 		u16 const mode = form < 2 ? 3 : form == 2 ? 0x90 | reg : form == 3 ? 0xf8 : 0xe0 | ((form - 4) << 3) | reg;
 		auto initial = initial_case("MVDP-retained-source-and-instruction-page-destination", {u16(0x7d00 | mode),u16(form == 3 ? source : 0x2e00)});
 		if (extended) initial.program[2].value = form == 3 ? 0x2e00 : form == 4 ? 0xffff : form == 5 ? 1 : 2;
+		if (form >= 4) std::swap(initial.program[1].value, initial.program[2].value);
 		initial.program[2 + extended].value = 0xf4e1;
 		for (auto &word : initial.program) word.address += base;
 		initial.program.push_back({base + 0x2e00,0xbeef}); initial.data = {{source,0x2468}};

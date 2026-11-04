@@ -255,7 +255,9 @@ private:
 				if (m_machine.side_effects_disabled()) return;
 				auto const *expected = m_data_cursor < m_input.data_events->size() ? &(*m_input.data_events)[m_data_cursor] : nullptr;
 				if (expected && expected->cycles_from_previous)
-					require(m_last_data_total && m_cpu.total_cycles() - *m_last_data_total == *expected->cycles_from_previous, "relative data-bus clock interval");
+					if (!m_last_data_total || m_cpu.total_cycles() - *m_last_data_total != *expected->cycles_from_previous)
+						throw emu_fatalerror("C54x relative bus interval case=%u event=%u actual=%llu expected=%u",m_case,m_data_cursor,
+							(unsigned long long)(m_last_data_total ? m_cpu.total_cycles() - *m_last_data_total : ~u64(0)),*expected->cycles_from_previous);
 				if (expected && expected->cycles_from_first)
 					require(m_first_data_total && m_cpu.total_cycles() - *m_first_data_total == *expected->cycles_from_first, "first-to-current data-bus clock interval");
 				if (!accept_bus_event(*m_input.data_events, m_data_cursor,

@@ -162,9 +162,9 @@ void check_disassembly(util::disasm_interface &decoder, Expect expect, Report re
 		{0x61e2, 3 | dasm::SUPPORTED, "BITF    *AR2($2345), #$6789"},
 		{0x70f8, 3 | dasm::SUPPORTED, "MVKD    $6789, *($2345)"},
 		{0x7192, 2 | dasm::SUPPORTED, "MVDK    *AR2+, $2345"},
-		{0x74e2, 3 | dasm::SUPPORTED, "PORTR   $2345, *AR2($6789)"},
+		{0x74e2, 3 | dasm::SUPPORTED, "PORTR   $6789, *AR2($2345)"},
 		{0x75f8, 3 | dasm::SUPPORTED, "PORTW   *($2345), $6789"},
-		{0x7de2, 3 | dasm::SUPPORTED, "MVDP    *AR2($6789), $2345"},
+		{0x7de2, 3 | dasm::SUPPORTED, "MVDP    *AR2($2345), $6789"},
 		{0x7e92, 1 | dasm::SUPPORTED, "READA   *AR2+"},
 		{0x7ef8, 2 | dasm::SUPPORTED, "READA   *($2345)"},
 	};
@@ -1043,8 +1043,8 @@ void check_disassembly(util::disasm_interface &decoder, Expect expect, Report re
 	vector const mvpd_forms[] = {
 		{0x7c12, 2 | dasm::SUPPORTED, "MVPD    $2345, $12"},
 		{0x7c92, 2 | dasm::SUPPORTED, "MVPD    $2345, *AR2+"},
-		{0x7ce2, 3 | dasm::SUPPORTED, "MVPD    $2345, *AR2($6789)"},
-		{0x7cea, 3 | dasm::SUPPORTED, "MVPD    $2345, *+AR2($6789)"},
+		{0x7ce2, 3 | dasm::SUPPORTED, "MVPD    $6789, *AR2($2345)"},
+		{0x7cea, 3 | dasm::SUPPORTED, "MVPD    $6789, *+AR2($2345)"},
 		{0x7cf8, 3 | dasm::SUPPORTED, "MVPD    $6789, *($2345)"},
 	};
 	check_syntax(mvpd_forms, {0x01ffff}, false,

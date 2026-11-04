@@ -13,8 +13,7 @@ inline std::vector<clocked_register_case> section_cases()
 		std::vector<u16> extensions;
 		if (family == 11) extensions = {0x900};
 		else if (form == 2) {
-			if (family == 10) extensions = {0x900,5};
-			else if (family >= 1 && family <= 3) extensions = {operands[family],5};
+			if (family == 10) extensions = {5,0x900};
 			else { extensions = {5}; if (family < 8 && family != 4) extensions.push_back(operands[family]); }
 		} else {
 			if (form == 3) extensions.push_back(0x600);
@@ -41,7 +40,7 @@ inline std::vector<clocked_register_case> section_cases()
 		if (family == 9 || family == 10) final.expected_program.push_back({0x900,0xbeef});
 		if (family == 10) final.expected_data.push_back({0x5ff,0xcafe});
 		clocked_register_case c{{{0,std::move(initial)},{1,observation("operand-order-replay-checkpoint",{})},{24,std::move(final)}},1,24};
-		c.pipeline_frontend = false;
+		c.pipeline_frontend = true;
 		c.initial_io = {{0x123,0xabcd},{0x124,0xaaaa}};
 		c.data_events = std::vector<clocked_data_event>{}; c.io_events = std::vector<clocked_data_event>{};
 		for (unsigned i = 0; i != extensions.size(); ++i) c.program_events.push_back({false,0x801+i,extensions[i],0,false});

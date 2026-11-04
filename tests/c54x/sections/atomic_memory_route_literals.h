@@ -20,15 +20,15 @@ inline std::vector<clocked_register_case> section_cases()
 		final.expected.insert(final.expected.end(),expected.begin(),expected.end());
 		final.expected.push_back({STATE_GENPC,0x601+program.size()});
 		final.expected_data = std::move(expected_data);
-		clocked_register_case c{{{0,std::move(initial)},{1,observation("before-route-markers",{{STATE_GENPC,0x601}})},
+		clocked_register_case c{{{0,std::move(initial)},{1,observation("before-route-markers",{{STATE_GENPC,0x600}})},
 			{2,observation("route-markers-running",{})},{48,std::move(final)}},3,48};
-		c.pipeline_frontend = false; c.observed_data_space = AS_IO;
+		c.pipeline_frontend = true; c.observed_data_space = AS_IO;
 		c.data_events = std::vector<clocked_data_event>{{true,0x124,0x1111,0,false},{true,0x124,0x1111,0,false,{},interval}};
 		cases.push_back(std::move(c));
 	};
 		add("bitf-long-preupdate-retains-carry", {0x61ea, 5, 0x8000}, {{r::STATE_AR2, 0x0f00}, {r::STATE_ST0, 0x0800}},
 			{{r::STATE_ST0, 0x1800, 0x1800}, {r::STATE_AR2, 0x0f05}}, {{0x0f05, 0x8001}}, 6);
-		add("cmpm-immediate-before-offset", {0x60e2, 0x1235, 5}, {{r::STATE_AR2, 0x0f00}, {r::STATE_ST0, 0x0800}},
+		add("cmpm-offset-before-immediate", {0x60e2, 5, 0x1235}, {{r::STATE_AR2, 0x0f00}, {r::STATE_ST0, 0x0800}},
 			{{r::STATE_ST0, 0x0800, 0x1800}, {r::STATE_AR2, 0x0f00}}, {{0x0f05, 0x1234}}, 6);
 		add("bitf-ar0-absent-bit", {0x6180, 1}, {{r::STATE_AR0, 0x0f20}, {r::STATE_ST0, 0x1800}},
 			{{r::STATE_ST0, 0x0800, 0x1800}, {r::STATE_AR0, 0x0f20}}, {{0x0f20, 4}});
@@ -61,7 +61,7 @@ inline std::vector<clocked_register_case> section_cases()
 		add("reada-long-preupdated-destination", {0x7eea, 5}, {{r::STATE_A, 0x9000}, {r::STATE_AR2, 0x0f00}},
 			{{r::STATE_AR2, 0x0f05}}, {{0x0f05, 0}}, 9, {{0x0f05, 0xabcd}});
 		cases.back().states.front().observation.program.emplace_back(0x9000, 0xabcd);
-		add("mvpd-program-address-before-offset", {0x7cea, 0x9000, 5}, {{r::STATE_AR2, 0x0f00}},
+		add("mvpd-offset-before-program-address", {0x7cea, 5, 0x9000}, {{r::STATE_AR2, 0x0f00}},
 			{{r::STATE_AR2, 0x0f05}}, {{0x0f05, 0}}, 7, {{0x0f05, 0xbeef}});
 		cases.back().states.front().observation.program.emplace_back(0x9000, 0xbeef);
 		add("load-shift-zero-offset-before-operation", {0x6fea, 5, 0x0c40}, {{r::STATE_A, 0}, {r::STATE_AR2, 0x0f00}},

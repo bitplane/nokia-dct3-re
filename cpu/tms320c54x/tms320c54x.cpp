@@ -377,7 +377,7 @@ constexpr bool staged_extended_program_move(u16 word)
 
 constexpr bool decode_staged_program_move(u16 word)
 {
-	return ((word & 0xff00) == 0x7c00 && u8(word) < 0x98) || staged_extended_program_move(word);
+	return ((word & 0xff00) == 0x7c00 && u8(word) < 0xa0) || staged_extended_program_move(word);
 }
 
 constexpr bool staged_data_to_program(u16 word)
@@ -397,7 +397,7 @@ constexpr bool decode_staged_immediate_asm(u16 word)
 
 constexpr bool staged_read_a(u16 word)
 {
-	return (word & 0xff00) == 0x7e00 && (u8(word) < 0x98 || u8(word) == 0xf8);
+	return (word & 0xff00) == 0x7e00 && (u8(word) < 0x98 || (u8(word) >= 0xe0 && u8(word) <= 0xf8));
 }
 
 constexpr bool staged_write_a(u16 word)
@@ -551,12 +551,12 @@ constexpr bool decode_staged_bitfield(u16 word)
 
 constexpr bool decode_staged_port_write(u16 word)
 {
-	return (word & 0xff00) == 0x7500 && (u8(word) < 0x98 || (u8(word) >= 0xc0 && u8(word) < 0xe0) || u8(word) == 0xf8);
+	return (word & 0xff00) == 0x7500 && (u8(word) < 0x98 || (u8(word) >= 0xc0 && u8(word) <= 0xf8));
 }
 
 constexpr bool decode_staged_port_read(u16 word)
 {
-	return (word & 0xff00) == 0x7400 && (u8(word) < 0x98 || (u8(word) >= 0xc0 && u8(word) < 0xe0) || u8(word) == 0xf8);
+	return (word & 0xff00) == 0x7400 && (u8(word) < 0x98 || (u8(word) >= 0xc0 && u8(word) <= 0xf8));
 }
 
 constexpr bool decode_staged_mar(u16 word)
@@ -972,8 +972,8 @@ public:
 			bool const extended = mode >= 0xe0;
 			u16 const first = next_word();
 			u16 const second = extended ? next_word(2) : 0;
-			util::stream_format(stream, "MVPD    $%04X, ", mode >= 0xf8 ? second : first);
-			smem(mode >= 0xf8 ? first : second);
+			util::stream_format(stream, "MVPD    $%04X, ", extended ? second : first);
+			smem(extended ? first : 0);
 			return (2 + extended) | SUPPORTED;
 		}
 		if (family == 0x4b00 || family == 0x8b00 || family == 0x7f00)
@@ -1090,15 +1090,13 @@ public:
 			family == 0x7400 || family == 0x7500 || family == 0x7d00 || family == 0x7e00)
 		{
 			bool const extended = mode >= 0xe0;
-			bool const address_first = !(mode >= 0xe0 && mode < 0xf8 &&
-				(family == 0x7400 || family == 0x7500 || family == 0x7d00));
-			u16 const offset = extended ? next_word(address_first ? 1 : 2) : 0;
+			u16 const offset = extended ? next_word() : 0;
 			if (family == 0x7e00)
 			{
 				stream << "READA   "; smem(offset);
 				return (1 + extended) | SUPPORTED;
 			}
-			u16 const operand = next_word(extended && address_first ? 2 : 1);
+			u16 const operand = next_word(extended ? 2 : 1);
 			char const *name = family == 0x6000 ? "CMPM" : family == 0x6100 ? "BITF" :
 				family == 0x7000 ? "MVKD" : family == 0x7100 ? "MVDK" : family == 0x7400 ? "PORTR" :
 				family == 0x7500 ? "PORTW" : "MVDP";
@@ -1457,7 +1455,7 @@ u8 decode_staged_extensions(u16 word)
 	if ((staged_delay_copy(word) && u8(word) >= 0xe0) || staged_data_to_program(word) || staged_extended_push(word) || (staged_write_a(word) && u8(word) >= 0xe0) ||
 		staged_shifted_smem(word) || staged_extended_dld(word) || staged_offset_load(word) || staged_bitfield(word) ||
 		staged_extended_smem_arithmetic(word) || staged_extended_smem_special(word) || staged_port_read(word) ||
-		staged_port_write(word) || staged_absolute_add(word) || (staged_memory_repeat(word) && u8(word) >= 0xe0) || staged_banz(word) || word == 0x7ef8 ||
+		staged_port_write(word) || staged_absolute_add(word) || (staged_memory_repeat(word) && u8(word) >= 0xe0) || staged_banz(word) || (staged_read_a(word) && u8(word) >= 0xe0) ||
 		staged_program_move(word) || staged_far_call(word) || (staged_absolute_load(word) || staged_extended_logic(word)) ||
 		staged_far_branch(word) || staged_long_mar(word) || staged_move(word) || staged_call(word) ||
 		staged_conditional_branch(word) || staged_immediate_alu(word) || (word & 0xfef0) == 0xf020 ||
@@ -1475,7 +1473,8 @@ u8 decode_staged_extensions(u16 word)
 		((staged_shifted_smem(word) || staged_memory_immediate_multiply(word)) && u8(word) >= 0xe0) ||
 		staged_extended_banz(word) || staged_extended_bitfield(word) ||
 		(staged_rmw(word) && (staged_extended_rmw(word) || u8(word) == 0xf8)) || staged_extended_move(word) ||
-		staged_extended_immediate_store(word) || staged_extended_data_copy(word) || word == 0x74f8 || word == 0x75f8 ||
+		staged_extended_immediate_store(word) || staged_extended_data_copy(word) ||
+		((staged_port_read(word) || staged_port_write(word)) && u8(word) >= 0xe0) ||
 		word == 0x76f8) ? 2 : 1;
 	}
 	return 0;
@@ -1489,12 +1488,12 @@ u8 decode_staged_retired_words(u16 word)
 	if (((staged_shifted_smem(word) || staged_memory_immediate_multiply(word)) && u8(word) >= 0xe0) ||
 		staged_extended_banz(word) || staged_extended_bitfield(word) || staged_extended_rmw(word) ||
 		staged_extended_move(word) || staged_extended_data_copy(word)) return 3;
-	if (staged_port_read(word)) return u8(word) == 0xf8 ? 3 : 2;
+	if (staged_port_read(word) || staged_port_write(word)) return u8(word) >= 0xe0 ? 3 : 2;
 	if (staged_extended_immediate_store(word)) return 3;
 	if (staged_data_copy(word)) return 2;
 	if ((staged_delay_copy(word) && u8(word) >= 0xe0) || staged_banz(word) || staged_extended_dld(word) || staged_offset_load(word) || staged_bitfield(word) ||
 		staged_absolute_add(word) || staged_extended_smem_arithmetic(word) || staged_extended_smem_special(word) ||
-		staged_shifted_smem(word) || staged_extended_store(word) || staged_extended_dst(word) ||
+		staged_shifted_smem(word) || staged_extended_store(word) || staged_extended_dst(word) || (staged_read_a(word) && u8(word) >= 0xe0) ||
 		staged_extended_long_arithmetic(word)) return 2;
 	if ((staged_rmw(word) && u8(word) == 0xf8) || word == 0x76f8 || (staged_coefficient_mac(word) && u8(word) >= 0xe0)) return 3;
 	return (staged_program_coefficient(word) || staged_far_call(word) || staged_absolute_load(word) || staged_extended_logic(word) || staged_far_branch(word) ||
@@ -3824,6 +3823,11 @@ void tms320c54x_device::pipeline_step()
 			logerror("%s: staged extended MVPD block/XC composition is unsupported\n", machine().describe_context()); m_illegal = true; return;
 		}
 		bool const read_a = staged_read_a(word) || staged_write_a(word) || staged_data_to_program(word);
+		if (m_pipeline_valid[2] && staged_read_a(word) && u8(word) >= 0xe0 && u8(word) != 0xf8 &&
+			(m_pipeline_delay_decode_words || m_pipeline_repeat_active || m_pipeline_xc_active || m_pipeline_block_body[2]))
+		{
+			logerror("%s: staged offset READA control/repeat composition is unsupported\n", machine().describe_context()); m_illegal = true; return;
+		}
 		if (m_pipeline_valid[2] && staged_data_to_program(word) && (m_pipeline_delay_decode_words || m_pipeline_xc_active || m_pipeline_block_body[2]))
 		{
 			logerror("%s: staged MVDP repeat/control-delay composition is unsupported\n", machine().describe_context()); m_illegal = true; return;
@@ -4239,15 +4243,14 @@ void tms320c54x_device::pipeline_step()
 		bool const extended = mode >= 0xe0;
 		u16 const literal = m_pipeline_operand_address[3];
 		m_pipeline_operand_address[3] = mode == 0xf8 ? literal : extended ?
-			long_offset_address(mode, indirect_ar(mode, 3), s16(m_pipeline_immediate[3]), 3) : basic_address(3, mode);
+			long_offset_address(mode, indirect_ar(mode, 3), s16(literal), 3) : basic_address(3, mode);
 		if (m_pipeline_operand_address[3] < 0x60)
 		{
 			logerror("%s: staged MVDP register/peripheral source is unsupported\n", machine().describe_context()); m_illegal = true; return;
 		}
 		if (!extended && BIT(mode, 7)) indirect_modify(mode, false, 3);
 		// Retain the explicit pmad and instruction page, not accumulator A.
-		u16 const destination = extended && mode != 0xf8 ? literal : m_pipeline_immediate[3];
-		m_pipeline_immediate[3] = destination;
+		// Both offset and absolute forms retain pmad in the final extension.
 	}
 	if (m_pipeline_valid[3] && staged_write_a(m_pipeline_word[3]))
 	{
@@ -4641,26 +4644,36 @@ void tms320c54x_device::pipeline_step()
 	if (m_pipeline_valid[3] && staged_port_write(m_pipeline_word[3]))
 	{
 		u8 const mode = m_pipeline_word[3];
-		bool const preincrement = mode != 0xf8 && BIT(mode, 7) && (mode & 0x78) == 0x18;
+		bool const extended = mode >= 0xe0;
+		unsigned const ar = indirect_ar(mode, 3);
+		u16 const previous_ar = m_ar[ar], previous_st0 = m_st0;
+		bool const preincrement = !extended && BIT(mode, 7) && (mode & 0x78) == 0x18;
 		if (preincrement) indirect_modify(mode, false, 3);
-		if (mode != 0xf8) m_pipeline_operand_address[3] = basic_address(3, mode);
+		if (mode != 0xf8) m_pipeline_operand_address[3] = extended ?
+			long_offset_address(mode, indirect_ar(mode, 3), s16(m_pipeline_operand_address[3]), 3) : basic_address(3, mode);
 		if (m_pipeline_operand_address[3] < 6)
 		{
+			m_ar[ar] = previous_ar; m_st0 = previous_st0;
 			logerror("%s: staged PORTW low control/reserved source is unsupported\n", machine().describe_context()); m_illegal = true; return;
 		}
-		if (mode != 0xf8 && BIT(mode, 7) && !preincrement) indirect_modify(mode, false, 3);
+		if (!extended && BIT(mode, 7) && !preincrement) indirect_modify(mode, false, 3);
 	}
 	if (m_pipeline_valid[3] && staged_port_read(m_pipeline_word[3]))
 	{
 		u8 const mode = m_pipeline_word[3];
-		if (mode != 0xf8) m_pipeline_operand_address[3] = basic_address(3, mode);
+		bool const extended = mode >= 0xe0;
+		unsigned const ar = indirect_ar(mode, 3);
+		u16 const previous_ar = m_ar[ar], previous_st0 = m_st0;
+		if (mode != 0xf8) m_pipeline_operand_address[3] = extended ?
+			long_offset_address(mode, indirect_ar(mode, 3), s16(m_pipeline_operand_address[3]), 3) : basic_address(3, mode);
 		u16 const destination = m_pipeline_operand_address[3];
 		if (destination < 0x60 && (destination < 8 || destination > 0x0f))
 		{
+			m_ar[ar] = previous_ar; m_st0 = previous_st0;
 			logerror("%s: staged PORTR control/DAGEN/peripheral destination is unsupported\n", machine().describe_context());
 			m_illegal = true; return;
 		}
-		if (mode != 0xf8 && BIT(mode, 7)) indirect_modify(mode, false, 3);
+		if (!extended && BIT(mode, 7)) indirect_modify(mode, false, 3);
 	}
 	if (m_pipeline_valid[3] && staged_firs(m_pipeline_word[3]))
 		m_pipeline_extension_first[3] = m_pipeline_immediate[3];
@@ -5008,9 +5021,11 @@ void tms320c54x_device::pipeline_step()
 	if (m_pipeline_valid[4] && staged_read_a(m_pipeline_word[4]))
 	{
 		u8 const mode = m_pipeline_word[4];
-		bool const preincrement = mode != 0xf8 && BIT(mode, 7) && (mode & 0x78) == 0x18;
+		bool const extended = mode >= 0xe0;
+		bool const preincrement = !extended && BIT(mode, 7) && (mode & 0x78) == 0x18;
 		if (preincrement) indirect_modify(mode, false, 4);
-		m_pipeline_operand_address[4] = mode == 0xf8 ? m_pipeline_immediate[4] : basic_address(4, mode);
+		m_pipeline_operand_address[4] = mode == 0xf8 ? m_pipeline_immediate[4] : extended ?
+			long_offset_address(mode, indirect_ar(mode, 4), s16(m_pipeline_immediate[4]), 4) : basic_address(4, mode);
 		u16 const destination = m_pipeline_operand_address[4];
 		bool const repeat_body = m_pipeline_repeat_active && m_pipeline_repeat_body_latched && m_pipeline_address[4] == m_pipeline_repeat_address;
 		bool const bd_delay = m_pipeline_control_words && m_pipeline_control_word == 0xf273 &&
@@ -5022,7 +5037,7 @@ void tms320c54x_device::pipeline_step()
 			logerror("%s: staged READA control/peripheral destination is unsupported instruction=%06x word=%04x destination=%04x repeat=%u\n",
 				machine().describe_context(), unsigned(m_pipeline_address[4]), m_pipeline_word[4], destination, unsigned(repeat_body)); m_illegal = true; return;
 		}
-		if (mode != 0xf8 && BIT(mode, 7) && !preincrement) indirect_modify(mode, false, 4);
+		if (!extended && BIT(mode, 7) && !preincrement) indirect_modify(mode, false, 4);
 		m_pipeline_read_a_wait = 4;
 	}
 	if (m_pipeline_valid[4] && staged_program_move(m_pipeline_word[4]))
@@ -5035,7 +5050,7 @@ void tms320c54x_device::pipeline_step()
 		u16 const first_extension = m_pipeline_operand_address[4];
 		if (preincrement) indirect_modify(mode, false, 4);
 		m_pipeline_operand_address[4] = mode == 0xf8 ? first_extension : extended ?
-			long_offset_address(mode, ar, s16(m_pipeline_immediate[4]), 4) : basic_address(4, mode);
+			long_offset_address(mode, ar, s16(first_extension), 4) : basic_address(4, mode);
 		if (m_pipeline_operand_address[4] < 0x60)
 		{
 			// An unsupported endpoint is not a hardware trap: undo a long
@@ -5044,7 +5059,6 @@ void tms320c54x_device::pipeline_step()
 			logerror("%s: staged MVPD register/peripheral destination is unsupported\n", machine().describe_context());
 			m_illegal = true; return;
 		}
-		if (extended && mode != 0xf8) m_pipeline_immediate[4] = first_extension;
 		if (!extended && BIT(mode, 7) && !preincrement) indirect_modify(mode, false, 4);
 		m_pipeline_program_move_pending = true;
 	}
@@ -5276,7 +5290,7 @@ void tms320c54x_device::pipeline_step()
 		else if (staged_read_a(m_op))
 		{
 			data_write(m_pipeline_operand_address[5], m_pipeline_operand[5]);
-			if (u8(m_op) == 0xf8) ++m_pc;
+			if (u8(m_op) >= 0xe0) ++m_pc;
 			if (m_pipeline_repeat_active && m_pipeline_repeat_body_latched && address == m_pipeline_repeat_address) pipeline_begin_repeat_stream();
 		}
 		else if (staged_data_to_program(m_op))
@@ -5430,12 +5444,12 @@ void tms320c54x_device::pipeline_step()
 		else if (staged_port_write(m_op))
 		{
 			m_io.write_word(m_pipeline_immediate[5], m_pipeline_operand[5]);
-			m_pc += u8(m_op) == 0xf8 ? 2 : 1;
+			m_pc += u8(m_op) >= 0xe0 ? 2 : 1;
 		}
 		else if (staged_port_read(m_op))
 		{
 			data_write(m_pipeline_operand_address[5], m_pipeline_operand[5]);
-			m_pc += u8(m_op) == 0xf8 ? 2 : 1;
+			m_pc += u8(m_op) >= 0xe0 ? 2 : 1;
 		}
 		else if (staged_conditional_store(m_op))
 			data_write(m_pipeline_operand_address[5], pipeline_store_word());
@@ -7489,17 +7503,7 @@ void tms320c54x_device::execute_one(u16 op)
 	}
 	case 0x7400: // PORTR port, Smem
 	{
-		u16 address, port;
-		if (low >= 0xe0 && low < 0xf8)
-		{
-			port = fetch();
-			address = prepare_smem_address(low);
-		}
-		else
-		{
-			address = prepare_smem_address(low);
-			port = fetch();
-		}
+		u16 const address = prepare_smem_address(low), port = fetch();
 		if (software_wait_enabled())
 		{
 			m_atomic_io_pending = true;
@@ -7522,17 +7526,7 @@ void tms320c54x_device::execute_one(u16 op)
 	}
 	case 0x7500: // PORTW Smem, port
 	{
-		u16 address, port;
-		if (low >= 0xe0 && low < 0xf8)
-		{
-			port = fetch();
-			address = prepare_smem_address(low);
-		}
-		else
-		{
-			address = prepare_smem_address(low);
-			port = fetch();
-		}
+		u16 const address = prepare_smem_address(low), port = fetch();
 		const u16 value = data_read(address);
 		finish_smem_access(low);
 		if (software_wait_enabled())
@@ -7656,17 +7650,8 @@ void tms320c54x_device::execute_one(u16 op)
 	{
 		const bool repeated = (m_rptc || m_rpt_end != REPEAT_END_UNSET) &&
 			u16(m_pc - 1) == m_rpt_address;
-		u16 address, destination;
-		if (low >= 0xe0 && low < 0xf8)
-		{
-			destination = fetch() + (repeated ? m_rpt_iteration : 0);
-			address = prepare_smem_address(low);
-		}
-		else
-		{
-			address = prepare_smem_address(low);
-			destination = fetch() + (repeated ? m_rpt_iteration : 0);
-		}
+		u16 const address = prepare_smem_address(low);
+		u16 const destination = fetch() + (repeated ? m_rpt_iteration : 0);
 		const u16 value = data_read(address);
 		finish_smem_access(low);
 		m_program.write_word(program_address(destination), value);
@@ -7678,18 +7663,7 @@ void tms320c54x_device::execute_one(u16 op)
 	{
 		const bool repeated = (m_rptc || m_rpt_end != REPEAT_END_UNSET) &&
 			u16(m_pc - 1) == m_rpt_address;
-		u16 destination;
-		u16 source;
-		if (low >= 0xf8)
-		{
-			destination = prepare_smem_address(low);
-			source = fetch();
-		}
-		else
-		{
-			source = fetch();
-			destination = prepare_smem_address(low);
-		}
+		u16 const destination = prepare_smem_address(low), source = fetch();
 		const u16 value = m_program.read_word(program_address(u16(source + (repeated ? m_rpt_iteration : 0))));
 		data_write(destination, value);
 		finish_smem_access(low);

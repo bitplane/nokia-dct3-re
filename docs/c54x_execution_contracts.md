@@ -5274,6 +5274,24 @@ firmware service or a healthy wait. These pre-correction captures are not
 the current acceptance endpoint.
 It does not establish upload completion, RF acquisition or handset boot.
 
+## Extended I/O and program transfer encoding
+
+Long-offset PORTW/PORTR and MVDP/MVPD retain offset in the first extension
+and explicit port/program address in the second. GNU tic54x assembler output
+independently establishes the qualified encoding; SPRU131G's generic
+last-word-offset note conflicts and is not hardware confirmation. Execution,
+disassembly, and both frontend fixtures use the same corrected words. Existing
+832 program-transfer and 41 MVDP cases retain their pointer/mapping poison,
+bus values, exact stage checkpoints and restores after re-encoding.
+
+`atomic_operand_order` retains all 46 independent data/I/O/program sequences
+and extension-before-operand checks. `atomic_memory_route_literals` retains
+26 result/marker cases, including long preupdated READA. The six transport
+cases retain pointers, flags, unrelated accumulators and actual transfers;
+PORTR's input Read is two clocks after the preceding PORTW Write and four
+before the successor Write. These are model-clock intervals, not standalone
+instruction latency. Offset READA repeat/control compositions remain excluded.
+
 ## Mapped TRN publication and protected interrupt drain
 
 The `transition_register` fixture distinguishes adjacent ST-to-TRN / LDM

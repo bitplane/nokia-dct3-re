@@ -171,22 +171,23 @@ Fixture-only `71ea` and `70ea` check long-offset MVDK/MVKD: the Smem
 displacement precedes the direct destination/source extension, with AR2
 preupdate, copied data and three-cycle cost. Original MU4 `71e7/70e7`
 execution independently exercises this ordering through cache program and
-read-back. Fixture-only `75ea` checks PORTW's port-before-offset ordering,
+read-back. Fixture-only `75ea` checks PORTW's offset-before-port ordering,
 AR2 preupdate, transferred data and three-cycle timing. These fixtures do not
 change the captured ROM4 opcode-set coverage.
 Fixture-only `7dea` checks MVDP with long-offset source addressing: program
-destination before offset, AR2 preupdate, the program-memory word written,
+offset before destination, AR2 preupdate, the program-memory word written,
 and TI's five-cycle cost. This also leaves observed ROM4 coverage unchanged.
 Fixture-only `7fea` and `7eea` check long-offset WRITA and READA in opposite
 directions: the word transferred between data and A-addressed program memory,
 AR2 preupdate, and TI's six-cycle cost. They do not alter observed ROM4 word
 coverage.
-TI SPRU131G section 5.5.3.2 states that the long offset is the last code
-word of a two- or three-word instruction. The three-word fixtures for MVDK,
-PORTW, and MVDP were re-encoded accordingly; fixture-only `7cea` now checks
-MVPD's long-offset destination decode and four-cycle cost. Absolute Smem
-forms retain their separately tested address-before-immediate ordering.
-Fixture-only `74ea` checks PORTR's port-before-offset order, port-read value,
+The independent GNU tic54x assembler emits offset before explicit address for
+PORTW/PORTR/MVDP/MVPD, including preupdated forms. The generic last-word-offset
+note in SPRU131G 5.5.3.2 conflicts with this encoding; it is not sufficient to
+override the instruction-specific assembler evidence. These synthetic fixtures
+now use assembler-emitted words; hardware confirmation remains outstanding.
+Absolute Smem forms retain address-before-immediate ordering.
+Fixture-only `74ea` checks PORTR's offset-before-port order, port-read value,
 AR2 preupdate, and TI's three-cycle long-offset cost.
 `6fea` checks the shifted Smem decoder's offset-before-extension-word
 order, accumulator result, AR2 preupdate, and three-cycle long-offset cost.

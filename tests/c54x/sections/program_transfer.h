@@ -41,7 +41,7 @@ inline std::vector<clocked_register_case> section_cases()
 		u16 const destination = std::array<u16,4>{0x802,0x122f,0x1231,0x1201}[form];
 		u16 const value = std::array<u16,4>{0,0xffff,0x2468,0xf495}[pattern];
 		u16 const mode = form ? 0xe0 + (form - 1) * 8 + reg : 0xf8;
-		u16 const first = form ? source : destination, second = form ? form == 1 ? 0xffff : form == 2 ? 1 : 2 : source;
+		u16 const first = form ? form == 1 ? 0xffff : form == 2 ? 1 : 2 : destination, second = source;
 		auto initial = initial_case("extended-mvpd", {u16(0x7c00 | mode),first,second,0xf4e1});
 		for (auto &word : initial.program) word.address += origin - 0x600;
 		initial.program.insert(initial.program.end(), {{physical ^ 0x20000,u16(value ^ 0xffff)},{physical,value}});
