@@ -15,8 +15,8 @@ through an expression: 241 lines and 39,048 cases. Counts describe entire
 sections, not atomic-only case counts. Helpers and firmware integration sources
 are additional migration work. The common case defaults to staged.
 
-Current validated progress: 62 sections (6,822 cases plus restores) migrated;
-75 of the original explicitly atomic sections remain. The baseline counts
+Current validated progress: 68 sections (6,963 cases plus restores) migrated;
+69 of the original explicitly atomic sections remain. The baseline counts
 describe the retirement scope, not the current number of atomic assignments.
 
 ## Disposition rules
@@ -140,7 +140,6 @@ Further preserved atomic sections after isolated staged trials:
 | `atomic_memory_address_literals` | Case 16, repeated ADD, sets ILLEGAL | Audit repeated-body admission and ownership |
 | `atomic_accumulator_calls` | Case 0 observes stack read `02ff=0602` at clock 15 rather than its retained bus sequence | Decode staged call/return ordering before retiming |
 | `atomic_memory_literals` | Case 0, ABDST, sets ILLEGAL after cold-Prefetch correction | Audit ABDST admission |
-| `atomic_shift_literals` | Case 20 sets ILLEGAL | Identify the unadmitted shift/compare/normalize form |
 | `atomic_zero_repeat` | Case 2 fetches `0602=f495` at clock 7 outside the expected sequence | Derive staged repeat-prefetch expectations |
 | `atomic_transfer_literals` | Case 13 reads `0d91=2222` as event 1 at clock 9 | Resolve transfer bus order |
 | `atomic_multiply_move_literals` | Case 6 reads mapped `0015=0000` as event 0 at clock 6 | Resolve mapped-source sampling |
@@ -165,7 +164,7 @@ Additional shared-contract queue (original atomic sections retained):
 - `repeat_status`: first case B is `4800`, expected `c800`; inspect repeat/status timing.
 - `block_repeat_control`: first case AR1 is 4, expected 1; inspect block endpoint/count behavior.
 - `zero_bk` case 144 and `indirect_popm` case 0 hit staged admission limits.
-- `clock_control`, `rounding`, `firs_sum`, `arithmetic_boundaries` (ABDST),
+- `clock_control`, `firs_sum`, `arithmetic_boundaries` (ABDST),
   `parallel_load_multiply` and `rounded_load` stop at ILLEGAL in their first case.
   Resolve instruction families/profile selection, not their literal results.
 
@@ -192,7 +191,7 @@ sections independently; do not run the complete suite after every edit.
 | `accumulator_call` | 2 | 23 | Re-derive timing/order; retain assertions |
 | `instruction_examples` | 50 | 21 | Migrate independent assertions; check staged admission |
 | `shifted_arithmetic` | 104 | 34 | Migrate independent assertions; check staged admission |
-| `rounding` | 64 | 31 | Migrate independent assertions; check staged admission |
+| `rounding` | 64 | 31 | Validated staged migration after RND/circular PORTW admission; assertions retained |
 | `square_difference` | 40 | 46 | Migrate independent assertions; check staged admission |
 | `firs_sum` | 32 | 35 | Migrate independent assertions; check staged admission |
 | `arithmetic_boundaries` | 80 | 47 | Migrate independent assertions; check staged admission |
@@ -222,7 +221,7 @@ sections independently; do not run the complete suite after every edit.
 | `atomic_mac_literals` | 39 | 47 | Migrate independent assertions; check staged admission |
 | `atomic_dual_address` | 11 | 46 | Migrate independent assertions; check staged admission |
 | `atomic_parallel_literals` | 10 | 54 | Migrate independent assertions; check staged admission |
-| `atomic_shift_literals` | 25 | 54 | Migrate independent assertions; check staged admission |
+| `atomic_shift_literals` | 25 | 54 | Validated staged migration after RND/circular PORTW admission; assertions retained |
 | `atomic_register_shift` | 36 | 61 | Migrate independent assertions; check staged admission |
 | `atomic_register_logic` | 20 | 45 | Migrate independent assertions; check staged admission |
 | `atomic_product_literals` | 21 | 63 | Migrate independent assertions; check staged admission |
@@ -279,13 +278,13 @@ sections independently; do not run the complete suite after every edit.
 | `atomic_basic_parallel_block` | 9 | 51 | Validated staged migration; assertions retained |
 | `atomic_accumulator_calls` | 3 | 31 | Re-derive timing/order; retain assertions |
 | `atomic_bus_timing` | 3 | 37 | Atomic retained; first staged contrast: Section IRQ case=0 line=2 clock=15 data_events=3 previous_case=0 return_pc=0701 |
-| `atomic_port_timing` | 15 | 65 | Atomic retained; first staged contrast: C54x case atomic-port-address-value-wrap-and-clock-interval/2: register 22 actual=1 expected=0 mask=ffffffffffffffff |
+| `atomic_port_timing` | 15 | 65 | Validated staged migration after RND/circular PORTW admission; assertions retained |
 | `atomic_mac_saturation` | 7 | 44 | Migrate independent assertions; check staged admission |
-| `atomic_port_marked_operations` | 22 | 83 | Atomic retained; first staged contrast: C54x case atomic-port-marked-condition-immediate-or-NOP/0: register 22 actual=1 expected=0 mask=ffffffffffffffff |
+| `atomic_port_marked_operations` | 22 | 83 | Validated staged migration after RND/circular PORTW admission; assertions retained |
 | `atomic_compatibility_memory` | 9 | 55 | Atomic retained; first staged contrast: C54x case atomic-compatibility-memory-and-fixed-ADDM-boundaries/2: register 22 actual=1 expected=0 mask=ffffffffffffffff |
-| `atomic_port_marked_memory` | 11 | 48 | Atomic retained; first staged contrast: C54x case atomic-port-marked-load-store-ALU-and-repeat/0: register 22 actual=1 expected=0 mask=ffffffffffffffff |
-| `atomic_port_loads` | 6 | 40 | Atomic retained; first staged contrast: C54x case atomic-stationary-port-or-doubleword-load/0: register 22 actual=1 expected=0 mask=ffffffffffffffff |
-| `atomic_port_marked_transfers` | 9 | 42 | Atomic retained; first staged contrast: C54x case atomic-port-marked-MVDM-MVKD-MVDK/7: register 22 actual=1 expected=0 mask=ffffffffffffffff |
+| `atomic_port_marked_memory` | 11 | 48 | Atomic retained; first staged contrast: C54x case atomic-port-marked-load-store-ALU-and-repeat/9: register 22 actual=1 expected=0 mask=ffffffffffffffff |
+| `atomic_port_loads` | 6 | 40 | Validated staged migration after RND/circular PORTW admission; assertions retained |
+| `atomic_port_marked_transfers` | 9 | 42 | Validated staged migration after RND/circular PORTW admission; assertions retained |
 | `atomic_port_marked_counter` | 8 | 40 | Validated staged migration; assertions retained |
 | `atomic_absolute_arithmetic` | 16 | 49 | Validated staged migration; assertions retained |
 | `atomic_long_offset_literals` | 14 | 60 | Atomic retained; first staged contrast: C54x case andm-immediate-before-long-offset/5: data[f05]=ff00 expected=f00 |

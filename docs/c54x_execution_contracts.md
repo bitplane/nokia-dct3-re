@@ -59,6 +59,21 @@ Use the [codec benchmark](../tests/README.md#codec-performance) to measure host
 cost separately from emulated timing. Optimizing a host path does not strengthen
 the model's silicon-timing claims.
 
+### RND and circular I/O
+
+Standalone RND (`f49f` with source/destination bits) is admitted through the
+shared register-only Execute implementation. The `rounding` and
+`atomic_shift_literals` sections retain independent numeric/OVM/flag expectations
+on staged. RND is a one-word class-1 operation; this does not qualify repeated
+RND (nonrepeatable in [SPRU172C, 4-142](https://www.ti.com/lit/ug/spru172c/spru172c.pdf)).
+PORTW now admits the short circular modes `c0..df` already handled by the shared
+DAGEN path, matching PORTR's admitted mode range. Existing PORTW Read sampling
+and Execute I/O publication are unchanged. Circular marker, pointer, source,
+transfer and relative-clock assertions pass without fitted timing changes.
+Focused admission/I/O/forwarding validation passes 42,233 cases plus restores;
+both EFR frontends remain bit-exact and the ordinary 5110 menu/save-state gates
+pass. This is selected regression coverage, not a complete CPU-suite renewal.
+
 ### Harness contract
 
 Each section owns explicit setup, independently justified expectations and

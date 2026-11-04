@@ -522,7 +522,7 @@ constexpr bool decode_staged_bitfield(u16 word)
 
 constexpr bool decode_staged_port_write(u16 word)
 {
-	return (word & 0xff00) == 0x7500 && (u8(word) < 0x98 || u8(word) == 0xf8);
+	return (word & 0xff00) == 0x7500 && (u8(word) < 0x98 || (u8(word) >= 0xc0 && u8(word) < 0xe0) || u8(word) == 0xf8);
 }
 
 constexpr bool decode_staged_port_read(u16 word)
@@ -1481,7 +1481,7 @@ bool decode_staged_supported(u16 word, bool extended_program)
 	bool const register_rotate = (word & 0xfeff) == 0xf490 || (word & 0xfeff) == 0xf491 || (word & 0xfeff) == 0xf492;
 	bool const register_alu = register_rotate || (word & 0xfeff) == 0xf483 || register_product_form(word) ||
 		staged_accumulator_logic(word) || staged_accumulator_shift(word) || staged_accumulator_arithmetic(word) || staged_norm(word) ||
-		staged_minmax(word) || (word & 0xfeff) == 0xf48d || (word & 0xfeff) == 0xf48e;
+		staged_minmax(word) || (word & 0xfcff) == 0xf49f || (word & 0xfeff) == 0xf48d || (word & 0xfeff) == 0xf48e;
 	bool const direct_mmr_load = (word & 0xfe80) == 0x4800;
 	bool const mmr_move = staged_mmr_move(word);
 	bool const memory_dp = staged_memory_dp(word);

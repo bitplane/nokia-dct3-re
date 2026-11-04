@@ -31,9 +31,9 @@ inline std::vector<clocked_register_case> section_cases()
 			{r::STATE_A,arithmetic ? arithmetic_results[variant-6] : a},{r::STATE_B,b},{r::STATE_AR6,0x101}});
 		if (variant == 10) final.expected.push_back({r::STATE_ST0,0x800,0x800});
 		final.expected_data = {{0x103,0x1234},{0x100,0x5678}};
-		clocked_register_case c{{{0,std::move(initial)},{1,observation("before-first-port",{{STATE_GENPC,0x601}})},
+		clocked_register_case c{{{0,std::move(initial)},{1,observation("before-first-port",{{STATE_GENPC,0x600}})},
 			{2,observation("marked-operation-running",{})},{48,std::move(final)}},3,48};
-		c.pipeline_frontend = false;
+		c.pipeline_frontend = true;
 		c.observed_data_space = AS_IO;
 		c.data_events = std::vector<clocked_data_event>{{true,0x124,0x1234,0,false},
 			{true,0x124,0x5678,0,false,{},branch ? taken ? 7U : 5U : arithmetic ? 4U : 3U}};
@@ -49,9 +49,9 @@ inline std::vector<clocked_register_case> section_cases()
 		auto final = observation("near-continuation-stack-and-port-clock-interval",{{STATE_GENPC,call ? 0x606U : 0x703U},
 			{r::STATE_SP,call ? 0x300U : 0x301U},{r::STATE_AR6,0x101}},
 			{{0x103,0x1234},{0x100,0x5678},{0x2ff,u16(call ? 0x605 : 0xbeef)},{0x300,0x700}});
-		clocked_register_case c{{{0,std::move(initial)},{1,observation("before-call-markers",{{STATE_GENPC,0x601}})},
+		clocked_register_case c{{{0,std::move(initial)},{1,observation("before-call-markers",{{STATE_GENPC,0x600}})},
 			{2,observation("call-markers-running",{})},{48,std::move(final)}},3,48};
-		c.pipeline_frontend = false; c.observed_data_space = AS_IO;
+		c.pipeline_frontend = true; c.observed_data_space = AS_IO;
 		c.data_events = std::vector<clocked_data_event>{{true,0x124,0x1234,0,false},
 			{true,0x124,0x5678,0,false,{},call ? 6U : 7U}};
 		cases.push_back(std::move(c));
@@ -72,9 +72,9 @@ inline std::vector<clocked_register_case> section_cases()
 		auto final = observation("return-selection-delay-effects-stack-and-timing",{{STATE_GENPC,taken ? 0x703U : 0x607U},
 			{r::STATE_SP,taken ? 0x301U : 0x300U},{r::STATE_AR6,0x101},{r::STATE_A,delayed ? 2U : a}});
 		final.expected_data = initial.data;
-		clocked_register_case c{{{0,std::move(initial)},{1,observation("before-return-markers",{{STATE_GENPC,0x601}})},
+		clocked_register_case c{{{0,std::move(initial)},{1,observation("before-return-markers",{{STATE_GENPC,0x600}})},
 			{2,observation("return-markers-running",{})},{48,std::move(final)}},3,48};
-		c.pipeline_frontend = false; c.observed_data_space = AS_IO;
+		c.pipeline_frontend = true; c.observed_data_space = AS_IO;
 		c.data_events = std::vector<clocked_data_event>{{true,0x124,0x1234,0,false},{true,0x124,0x5678,0,false,{},taken ? 7U : 5U}};
 		cases.push_back(std::move(c));
 	}
