@@ -2377,6 +2377,29 @@ retains the fifteen-add result and read count, and `atomic_repeat_irq` checks
 four/65,536 additions, exact count exhaustion, and the pending IRQ's continuation
 frame only after the repeat completes. Both retain save/replay coverage.
 
+`atomic_port_marked_memory` keeps eleven independent result/address/flag cases.
+Its six-ADD body executes at clocks 10..15, between marker writes at 8 and 21:
+the 13-clock interval includes the declared Prefetch/refill and two-word marker
+Decode. All other marker intervals retain their existing expectations. This
+is a staged model clock contract, not a measured peripheral timing claim.
+
+### Fixed-MMR repeat transfers
+
+Direct MVMD AR0..AR7 and MVDM to AR0..AR7 reuse the pipelined two-word copy
+stream. Each iteration advances EAR exactly once while retaining its MMR
+selector (SPRU172C 4-114/115). MVDM's repeated destination guard uses that
+fixed selector, not a DP-relative address preview; source RAM and AR-only
+destination restrictions remain enforced before bus/pointer effects.
+MVMD retains its interleaved source reads and RAM writes; MVDM publishes each
+AR destination in Read as in its existing nonrepeated path.
+
+`atomic_mapped_moves` keeps all four baseline source/destination progressions
+plus a DP=0 checkpoint mid-repeat. `repeat_endpoints` retains twelve
+short/long-count, page-end, IRQ/NMI and final-copy cases with exact continuation
+frames, no fourth destination write, and restore after frame publication.
+It asserts three logical body executions and one captured extension, replacing
+atomic's implementation-specific opcode/extension refetches.
+
 ### Software INTR and INTM followers
 
 `software_intr_pipeline` checks all 32 software vectors with both initial INTM

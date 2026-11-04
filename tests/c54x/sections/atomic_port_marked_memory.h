@@ -15,7 +15,7 @@ inline std::vector<clocked_register_case> section_cases()
 		{0x01f8,0x120,0x8001,0x1800,0x100,0x12345678,1,0x12345678,0xffffff8002ULL,0x1000,0xffff,4},
 		{0x09f8,0x120,1,0,0,0x12345678,0,0x12345678,0xffffffffffULL,0,0x800,4},
 		{0x09f8,0x120,0xfffe,0,0x100,0x12345678,0xffffffffffULL,0x12345678,1,0x800,0x800,4},
-		{0xec05,0x0082,1,0,0,0,5,6,5,0,0,9},
+		{0xec05,0x0082,1,0,0,0,5,6,5,0,0,13},
 		{0x7593,0x124,0xabcd,0,0,0,5,0,5,0,0,4}
 	};
 	std::vector<clocked_register_case> cases;
@@ -35,12 +35,17 @@ inline std::vector<clocked_register_case> section_cases()
 			{r::STATE_AR2,0x120},{r::STATE_AR3,port ? 0x121U : 0x120U},{r::STATE_AR4,store ? 0x121U : 0x120U},
 			{r::STATE_AR6,0x101}},{{0x103,0x1234},{0x100,0x5678},{0x120,u16(store ? 0x5678 : v.operand)},{0x121,0xbeef}});
 		if (v.opcode == 0xec05) final.expected.push_back({r::STATE_RC,0});
-		clocked_register_case c{{{0,std::move(initial)},{1,observation("before-memory-markers",{{STATE_GENPC,0x601}})},
+		clocked_register_case c{{{0,std::move(initial)},{1,observation("before-memory-markers",{{STATE_GENPC,0x600}})},
 			{2,observation("memory-markers-running",{})},{64,std::move(final)}},3,64};
-		c.pipeline_frontend = false; c.observed_data_space = AS_IO;
+		c.pipeline_frontend = true; c.observed_data_space = AS_IO;
 		c.data_events = std::vector<clocked_data_event>{{true,0x124,0x1234,0,false}};
 		if (port) c.data_events->push_back({true,0x124,0xabcd,0,false,{},2});
 		c.data_events->push_back({true,0x124,0x5678,0,false,{},port ? 2U : v.interval});
+		if (v.opcode == 0xec05) {
+			// Marker Execute=8; ADDs Execute=10..15; resumed two-word marker Execute=21.
+			c.data_events->front().cycle = 8; c.data_events->front().check_cycle = true;
+			c.data_events->back().cycle = 21; c.data_events->back().check_cycle = true;
+		}
 		cases.push_back(std::move(c));
 	}
 	return cases;

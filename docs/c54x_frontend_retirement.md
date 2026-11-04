@@ -15,8 +15,8 @@ through an expression: 241 lines and 39,048 cases. Counts describe entire
 sections, not atomic-only case counts. Helpers and firmware integration sources
 are additional migration work. The common case defaults to staged.
 
-Current validated progress: 119 sections (11,250 cases plus restores) migrated;
-18 of the original explicitly atomic sections remain, containing 228 cases.
+Current validated progress: 122 sections (11,278 cases plus restores) migrated;
+15 of the original explicitly atomic sections remain, containing 201 cases.
 The baseline counts
 describe the retirement scope, not the current number of atomic assignments.
 The seven originally paired sections are now staged-only: 24,040 cases remain
@@ -76,6 +76,16 @@ gates and documentation also expose frontend variants.
 ## Section work queue
 
 ### Validated migrations
+
+`atomic_mapped_moves` keeps all four MVMD/MVDM progression cases plus a DP=0,
+mid-repeat restore regression (five current). Short direct AR-source MVMD and
+AR-destination MVDM repeats advance EAR while retaining the fixed MMR.
+`repeat_endpoints` retains all twelve page-wrap/IRQ/NMI/final-copy/frame cases;
+exact Execute events replace atomic opcode refetch assertions. Its transfer
+values/counts, late-IRQ trigger and continuation frame remain unchanged.
+`atomic_port_marked_memory` retains all eleven values/address/flag cases; the
+six-ADD repeat marker interval is 13 staged clocks, explicitly checked at
+clocks 8 and 21 across the declared Prefetch refill.
 
 `coefficient_mac_literals` keeps all six MACP/MACD source, successor, T and
 coefficient results on staged; GNU tic54x-as independently corrects long-offset
@@ -327,7 +337,6 @@ Further preserved atomic sections after isolated staged trials:
 
 | Section | First observed contrast | Follow-up |
 | --- | --- | --- |
-| `atomic_mapped_moves` | Case 2, MVMD/DAR progression, sets ILLEGAL | Audit mapped-move destination admission |
 | `atomic_far_edges` | Case 2, FBACCD, sets ILLEGAL after cold-PC correction | Audit accumulator far-branch admission |
 
 These are migration blockers, not established silicon defects. An atomic
@@ -408,7 +417,7 @@ sections independently; do not run the complete suite after every edit.
 | `atomic_address_literals` | 4 | 33 | Migrate independent assertions; check staged admission |
 | `atomic_shifted_loads` | 7 | 36 | Migrate independent assertions; check staged admission |
 | `atomic_stack_literals` | 9 | 53 | Staged validated; original stack/accumulator fields retained with Read/Write clocks |
-| `atomic_mapped_moves` | 4 | 36 | Migrate independent assertions; check staged admission |
+| `atomic_mapped_moves` | 4 | 36 | Migrated; all baseline cases plus DP=0/mid-repeat restore (five current). |
 | `atomic_memory_tests` | 10 | 44 | Migrate independent assertions; check staged admission |
 | `atomic_zero_repeat` | 3 | 26 | Staged validated; once-only logical body execution replaces atomic fetch-count convention |
 | `atomic_program_transfers` | 8 | 46 | Validated staged migration; assertions retained |
@@ -453,7 +462,7 @@ sections independently; do not run the complete suite after every edit.
 | `atomic_mac_saturation` | 7 | 44 | Migrate independent assertions; check staged admission |
 | `atomic_port_marked_operations` | 22 | 83 | Validated staged migration after RND/circular PORTW admission; assertions retained |
 | `atomic_compatibility_memory` | 9 | 55 | Staged validated; compatibility pointers, arithmetic/flags, RAM and marker intervals retained |
-| `atomic_port_marked_memory` | 11 | 48 | Atomic retained; first staged contrast: C54x case atomic-port-marked-load-store-ALU-and-repeat/9: register 22 actual=1 expected=0 mask=ffffffffffffffff |
+| `atomic_port_marked_memory` | 11 | 48 | Migrated; all results retained, repeated ADD markers explicitly retimed. |
 | `atomic_port_loads` | 6 | 40 | Validated staged migration after RND/circular PORTW admission; assertions retained |
 | `atomic_port_marked_transfers` | 9 | 42 | Validated staged migration after RND/circular PORTW admission; assertions retained |
 | `atomic_port_marked_counter` | 8 | 40 | Validated staged migration; assertions retained |
@@ -483,7 +492,7 @@ sections independently; do not run the complete suite after every edit.
 | `bsp_interrupt` | 9 | 42 | Validated staged migration; terminal idle cleanup explicit where needed |
 | `idle_dma` | 10 | 38 | Validated staged migration; terminal idle cleanup explicit where needed |
 | `idle3_pll` | 1 | 34 | Validated staged migration; terminal idle cleanup explicit where needed |
-| `repeat_endpoints` | 12 | 44 | Atomic retained; first staged contrast: C54x case repeat-final-copy-protected-at-page-endpoints/0: register 22 actual=1 expected=0 mask=ffffffffffffffff |
+| `repeat_endpoints` | 12 | 44 | Migrated; exact IRQ/NMI/frame/copy assertions retained, logical repeats replace refetch convention. |
 | `block_repeat_pages` | 96 | 37 | Validated staged subset; atomic dimension removed |
 | `initial_control_sequences` | 3 | 32 | Migrated; call frames, loop counts and copy words retained with explicit bus overlap. |
 | `receive_ring_copy` | 4 | 20 | Validated staged subset; atomic dimension removed |

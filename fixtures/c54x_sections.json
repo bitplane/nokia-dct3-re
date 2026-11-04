@@ -208,7 +208,7 @@
   "delay_copy": 7424,
   "mapped_load_age": 8064,
   "atomic_stack_literals": 9,
-  "atomic_mapped_moves": 4,
+  "atomic_mapped_moves": 5,
   "atomic_memory_tests": 10,
   "atomic_zero_repeat": 3,
   "atomic_program_transfers": 8,

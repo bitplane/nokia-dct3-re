@@ -18,19 +18,27 @@ inline std::vector<clocked_register_case> section_cases()
 		auto final = observation("move-completes-with-owned-pointer-and-count", {{STATE_GENPC,0x601 + at},
 			{r::STATE_AR2,to_mmr ? repeat ? 0x3333U : 0x1234U : repeat ? 0x4455U : 0x1234U}});
 		if (repeat) final.expected.push_back({r::STATE_RC,0});
-		clocked_register_case c{{},1,48}; c.pipeline_frontend = false;
+		clocked_register_case c{{},1,48}; c.pipeline_frontend = true;
 		c.data_events = std::vector<clocked_data_event>{};
 		for (unsigned i = 0; i != (repeat ? 3U : 1U); ++i) {
 			u16 const word = to_mmr ? repeat ? 0x1111 * (i + 1) : 0x1234 : repeat ? 0x4455 : 0x1234;
 			initial.data.push_back({address + i,to_mmr ? word : u16(0)});
 			final.expected_data.push_back({address + i,word});
 			c.data_events->push_back({false,to_mmr ? address + i : 0x12,word,0,false});
-			c.data_events->push_back({true,to_mmr ? 0x12 : address + i,word,0,false});
+			if (to_mmr) c.data_events->push_back({true,0x12,word,0,false});
+			else if (i) c.data_events->push_back({true,address+i-1,word,0,false});
 		}
-		c.states = {{0,std::move(initial)},{1,observation("pre-move-snapshot", {{STATE_GENPC,0x600}})},
+		if (!to_mmr) c.data_events->push_back({true,address+(repeat ? 2U : 0U),u16(repeat ? 0x4455 : 0x1234),0,false});
+		c.states = {{0,std::move(initial)},{1,observation("pre-move-snapshot", {{STATE_GENPC,0x5ff}})},
 			{2,observation("move-running", {})},{48,std::move(final)}};
 		cases.push_back(std::move(c));
 	}
+	auto page_zero = cases.back();
+	page_zero.states.front().observation.id = "repeated-MVDM-fixed-MMR-ignores-DP";
+	page_zero.states.front().observation.initial.push_back({r::STATE_ST0,0});
+	page_zero.states.back().observation.expected.push_back({r::STATE_ST0,0});
+	page_zero.checkpoint = 7;
+	cases.push_back(std::move(page_zero));
 	return cases;
 }
 }

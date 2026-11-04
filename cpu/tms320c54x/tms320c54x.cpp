@@ -149,14 +149,14 @@ constexpr bool staged_repeat_accumulator_store(u16 word)
 
 constexpr bool staged_repeat_data_copy(u16 word)
 {
-	return (word & 0xff00) == 0x7000 && u8(word) < 0xa0;
+	return (word & 0xfff8) == 0x7210 || ((word & 0xff00) == 0x7000 && u8(word) < 0xa0);
 }
 
 constexpr bool staged_repeat_destination_copy(u16 word)
 {
-	// MVMD AL/BL repeats a fixed MMR source into incrementing EAR
+	// MVMD AL/BL/ARx repeats a fixed MMR source into incrementing EAR
 	// destinations (SPRU172C 4-115), unlike MVDK's Smem source DAGEN.
-	return word == 0x7308 || word == 0x730b ||
+	return word == 0x7308 || word == 0x730b || (word & 0xfff8) == 0x7310 ||
 		((word & 0xff00) == 0x7100 && (u8(word) < 0x98 || (u8(word) >= 0xa8 && u8(word) < 0xb8) || (u8(word) >= 0xc0 && u8(word) <= 0xdf)));
 }
 
@@ -4289,8 +4289,10 @@ void tms320c54x_device::pipeline_step()
 		}
 		bool const extended = staged_extended_data_copy(m_pipeline_word[3]);
 		bool const preincrement = !extended && BIT(mode, 7) && (mode & 0x78) == 0x18;
+		bool const fixed_mmr = staged_direct_mvdm(m_pipeline_word[3]);
+		u16 const preview = fixed_mmr ? mode : u16(basic_address(3, mode) + unsigned(preincrement));
 		if (m_pipeline_repeat_active && m_pipeline_repeat_body_latched && m_pipeline_address[3] == m_pipeline_repeat_address &&
-			(source < 0x60 || (staged_direct_mvdm(m_pipeline_word[3]) && mode < 0x10) || u16(basic_address(3, mode) + unsigned(preincrement)) < 0x60))
+			(source < 0x60 || (fixed_mmr ? mode < 0x10 || mode > 0x17 : preview < 0x60)))
 		{
 			logerror("%s: repeated MVKD mapped source/destination is unsupported\n", machine().describe_context()); m_illegal = true; return;
 		}
