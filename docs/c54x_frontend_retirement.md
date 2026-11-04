@@ -15,8 +15,8 @@ through an expression: 241 lines and 39,048 cases. Counts describe entire
 sections, not atomic-only case counts. Helpers and firmware integration sources
 are additional migration work. The common case defaults to staged.
 
-Current validated progress: 68 sections (6,963 cases plus restores) migrated;
-69 of the original explicitly atomic sections remain. The baseline counts
+Current validated progress: 75 sections (7,010 cases plus restores) migrated;
+62 of the original explicitly atomic sections remain. The baseline counts
 describe the retirement scope, not the current number of atomic assignments.
 The seven originally paired sections are now staged-only: 24,040 cases remain
 from their 39,048-case baseline. Their original staged stimuli, assertions and
@@ -118,6 +118,21 @@ Also migrated without semantic assertion changes: `signed_conditions`,
 The overflow-branch section now uses staged Read-clock observations (clock 6),
 not atomic clock 1. Its original flag results, including delay-slot flag changes,
 pass unchanged. See TI SPRU131G, ST0 overflow flags and chapter 7 pipeline rules.
+
+### Idle fixture endpoints
+
+Idle wake, NMI, deep-clock, DMA and BSP fixtures now observe their original
+wake masks/pending flags at entry or continuation, then execute real IFR
+acknowledgement or IMR masking before terminal IDLE. They no longer depend on
+attempting to sleep again with an enabled wake flag still pending. These
+revised inputs pass on both frontends; this does not establish real-silicon
+IDLE re-entry behavior with an already-latched flag. Temporary CPU tracing
+was removed; CPU idle behavior is unchanged.
+
+The PLL fixture preserves its cold lock interval but releases wake after cold
+staged startup has drained. Sixteenth-clock observation timestamps are derived
+from 32 samples per divided CPU clock; the lock-edge check moves with the
+software-reentry stimulus, not with observed CPU results. Both frontends pass.
 
 ### Unresolved migration contrasts
 
@@ -308,20 +323,20 @@ sections independently; do not run the complete suite after every edit.
 | `atomic_operand_order` | 46 | 63 | Atomic retained; first staged contrast: C54x case extensions-before-data-IO-and-program-operands/10: register 22 actual=1 expected=0 mask=ffffffffffffffff |
 | `atomic_intm_follower` | 3 | 33 | Atomic retained; first staged contrast: Section IRQ case=0 line=0 clock=10 data_events=0 previous_case=0 return_pc=09d5 |
 | `atomic_xc_interrupt` | 8 | 40 | Atomic retained; first staged contrast: Section IRQ case=0 line=2 clock=12 data_events=0 previous_case=0 return_pc=0804 |
-| `atomic_waited_io_control` | 12 | 36 | Re-derive timing/order; retain assertions |
-| `stopped_timer_reload` | 48 | 26 | Re-derive timing/order; retain assertions |
+| `atomic_waited_io_control` | 12 | 36 | Atomic retained; first staged contrast: C54x case waited-port-control-defers-pending-IRQ/0: register 22 actual=1 expected=0 mask=ffffffffffffffff |
+| `stopped_timer_reload` | 48 | 26 | Atomic retained; first staged contrast: C54x case stopped-timer-TRB-reloads-TIM-and-readonly-PSC/16: register 22 actual=1 expected=0 mask=ffffffffffffffff |
 | `source_admission` | 38,464 | 54 | Validated staged subset; atomic dimension removed |
-| `idle_nmi` | 12 | 35 | Re-derive timing/order; retain assertions |
-| `idle_wake` | 6 | 36 | Re-derive timing/order; retain assertions |
-| `deep_idle_clocks` | 8 | 34 | Re-derive timing/order; retain assertions |
-| `bsp_interrupt` | 9 | 42 | Re-derive timing/order; retain assertions |
-| `idle_dma` | 10 | 38 | Re-derive timing/order; retain assertions |
-| `idle3_pll` | 1 | 34 | Re-derive timing/order; retain assertions |
-| `repeat_endpoints` | 12 | 44 | Re-derive timing/order; retain assertions |
+| `idle_nmi` | 12 | 35 | Validated staged migration; terminal idle cleanup explicit where needed |
+| `idle_wake` | 6 | 36 | Validated staged migration; terminal idle cleanup explicit where needed |
+| `deep_idle_clocks` | 8 | 34 | Validated staged migration; terminal idle cleanup explicit where needed |
+| `bsp_interrupt` | 9 | 42 | Validated staged migration; terminal idle cleanup explicit where needed |
+| `idle_dma` | 10 | 38 | Validated staged migration; terminal idle cleanup explicit where needed |
+| `idle3_pll` | 1 | 34 | Validated staged migration; terminal idle cleanup explicit where needed |
+| `repeat_endpoints` | 12 | 44 | Atomic retained; first staged contrast: C54x case repeat-final-copy-protected-at-page-endpoints/0: register 22 actual=1 expected=0 mask=ffffffffffffffff |
 | `block_repeat_pages` | 96 | 37 | Validated staged subset; atomic dimension removed |
-| `initial_control_sequences` | 3 | 32 | Re-derive timing/order; retain assertions |
+| `initial_control_sequences` | 3 | 32 | Atomic retained; first staged contrast: C54x case=0 event=1 write=0 address=2fff value=602 clock=11 |
 | `receive_ring_copy` | 4 | 20 | Validated staged subset; atomic dimension removed |
-| `disassembly` | 1 | 13 | Migrate independent assertions; check staged admission |
+| `disassembly` | 1 | 13 | Validated staged migration; terminal idle cleanup explicit where needed |
 | `instruction_observer` | 24 | 25 | Validated staged subset; atomic dimension removed |
 
 ## Exit gates before deletion

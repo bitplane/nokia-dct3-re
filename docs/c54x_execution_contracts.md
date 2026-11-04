@@ -174,7 +174,7 @@ far-return path; INTM-blocked wake instead resumes foreground without a frame.
 Exact bus events, PC page, A/B, SP, pending IFR and standard-mode status survive
 replay. Physical frequencies and silicon restart latency remain unestablished.
 
-`idle_nmi` owns twelve independent atomic-frontend cases: IDLE1/2/3 crossed
+`idle_nmi` owns twelve independent staged-frontend cases: IDLE1/2/3 crossed
 with INTM and empty/full IMR. Each reaches idle before an NMI is asserted.
 A fixture execution hold lets the synchronizer latch NMI while vector entry
 is frozen; the snapshot retains that pending request, original INTM/SP,
@@ -183,10 +183,10 @@ with one continuation write and no maskable-IFR consumption. The external NMI
 level remains high across acknowledgement; reasserting the same high level
 must not create another interrupt. Clearing it on acknowledgement makes this
 negative control fail. MAME HALT is fixture control here, not an asserted
-C54x pin assignment. Cycle accuracy and staged-frontend equivalence are not
-claimed by this section.
+C54x pin assignment. Pending IFR is checked before the ISR explicitly
+acknowledges it and enters terminal IDLE. Silicon cycle accuracy is not claimed.
 
-`idle_wake` owns six atomic-frontend IDLE1 cases: external requests with
+`idle_wake` owns six staged-frontend IDLE1 cases: external requests with
 IMR/INTM combinations, plus timer requests with the timer mask disabled or
 enabled. IMR gates wake independently of INTM. Enabled/unmasked interrupts
 enter the vector and stack the old continuation; enabled requests under
@@ -194,9 +194,12 @@ INTM instead resume foreground, write its marker and stop the timer. Masked
 requests remain pending without executing foreground. Exact IFR, PC, SP,
 marker/stack RAM and ordered writes are checked after a pre-wake checkpoint
 and replay. Timer start is explicit MMIO/state conformance stimulus; no
-physical clock-rate or exact wake-latency claim is made.
+physical clock-rate or exact wake-latency claim is made. The continuation checks
+its pending flag before acknowledging it through STLM IFR, then enters terminal
+IDLE. Deep-clock, BSP and DMA continuations instead mask further wakeups through
+STLM IMR after verifying the original mask; their pending IFR checks remain.
 
-`deep_idle_clocks` owns eight independent atomic-frontend IDLE2/3 cases.
+`deep_idle_clocks` owns eight independent staged-frontend IDLE2/3 cases.
 The CPU peripheral-clock output drives a real McBSP device. Internal timer
 count/prescaler and the queued serial word remain frozen without setting TSS;
 an enabled external IRQ resumes both, while a masked one does not. Separately,
@@ -208,7 +211,7 @@ Disconnecting the peripheral-clock output fails on premature transmission.
 Register inspection is nondestructive observation, not guest bus traffic.
 These are clock-domain and replay contracts, not physical rate measurements.
 
-`bsp_interrupt` owns nine atomic completed-frame interrupt cases. The standard
+`bsp_interrupt` owns nine staged completed-frame interrupt cases. The standard
 BSP word-state implementation generates RX/TX ready transitions, then the test
 attachment routes them to CPU inputs4/5. An execution hold allows the snapshot
 to capture pending IFR before vector dispatch. RX wins simultaneous readiness;
@@ -217,7 +220,7 @@ and ordinary unmasked requests push one continuation and enter the appropriate
 vector. PC, SP, status/masks, pending IFR and exact writes survive replay.
 This verifies completed-word routing, not serial pin cadence or handset audio.
 
-`idle_dma` owns ten independent atomic idle/DMA contracts using the real DMA
+`idle_dma` owns ten independent staged idle/DMA contracts using the real DMA
 device: IDLE1/2 system clocks, IDLE3 input clocks, absent input clocks, and
 clock loss halfway through the first word, each with its completion mask off/on.
 Four explicit source words must be read and copied in order; each destination

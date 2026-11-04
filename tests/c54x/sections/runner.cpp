@@ -469,9 +469,9 @@ private:
 #endif
 #ifdef C54X_SECTION_IDLE3_PLL
 		unsigned const pll_now=m_fixture->tick_count();
-		if ((pll_now==128 || pll_now==480 || pll_now==640) && m_cpu->clock()!=6'500'000)
+		if ((pll_now==128 || pll_now==c54x_test::idle3_pll_settled_tick || pll_now==c54x_test::idle3_pll_checkpoint_tick) && m_cpu->clock()!=6'500'000)
 			throw emu_fatalerror("IDLE3 wake and pending software relock must stay on DIV");
-		if (pll_now==65880 && m_cpu->clock()!=104'000'000)
+		if (pll_now==c54x_test::idle3_pll_locked_tick && m_cpu->clock()!=104'000'000)
 			throw emu_fatalerror("Software relock must publish x8 only after the new lock delay");
 #endif
 #ifdef C54X_SECTION_CLOCK_RATES

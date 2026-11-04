@@ -117,9 +117,14 @@ constexpr int AS_PROGRAM = 0;
 constexpr int AS_DATA = 1;
 constexpr int AS_IO = 2;
 constexpr int SUSPEND_REASON_DISABLE = 0;
+struct emu_fatalerror : std::runtime_error {
+    template <typename... Args> emu_fatalerror(const char *message, Args...) : std::runtime_error(message) { }
+};
 ''' + action + r'''
 struct bench {
     unsigned m_tick = 5;
+    unsigned m_case = 0;
+    bool m_replay = false;
     bool disabled = false;
     bool m_resume = false;
     bool m_bio_level = true, m_ready_level = true;
