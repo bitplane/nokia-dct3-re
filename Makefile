@@ -1793,7 +1793,7 @@ verify-5110-late-input: build
 			-rompath $(abspath $(MAME_DIR))/roms -nvram_directory "$$tmp/nvram" \
 			-video none -sound none -log -verbose -skip_gameinfo -nothrottle \
 			-seconds_to_run 16 \
-			-autoboot_script "$$script" >/dev/null; \
+			$(NATIVE_HEADLESS_OPTIONS) -autoboot_script "$$script" >/dev/null; \
 		$(PYTHON) $(abspath tools/rom4_idle_input_trace_check.py) error.log; \
 		if [ "$(NSE1_MACHINE)" = nse1pipe ] || [ "$(NSE1_MACHINE)" = noki5110 ]; then grep -q 'rom4_staged_end: .*illegal=0' error.log; fi; \
 		sha256sum snap/*.pgm | grep -q \
@@ -1821,7 +1821,7 @@ verify-5110-power-lifecycle: build
 				-rompath $(abspath $(MAME_DIR))/roms -nvram_directory "$$tmp/nvram" \
 				-video none -sound none -log -verbose -skip_gameinfo -nothrottle \
 				-seconds_to_run "$$seconds" \
-				-autoboot_script "$$script" >/dev/null); \
+				$(NATIVE_HEADLESS_OPTIONS) -autoboot_script "$$script" >/dev/null); \
 		$(PYTHON) tools/power_5110_trace_check.py "$$kind" "$$tmp/error.log"; \
 		if [ "$(NSE1_MACHINE)" = nse1pipe ] || [ "$(NSE1_MACHINE)" = noki5110 ]; then grep -q 'rom4_staged_end: .*illegal=0' "$$tmp/error.log"; fi; \
 		rm -rf "$$tmp"; \
