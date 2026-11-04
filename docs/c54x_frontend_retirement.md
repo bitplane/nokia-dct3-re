@@ -15,8 +15,8 @@ through an expression: 241 lines and 39,048 cases. Counts describe entire
 sections, not atomic-only case counts. Helpers and firmware integration sources
 are additional migration work. The common case defaults to staged.
 
-Current validated progress: 117 sections (11,237 cases plus restores) migrated;
-20 of the original explicitly atomic sections remain, containing 239 cases.
+Current validated progress: 119 sections (11,250 cases plus restores) migrated;
+18 of the original explicitly atomic sections remain, containing 228 cases.
 The baseline counts
 describe the retirement scope, not the current number of atomic assignments.
 The seven originally paired sections are now staged-only: 24,040 cases remain
@@ -77,10 +77,21 @@ gates and documentation also expose frontend variants.
 
 ### Validated migrations
 
+`coefficient_mac_literals` keeps all six MACP/MACD source, successor, T and
+coefficient results on staged; GNU tic54x-as independently corrects long-offset
+encoding to offset-before-coefficient. `atomic_coefficient_fir_literals` keeps
+all five baseline standalone/streamed MACP/FIRS and MACD cases plus two held
+request/pending successor poison-and-replay checks (seven current). A running
+repeat retains its opcode and advances PAR without refetching literals; the
+first program-bus hold is followed by one coefficient read per iteration.
+Repeated MACD, extended MACP repeats and block/XC/control composition remain
+explicitly unqualified, not silently routed through atomic execution.
+
 `firs_sum` retains all 32 SXM/OVM/carry/sticky-overflow cases on staged, plus
 two coefficient-request/capture poison-and-replay cases (34 current). The
 Class-8 program-bus hold retains physical coefficient selection and X/Y words;
-repeat/control composition remains excluded. `repeat_status` now checks the
+the separately qualified stream cases cover single-instruction repeats, not
+block/XC/control composition. `repeat_status` now checks the
 documented Decode-owned BRAF clearance during the final iteration (SPRU131G
 7.5.8.2), with exact two-iteration Execute events and final CPL/BRC state.
 Its old `c800` accumulator expectation depended on atomic clearing BRAF after
@@ -316,7 +327,6 @@ Further preserved atomic sections after isolated staged trials:
 
 | Section | First observed contrast | Follow-up |
 | --- | --- | --- |
-| `atomic_coefficient_fir_literals` | Case 0, MACP `788b`, sets ILLEGAL | Audit program-coefficient multiply admission |
 | `atomic_mapped_moves` | Case 2, MVMD/DAR progression, sets ILLEGAL | Audit mapped-move destination admission |
 | `atomic_far_edges` | Case 2, FBACCD, sets ILLEGAL after cold-PC correction | Audit accumulator far-branch admission |
 
@@ -392,7 +402,7 @@ sections independently; do not run the complete suite after every edit.
 | `atomic_fast_return` | 1 | 26 | Migrated; RTN and stack poison retained, settled continuation retimed. |
 | `atomic_pending_far` | 2 | 38 | Staged validated; first-delay retirement checkpoint derived; pending transfer replay retained |
 | `atomic_program_mapping` | 13 | 68 | Migrate independent assertions; check staged admission |
-| `coefficient_mac_literals` | 6 | 38 | Atomic retained; first staged contrast: C54x case MACP-coefficient-no-store/0: register 22 actual=1 expected=0 mask=ffffffffffffffff |
+| `coefficient_mac_literals` | 6 | 38 | Migrated; canonical assembler-confirmed offset order and all independent results retained. |
 | `atomic_memory_literals` | 24 | 91 | Staged validated; baseline assertions plus LTD/STLM T-publication replay regression (25 current cases) |
 | `atomic_double_stores` | 8 | 40 | Migrate independent assertions; check staged admission |
 | `atomic_address_literals` | 4 | 33 | Migrate independent assertions; check staged admission |
@@ -429,7 +439,7 @@ sections independently; do not run the complete suite after every edit.
 | `atomic_memory_address_literals` | 28 | 84 | Migrated; independent results/events retained, cold PC retimed. |
 | `atomic_memory_arithmetic` | 45 | 97 | Staged validated; T-based long-word arithmetic and original literal/bus assertions retained |
 | `atomic_dual_arithmetic_literals` | 3 | 29 | Migrate independent assertions; check staged admission |
-| `atomic_coefficient_fir_literals` | 5 | 45 | Migrate independent assertions; check staged admission |
+| `atomic_coefficient_fir_literals` | 5 | 45 | Migrated; baseline cases plus two coefficient/successor poison/replays (seven current). |
 | `atomic_dual_add_sub_literals` | 8 | 38 | Migrate independent assertions; check staged admission |
 | `atomic_immediate_product_literals` | 11 | 41 | Migrate independent assertions; check staged admission |
 | `atomic_asm_arithmetic` | 523 | 51 | Migrate independent assertions; check staged admission |

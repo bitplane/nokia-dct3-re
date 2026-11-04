@@ -10,8 +10,8 @@ inline std::vector<clocked_register_case> section_cases()
 	{
 		u16 const opcode = u16((move ? 0x7b00 : 0x7900) | (form == 0 ? 0x8b : form == 1 ? 0xf8 : 0xea));
 		auto initial = initial_case(move ? "MACD-coefficient-and-successor" : "MACP-coefficient-no-store", {opcode});
-		initial.program[1].value = form == 1 ? 0xf90 : 0x700;
-		initial.program[2].value = form == 1 ? 0x700 : form == 2 ? 5 : 0xf4e1;
+		initial.program[1].value = form == 1 ? 0xf90 : form == 2 ? 5 : 0x700;
+		initial.program[2].value = form ? 0x700 : 0xf4e1;
 		if (form) initial.program[3].value = 0xf4e1;
 		initial.program.push_back({0x5ff,0xf495});
 		initial.program.push_back({0x700,0x1234});
@@ -25,9 +25,9 @@ inline std::vector<clocked_register_case> section_cases()
 			{r::STATE_AR3,form == 0 ? 0xf8fU : 0xf90U},{r::STATE_AR2,form == 2 ? 0xf05U : 0xf00U}},
 			{{source,0x55},{source + 1,u16(move ? 0x55 : 0x66)}});
 		final.expected_program = {{0x700,0x1234}};
-		clocked_register_case c{{{0,std::move(initial)},{1,observation("pre-MAC-snapshot", {{STATE_GENPC,0x600}})},
+		clocked_register_case c{{{0,std::move(initial)},{1,observation("pre-MAC-snapshot", {{STATE_GENPC,0x5ff}})},
 			{2,observation("MAC-running", {})},{32,std::move(final)}},1,32};
-		c.pipeline_frontend = false;
+		c.pipeline_frontend = true;
 		c.program_events = {{false,0x700,0x1234,0,false}};
 		c.data_events = std::vector<clocked_data_event>{{false,source,0x55,0,false}};
 		if (move) c.data_events->push_back({true,source + 1,0x55,0,false});

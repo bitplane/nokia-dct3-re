@@ -249,7 +249,7 @@
   "atomic_memory_address_literals": 28,
   "atomic_memory_arithmetic": 45,
   "atomic_dual_arithmetic_literals": 3,
-  "atomic_coefficient_fir_literals": 5,
+  "atomic_coefficient_fir_literals": 7,
   "atomic_dual_add_sub_literals": 8,
   "atomic_immediate_product_literals": 11,
   "atomic_asm_arithmetic": 523,

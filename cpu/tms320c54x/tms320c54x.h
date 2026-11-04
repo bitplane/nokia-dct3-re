@@ -178,6 +178,7 @@ private:
 	void pipeline_delay_compiler_sp(u16 previous);
 	void pipeline_begin_repeat_stream();
 	void pipeline_resume_after_repeat();
+	void pipeline_request_coefficient(u16 address);
 	void pipeline_restore_block_on_return(u32 address);
 	void enter_idle(u8 mode);
 	void finish_repeats();
@@ -399,6 +400,7 @@ private:
 	bool m_pipeline_program_move_pending = false;
 	bool m_pipeline_coefficient_pending = false;
 	u32 m_pipeline_coefficient_source = 0;
+	bool m_pipeline_repeat_coefficient_started = false;
 	bool m_pipeline_repeat_active = false;
 	bool m_pipeline_repeat_body_latched = false;
 	bool m_pipeline_repeat_stream = false;

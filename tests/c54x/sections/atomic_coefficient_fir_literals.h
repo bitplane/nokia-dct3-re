@@ -36,10 +36,30 @@ inline std::vector<clocked_register_case> section_cases()
 			if (fir) reads.push_back({false,0xf91 + i,u16(repeated ? 2 : 0xaa),0,false});
 			if (variant == 1) reads.push_back({true,0xf91,0x55,0,false});
 		}
-		clocked_register_case c{{{0,std::move(initial)},{1,observation("pre-coefficient-operation-snapshot",{{STATE_GENPC,0x601}})},
+		clocked_register_case c{{{0,std::move(initial)},{1,observation("pre-coefficient-operation-snapshot",{{STATE_GENPC,0x600}})},
 			{2,observation("coefficient-operation-running",{})},{64,std::move(final)}},1,64};
-		c.pipeline_frontend = false; c.data_events = std::move(reads); c.program_events = std::move(coefficients); cases.push_back(std::move(c));
+		c.pipeline_frontend = true; c.data_events = std::move(reads); c.program_events = std::move(coefficients); cases.push_back(std::move(c));
 	}
+	auto stream = cases[2];
+	stream.states.front().observation.id = "MACP-retains-held-coefficient-stream";
+	stream.states.front().observation.program.push_back({0x800,0xdead});
+	stream.checkpoint = 8;
+	stream.actions = {{8,{},false,{{0x603,0x800}},{},{{0xf90,0xdead}}}};
+	stream.states.back().observation.expected_data.front().value = 0xdead;
+	stream.data_events = std::vector<clocked_data_event>{{false,0xf90,1,8},{false,0xf91,2,10},{false,0xf92,3,11}};
+	stream.program_events = {{false,0x700,4,9},{false,0x701,5,10},{false,0x702,6,11}};
+	cases.push_back(std::move(stream));
+	auto successor = cases[1];
+	successor.states.front().observation.id = "MACD-retains-result-before-successor-write";
+	successor.checkpoint = 8;
+	successor.actions = {{8,{{r::STATE_T,0x7777}},false,{{0x700,0xdead}},{},{{0xf90,0xdead}}}};
+	successor.states.back().observation.expected_data.front().value = 0xdead;
+	successor.states.back().observation.expected_program.front().value = 0xdead;
+	for (auto &value : successor.states.back().observation.expected)
+		if (value.index == r::STATE_T) value.value = 0x7777;
+	successor.data_events = std::vector<clocked_data_event>{{false,0xf90,0x55,7},{true,0xf91,0x55,9}};
+	successor.program_events = {{false,0x700,0x1234,8}};
+	cases.push_back(std::move(successor));
 	return cases;
 }
 }

@@ -2269,14 +2269,35 @@ request and its address are saved/reset. Execute accumulates old A(32–16)
 times the signed coefficient into B, then places `(X+Y)<<16` in A using the
 existing FRCT/SMUL/OVM/carry/sticky-overflow helpers (SPRU172C 4-59, Class 8).
 The extra program-bus cycle models the documented initial three-cycle cost;
-its precise silicon placement remains partial. Mapped operands and
-repeat/block/XC/control composition remain explicitly unqualified.
+its precise silicon placement remains partial. Short single-instruction repeats
+use the coefficient stream described below; mapped operands and
+block/XC/control composition remain explicitly unqualified.
 
 `firs_sum` keeps all 32 independent status/result cases. Two added cases poison
 X/Y and the instruction literal after Read, with checkpoints before and after
 the coefficient read; the latter also poisons the coefficient afterward.
 Exact clocks (X/Y at 6, coefficient at 7), one read per operand, result and
 replay distinguish captured data from rereads or a lost pending request.
+
+MACP/MACD (SPRU172C 4-87..90) shares the captured program-coefficient request.
+Access retains the RAM source and updates its pointer once; Read captures the
+source and publishes T after older Execute. Execute accumulates the retained
+signed product; MACD also copies the retained word to source+1 without
+republishing T. Mapped sources and a wrapping MACD successor are rejected.
+GNU binutils 2.43 tic54x-as independently emits `79ea 0005 0700` and
+`7bea 0005 0700` for `MACP/MACD *+AR2(5),0700h,B`: long offset precedes
+coefficient address. Both legacy parsing and the six-case literal fixture now
+use that order; all original operand/address/result expectations are unchanged.
+
+Pipelined FIRS and short MACP repeats retain the decoded opcode, advance PAR
+once per iteration, and use PB for coefficients instead of refetching opcode
+extensions. The first request owns an extra program-bus hold; later iterations
+read one coefficient per clock. The stream-start flag and held physical request
+are saved/reset. Two extra `atomic_coefficient_fir_literals` cases snapshot
+the held first MACP request and MACD before its successor write, poisoning
+already-read RAM/literals/coefficients/T as appropriate. Exact reads, writes,
+products, final input poison and replay are checked. Repeated MACD, extended
+MACP repeats and coefficient block/XC/control composition remain rejected.
 
 `repeat_status` checks BRAF independently of CPL. SPRU131G 7.5.8.2 clears
 BRAF at Decode of the final iteration's first instruction, not after Execute
