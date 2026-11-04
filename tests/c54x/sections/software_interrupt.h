@@ -18,7 +18,7 @@ inline std::vector<clocked_register_case> section_cases()
 		initial.initial.insert(initial.initial.end(), {{STATE_GENPC,0x10600},{r::STATE_PMST,table},{r::STATE_SP,0x1000},
 			{r::STATE_ST1,st1},{r::STATE_IFR,0xffff},{r::STATE_IMR,0}});
 		clocked_register_case c{{{0,std::move(initial)}},index & 1 ? 3U : 1U,trap ? 24U : 48U};
-		c.pipeline_frontend = false;
+		c.pipeline_frontend = true;
 		c.states.push_back({24,observation("IPTR-vector-entry-and-mask-semantics", {{STATE_GENPC,target + 2},
 			{r::STATE_SP,0xfff},{r::STATE_ST1,trap ? st1 : 0x980U},{r::STATE_IFR,flags},{r::STATE_IMR,0},{r::STATE_B,0x55}},{{0xfff,0x601}})});
 		if (!trap) {

@@ -170,7 +170,8 @@ constexpr bool staged_ram_stm(u16 word)
 constexpr bool decode_staged_pipelined_repeat(u16 word)
 {
 	bool const short_mar = (word & 0xff00) == 0x6d00 && u8(word) >= 0x80 && u8(word) < 0xe0 && (word & 0xf8) != 0x98;
-	return short_mar || staged_repeat_data_copy(word) || staged_repeat_destination_copy(word) || staged_repeat_accumulator_store(word) || staged_poly(word) || decode_staged_parallel_load(word) || staged_parallel_alu(word) || ((square_accumulate(word) || (word & 0xf800) == 0x2800) && u8(word) < 0x98) || (word & 0xf000) == 0xb000 || staged_mvdd(word) || (((word & 0xff00) == 0x4b00 || (word & 0xff00) == 0x8b00) && u8(word) < 0x98);
+	bool const short_add = (word & 0xfe00) == 0 && u8(word) < 0x98;
+	return short_add || short_mar || staged_repeat_data_copy(word) || staged_repeat_destination_copy(word) || staged_repeat_accumulator_store(word) || staged_poly(word) || decode_staged_parallel_load(word) || staged_parallel_alu(word) || ((square_accumulate(word) || (word & 0xf800) == 0x2800) && u8(word) < 0x98) || (word & 0xf000) == 0xb000 || staged_mvdd(word) || (((word & 0xff00) == 0x4b00 || (word & 0xff00) == 0x8b00) && u8(word) < 0x98);
 }
 
 constexpr bool staged_repeat_accumulator_load(u16 word)
@@ -249,7 +250,7 @@ constexpr bool staged_call(u16 word)
 
 constexpr bool staged_software_intr(u16 word)
 {
-	return (word & 0xffe0) == 0xf7c0;
+	return (word & 0xffe0) == 0xf7c0 || (word & 0xffe0) == 0xf4c0;
 }
 
 constexpr bool staged_far_branch(u16 word)
@@ -4481,6 +4482,10 @@ void tms320c54x_device::pipeline_step()
 		m_pipeline_operand_address[3] = extended ? (mode == 0xf8 ? literal :
 			long_offset_address(mode, indirect_ar(mode, 3), s16(literal), 3)) : basic_address(3, mode);
 		u16 const source = m_pipeline_operand_address[3];
+		if (m_pipeline_repeat_active && (m_pipeline_word[3] & 0xfe00) == 0 && source < 0x60)
+		{
+			logerror("%s: repeated ADD mapped/peripheral source is unsupported\n", machine().describe_context()); m_illegal = true; return;
+		}
 		if ((m_pipeline_repeat_active || m_pipeline_control_words) && square_accumulate(m_pipeline_word[3]) && source < 0x60)
 		{
 			logerror("%s: repeated square mapped/peripheral source is unsupported\n", machine().describe_context()); m_illegal = true; return;
@@ -4695,7 +4700,8 @@ void tms320c54x_device::pipeline_step()
 		m_pipeline_operand[4] = pipeline_read_data(m_pipeline_operand_address[4]);
 		if (staged_memory_immediate_multiply(m_pipeline_word[4])) m_t = m_pipeline_operand[4];
 	}
-	if (m_pipeline_valid[4] && staged_software_intr(m_pipeline_word[4]))
+	// TRAP shares vector/stack entry, but preserves INTM and IFR (SPRU172C 4-193).
+	if (m_pipeline_valid[4] && (m_pipeline_word[4] & 0xffe0) == 0xf7c0)
 	{
 		unsigned const vector = m_pipeline_word[4] & 31;
 		m_st1 |= 0x0800;

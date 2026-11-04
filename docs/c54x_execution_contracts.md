@@ -2260,14 +2260,25 @@ of the original MAC is not proof of valid recording or audio.
 
 ### Software INTR and INTM followers
 
+Short `ADD Smem,A/B` bodies (direct or indirect modes below `0x98`) are
+admitted to pipelined single-instruction repeats. Each iteration captures its
+own address/source before Execute updates the accumulator; mapped/peripheral
+sources remain rejected before a bus read. `atomic_memory_address_literals`
+retains the fifteen-add result and read count, and `atomic_repeat_irq` checks
+four/65,536 additions, exact count exhaustion, and the pending IRQ's continuation
+frame only after the repeat completes. Both retain save/replay coverage.
+
 `software_intr_pipeline` checks all 32 software vectors with both initial INTM
 states in 64 cases/replays. Decode-owned RTN, retained opcode/vector words,
 exact frame Write/RET Read/handler and continuation Write clocks, frame poison,
 selective IFR clearance and preserved arithmetic/configuration state are checked.
 Pages and two checkpoints are distributed rather than producing 256 executions.
 RET's Read precedes the handler STLM's Execute in their shared model clock.
-The separate atomic `software_interrupt` section also covers TRAP/RETF behavior;
-it does not substitute for this staged publication contract.
+The staged `software_interrupt` section retains 128 cases covering TRAP/INTR,
+both initial INTM states, every vector, IPTR selection and RETF behavior.
+TRAP shares Decode-owned RTN, vector redirection and frame delivery with INTR,
+but leaves INTM and IFR unchanged (SPRU172C 4-193). This broader functional
+coverage does not substitute for `software_intr_pipeline`'s publication clocks.
 
 `atomic_intm_follower` retains all three complete-follower cases after INTM
 clear: one-word LD, three-word ST and RET. Exact ordered data events, logical

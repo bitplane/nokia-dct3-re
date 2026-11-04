@@ -20,9 +20,9 @@ inline std::vector<clocked_register_case> section_cases()
 			if (at == final.expected_data.end()) { initial.data.push_back({word.address,0xbeef}); final.expected_data.push_back(word); }
 			else at->value = word.value;
 		}
-		clocked_register_case c{{{0,std::move(initial)},{1,observation("pre-literal-snapshot",{{STATE_GENPC,0x601}})},
+		clocked_register_case c{{{0,std::move(initial)},{1,observation("pre-literal-snapshot",{{STATE_GENPC,0x600}})},
 			{2,observation("literal-running",{})},{64,std::move(final)}},1,64};
-		c.pipeline_frontend = false; c.data_events = std::move(events); cases.push_back(std::move(c));
+		c.pipeline_frontend = true; c.data_events = std::move(events); cases.push_back(std::move(c));
 	};
 	add("dual-move-BK5-source-wrap",{0xe5c9},{{r::STATE_AR0,1},{r::STATE_AR2,0xe04},{r::STATE_AR3,0xe10},{r::STATE_ST1,0}},
 		{{r::STATE_AR0,1},{r::STATE_AR2,0xe00},{r::STATE_AR3,0xe11}},{{0xe04,0x2468},{0xe10,0}},{{0xe10,0x2468}},

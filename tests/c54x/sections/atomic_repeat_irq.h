@@ -14,7 +14,7 @@ inline std::vector<clocked_register_case> section_cases()
 		initial.data = {{0x1002,1}};
 		initial.initial.insert(initial.initial.end(), {{r::STATE_AR2,0x1002},{r::STATE_ST1,0},{r::STATE_IMR,4}});
 		clocked_register_case c{{{0,std::move(initial)}},count == 3 ? 4U : 32U,count + 40};
-		c.pipeline_frontend = false;
+		c.pipeline_frontend = true;
 		if (count == 0xffff) {
 			c.states.push_back({32,observation("active-repeat-with-pending-IRQ", {
 				{r::STATE_RC,0xff00,0xff00},{r::STATE_IFR,4}})});
