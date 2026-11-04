@@ -35,7 +35,7 @@ inline std::vector<clocked_register_case> section_cases()
 			{r::STATE_PMST,edge && (v & 4) ? 1U : 0U}});
 		constexpr unsigned delta[]{0,0xffff,1,3};
 		clocked_register_case c{{{0,std::move(initial)}},index & 1 ? 3U : 1U,24};
-		c.pipeline_frontend = false;
+		c.pipeline_frontend = true;
 		c.states.push_back({24,observation("predicate-store-and-unconditional-address-update", {{r::STATE_A,a},{r::STATE_B,b},
 			{r::STATE_AR2,u16(0x500 + delta[mode])},{r::STATE_ST0,st0},{r::STATE_ST1,st1},{STATE_GENPC,0x602}},
 			{{0x500,take ? word : u16(0xa55a)}})});

@@ -47,7 +47,7 @@ inline std::vector<clocked_register_case> section_cases()
 		clocked_register_case c{{{0,std::move(initial)},
 			{32,observation("predicate-precedes-delay-word-mutation", {{r::STATE_A,1},{r::STATE_B,index < 3 ? 2U : 3U}})}},
 			index & 1 ? 3U : 4U,32};
-		c.pipeline_frontend = false;
+		c.pipeline_frontend = true;
 		c.data_events = std::vector<clocked_data_event>{};
 		cases.push_back(std::move(c));
 	}

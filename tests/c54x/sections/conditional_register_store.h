@@ -26,7 +26,7 @@ inline std::vector<clocked_register_case> section_cases()
 		for (unsigned ar = 2; ar < 6; ++ar) initial.initial.push_back({r::STATE_AR0 + ar,0x1403 + (ar - 2) * 16});
 		initial.data = {{address,0xa55a}};
 		clocked_register_case c{{{0,std::move(initial)}},(condition + pattern + mode + brc) & 1 ? 4U : 1U,24};
-		c.pipeline_frontend = false;
+		c.pipeline_frontend = true;
 		auto final = observation("conditional-read-writeback", {{STATE_GENPC,0x602},{r::STATE_A,a},{r::STATE_B,b},
 			{r::STATE_T,brc ? 0xbeefU : unsigned(source)},{r::STATE_BRC,brc ? unsigned(source) : 0x55aaU},
 			{r::STATE_ST0,0x1e05},{r::STATE_ST1,0x800}},{{address,u16(take ? source : 0xa55a)}});

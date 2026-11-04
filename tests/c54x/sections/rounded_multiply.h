@@ -55,7 +55,7 @@ inline std::vector<clocked_register_case> section_cases()
 			{r::STATE_B,destination_b ? v.initial : 0x12345678},{r::STATE_AR2,0x500},{r::STATE_T,v.t},
 			{r::STATE_ST0,st0},{r::STATE_ST1,u64(0x800 | v.status)},{r::STATE_PMST,v.pmst}});
 		clocked_register_case c{{{0,std::move(initial)}},index & 1 ? 3U : 1U,24};
-		c.pipeline_frontend = false;
+		c.pipeline_frontend = true;
 		c.states.push_back({24,observation("manual-rounded-product-result", {{r::STATE_A,destination_b ? 0x12345678 : v.expected},
 			{r::STATE_B,destination_b ? v.expected : 0x12345678},{r::STATE_AR2,0x500},{r::STATE_T,v.t},
 			{r::STATE_ST0,flags},{r::STATE_ST1,u64(0x800 | v.status)},{r::STATE_PMST,v.pmst},{STATE_GENPC,absolute ? 0x603U : 0x602U}})});

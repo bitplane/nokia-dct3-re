@@ -15,8 +15,8 @@ through an expression: 241 lines and 39,048 cases. Counts describe entire
 sections, not atomic-only case counts. Helpers and firmware integration sources
 are additional migration work. The common case defaults to staged.
 
-Current validated progress: 31 sections (1,831 cases plus restores) migrated;
-106 of the original explicitly atomic sections remain. The baseline counts
+Current validated progress: 45 sections (5,960 cases plus restores) migrated;
+92 of the original explicitly atomic sections remain. The baseline counts
 describe the retirement scope, not the current number of atomic assignments.
 
 ## Disposition rules
@@ -105,6 +105,12 @@ assertions and restore checks: `atomic_conditional_return`,
 observations in the mapping section retain the pre-Prefetch logical address,
 including nonzero XPC pages; final page/overlay/ARP/DP expectations are unchanged.
 
+Also migrated without semantic assertion changes: `signed_conditions`,
+`carry_branch`, `conditional_register_store`, `accumulator_call`,
+`instruction_examples`, `shifted_arithmetic`, `square_difference`,
+`conditional_accumulator_store`, `rounded_multiply`, `store_shift`,
+`smul_control`, `bit_immediate`, `shifted_high_store` and `offset_memory_test`.
+
 ### Unresolved migration contrasts
 
 `atomic_product_literals` remains atomic: after accounting for cold Prefetch,
@@ -150,6 +156,15 @@ Further preserved atomic sections after isolated staged trials:
 
 These are migration blockers, not established silicon defects. An atomic
 expectation is not automatically correct where implementations disagree.
+
+Additional shared-contract queue (original atomic sections retained):
+
+- `repeat_status`: first case B is `4800`, expected `c800`; inspect repeat/status timing.
+- `block_repeat_control`: first case AR1 is 4, expected 1; inspect block endpoint/count behavior.
+- `zero_bk` case 144 and `indirect_popm` case 0 hit staged admission limits.
+- `clock_control`, `rounding`, `firs_sum`, `arithmetic_boundaries` (ABDST),
+  `parallel_load_multiply` and `rounded_load` stop at ILLEGAL in their first case.
+  Resolve instruction families/profile selection, not their literal results.
 
 Classifications below are routing priorities based on explicit frontend settings
 and contract families, not behavioral equivalence findings. Validate migrated

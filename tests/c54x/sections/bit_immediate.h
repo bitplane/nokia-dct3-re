@@ -14,7 +14,7 @@ inline std::vector<clocked_register_case> section_cases()
 		initial.initial.insert(initial.initial.end(), {{r::STATE_ST0,u64(0xaa5 | (set ? 0 : 0x1000))},
 			{r::STATE_AR0,3},{int(r::STATE_AR0 + reg),0x507},{r::STATE_BK,8},{r::STATE_A,0x12345},{r::STATE_B,0x6789}});
 		clocked_register_case c{{{0,std::move(initial)}},index & 1 ? 3U : 1U,24};
-		c.pipeline_frontend = false;
+		c.pipeline_frontend = true;
 		c.states.push_back({24,observation("bit-position-and-address-mode", {{r::STATE_ST0,u64(0xaa5 | (set ? 0x1000 : 0))},
 			{int(r::STATE_AR0 + reg),std::array<u16,4>{0x507,0x506,0x508,0x502}[operand >> 2]},
 			{r::STATE_A,0x12345},{r::STATE_B,0x6789},{STATE_GENPC,0x602}})});

@@ -13,7 +13,7 @@ inline std::vector<clocked_register_case> section_cases()
 		auto final = observation(vector.id,{});
 		final.expected = vector.expected; final.expected_data = vector.expected_data;
 		clocked_register_case c{{{0,std::move(initial)},{40,std::move(final)}},cases.size() & 1 ? 5U : 1U,40};
-		c.pipeline_frontend = false;
+		c.pipeline_frontend = true;
 		cases.push_back(std::move(c));
 	}
 	return cases;

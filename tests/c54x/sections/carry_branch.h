@@ -16,7 +16,7 @@ inline std::vector<clocked_register_case> section_cases()
 		u16 const status = 0x02a5 | (carry ? 0x800 : 0);
 		initial.initial.insert(initial.initial.end(), {{STATE_GENPC,0x10600},{r::STATE_ST0,status}});
 		clocked_register_case c{{{0,std::move(initial)}},variant & 1 ? 3U : 1U,32};
-		c.pipeline_frontend = false;
+		c.pipeline_frontend = true;
 		c.states.push_back({32,observation("carry-condition", {{r::STATE_A,taken ? 0x2222U : 0x1111U},{r::STATE_ST0,status}})});
 		c.data_events = std::vector<clocked_data_event>{};
 		cases.push_back(std::move(c));

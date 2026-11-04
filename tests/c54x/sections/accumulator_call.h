@@ -10,7 +10,7 @@ inline std::vector<clocked_register_case> section_cases()
 		initial.program.insert(initial.program.end(), {{0x700,0xf4e1},{0x701,0xf49b}});
 		initial.initial.insert(initial.initial.end(), {{r::STATE_A,0x700},{r::STATE_B,0x700}});
 		clocked_register_case c{{{0,std::move(initial)}},b ? 16U : 1U,40};
-		c.pipeline_frontend = false;
+		c.pipeline_frontend = true;
 		c.states.push_back({16,observation("paused-callee", {{STATE_GENPC,0x701},{r::STATE_SP,0xfff},{r::STATE_IDLE,1}},{{0xfff,0x601}})});
 		c.states.push_back({17,observation("resumed-fast-return", {})});
 		c.states.push_back({40,observation("rtn-not-stack-word", {{STATE_GENPC,0x602},{r::STATE_SP,0x1000}},{{0xfff,0xdead}})});

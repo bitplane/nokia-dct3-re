@@ -13,7 +13,7 @@ inline std::vector<clocked_register_case> section_cases()
 		initial.data = {{0x1004,value},{0x1001,4},{0x1002,4}};
 		initial.initial.insert(initial.initial.end(), {{r::STATE_AR1,0x1000},{r::STATE_ST0,st0}});
 		clocked_register_case c{{{0,std::move(initial)}},index & 1 ? 3U : 1U,24};
-		c.pipeline_frontend = false;
+		c.pipeline_frontend = true;
 		c.states.push_back({24,observation("displacement-before-test-literal", {{r::STATE_AR1,update ? 0x1004U : 0x1000U},
 			{r::STATE_ST0,u64(st0 | (match ? 0x1000 : 0))},{STATE_GENPC,0x604}})});
 		c.data_events = std::vector<clocked_data_event>{{false,0x1004,value,0,false}};
