@@ -168,11 +168,19 @@ execution passes all six complete-file comparisons and the original loader's
 3,254 records/51,921 words. Thus the damaged-record investigation belongs
 upstream of that directory reader, in fresh InitDisk media creation. The
 retained consumer also requires the C5416-compatible bus-register profile
-(`7728/7729`). With that profile selected, native startup reaches an unqualified
-repeated XOR (`1c91` at `03:928d`), not the retained atomic endpoint. These are
-distinct remaining contracts; neither permits dropping MU4's assertions or
+(`7728/7729`). Repeated short RAM logic is now qualified by sixty additional
+generic cases, including the XOR form (`1c91` at `03:928d`). The retained
+consumer reaches its native status/pin transaction; the setup-generated seed
+has no settings files and cannot satisfy the stronger retained-media gate.
+Fresh media creation and full retained acceptance are distinct remaining
+contracts; neither permits dropping MU4's assertions or
 deleting the engine underneath them. Experimental MU4 selections and write taps
 are removed; its existing execution configuration stays unchanged.
+
+The original InitDisk name-copy helper `491e..492a` passes sixteen isolated
+copied-firmware cases with empty/short/eight/twelve-character inputs and four
+restore points. Its unchanged delayed BANZ loop is not, by itself, the fresh
+directory corruption. This is an added firmware section, not generic ISA scope.
 
 The new IDLE-loop regression also fails with the old control-span arithmetic
 and passes after restoring the correction, independently of the full MU4 run.

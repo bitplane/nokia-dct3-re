@@ -76,6 +76,15 @@ pass. This is selected regression coverage, not a complete CPU-suite renewal.
 
 ### Harness contract
 
+Short RAM AND/OR/XOR operands can issue through the staged single-instruction
+repeat slots. Each iteration owns one operand read and one pointer update;
+Execute reduces the retained zero-extended word into the selected accumulator
+without changing status flags (SPRU172C 4-11, 4-123, 4-201). `memory_logic` adds
+48 short/long-count, A/B and count-zero/nonzero cases with source poisoning and
+replay, plus twelve mapped/peripheral-source rejection cases. Those unqualified
+sources fail before a read or pointer modification. This does not qualify
+long-offset logical repeats or physical bus timing.
+
 An IDLE Decode guard belongs only to that instruction. An older backward branch
 can retire while its target IDLE decodes; numeric address proximity does not make
 the branch part of the younger guard. Its retirement must neither underflow nor
