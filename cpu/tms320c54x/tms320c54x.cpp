@@ -97,9 +97,9 @@ constexpr bool staged_dual_arithmetic(u16 word)
 	return (word & 0xfc00) == 0xa000;
 }
 
-constexpr bool staged_sqdst(u16 word)
+constexpr bool staged_distance(u16 word)
 {
-	return (word & 0xff00) == 0xe200;
+	return (word & 0xfe00) == 0xe200; // SQDST/ABDST Xmem, Ymem.
 }
 
 constexpr bool staged_mvdd(u16 word)
@@ -338,7 +338,7 @@ constexpr bool decode_staged_data_copy(u16 word)
 
 constexpr bool staged_delay_copy(u16 word)
 {
-	return (word & 0xff00) == 0x4d00 && (u8(word) < 0x98 || (u8(word) >= 0xe0 && u8(word) <= 0xf8));
+	return (word & 0xfe00) == 0x4c00 && (u8(word) < 0x98 || (u8(word) >= 0xe0 && u8(word) <= 0xf8));
 }
 
 constexpr bool staged_extended_program_move(u16 word)
@@ -484,7 +484,7 @@ constexpr bool staged_ts_arithmetic(u16 word)
 
 constexpr bool decode_staged_smem_arithmetic(u16 word)
 {
-	return !staged_absolute_add(word) && (word & 0xf8) != 0x98 && ((word & 0xfe00) == 0x0000 || (word & 0xfe00) == 0x0600 || (word & 0xfe00) == 0x0800 || staged_unsigned_memory_arithmetic(word) || staged_ts_arithmetic(word) || (word & 0xfe00) == 0x1e00 || (word & 0xfc00) == 0x3c00 || (word & 0xfc00) == 0x4000) && u8(word) <= 0xf8;
+	return !staged_absolute_add(word) && (word & 0xf8) != 0x98 && ((word & 0xfe00) == 0x0000 || (word & 0xfe00) == 0x0600 || (word & 0xfe00) == 0x0800 || (word & 0xfe00) == 0x0e00 || staged_unsigned_memory_arithmetic(word) || staged_ts_arithmetic(word) || (word & 0xfe00) == 0x1e00 || (word & 0xfc00) == 0x3c00 || (word & 0xfc00) == 0x4000) && u8(word) <= 0xf8;
 }
 
 constexpr bool staged_bitt(u16 word)
@@ -664,7 +664,7 @@ constexpr bool staged_extended_dld(u16 word)
 
 constexpr bool decode_staged_long_arithmetic(u16 word)
 {
-	return ((word & 0xfc00) == 0x5000 || (word & 0xfe00) == 0x5400 || (word & 0xfe00) == 0x5800) && u8(word) <= 0xf8 && (word & 0xf8) != 0x98;
+	return (word & 0xf000) == 0x5000 && (word & 0xfe00) != 0x5600 && u8(word) <= 0xf8 && (word & 0xf8) != 0x98;
 }
 
 constexpr bool staged_extended_long_arithmetic(u16 word)
@@ -1531,7 +1531,7 @@ bool decode_staged_supported(u16 word, bool extended_program)
 		read_a || short_load || direct_store || immediate_store || long_load || rmw || staged_xmem_bit(word) || staged_xmem_load(word) ||
 		staged_xmem_arithmetic(word) || staged_xmem_store(word) || staged_conditional_store(word) || staged_dual_multiply(word) ||
 		staged_lms(word) || staged_parallel_alu(word) || staged_parallel_product(word) || staged_parallel_load(word) ||
-		staged_sqdst(word) || staged_dual_arithmetic(word) || staged_mvdd(word) || staged_port_read(word) || smem_arithmetic ||
+		staged_distance(word) || staged_dual_arithmetic(word) || staged_mvdd(word) || staged_port_read(word) || smem_arithmetic ||
 		staged_bitfield(word);
 }
 
@@ -1761,6 +1761,7 @@ void tms320c54x_device::device_start()
 	save_item(NAME(m_pipeline_intm_protected));
 	save_item(NAME(m_pipeline_direct_status));
 	save_item(NAME(m_pipeline_alu_mode));
+	save_item(NAME(m_pipeline_t));
 	save_item(NAME(m_pipeline_cmpt));
 	save_item(NAME(m_pipeline_bk));
 	save_item(NAME(m_pipeline_direct_sp));
@@ -2544,7 +2545,7 @@ u64 tms320c54x_device::add_sub(u64 source, u64 operand, bool subtract, bool dest
 	return u64(result) & ACC_MASK;
 }
 
-void tms320c54x_device::long_word_arithmetic(u16 op, u16 high, u16 low_word)
+void tms320c54x_device::long_word_arithmetic(u16 op, u16 high, u16 low_word, u16 t)
 {
 	const unsigned family = (op >> 8) & 0x0f;
 	const bool t_variant = family >= 0x0a;
@@ -2560,8 +2561,8 @@ void tms320c54x_device::long_word_arithmetic(u16 op, u16 high, u16 low_word)
 	if (BIT(m_st1, 8) && BIT(high, 15)) memory |= u64(0xff) << 32;
 	if (!BIT(m_st1, 7))
 	{
-		u64 t_pair = (u64(m_t) << 16) | m_t;
-		if (BIT(m_st1, 8) && BIT(m_t, 15)) t_pair |= u64(0xff) << 32;
+		u64 t_pair = (u64(t) << 16) | t;
+		if (BIT(m_st1, 8) && BIT(t, 15)) t_pair |= u64(0xff) << 32;
 		const u64 left = memory_first ? memory : source;
 		const u64 right = t_variant ? t_pair : memory_first ? source : memory;
 		destination = add_sub(left, right, subtract_high, destination_b);
@@ -2569,9 +2570,9 @@ void tms320c54x_device::long_word_arithmetic(u16 op, u16 high, u16 low_word)
 	else // Independent 16-bit lanes; the high lane extends into guard bits.
 	{
 		const u16 left_high_word = memory_first ? high : u16(source >> 16);
-		const u16 right_high_word = t_variant ? m_t : memory_first ? u16(source >> 16) : high;
+		const u16 right_high_word = t_variant ? t : memory_first ? u16(source >> 16) : high;
 		const u16 left_low_word = memory_first ? low_word : u16(source);
-		const u16 right_low_word = t_variant ? m_t : memory_first ? u16(source) : low_word;
+		const u16 right_low_word = t_variant ? t : memory_first ? u16(source) : low_word;
 		const s32 left_high = BIT(m_st1, 8) ? s32(s16(left_high_word)) : s32(left_high_word);
 		const s32 right_high = BIT(m_st1, 8) ? s32(s16(right_high_word)) : s32(right_high_word);
 		const s32 result_high = subtract_high ? left_high - right_high : left_high + right_high;
@@ -3022,6 +3023,7 @@ void tms320c54x_device::reset_pipeline()
 	m_pipeline_intm_protected.fill(false);
 	m_pipeline_direct_status.fill(0);
 	m_pipeline_alu_mode.fill(0);
+	m_pipeline_t.fill(0);
 	m_pipeline_cmpt.fill(false);
 	m_pipeline_bk.fill(0);
 	m_pipeline_direct_sp.fill(0);
@@ -3361,6 +3363,7 @@ void tms320c54x_device::pipeline_step()
 		m_pipeline_intm_protected[stage] = m_pipeline_intm_protected[stage - 1];
 		m_pipeline_direct_status[stage] = m_pipeline_direct_status[stage - 1];
 		m_pipeline_alu_mode[stage] = m_pipeline_alu_mode[stage - 1];
+		m_pipeline_t[stage] = m_pipeline_t[stage - 1];
 		m_pipeline_cmpt[stage] = m_pipeline_cmpt[stage - 1];
 		m_pipeline_bk[stage] = m_pipeline_bk[stage - 1];
 		m_pipeline_direct_sp[stage] = m_pipeline_direct_sp[stage - 1];
@@ -4214,7 +4217,10 @@ void tms320c54x_device::pipeline_step()
 		if (!extended && BIT(mode, 7)) indirect_modify(mode, false, 3);
 	}
 	if (m_pipeline_valid[4] && staged_delay_copy(m_pipeline_word[4]))
+	{
 		m_pipeline_operand[4] = pipeline_read_data(m_pipeline_operand_address[4]);
+		if (!BIT(m_pipeline_word[4], 8)) m_t = m_pipeline_operand[4]; // LTD publishes T at Read.
+	}
 	if (m_pipeline_valid[3] && staged_data_copy(m_pipeline_word[3]))
 	{
 		u8 const mode = m_pipeline_word[3];
@@ -4563,7 +4569,7 @@ void tms320c54x_device::pipeline_step()
 		}
 		if (mode != 0xf8 && BIT(mode, 7)) indirect_modify(mode, false, 3);
 	}
-	if (m_pipeline_valid[3] && (staged_dual_multiply(m_pipeline_word[3]) || staged_lms(m_pipeline_word[3]) || staged_dual_arithmetic(m_pipeline_word[3]) || staged_sqdst(m_pipeline_word[3])))
+	if (m_pipeline_valid[3] && (staged_dual_multiply(m_pipeline_word[3]) || staged_lms(m_pipeline_word[3]) || staged_dual_arithmetic(m_pipeline_word[3]) || staged_distance(m_pipeline_word[3])))
 	{
 		u8 const x = m_pipeline_word[3] >> 4, y = m_pipeline_word[3];
 		unsigned const xar = 2 + (x & 3), yar = 2 + (y & 3);
@@ -4580,7 +4586,7 @@ void tms320c54x_device::pipeline_step()
 		dual_modify(x, 3);
 		if (xar != yar) dual_modify(y, 3);
 	}
-	if (m_pipeline_valid[4] && (staged_dual_multiply(m_pipeline_word[4]) || staged_lms(m_pipeline_word[4]) || staged_dual_arithmetic(m_pipeline_word[4]) || staged_sqdst(m_pipeline_word[4])))
+	if (m_pipeline_valid[4] && (staged_dual_multiply(m_pipeline_word[4]) || staged_lms(m_pipeline_word[4]) || staged_dual_arithmetic(m_pipeline_word[4]) || staged_distance(m_pipeline_word[4])))
 	{
 		m_pipeline_operand[4] = pipeline_read_data(m_pipeline_operand_address[4]);
 		m_pipeline_immediate[4] = pipeline_read_data(m_pipeline_immediate[4]);
@@ -4727,6 +4733,7 @@ void tms320c54x_device::pipeline_step()
 		m_pipeline_operand[4] = m_io.read_word(m_pipeline_immediate[4]);
 	if (m_pipeline_valid[4] && (staged_dld(m_pipeline_word[4]) || staged_long_arithmetic(m_pipeline_word[4])))
 	{
+		m_pipeline_t[4] = m_t;
 		m_pipeline_operand[4] = pipeline_read_data(m_pipeline_operand_address[4]);
 		m_pipeline_immediate[4] = pipeline_read_data(m_pipeline_operand_address[4] ^ 1);
 	}
@@ -5202,7 +5209,7 @@ void tms320c54x_device::pipeline_step()
 		}
 		else if (staged_long_arithmetic(m_op))
 		{
-			long_word_arithmetic(m_op, m_pipeline_operand[5], m_pipeline_immediate[5]);
+			long_word_arithmetic(m_op, m_pipeline_operand[5], m_pipeline_immediate[5], m_pipeline_t[5]);
 			if (staged_extended_long_arithmetic(m_op)) ++m_pc;
 		}
 		else if (staged_dld(m_op))
@@ -5339,13 +5346,14 @@ void tms320c54x_device::pipeline_step()
 			data_write(m_pipeline_operand_address[5], m_pipeline_operand[5]);
 			m_observed_mvdd_write = false;
 		}
-		else if (staged_sqdst(m_op))
+		else if (staged_distance(m_op))
 		{
-			// SQDST squares old A before the vector subtraction replaces it.
+			// Both forms consume old A before the vector subtraction replaces it.
 			s64 const high = accumulator_high17(m_a);
-			s64 square = high * high;
-			if (BIT(m_st1, 6)) square *= 2;
-			m_b = multiply_result((s64(m_b << 24) >> 24) + multiply_product(square), true);
+			s64 distance = BIT(m_op, 8) ? (high < 0 ? -high : high) : high * high;
+			if (BIT(m_st1, 6)) distance *= 2;
+			m_b = BIT(m_op, 8) ? add_sub(m_b, u64(distance), false, true) :
+				multiply_result((s64(m_b << 24) >> 24) + multiply_product(distance), true);
 			s64 const x = BIT(m_st1, 8) ? s64(s16(m_pipeline_operand[5])) : s64(m_pipeline_operand[5]);
 			s64 const y = BIT(m_st1, 8) ? s64(s16(m_pipeline_immediate[5])) : s64(m_pipeline_immediate[5]);
 			m_a = add_sub(u64(x * 65536) & ACC_MASK, u64(y * 65536) & ACC_MASK, true, false);
@@ -5443,11 +5451,12 @@ void tms320c54x_device::pipeline_step()
 		{
 			u64 &destination = accumulator(BIT(m_op, 8));
 			bool const with_carry = (m_op & 0xfe00) == 0x0600;
+			bool const with_borrow = (m_op & 0xfe00) == 0x0e00;
 			bool const shift16 = (m_op & 0xfc00) == 0x3c00 || (m_op & 0xfc00) == 0x4000;
-			u64 const memory = with_carry || staged_unsigned_memory_arithmetic(m_op) ? m_pipeline_operand[5] : data_operand(m_pipeline_operand[5]);
-			// ADDC retains unsigned Smem in Read, but consumes the accumulator
+			u64 const memory = with_carry || with_borrow || staged_unsigned_memory_arithmetic(m_op) ? m_pipeline_operand[5] : data_operand(m_pipeline_operand[5]);
+			// ADDC/SUBB retain unsigned Smem in Read, but consume the accumulator
 			// and carry in Execute, including an adjacent ALU's carry output.
-			u64 const operand = with_carry ? memory + unsigned(BIT(m_st0, 11)) : staged_ts_arithmetic(m_op) ? shifted_by_t(m_pipeline_operand[5], m_pipeline_immediate[5]) : shift16 ? (memory << 16) & ACC_MASK : memory;
+			u64 const operand = with_carry ? memory + unsigned(BIT(m_st0, 11)) : with_borrow ? memory + unsigned(!BIT(m_st0, 11)) : staged_ts_arithmetic(m_op) ? shifted_by_t(m_pipeline_operand[5], m_pipeline_immediate[5]) : shift16 ? (memory << 16) & ACC_MASK : memory;
 			destination = (m_op & 0xfe00) == 0x1e00 ? conditional_subtract(destination, m_pipeline_operand[5], BIT(m_op, 8)) :
 				add_sub(shift16 ? accumulator(BIT(m_op, 9)) : destination, operand, shift16 ? (m_op & 0xfc00) == 0x4000 : BIT(m_op, 11), BIT(m_op, 8), shift16);
 			if (staged_extended_smem_arithmetic(m_op)) ++m_pc;
@@ -7081,7 +7090,7 @@ void tms320c54x_device::execute_one(u16 op)
 		const u16 low_word = data_read(address ^ 1);
 		if (low >= 0x80 && !extended && !preincrement)
 			indirect_modify(low, true);
-		long_word_arithmetic(op, high, low_word);
+		long_word_arithmetic(op, high, low_word, m_t);
 		m_icount -= extended;
 		return;
 	}

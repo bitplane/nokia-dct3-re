@@ -16,9 +16,9 @@ inline std::vector<clocked_register_case> section_cases()
 		initial.data.insert(initial.data.end(),extra.begin(),extra.end());
 		auto final = observation("fixed-A-B-T-carry-and-address-results",{{STATE_GENPC,0x602 + words.size()}});
 		final.expected.insert(final.expected.end(),expected.begin(),expected.end()); final.expected_data = initial.data;
-		clocked_register_case c{{{0,std::move(initial)},{1,observation("pre-arithmetic-snapshot",{{STATE_GENPC,0x601}})},
+		clocked_register_case c{{{0,std::move(initial)},{1,observation("pre-arithmetic-snapshot",{{STATE_GENPC,0x600}})},
 			{2,observation("arithmetic-running",{})},{32,std::move(final)}},1,32};
-		c.pipeline_frontend = false; c.data_events = std::vector<clocked_data_event>{{false,source,value,0,false}};
+		c.pipeline_frontend = true; c.data_events = std::vector<clocked_data_event>{{false,source,value,0,false}};
 		if (long_word) c.data_events->push_back({false,u32(source + 1),extra.front().value,0,false});
 		cases.push_back(std::move(c));
 	};

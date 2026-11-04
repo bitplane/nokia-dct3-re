@@ -178,7 +178,7 @@
   "load_t_multiply": 256,
   "square_literals": 6,
   "atomic_near_control": 10,
-  "long_literals": 33,
+  "long_literals": 34,
   "atomic_mac_literals": 39,
   "atomic_dual_address": 11,
   "atomic_parallel_literals": 10,

@@ -193,7 +193,7 @@ private:
 	u64 shifted_load(u64 source, int shift, bool destination_b);
 	u64 add_sub(u64 source, u64 operand, bool subtract, bool destination_b, bool partial_carry = false);
 	u64 conditional_subtract(u64 source, u16 memory, bool destination_b);
-	void long_word_arithmetic(u16 op, u16 high, u16 low_word);
+	void long_word_arithmetic(u16 op, u16 high, u16 low_word, u16 t);
 	void accumulator_memory_multiply(u16 op, u16 memory);
 	void polynomial_step(u16 memory, u16 t);
 	void square_accumulate_result(u16 word, u16 memory);
@@ -359,6 +359,7 @@ private:
 	std::array<bool, 6> m_pipeline_intm_protected = {};
 	std::array<u16, 6> m_pipeline_direct_status = {};
 	std::array<u16, 6> m_pipeline_alu_mode = {};
+	std::array<u16, 6> m_pipeline_t = {};
 	std::array<bool, 6> m_pipeline_cmpt = {};
 	std::array<u16, 6> m_pipeline_bk = {};
 	std::array<u16, 6> m_pipeline_direct_sp = {};

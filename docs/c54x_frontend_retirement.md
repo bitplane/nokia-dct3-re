@@ -15,8 +15,8 @@ through an expression: 241 lines and 39,048 cases. Counts describe entire
 sections, not atomic-only case counts. Helpers and firmware integration sources
 are additional migration work. The common case defaults to staged.
 
-Current validated progress: 78 sections (7,301 cases plus restores) migrated;
-59 of the original explicitly atomic sections remain. The baseline counts
+Current validated progress: 82 sections (7,484 cases plus restores) migrated;
+55 of the original explicitly atomic sections remain. The baseline counts
 describe the retirement scope, not the current number of atomic assignments.
 The seven originally paired sections are now staged-only: 24,040 cases remain
 from their 39,048-case baseline. Their original staged stimuli, assertions and
@@ -134,7 +134,17 @@ staged startup has drained. Sixteenth-clock observation timestamps are derived
 from 32 samples per divided CPU clock; the lock-edge check moves with the
 software-reentry stimulus, not with observed CPU results. Both frontends pass.
 
-### Unresolved migration contrasts
+`atomic_memory_literals`, `atomic_memory_arithmetic` and `long_literals` now
+run staged with their independent results and ordered memory events retained.
+ABDST shares the dual-read address ownership with SQDST; LTD shares DELAY's
+copy path and additionally publishes T at Read. SUBB retains an unsigned memory
+operand and consumes inverted carry at Execute. DADST/DSADT/DSUBT now use the
+shared long-word arithmetic semantics with a saved Read-owned T latch. The
+33 original long-word cases remain, with one additional T-poison/restore case.
+`arithmetic_boundaries` also retains all 80 ABDST/POLY boundary cases on staged,
+including fractional, saturation, overflow, sticky flags and old-source use.
+The four migrated sections pass 183 cases/restores and eight focused controls
+pass another 39,626. Host checks pass 354 CPU-tool and 84 runner tests.
 
 `atomic_product_literals`, `atomic_long_offset_literals` and `atomic_xorm`
 now select staged. Their long-offset word streams are corrected against an
@@ -149,6 +159,8 @@ The nine focused sections pass 43,584 cases plus restores; the 354 host tests,
 four atomic/staged EFR codec/replay profiles and ordinary 5110 menu/save gates
 also pass. This is selected regression evidence, not a full-suite certificate.
 
+### Unresolved migration contrasts
+
 `atomic_register_copy_sequences` remains atomic. It writes `7728` under the
 legacy default bus profile. A standard-SWWSR trial of the register-copy sequence
 passes admission but rejects simultaneous staged peripheral arbitration:
@@ -160,10 +172,8 @@ Further preserved atomic sections after isolated staged trials:
 
 | Section | First observed contrast | Follow-up |
 | --- | --- | --- |
-| `atomic_memory_arithmetic` | Case 1, `5aea 0006`, sets ILLEGAL | Audit extended two-word arithmetic admission |
 | `atomic_memory_address_literals` | Case 16, repeated ADD, sets ILLEGAL | Audit repeated-body admission and ownership |
 | `atomic_accumulator_calls` | Case 0 observes stack read `02ff=0602` at clock 15 rather than its retained bus sequence | Decode staged call/return ordering before retiming |
-| `atomic_memory_literals` | Case 0, ABDST, sets ILLEGAL after cold-Prefetch correction | Audit ABDST admission |
 | `atomic_zero_repeat` | Case 2 fetches `0602=f495` at clock 7 outside the expected sequence | Derive staged repeat-prefetch expectations |
 | `atomic_transfer_literals` | Case 13 reads `0d91=2222` as event 1 at clock 9 | Resolve transfer bus order |
 | `atomic_multiply_move_literals` | Case 6 reads mapped `0015=0000` as event 0 at clock 6 | Resolve mapped-source sampling |
@@ -188,7 +198,7 @@ Additional shared-contract queue (original atomic sections retained):
 - `repeat_status`: first case B is `4800`, expected `c800`; inspect repeat/status timing.
 - `block_repeat_control`: first case AR1 is 4, expected 1; inspect block endpoint/count behavior.
 - `zero_bk` case 144 and `indirect_popm` case 0 hit staged admission limits.
-- `clock_control`, `firs_sum`, `arithmetic_boundaries` (ABDST),
+- `clock_control`, `firs_sum`,
   `parallel_load_multiply` and `rounded_load` stop at ILLEGAL in their first case.
   Resolve instruction families/profile selection, not their literal results.
 
@@ -219,7 +229,7 @@ sections independently; do not run the complete suite after every edit.
 | `rounding` | 64 | 31 | Validated staged migration after RND/circular PORTW admission; assertions retained |
 | `square_difference` | 40 | 46 | Migrate independent assertions; check staged admission |
 | `firs_sum` | 32 | 35 | Migrate independent assertions; check staged admission |
-| `arithmetic_boundaries` | 80 | 47 | Migrate independent assertions; check staged admission |
+| `arithmetic_boundaries` | 80 | 47 | Staged validated; ABDST/POLY boundaries, flags and old-source assertions retained |
 | `conditional_accumulator_store` | 168 | 50 | Migrate independent assertions; check staged admission |
 | `rounded_multiply` | 104 | 67 | Migrate independent assertions; check staged admission |
 | `store_shift` | 120 | 41 | Migrate independent assertions; check staged admission |
@@ -242,7 +252,7 @@ sections independently; do not run the complete suite after every edit.
 | `atomic_subtract` | 384 | 53 | Migrate independent assertions; check staged admission |
 | `square_literals` | 6 | 38 | Validated staged migration; assertions retained |
 | `atomic_near_control` | 10 | 50 | Re-derive timing/order; retain assertions |
-| `long_literals` | 33 | 68 | Atomic retained; first staged contrast: C54x case literal-long-word-arithmetic/11: register 22 actual=1 expected=0 mask=ffffffffffffffff |
+| `long_literals` | 33 | 68 | Staged validated; all baseline cases plus one T-poison/replay check (34 current cases) |
 | `atomic_mac_literals` | 39 | 47 | Migrate independent assertions; check staged admission |
 | `atomic_dual_address` | 11 | 46 | Migrate independent assertions; check staged admission |
 | `atomic_parallel_literals` | 10 | 54 | Migrate independent assertions; check staged admission |
@@ -257,7 +267,7 @@ sections independently; do not run the complete suite after every edit.
 | `atomic_pending_far` | 2 | 38 | Migrate independent assertions; check staged admission |
 | `atomic_program_mapping` | 13 | 68 | Migrate independent assertions; check staged admission |
 | `coefficient_mac_literals` | 6 | 38 | Atomic retained; first staged contrast: C54x case MACP-coefficient-no-store/0: register 22 actual=1 expected=0 mask=ffffffffffffffff |
-| `atomic_memory_literals` | 24 | 91 | Migrate independent assertions; check staged admission |
+| `atomic_memory_literals` | 24 | 91 | Staged validated; ABDST/LTD/SUBB and original arithmetic/status/bus assertions retained |
 | `atomic_double_stores` | 8 | 40 | Migrate independent assertions; check staged admission |
 | `atomic_address_literals` | 4 | 33 | Migrate independent assertions; check staged admission |
 | `atomic_shifted_loads` | 7 | 36 | Migrate independent assertions; check staged admission |
@@ -291,7 +301,7 @@ sections independently; do not run the complete suite after every edit.
 | `atomic_single_slot_conditions` | 8 | 27 | Migrate independent assertions; check staged admission |
 | `atomic_memory_pairs` | 13 | 70 | Migrate independent assertions; check staged admission |
 | `atomic_memory_address_literals` | 28 | 84 | Migrate independent assertions; check staged admission |
-| `atomic_memory_arithmetic` | 45 | 97 | Migrate independent assertions; check staged admission |
+| `atomic_memory_arithmetic` | 45 | 97 | Staged validated; T-based long-word arithmetic and original literal/bus assertions retained |
 | `atomic_dual_arithmetic_literals` | 3 | 29 | Migrate independent assertions; check staged admission |
 | `atomic_coefficient_fir_literals` | 5 | 45 | Migrate independent assertions; check staged admission |
 | `atomic_dual_add_sub_literals` | 8 | 38 | Migrate independent assertions; check staged admission |

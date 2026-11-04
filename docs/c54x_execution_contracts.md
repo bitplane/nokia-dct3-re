@@ -1038,8 +1038,9 @@ operand access. The unchanged core fails the matrix's first atomic case at
 the no-data-transaction assertion. An older default fixture had incorrectly
 treated `4d9b` as a valid preincrement read; its positive control now uses
 legal long MOD=13, `4deb 0001`, preserving the distinct two-cycle contract.
-This is fail-closed source admission, not a silicon-trap claim or new positive
-staged LTD/long-DELAY support. MACP/MACD have the same explicit source
+This is fail-closed source admission, not a silicon-trap claim. Positive staged
+LTD/long-DELAY qualification is separately described under
+[successor memory copy](#staged-successor-memory-copy). MACP/MACD have the same explicit source
 guard; MVDK, MVDP, MVMD, PORTW and WRITA are covered by the central
 `execute_one` admission check. Destination-side transfers are distinct,
 as described below; the implicit write alone is not evidence of a missing
@@ -1067,7 +1068,7 @@ destination and must not inherit a read-only Smem restriction. In particular,
 source rejection. Xmem/Ymem have separate grammars. For `6fxx`, classify the
 operation extension before deciding source versus destination; shifted
 STL/STH remain unchanged. Rejection support does not imply positive staged
-support for ADC/SUBB, paired T variants or otherwise unsupported operations.
+support for unenumerated operations or compositions.
 MVDP's Smem is a data-memory **source** (SPRU172C p. 4-111), unlike
 MVPD and READA destinations. The atomic MVDP handler formerly admitted
 short `98..9f`, read data, advanced the AR and could write program memory.
@@ -3904,9 +3905,22 @@ and applies its pointer modifier in Access, samples one RAM word in Read,
 and writes that retained word to source+1 in Execute. It does not modify
 A/B, T/TRN or arithmetic flags. Compiler-mode DP/SP and compatibility ARP
 selection use the existing address-age model. Mapped operands and a source
-at `ffff` fail before reads, writes or pointer updates. LTD, longer address
-forms, repeat/block/XC composition and physical bus arbitration remain
-outside this qualification.
+at `ffff` fail before reads, writes or pointer updates.
+
+The same staged path now also handles LTD (`4cxx`), with T published at Read,
+and absolute/long-offset LTD/DELAY. The retained literal sections qualify
+stationary, postincrement, compiler-SP, absolute and long-offset successor
+copies with independent T, pointer and source/destination results. Their
+short matrix is not a full long-address matrix. Repeat/block/XC composition
+and physical bus arbitration remain outside this qualification.
+
+ABDST now shares SQDST's retained dual-source path. It adds the magnitude
+of old A's signed high-17 field to B (doubled under FRCT), then replaces A
+with `(X-Y)<<16`, with the documented status effects (SPRU172C page 4-2).
+Two retained literal cases include the TI example and its fractional contrast.
+SUBB retains unsigned Smem, then subtracts it plus inverted carry at Execute.
+DADST/DSADT/DSUBT use retained paired Reads and a separately saved T latch;
+all 33 long-word literals remain, plus one after-Read T-poison/replay check.
 
 `delay-copy` passes 15,360 cases and replays over DP/SP, indirect,
 postdecrement and postincrement, all eight AR selectors, eight patterns,
