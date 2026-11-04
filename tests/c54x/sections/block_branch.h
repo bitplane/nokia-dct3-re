@@ -48,6 +48,19 @@ inline std::vector<clocked_register_case> section_cases()
 		}
 		cases.push_back(std::move(c));
 	}
+	for (bool carry : {false,true}) for (bool inverted : {false,true}) for (u32 base : {0U,0x20000U}) {
+		// ROM4 EFR unpacking branches on carry inside RPTB. Both delay
+		// words execute, whether the in-block target is selected or not.
+		auto initial=initial_case("delayed-carry-branch-inside-block",{0xf072,0x60a,
+			u16(inverted ? 0xfa0c : 0xfa08),0x60a,0xe833,0xe944,0xe811,0xf495,0xf495,0xf495,0xe922,0xf4e1});
+		for (auto &word : initial.program) word.address+=base;
+		initial.initial.insert(initial.initial.end(),{{STATE_GENPC,base+0x600},{r::STATE_ST0,carry ? 0x800U : 0U},
+			{r::STATE_ST1,0x800},{r::STATE_BRC,1},{r::STATE_A,0},{r::STATE_B,0}});
+		bool const taken=carry==inverted;
+		auto final=observation("carry-selects-target-with-delay-words-retained",{{r::STATE_A,taken ? 0x33U : 0x11U},
+			{r::STATE_B,0x22},{r::STATE_BRC,0},{r::STATE_RSA,0x602},{r::STATE_REA,0x60a},{r::STATE_IDLE,1}});
+		cases.push_back({{{0,std::move(initial)},{100,std::move(final)}},8,100});
+	}
 	return cases;
 }
 }

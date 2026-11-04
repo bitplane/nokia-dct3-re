@@ -36,6 +36,21 @@ inline std::vector<clocked_register_case> section_cases()
 		}
 		cases.push_back(std::move(c));
 	}
+	for (unsigned checkpoint : {18U,22U,202U,206U}) {
+		auto initial=initial_case("two-interrupts-through-backward-IDLE-loop",{0xf4e1,0xf073,0x600});
+		initial.program.insert(initial.program.end(),{{0x40,0xf300},{0x41,1},{0x42,0xf4eb}});
+		initial.initial.insert(initial.initial.end(),{{r::STATE_ST1,0},{r::STATE_IMR,1},{r::STATE_SP,0x1000},{r::STATE_B,0}});
+		auto final=observation("both-receives-return-to-idle-with-no-pending-guard",{{r::STATE_IDLE,1},{r::STATE_ILLEGAL,0},
+			{r::STATE_SP,0x1000},{r::STATE_B,2},{r::STATE_IFR,0},{r::STATE_RTN,0x601}});
+		clocked_register_case c{{{0,std::move(initial)},{400,std::move(final)}},checkpoint,400};
+		c.initial_input_lines={{0,CLEAR_LINE}};
+		c.actions={{16,{},false,{},{{0,ASSERT_LINE},{0,CLEAR_LINE}}},
+			{200,{},false,{},{{0,ASSERT_LINE},{0,CLEAR_LINE}}}};
+		c.data_events=std::vector<clocked_data_event>{{true,0xfff,0x601,0,false},{false,0xfff,0x601,0,false},
+			{true,0xfff,0x601,0,false},{false,0xfff,0x601,0,false}};
+		c.irqs={{0,0,~0U,0,0x601},{0,0,~0U,2,0x601}};
+		cases.push_back(std::move(c));
+	}
 	return cases;
 }
 }

@@ -76,6 +76,15 @@ pass. This is selected regression coverage, not a complete CPU-suite renewal.
 
 ### Harness contract
 
+An IDLE Decode guard belongs only to that instruction. An older backward branch
+can retire while its target IDLE decodes; numeric address proximity does not make
+the branch part of the younger guard. Its retirement must neither underflow nor
+consume that one-word guard. `idle_wake` checks two IRQ/RETE cycles through an
+IDLE/backward-branch loop, including restoration during either interrupt entry.
+Delayed C/NC branches are admitted within a block repeat when both delay words
+and the target remain inside the block, with polarity/carry/page contrasts in
+`block_branch` and original EFR packing/unpacking coverage.
+
 Each section owns explicit setup, independently justified expectations and
 replay. Shared helpers load memory, observe buses and serialize state; they do
 not call CPU implementation helpers to derive expected results.

@@ -776,19 +776,6 @@ u16 tms320c54x_test_state::rom4_loader_entry_r()
 			u16(m_cpu->state_int(tms320c54x_device::STATE_PMST)), (unsigned long long)m_cpu->pipeline_cycles());
 		throw emu_fatalerror(0, "TMS320C54x ROM4 staged cold frontier complete");
 	}
-	if (m_phase == 4 && !machine().side_effects_disabled())
-	{
-		// Stop at the absent loader's fetch, not at an unsupported opcode:
-		// zero is a valid ADD instruction and must not serve as a sentinel.
-		expect(word == 0 && m_cpu->state_int(tms320c54x_device::STATE_PC) == 0x0f01,
-			"ROM4 cold fetch reaches the unpopulated MCU-uploaded loader");
-		osd_printf_info("TMS320C54x ROM4 cold frontier: pc=%04x sp=%04x pmst=%04x idle=%u\n",
-			u16(m_cpu->state_int(tms320c54x_device::STATE_PC)),
-			u16(m_cpu->state_int(tms320c54x_device::STATE_SP)),
-			u16(m_cpu->state_int(tms320c54x_device::STATE_PMST)),
-			unsigned(m_cpu->state_int(tms320c54x_device::STATE_IDLE)));
-		throw emu_fatalerror(0, "TMS320C54x ROM4 cold frontier complete");
-	}
 	return word;
 }
 
@@ -1411,23 +1398,6 @@ bool tms320c54x_test_state::check_rom4_crc_input_results()
 		}
 		expect(++m_rom4_checks < 10000, "Staged ROM4 cold execution timeout");
 		m_check_timer->adjust(attotime::from_usec(100)); return true;
-	}
-	if (m_phase == 4)
-	{
-		if (!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) &&
-				!m_cpu->state_int(tms320c54x_device::STATE_IDLE))
-		{
-			expect(++m_rom4_checks < 10000, "ROM4 cold execution timeout");
-			m_check_timer->adjust(attotime::from_usec(100));
-			return true;
-		}
-		osd_printf_info("TMS320C54x ROM4 cold frontier: pc=%04x sp=%04x "
-				"pmst=%04x idle=%u\n",
-				u16(m_cpu->state_int(tms320c54x_device::STATE_PC)),
-				u16(m_cpu->state_int(tms320c54x_device::STATE_SP)),
-				u16(m_cpu->state_int(tms320c54x_device::STATE_PMST)),
-				unsigned(m_cpu->state_int(tms320c54x_device::STATE_IDLE)));
-		expect(false, "ROM4 cold execution stopped before the loader-entry fetch");
 	}
 	if (m_phase == 2)
 	{

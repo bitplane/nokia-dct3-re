@@ -16,6 +16,7 @@ void tms320c54x_test_state::machine_start()
 
 void tms320c54x_test_state::machine_reset()
 {
+	m_cpu->set_pipeline_frontend(true);
 	m_result_owner=nullptr;
 	m_context_coverage={};
 	if(profile_is("rom4-context")){m_result_owner=&tms320c54x_test_state::check_rom4_context_results;start_pipeline_mu4_prologue();return;}
@@ -115,9 +116,7 @@ void tms320c54x_test_state::machine_reset()
 	if (!strcmp(machine().system().name, "tms54rom4") &&
 			(profile_is("cold") || profile_is("cold-pipeline")))
 	{
-		bool const staged = profile_is("cold-pipeline");
-		m_phase = staged ? rom4_staged_cold_phase : 4;
-		if (staged) m_cpu->set_pipeline_frontend(true);
+		m_phase = rom4_staged_cold_phase;
 		m_rom4_checks = 0;
 		m_check_timer->adjust(attotime::from_usec(100));
 		return;

@@ -91,8 +91,11 @@ Validate ordinary boot/menu, codecs, peripheral/audio integration, power/reset
 and save/restore without inheriting unrelated research overrides.
 Other HLE-backed products do not establish native DSP parity.
 
-Atomic comparison aliases and the cold/MU4 laboratory defaults are still live
-reference consumers. Generic-section migration does not qualify those full
+Atomic comparison aliases and the MU4 laboratory defaults are still live
+reference consumers. ROM4 integration now selects staged at reset for ordinary
+profile names as well as the retained `-pipe` aliases. Both cold names use the
+same mask-only Prefetch assertion; the unreachable atomic cold phase is removed.
+Generic-section migration does not qualify those full
 firmware applications on staged. Stage 4 must promote their required contracts
 or retire comparison-only entry points before removing the engine; do not infer
 that deleting the unit-test dimension alone makes that deletion safe.
@@ -115,6 +118,29 @@ execution continuations; each successor reinitializes staged before scheduling
 CPU time. They are removed rather than counted as eight migrated code paths.
 Benchmark tools, machine registrations,
 gates and documentation also expose frontend variants.
+
+### Stage 4 firmware qualification
+
+Ordinary ROM4 entry and cold boot, CRC helper (512 cases), packed CRC (516),
+FR packing (293), EFR CRC (554), EFR packing (277 vectors with round-trip and
+corruption checks), FR decoder (32 frames plus replay) and FR encoder (32 frames
+plus replay and eight PCM-mute cases) pass on staged. EFR unpacking required
+admitting delayed C/NC branches whose targets and complete delay span remain
+inside the active block. `block_branch` retains eight new carry/polarity/page
+contrasts (392 current cases).
+
+A backward branch can retire beside its target IDLE's Decode. It must not
+consume that younger one-word control guard merely because its numeric address
+is nearby. Control-word subtraction is bounded, and IDLE's guard belongs only
+to IDLE itself. `idle_wake` adds two receive interrupts through the backward
+IDLE loop with four replay checkpoints (ten current cases). MU4's original
+two-word serial receive/ring assertion passes this boundary; full MU4
+application qualification remains separate from that focused result.
+
+These twelve added cases change the current catalogue from the step-3 snapshot;
+the complete step-3 acceptance above is not a renewed full-suite claim for this
+source revision. Atomic scheduling/state remains until the remaining firmware
+consumers are qualified or their redundant comparison entry points retired.
 
 ## Section work queue
 

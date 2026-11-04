@@ -3935,7 +3935,7 @@ void tms320c54x_device::pipeline_step()
 			m_pipeline_address[2] + 1 < m_pipeline_block_end_address && block_branch_target > m_pipeline_block_end_address;
 		bool const delayed_forward_block_exit = (word == 0xf273 || (staged_accumulator_branch(word) && !staged_conditional_call(word) && BIT(word, 9))) &&
 			m_pipeline_address[2] + 3 < m_pipeline_block_end_address && block_branch_target > m_pipeline_block_end_address;
-		bool const internal_delayed_block_branch = (word == 0xf273 || ((staged_accumulator_branch(word) || staged_tc_branch(word)) && !staged_conditional_call(word) && BIT(word, 9))) &&
+		bool const internal_delayed_block_branch = (word == 0xf273 || ((staged_accumulator_branch(word) || staged_tc_branch(word) || (word & 0xfdfb) == 0xf808) && !staged_conditional_call(word) && BIT(word, 9))) &&
 			m_pipeline_address[2] + 3 < m_pipeline_block_end_address && block_branch_target >= m_pipeline_block_start && block_branch_target <= m_pipeline_block_end_address;
 		u32 const far_call_target = (u32(word & 0x7f) << 16) | m_pipeline_operand[2];
 		bool const block_far_call = staged_far_call(word) &&
@@ -5773,11 +5773,13 @@ void tms320c54x_device::pipeline_step()
 				younger_xc |= m_pipeline_valid[stage] && staged_xc(m_pipeline_word[stage]);
 			if (!younger_xc) m_pipeline_xc_active = false;
 		}
+		// A backward branch can retire alongside its target IDLE's Decode.
+		// That older branch must not consume the younger one-word guard.
 		if (m_pipeline_control_words && (address & 0x7f0000) == (m_pipeline_control_address & 0x7f0000) &&
-			u16(address - m_pipeline_control_address) <= 3)
+			(address == m_pipeline_control_address || (!staged_idle(m_pipeline_control_word) && u16(address - m_pipeline_control_address) <= 3)))
 		{
 			unsigned const words = (staged_opcode_descriptor[m_op] >> 2) & 3;
-			m_pipeline_control_words -= words;
+			m_pipeline_control_words = words >= m_pipeline_control_words ? 0 : m_pipeline_control_words - words;
 		}
 		if (m_pipeline_vector_pending && u16(address) == m_interrupt_vector_pc)
 			m_pipeline_vector_pending = false;

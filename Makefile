@@ -1159,7 +1159,7 @@ check-mu4-storage-original: build
 		$(PYTHON) tools/noki5510_a00_inventory.py roms/5510-mu4-reference/initdisk_R060.a00 \
 			--extract-section 0x80 --output "$$tmp/roms/mu4nand/mu4_initdisk_vectors.bin"; \
 		cd "$$tmp"; $(abspath $(MAME_DIR)/mame) mu4nand -rompath "$$tmp/roms" \
-			-video none -sound none -nothrottle -debugger none -log \
+			$(NATIVE_HEADLESS_OPTIONS) -video none -sound none -nothrottle -debugger none -log \
 			$(if $(MU4_STORAGE_NVRAM_DIR),-nvram_directory "$(abspath $(MU4_STORAGE_NVRAM_DIR))" -nvram_save,-nonvram_save) \
 			-bios $(or $(MU4_STORAGE_BIOS),setup) -seconds_to_run $(MU4_STORAGE_SECONDS) >output.log 2>&1 || { cat output.log; cat error.log; exit 1; }; \
 		cat output.log; cat error.log; grep -q 'mu4_storage_original: PASS' error.log; \
@@ -1562,16 +1562,16 @@ prepare-c54x-rom4-fixture:
 check-c54x-rom4-execute: build prepare-c54x-rom4-fixture
 	@set -eu; mkdir -p "$(NATIVE_SCRATCH_ROOT)"; tmp="$$(mktemp -d "$(NATIVE_SCRATCH_ROOT)/rom4-execute.XXXXXX")"; \
 		cd "$$tmp"; $(abspath $(MAME_DIR)/mame) tms54rom4 -rompath $(abspath $(MAME_DIR)/roms) -video none -sound none \
-			-nothrottle -seconds_to_run 1 >output.log 2>&1 || { status=$$?; test "$$status" -eq 3; }; \
+			$(NATIVE_HEADLESS_OPTIONS) -nothrottle -seconds_to_run 1 >output.log 2>&1 || { status=$$?; test "$$status" -eq 3; }; \
 		cat output.log; grep -q "TMS320C54x ROM4 execution frontier: pc=7eca" output.log; \
 		grep -q "TMS320C54x ROM4 frontier complete" output.log
 
 check-c54x-rom4-cold-execute: build prepare-c54x-rom4-fixture
 	@set -eu; mkdir -p "$(NATIVE_SCRATCH_ROOT)"; tmp="$$(mktemp -d "$(NATIVE_SCRATCH_ROOT)/rom4-cold-execute.XXXXXX")"; \
 		cd "$$tmp"; $(abspath $(MAME_DIR)/mame) tms54rom4 -bios cold -rompath $(abspath $(MAME_DIR)/roms) -video none -sound none \
-			-nothrottle -seconds_to_run 1 >output.log 2>&1 || { status=$$?; test "$$status" -eq 3; }; \
-		cat output.log; grep -q "TMS320C54x ROM4 cold frontier: pc=0f01 sp=0000 pmst=ffa8 idle=0" output.log; \
-		grep -q "TMS320C54x ROM4 cold frontier complete" output.log
+			$(NATIVE_HEADLESS_OPTIONS) -nothrottle -seconds_to_run 1 >output.log 2>&1 || { status=$$?; test "$$status" -eq 3; }; \
+		cat output.log; grep -q "TMS320C54x ROM4 staged cold frontier: fetch=000f00 pc=0f01 sp=0000 pmst=ffa8 cycles=12" output.log; \
+		grep -q "TMS320C54x ROM4 staged cold frontier complete" output.log
 
 .PHONY: check-c54x-rom4-counter-observe
 check-c54x-rom4-counter-observe: build
