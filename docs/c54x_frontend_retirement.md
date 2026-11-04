@@ -15,8 +15,8 @@ through an expression: 241 lines and 39,048 cases. Counts describe entire
 sections, not atomic-only case counts. Helpers and firmware integration sources
 are additional migration work. The common case defaults to staged.
 
-Current validated progress: 45 sections (5,960 cases plus restores) migrated;
-92 of the original explicitly atomic sections remain. The baseline counts
+Current validated progress: 57 sections (6,777 cases plus restores) migrated;
+80 of the original explicitly atomic sections remain. The baseline counts
 describe the retirement scope, not the current number of atomic assignments.
 
 ## Disposition rules
@@ -111,6 +111,10 @@ Also migrated without semantic assertion changes: `signed_conditions`,
 `conditional_accumulator_store`, `rounded_multiply`, `store_shift`,
 `smul_control`, `bit_immediate`, `shifted_high_store` and `offset_memory_test`.
 
+The overflow-branch section now uses staged Read-clock observations (clock 6),
+not atomic clock 1. Its original flag results, including delay-slot flag changes,
+pass unchanged. See TI SPRU131G, ST0 overflow flags and chapter 7 pipeline rules.
+
 ### Unresolved migration contrasts
 
 `atomic_product_literals` remains atomic: after accounting for cold Prefetch,
@@ -146,7 +150,6 @@ Further preserved atomic sections after isolated staged trials:
 | `atomic_coefficient_fir_literals` | Case 0, MACP `788b`, sets ILLEGAL | Audit program-coefficient multiply admission |
 | `atomic_stack_literals` | Case 2 reads `0061=abcd` as event 1 at clock 7 | Resolve stack operand sampling/order |
 | `atomic_mapped_moves` | Case 2, MVMD/DAR progression, sets ILLEGAL | Audit mapped-move destination admission |
-| `atomic_overflow_branch` | Case 8 ST0 is `1c05` rather than `1805` | Resolve overflow-test flag consumption |
 | `atomic_delayed_call` | Case 4 sets ILLEGAL | Audit delayed-call composition admission |
 | `atomic_near_control` | Case 9 reads `0063=5678` as event 1 at clock 7 | Resolve near-control operand order |
 | `atomic_far_edges` | Case 2, FBACCD, sets ILLEGAL after cold-PC correction | Audit accumulator far-branch admission |
@@ -177,7 +180,7 @@ sections independently; do not run the complete suite after every edit.
 | `xc_status` | 64 | 30 | Trim paired dimension; preserve staged contrasts |
 | `xc_latency` | 384 | 46 | Trim paired dimension; preserve staged contrasts |
 | `atomic_conditional_return` | 96 | 33 | Re-derive timing/order; retain assertions |
-| `atomic_overflow_branch` | 32 | 31 | Migrate independent assertions; check staged admission |
+| `atomic_overflow_branch` | 32 | 31 | Validated staged migration; assertions retained |
 | `carry_branch` | 8 | 26 | Migrate independent assertions; check staged admission |
 | `repeat_status` | 1 | 14 | Re-derive timing/order; retain assertions |
 | `atomic_delayed_call` | 9 | 32 | Re-derive timing/order; retain assertions |
@@ -202,20 +205,20 @@ sections independently; do not run the complete suite after every edit.
 | `rounded_load` | 64 | 29 | Migrate independent assertions; check staged admission |
 | `shifted_high_store` | 128 | 27 | Migrate independent assertions; check staged admission |
 | `offset_memory_test` | 8 | 24 | Migrate independent assertions; check staged admission |
-| `software_interrupt` | 128 | 35 | Re-derive timing/order; retain assertions |
-| `compact_load` | 28 | 32 | Migrate independent assertions; check staged admission |
-| `stack_address_dependency` | 24 | 33 | Migrate independent assertions; check staged admission |
-| `transition_register` | 20 | 40 | Migrate independent assertions; check staged admission |
-| `compact_store` | 640 | 43 | Migrate independent assertions; check staged admission |
-| `reverse_carry` | 2,690 | 46 | Migrate independent assertions; check staged admission |
-| `interrupt_entry` | 12 | 53 | Re-derive timing/order; retain assertions |
+| `software_interrupt` | 128 | 35 | Atomic retained; first staged contrast: C54x case software-interrupt/64: register 22 actual=1 expected=0 mask=ffffffffffffffff |
+| `compact_load` | 28 | 32 | Validated staged migration; assertions retained |
+| `stack_address_dependency` | 24 | 33 | Validated staged migration; assertions retained |
+| `transition_register` | 20 | 40 | Atomic retained; first staged contrast: C54x case=0 event=0 write=0 address=f value=abcd clock=7 |
+| `compact_store` | 640 | 43 | Validated staged migration; assertions retained |
+| `reverse_carry` | 2,690 | 46 | Atomic retained; first staged contrast: C54x case reverse-carry-address/1: register 22 actual=1 expected=0 mask=ffffffffffffffff |
+| `interrupt_entry` | 12 | 53 | Atomic retained; first staged contrast: C54x case=0 event=1 write=0 address=700 value=0 clock=15 |
 | `atomic_xorm` | 256 | 33 | Migrate independent assertions; check staged admission |
-| `scalar_boundaries` | 34 | 66 | Migrate independent assertions; check staged admission |
-| `atomic_repeat_irq` | 2 | 34 | Re-derive timing/order; retain assertions |
+| `scalar_boundaries` | 34 | 66 | Validated staged migration; assertions retained |
+| `atomic_repeat_irq` | 2 | 34 | Atomic retained; first staged contrast: C54x case atomic-repeat-pending-IRQ/0: register 22 actual=1 expected=0 mask=ffffffffffffffff |
 | `atomic_subtract` | 384 | 53 | Migrate independent assertions; check staged admission |
-| `square_literals` | 6 | 38 | Migrate independent assertions; check staged admission |
+| `square_literals` | 6 | 38 | Validated staged migration; assertions retained |
 | `atomic_near_control` | 10 | 50 | Re-derive timing/order; retain assertions |
-| `long_literals` | 33 | 68 | Migrate independent assertions; check staged admission |
+| `long_literals` | 33 | 68 | Atomic retained; first staged contrast: C54x case literal-long-word-arithmetic/11: register 22 actual=1 expected=0 mask=ffffffffffffffff |
 | `atomic_mac_literals` | 39 | 47 | Migrate independent assertions; check staged admission |
 | `atomic_dual_address` | 11 | 46 | Migrate independent assertions; check staged admission |
 | `atomic_parallel_literals` | 10 | 54 | Migrate independent assertions; check staged admission |
@@ -229,7 +232,7 @@ sections independently; do not run the complete suite after every edit.
 | `atomic_fast_return` | 1 | 26 | Re-derive timing/order; retain assertions |
 | `atomic_pending_far` | 2 | 38 | Migrate independent assertions; check staged admission |
 | `atomic_program_mapping` | 13 | 68 | Migrate independent assertions; check staged admission |
-| `coefficient_mac_literals` | 6 | 38 | Migrate independent assertions; check staged admission |
+| `coefficient_mac_literals` | 6 | 38 | Atomic retained; first staged contrast: C54x case MACP-coefficient-no-store/0: register 22 actual=1 expected=0 mask=ffffffffffffffff |
 | `atomic_memory_literals` | 24 | 91 | Migrate independent assertions; check staged admission |
 | `atomic_double_stores` | 8 | 40 | Migrate independent assertions; check staged admission |
 | `atomic_address_literals` | 4 | 33 | Migrate independent assertions; check staged admission |
@@ -238,12 +241,12 @@ sections independently; do not run the complete suite after every edit.
 | `atomic_mapped_moves` | 4 | 36 | Migrate independent assertions; check staged admission |
 | `atomic_memory_tests` | 10 | 44 | Migrate independent assertions; check staged admission |
 | `atomic_zero_repeat` | 3 | 26 | Re-derive timing/order; retain assertions |
-| `atomic_program_transfers` | 8 | 46 | Migrate independent assertions; check staged admission |
-| `atomic_conditional_repeat` | 4 | 32 | Re-derive timing/order; retain assertions |
+| `atomic_program_transfers` | 8 | 46 | Validated staged migration; assertions retained |
+| `atomic_conditional_repeat` | 4 | 32 | Atomic retained; first staged contrast: C54x case RPT-memory-count-sampled-once/2: register 22 actual=1 expected=0 mask=ffffffffffffffff |
 | `atomic_transfer_literals` | 34 | 85 | Migrate independent assertions; check staged admission |
-| `atomic_mmr_burst` | 2 | 43 | Migrate independent assertions; check staged admission |
-| `atomic_memory_sequences` | 3 | 40 | Migrate independent assertions; check staged admission |
-| `atomic_absolute_literals` | 30 | 78 | Migrate independent assertions; check staged admission |
+| `atomic_mmr_burst` | 2 | 43 | Atomic retained; first staged contrast: C54x case MMR-burst-initialize-and-push/0: register 22 actual=1 expected=0 mask=ffffffffffffffff |
+| `atomic_memory_sequences` | 3 | 40 | Validated staged migration; assertions retained |
+| `atomic_absolute_literals` | 30 | 78 | Atomic retained; first staged contrast: C54x case TCR-store-readback/17: register 22 actual=1 expected=0 mask=ffffffffffffffff |
 | `atomic_condition_edges` | 6 | 30 | Migrate independent assertions; check staged admission |
 | `atomic_alu_store_literals` | 8 | 37 | Migrate independent assertions; check staged admission |
 | `atomic_high_store_literals` | 5 | 28 | Migrate independent assertions; check staged admission |
@@ -253,13 +256,13 @@ sections independently; do not run the complete suite after every edit.
 | `atomic_logic_program_literals` | 5 | 40 | Migrate independent assertions; check staged admission |
 | `atomic_accumulator_add_literals` | 7 | 31 | Migrate independent assertions; check staged admission |
 | `atomic_multiply_move_literals` | 7 | 59 | Migrate independent assertions; check staged admission |
-| `atomic_conditional_slot_literals` | 10 | 55 | Migrate independent assertions; check staged admission |
+| `atomic_conditional_slot_literals` | 10 | 55 | Validated staged migration; assertions retained |
 | `atomic_mapped_load_sequences` | 4 | 53 | Migrate independent assertions; check staged admission |
 | `atomic_register_copy_sequences` | 4 | 43 | Migrate independent assertions; check staged admission |
 | `atomic_guard_conditions` | 18 | 41 | Migrate independent assertions; check staged admission |
 | `atomic_memory_alu_literals` | 9 | 40 | Migrate independent assertions; check staged admission |
 | `atomic_mmr_transfer_literals` | 4 | 45 | Migrate independent assertions; check staged admission |
-| `atomic_transfer_repeat_literals` | 265 | 55 | Re-derive timing/order; retain assertions |
+| `atomic_transfer_repeat_literals` | 265 | 55 | Atomic retained; first staged contrast: C54x case RPT-every-eight-bit-count-with-MAR-body/9: register 22 actual=1 expected=0 mask=ffffffffffffffff |
 | `atomic_status_xf` | 8 | 29 | Migrate independent assertions; check staged admission |
 | `atomic_single_slot_conditions` | 8 | 27 | Migrate independent assertions; check staged admission |
 | `atomic_memory_pairs` | 13 | 70 | Migrate independent assertions; check staged admission |
@@ -270,12 +273,12 @@ sections independently; do not run the complete suite after every edit.
 | `atomic_dual_add_sub_literals` | 8 | 38 | Migrate independent assertions; check staged admission |
 | `atomic_immediate_product_literals` | 11 | 41 | Migrate independent assertions; check staged admission |
 | `atomic_asm_arithmetic` | 523 | 51 | Migrate independent assertions; check staged admission |
-| `atomic_basic_repeat_sequences` | 5 | 54 | Re-derive timing/order; retain assertions |
-| `atomic_basic_control_sequences` | 13 | 53 | Re-derive timing/order; retain assertions |
-| `atomic_basic_alu_control` | 10 | 49 | Re-derive timing/order; retain assertions |
-| `atomic_basic_parallel_block` | 9 | 51 | Migrate independent assertions; check staged admission |
+| `atomic_basic_repeat_sequences` | 5 | 54 | Atomic retained; first staged contrast: C54x case basic-repeat-and-transfer-sequences/0: register 22 actual=1 expected=0 mask=ffffffffffffffff |
+| `atomic_basic_control_sequences` | 13 | 53 | Validated staged migration; assertions retained |
+| `atomic_basic_alu_control` | 10 | 49 | Validated staged migration; assertions retained |
+| `atomic_basic_parallel_block` | 9 | 51 | Validated staged migration; assertions retained |
 | `atomic_accumulator_calls` | 3 | 31 | Re-derive timing/order; retain assertions |
-| `atomic_bus_timing` | 3 | 37 | Re-derive timing/order; retain assertions |
+| `atomic_bus_timing` | 3 | 37 | Atomic retained; first staged contrast: Section IRQ case=0 line=2 clock=15 data_events=3 previous_case=0 return_pc=0701 |
 | `atomic_port_timing` | 15 | 65 | Re-derive timing/order; retain assertions |
 | `atomic_mac_saturation` | 7 | 44 | Migrate independent assertions; check staged admission |
 | `atomic_port_marked_operations` | 22 | 83 | Re-derive timing/order; retain assertions |

@@ -44,9 +44,9 @@ inline std::vector<clocked_register_case> section_cases()
 			program = {{true,0x940,0xaaaa,0,false},{true,0x941,0xbbbb,0,false}};
 		}
 		if (variant == 10) final.expected.push_back({r::STATE_ST1,1,0x1f});
-		clocked_register_case c{{{0,std::move(initial)},{1,observation("pre-basic-operation-snapshot",{{STATE_GENPC,0x601}})},
+		clocked_register_case c{{{0,std::move(initial)},{1,observation("pre-basic-operation-snapshot",{{STATE_GENPC,0x600}})},
 			{2,observation("basic-operation-running",{})},{96,std::move(final)}},1,96};
-		c.pipeline_frontend = false; c.data_events = std::move(data); c.program_events = std::move(program); cases.push_back(std::move(c));
+		c.pipeline_frontend = true; c.data_events = std::move(data); c.program_events = std::move(program); cases.push_back(std::move(c));
 	}
 	return cases;
 }

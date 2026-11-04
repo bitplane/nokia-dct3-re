@@ -18,9 +18,10 @@ inline std::vector<clocked_register_case> section_cases()
 		initial.program.insert(initial.program.end(), {{0x700,0xe822},{0x701,0xf4e1}});
 		initial.initial.push_back({r::STATE_ST0,status});
 		clocked_register_case c{{{0,std::move(initial)}},(flags + accumulator + polarity + delayed) & 1 ? 3U : 1U,32};
-		c.pipeline_frontend = false;
-		c.states.push_back({1,observation("selected-overflow-consumed", {{r::STATE_ST0,unsigned(status & ~mask)}})});
-		c.states.push_back({2,observation("retained-transfer", {})});
+		c.pipeline_frontend = true;
+		// Two-word BC/BCD reaches Read at clock 6 from cold Prefetch.
+		c.states.push_back({6,observation("selected-overflow-consumed", {{r::STATE_ST0,unsigned(status & ~mask)}})});
+		c.states.push_back({7,observation("retained-transfer", {})});
 		c.states.push_back({32,observation("flag-changing-delay", {{r::STATE_A,taken ? 0x22U : 0x11U},{r::STATE_B,slots ? 0x55U : 0U},
 			{STATE_GENPC,taken ? 0x702U : 0x606U},{r::STATE_ST0,unsigned((status & ~mask) | (slots ? mask : 0))},{r::STATE_SP,0x1000}})});
 		c.data_events = std::vector<clocked_data_event>{};
