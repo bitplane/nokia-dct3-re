@@ -2420,6 +2420,18 @@ older pending pops have read their operands: REA/RSA/BRC are then at
 SP+2..4, not SP..2. That observation must not be diagnosed as a corrupt
 saved frame without accounting for the older pipeline slots.
 
+### Physical BIO predicate ownership
+
+BIO/NBIO predicates are also admitted for conditional calls, returns and XC.
+Calls/returns sample the physical line once in Read; XC samples once in Access,
+matching the existing owners for their other predicates. `bio_atomic` retains
+all 28 opcode/level contrasts and its physical polling case on staged. The
+polling test changes the pin at clock 13, checks Read samples at 7/12/17,
+and observes two taken logical BC executions followed by the untaken BC,
+the real load and IDLE. This replaces an atomic in-flight PC convention;
+final PC, stack, selected values, delay effects and replay remain checked.
+These stage clocks are model contracts, not measured silicon timing.
+
 ### Delayed conditional calls
 
 CCD admits AGEQ/ALT/ANEQ/AEQ/AGT/ALEQ and their B equivalents. SPRU172C

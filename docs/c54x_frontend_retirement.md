@@ -15,8 +15,8 @@ through an expression: 241 lines and 39,048 cases. Counts describe entire
 sections, not atomic-only case counts. Helpers and firmware integration sources
 are additional migration work. The common case defaults to staged.
 
-Current validated progress: 92 sections (10,286 cases plus restores) migrated;
-45 of the original explicitly atomic sections remain. The baseline counts
+Current validated progress: 94 sections (10,349 cases plus restores) migrated;
+43 of the original explicitly atomic sections remain. The baseline counts
 describe the retirement scope, not the current number of atomic assignments.
 The seven originally paired sections are now staged-only: 24,040 cases remain
 from their 39,048-case baseline. Their original staged stimuli, assertions and
@@ -185,6 +185,16 @@ input after cold startup reaches IDLE, not during Prefetch. Its expected frame
 and ISR behavior are unchanged. Thirteen focused sections pass 24,171
 cases/restores; host CPU-tool checks pass 354 tests.
 
+`bio_atomic` now runs all 29 cases on staged. BIO/NBIO CC, RC/RCD and XC
+use their existing predicate owners (Read for calls/returns, Access for XC),
+with one physical sample per decision. Its polling case retains the original
+pin change at clock 13 and final state, but replaces an atomic transient PC
+assertion with the logical Execute sequence and Read samples at 7/12/17.
+`atomic_transfer_literals` retains all 34 cases, including three-copy MVKD/MVDK
+streams with one-clock cadence and younger-read/older-write overlap explicit.
+Seven BIO/control/admission sections pass 24,709 cases/restores, and the
+transfer section passes another 34; host CPU-tool checks pass 354 tests.
+
 ### Unresolved migration contrasts
 
 `atomic_register_copy_sequences` remains atomic. It writes `7728` under the
@@ -200,7 +210,6 @@ Further preserved atomic sections after isolated staged trials:
 | --- | --- | --- |
 | `atomic_memory_address_literals` | Case 16, repeated ADD, sets ILLEGAL | Audit repeated-body admission and ownership |
 | `atomic_zero_repeat` | Case 2 fetches `0602=f495` at clock 7 outside the expected sequence | Derive staged repeat-prefetch expectations |
-| `atomic_transfer_literals` | Case 13 reads `0d91=2222` as event 1 at clock 9 | Resolve transfer bus order |
 | `atomic_multiply_move_literals` | Case 6 reads mapped `0015=0000` as event 0 at clock 6 | Resolve mapped-source sampling |
 | `atomic_coefficient_fir_literals` | Case 0, MACP `788b`, sets ILLEGAL | Audit program-coefficient multiply admission |
 | `atomic_mapped_moves` | Case 2, MVMD/DAR progression, sets ILLEGAL | Audit mapped-move destination admission |
@@ -295,7 +304,7 @@ sections independently; do not run the complete suite after every edit.
 | `atomic_zero_repeat` | 3 | 26 | Re-derive timing/order; retain assertions |
 | `atomic_program_transfers` | 8 | 46 | Validated staged migration; assertions retained |
 | `atomic_conditional_repeat` | 4 | 32 | Atomic retained; first staged contrast: C54x case RPT-memory-count-sampled-once/2: register 22 actual=1 expected=0 mask=ffffffffffffffff |
-| `atomic_transfer_literals` | 34 | 85 | Migrate independent assertions; check staged admission |
+| `atomic_transfer_literals` | 34 | 85 | Staged validated; repeated-copy cadence/interleaving explicit; values and counts retained |
 | `atomic_mmr_burst` | 2 | 43 | Atomic retained; first staged contrast: C54x case MMR-burst-initialize-and-push/0: register 22 actual=1 expected=0 mask=ffffffffffffffff |
 | `atomic_memory_sequences` | 3 | 40 | Validated staged migration; assertions retained |
 | `atomic_absolute_literals` | 30 | 78 | Atomic retained; first staged contrast: C54x case TCR-store-readback/17: register 22 actual=1 expected=0 mask=ffffffffffffffff |
@@ -351,7 +360,7 @@ sections independently; do not run the complete suite after every edit.
 | `atomic_offset_transports` | 6 | 42 | Atomic retained; first staged contrast: C54x case atomic-offset-transport-or-stationary-AR0-load/0: register 22 actual=1 expected=0 mask=ffffffffffffffff |
 | `atomic_shift_peripheral_literals` | 10 | 52 | Validated staged migration; assertions retained |
 | `atomic_xc_word_boundary` | 3 | 37 | Atomic retained; first staged contrast: C54x case=2 event=2 write=0 address=100 value=1111 clock=14 |
-| `bio_atomic` | 29 | 50 | Atomic retained; first staged contrast: C54x case atomic-BIO-NBIO-control-forms-at-both-levels/0: register -1 actual=10900 expected=10901 mask=ffffffffffffffff |
+| `bio_atomic` | 29 | 50 | Staged validated; physical predicate samples, control results and logical polling loop retained |
 | `peripheral_cost_classes` | 20 | 36 | Atomic retained; first staged contrast: C54x case atomic-CPU-peripheral-and-scratch-cost-classes/2: register 22 actual=1 expected=0 mask=ffffffffffffffff |
 | `atomic_operand_order` | 46 | 63 | Atomic retained; first staged contrast: C54x case extensions-before-data-IO-and-program-operands/10: register 22 actual=1 expected=0 mask=ffffffffffffffff |
 | `atomic_intm_follower` | 3 | 33 | Atomic retained; first staged contrast: Section IRQ case=0 line=0 clock=10 data_events=0 previous_case=0 return_pc=09d5 |

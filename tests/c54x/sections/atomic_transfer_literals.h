@@ -23,9 +23,9 @@ inline std::vector<clocked_register_case> section_cases()
 			if (std::none_of(events.begin(),events.end(),[&](auto const &other) { return other.write && other.address == e.address; }))
 				final.expected_data.push_back({e.address,e.value});
 		}
-		clocked_register_case c{{{0,std::move(initial)},{1,observation("pre-transfer-snapshot", {{STATE_GENPC,0x600}})},
+		clocked_register_case c{{{0,std::move(initial)},{1,observation("pre-transfer-snapshot", {{STATE_GENPC,0x5ff}})},
 			{2,observation("transfer-running", {})},{48,std::move(final)}},1,48};
-		c.pipeline_frontend = false; c.data_events = std::move(events); cases.push_back(std::move(c));
+		c.pipeline_frontend = true; c.data_events = std::move(events); cases.push_back(std::move(c));
 	};
 	append("STM-BRC-literal",{0x771a,0x42},{},{{r::STATE_BRC,0x42}},{{true,0x1a,0x42,0,false}});
 	append("ST-literal-absolute",{0x76f8,0xd50,0x5678},{},{},{{true,0xd50,0x5678,0,false}});
@@ -47,16 +47,16 @@ inline std::vector<clocked_register_case> section_cases()
 	append("MVDK-postincrement",{0x7192,0xda0},{{r::STATE_AR2,0xd90}},{{r::STATE_AR2,0xd91}},
 		{{false,0xd90,0x1234,0,false},{true,0xda0,0x1234,0,false}});
 	append("MVKD-repeat-three",{0xec02,0x7093,0xd90},{{r::STATE_AR3,0xdb0}},{{r::STATE_AR3,0xdb3},{r::STATE_RC,0}},
-		{{false,0xd90,0x1111,0,false},{true,0xdb0,0x1111,0,false},{false,0xd91,0x2222,0,false},
-		{true,0xdb1,0x2222,0,false},{false,0xd92,0x3333,0,false},{true,0xdb2,0x3333,0,false}});
+		{{false,0xd90,0x1111,0,false},{false,0xd91,0x2222,0,false,{},1U},{true,0xdb0,0x1111,0,false,{},0U},
+		{false,0xd92,0x3333,0,false,{},1U},{true,0xdb1,0x2222,0,false,{},0U},{true,0xdb2,0x3333,0,false,{},1U}});
 	append("LD-high-absolute",{0x44f8,0xdc0},{},{{r::STATE_A,0x12340000}},{{false,0xdc0,0x1234,0,false}});
 	append("ST-low-absolute",{0x80f8,0xdc1},{{r::STATE_A,0x12345678}},{},{{true,0xdc1,0x5678,0,false}});
 	append("ST-high-absolute",{0x82f8,0xdc2},{{r::STATE_A,0x12345678}},{},{{true,0xdc2,0x1234,0,false}});
 	append("ST-T-absolute",{0x8cf8,0xdc3},{{r::STATE_T,0x4321}},{},{{true,0xdc3,0x4321,0,false}});
 	append("MVDK-absolute",{0x71f8,0xdd0,0xde0},{},{},{{false,0xdd0,0x4444,0,false},{true,0xde0,0x4444,0,false}});
 	append("MVDK-repeat-three",{0xec02,0x7192,0xde1},{{r::STATE_AR2,0xdd0}},{{r::STATE_AR2,0xdd3},{r::STATE_RC,0}},
-		{{false,0xdd0,0x1111,0,false},{true,0xde1,0x1111,0,false},{false,0xdd1,0x2222,0,false},
-		{true,0xde2,0x2222,0,false},{false,0xdd2,0x3333,0,false},{true,0xde3,0x3333,0,false}});
+		{{false,0xdd0,0x1111,0,false},{false,0xdd1,0x2222,0,false,{},1U},{true,0xde1,0x1111,0,false,{},0U},
+		{false,0xdd2,0x3333,0,false,{},1U},{true,0xde2,0x2222,0,false,{},0U},{true,0xde3,0x3333,0,false,{},1U}});
 	append("LD-extended-postdecrement",{0x6f8a,0xc40},{{r::STATE_AR2,0xdf0}},
 		{{r::STATE_A,0x2345},{r::STATE_AR2,0xdef}},{{false,0xdf0,0x2345,0,false}});
 	append("LD-extended-absolute",{0x6ff8,0xdf0,0xc40},{},{{r::STATE_A,0x2345}},{{false,0xdf0,0x2345,0,false}});

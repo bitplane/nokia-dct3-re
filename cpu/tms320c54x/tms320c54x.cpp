@@ -195,13 +195,13 @@ constexpr bool decode_staged_conditional_call(u16 word)
 	// CC/CCD admit TC/NTC and six signed predicates for either accumulator.
 	u8 const condition = word;
 	return word == 0xf920 || word == 0xf930 || word == 0xfb20 || word == 0xfb30 || ((word & 0xfd00) == 0xf900 &&
-		((condition >= 0x42 && condition <= 0x47) || (condition >= 0x4a && condition <= 0x4f)));
+		(condition == 2 || condition == 3 || (condition >= 0x42 && condition <= 0x47) || (condition >= 0x4a && condition <= 0x4f)));
 }
 
 constexpr bool staged_conditional_return(u16 word)
 {
 	u8 const condition = word;
-	return word == 0xfc20 || word == 0xfc30 || ((word & 0xff00) == 0xfc00 && ((condition >= 0x42 && condition <= 0x47) || (condition >= 0x4a && condition <= 0x4f)));
+	return word == 0xfc20 || word == 0xfc30 || ((word & 0xff00) == 0xfc00 && (condition == 2 || condition == 3 || (condition >= 0x42 && condition <= 0x47) || (condition >= 0x4a && condition <= 0x4f)));
 }
 
 constexpr bool staged_delayed_conditional_return(u16 word)
@@ -238,7 +238,7 @@ constexpr bool decode_staged_conditional_branch(u16 word)
 
 constexpr bool staged_bio_branch(u16 word)
 {
-	return (word & 0xfdfe) == 0xf802;
+	return (word & 0xfcfe) == 0xf802; // BC/BCD/CC/CCD BIO/NBIO.
 }
 
 constexpr bool staged_call(u16 word)
@@ -595,7 +595,7 @@ constexpr bool staged_shifted_memory_arithmetic(u16 extension)
 constexpr bool decode_staged_xc(u16 word)
 {
 	u16 const form = word & ~u16(0x0200);
-	return form == 0xfd00 || form == 0xfd08 || form == 0xfd0c || form == 0xfd20 || form == 0xfd30 ||
+	return form == 0xfd00 || form == 0xfd02 || form == 0xfd03 || form == 0xfd08 || form == 0xfd0c || form == 0xfd20 || form == 0xfd30 ||
 		(form >= 0xfd42 && form <= 0xfd47) || (form >= 0xfd4a && form <= 0xfd4f);
 }
 
@@ -3535,7 +3535,7 @@ void tms320c54x_device::pipeline_step()
 	if (m_pipeline_valid[3] && staged_xc(m_pipeline_word[3]))
 	{
 		u16 const word = m_pipeline_word[3];
-		bool const execute = BIT(word, 6) ? staged_accumulator_condition(word, accumulator(BIT(word, 3))) :
+		bool const execute = (word & 0xfe) == 2 ? (bool(m_bio_in_cb()) != BIT(word, 0)) : BIT(word, 6) ? staged_accumulator_condition(word, accumulator(BIT(word, 3))) :
 			BIT(word, 5) ? BIT(m_st0, 12) == BIT(word, 4) : BIT(word, 3) ? BIT(m_st0, 11) == BIT(word, 2) : true;
 		m_pipeline_operand[3] = execute;
 		if (!execute) m_pipeline_xc_skip_words = BIT(m_pipeline_word[3], 9) ? 2 : 1;
@@ -5687,7 +5687,7 @@ void tms320c54x_device::pipeline_step()
 		// Consume older accumulator/TC publications before retaining the
 		// decision. Execute must not retest a subsequently changed source.
 		u16 const word = m_pipeline_word[4] & 0xfdff;
-		bool const taken = (word & 0xffef) == 0xfc20 ? BIT(m_st0, 12) == BIT(word, 4) :
+		bool const taken = (word & 0xfe) == 2 ? (bool(m_bio_in_cb()) != BIT(word, 0)) : (word & 0xffef) == 0xfc20 ? BIT(m_st0, 12) == BIT(word, 4) :
 			staged_accumulator_condition(word, accumulator(BIT(word, 3)));
 		m_pipeline_immediate[4] = taken;
 		if (staged_delayed_conditional_return(m_pipeline_word[4]))

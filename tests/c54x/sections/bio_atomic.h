@@ -1,5 +1,6 @@
 // license:BSD-3-Clause
 // copyright-holders:Gaz
+#define C54X_SECTION_INSTRUCTION_EVENTS
 #include "c54x_section_common.h"
 namespace c54x_test {
 inline std::vector<clocked_register_case> section_cases()
@@ -28,9 +29,9 @@ inline std::vector<clocked_register_case> section_cases()
 			{r::STATE_B,execute ? take && delayed ? 3U : 0U : delayed ? 6U : 0U},
 			{r::STATE_SP,take && returning ? 0x401U : take && call ? 0x3ffU : 0x400U}});
 		final.expected_data = {{0x400,0x910},{0x3ff,u16(take && call ? 0x903 : 0xbeef)}};
-		clocked_register_case c{{{0,std::move(initial)},{1,observation("before-BIO-control",{{STATE_GENPC,0x10901}})},
+		clocked_register_case c{{{0,std::move(initial)},{1,observation("before-BIO-control",{{STATE_GENPC,0x10900}})},
 			{2,observation("BIO-control-running",{})},{48,std::move(final)}},1,48};
-		c.pipeline_frontend = false; c.initial_bio = level; c.bio_samples = std::vector<clocked_line_sample>{{0,level,false}};
+		c.pipeline_frontend = true; c.initial_bio = level; c.bio_samples = std::vector<clocked_line_sample>{{0,level,false}};
 		c.data_events = std::vector<clocked_data_event>{};
 		if (take && call) c.data_events->push_back({true,0x3ff,0x903,0,false});
 		if (take && returning) c.data_events->push_back({false,0x400,0x910,0,false});
@@ -39,10 +40,15 @@ inline std::vector<clocked_register_case> section_cases()
 	auto initial = initial_case("BIO-low-poll-loop-releases-through-physical-pin",{0xf495,0xf803,0x601,0xe807,0xf4e1});
 	initial.initial.insert(initial.initial.end(),{{r::STATE_A,0},{r::STATE_ST1,0}});
 	auto final = observation("released-poll-loop-reaches-real-IDLE",{{STATE_GENPC,0x605},{r::STATE_A,7}});
-	clocked_register_case c{{{0,std::move(initial)},{1,observation("before-poll",{{STATE_GENPC,0x601}})},
-		{2,observation("poll-running",{})},{12,observation("pin-low-remains-live",{{STATE_GENPC,0x601},{r::STATE_A,0},{r::STATE_IDLE,0}})},
+	clocked_register_case c{{{0,std::move(initial)},{1,observation("before-poll",{{STATE_GENPC,0x600}})},
+		{2,observation("poll-running",{})},{12,observation("pin-low-remains-live",{{r::STATE_A,0},{r::STATE_IDLE,0}})},
 		{14,observation("pin-raised",{})},{64,std::move(final)}},12,64};
-	c.pipeline_frontend = false; c.initial_bio = false; c.forbid_data_access = true;
+	c.pipeline_frontend = true; c.initial_bio = false; c.forbid_data_access = true;
+	c.bio_samples = std::vector<clocked_line_sample>{{7,false},{12,false},{17,true}};
+	// Read at clocks 7/12/17: two low-pin loops, then the high-pin fall-through.
+	// Logical Execute identity, unlike the in-flight PC cursor, proves the loop.
+	c.instruction_events = std::vector<memory_word>{{0x600,0xf495},{0x601,0xf803},{0x601,0xf803},
+		{0x601,0xf803},{0x603,0xe807},{0x604,0xf4e1}};
 	c.actions = {{13,{}}}; c.actions.back().bio_level = true;
 	cases.push_back(std::move(c));
 	return cases;
