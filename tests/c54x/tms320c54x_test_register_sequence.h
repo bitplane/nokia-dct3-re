@@ -64,7 +64,12 @@ public:
 		for (auto const &state : m_input.states) if (m_tick >= state.tick) expected = &state.observation;
 		{
 			auto const disable = m_machine.disable_side_effects();
-			check_case_state(m_cpu, *expected);
+			try { check_case_state(m_cpu, *expected); }
+			catch (emu_fatalerror const &error)
+			{
+				throw emu_fatalerror("C54x register sequence case=%u tick=%u replay=%u: %s",
+					m_case, m_tick, unsigned(m_replay), error.what());
+			}
 		}
 		// A clock's mutations follow observation but precede snapshot capture.
 		apply_actions(false);
