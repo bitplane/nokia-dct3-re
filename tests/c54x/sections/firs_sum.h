@@ -23,12 +23,23 @@ inline std::vector<clocked_register_case> section_cases()
 			{r::STATE_ST0,u64(0x1200 | (pair == 2 ? 0x800 : 0) | (index >= 16 ? 0x400 : 0))},
 			{r::STATE_ST1,u64((sxm ? 0x100 : 0) | (ovm ? 0x200 : 0))}});
 		clocked_register_case c{{{0,std::move(initial)}},index & 1 ? 3U : 1U,24};
-		c.pipeline_frontend = false;
+		c.pipeline_frontend = true;
 		// B accumulates old A's high word times the program-space coefficient.
 		c.states.push_back({24,observation("sum-carry-and-saturation", {{r::STATE_A,result},{r::STATE_B,5},
 			{r::STATE_ST0,flags},{r::STATE_T,0x1234},{r::STATE_AR2,0x600},{r::STATE_AR3,0x601},{STATE_GENPC,0x603}})});
 		c.data_events = std::vector<clocked_data_event>{{false,0x600,x,0,false},{false,0x601,y,0,false}};
 		cases.push_back(std::move(c));
+	}
+	for (unsigned boundary : {6U,7U}) {
+		auto retained = cases.front();
+		retained.states.front().observation.id = boundary == 6 ? "FIRS-held-coefficient-request" : "FIRS-captured-coefficient";
+		retained.states.front().observation.program.push_back({0xa00,9});
+		retained.checkpoint = boundary;
+		retained.actions = {{boundary,{},false,{{0x601,0xa00}},{},{{0x600,0x5a5a},{0x601,0xa5a5}}}};
+		if (boundary == 7) retained.actions.front().program.push_back({0x900,0xdead});
+		retained.data_events = std::vector<clocked_data_event>{{false,0x600,0xffff,6},{false,0x601,1,6}};
+		retained.program_events = {{false,0x900,2,7}};
+		cases.push_back(std::move(retained));
 	}
 	return cases;
 }

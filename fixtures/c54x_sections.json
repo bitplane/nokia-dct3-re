@@ -97,7 +97,7 @@
   "shifted_arithmetic": 104,
   "rounding": 64,
   "square_difference": 40,
-  "firs_sum": 32,
+  "firs_sum": 34,
   "arithmetic_boundaries": 80,
   "conditional_accumulator_store": 168,
   "rounded_multiply": 104,

@@ -62,6 +62,11 @@ constexpr bool staged_lms(u16 word)
 	return (word & 0xff00) == 0xe100;
 }
 
+constexpr bool staged_firs(u16 word)
+{
+	return (word & 0xff00) == 0xe000;
+}
+
 constexpr bool staged_load_mac(u16 word)
 {
 	return (word & 0xf800) == 0xa800; // LD Xmem || MAC[R]/MAS[R] Ymem.
@@ -1444,7 +1449,7 @@ u8 decode_staged_extensions(u16 word)
 		staged_conditional_branch(word) || staged_immediate_alu(word) || (word & 0xfef0) == 0xf020 ||
 		(word & 0xfeff) == 0xf062 || staged_extended_pop(word) || staged_immediate_multiply(word) ||
 		staged_extended_store(word) || staged_extended_dst(word) || staged_extended_long_arithmetic(word) ||
-		staged_data_copy(word) || staged_immediate_repeat(word) || staged_block_repeat(word) || word == 0xf073 ||
+		staged_data_copy(word) || staged_firs(word) || staged_immediate_repeat(word) || staged_block_repeat(word) || word == 0xf073 ||
 		word == 0xf273 || word == 0x46f8 || staged_ram_stm(word) || staged_accumulator_stm(word) || word == 0x7707 ||
 		word == 0x771d || staged_immediate_loop_register(word) || word == 0x7700 ||
 		((word >= 0x7724 && word <= 0x7726) || (word == 0x7721 || word == 0x7722) || (word == 0x7758)) || word == 0x770e ||
@@ -1478,7 +1483,7 @@ u8 decode_staged_retired_words(u16 word)
 		staged_shifted_smem(word) || staged_extended_store(word) || staged_extended_dst(word) ||
 		staged_extended_long_arithmetic(word)) return 2;
 	if ((staged_rmw(word) && u8(word) == 0xf8) || word == 0x76f8) return 3;
-	return (staged_far_call(word) || staged_absolute_load(word) || staged_extended_logic(word) || staged_far_branch(word) ||
+	return (staged_firs(word) || staged_far_call(word) || staged_absolute_load(word) || staged_extended_logic(word) || staged_far_branch(word) ||
 		staged_long_mar(word) || staged_move(word) || staged_call(word) || staged_conditional_branch(word) ||
 		staged_immediate_alu(word) || (word & 0xfef0) == 0xf020 || (word & 0xfeff) == 0xf062 || staged_immediate_multiply(word) ||
 		staged_rmw(word) || (word & 0xff00) == 0x7700 || (word & 0xff00) == 0x7600 || staged_block_repeat(word) ||
@@ -1544,7 +1549,7 @@ bool decode_staged_supported(u16 word, bool extended_program)
 		long_arithmetic || register_alu || direct_mmr_load || mmr_move || memory_dp || direct_move || data_copy || program_move ||
 		read_a || short_load || direct_store || immediate_store || long_load || rmw || staged_xmem_bit(word) || staged_xmem_load(word) ||
 		staged_xmem_arithmetic(word) || staged_xmem_store(word) || staged_conditional_store(word) || staged_dual_multiply(word) ||
-		staged_lms(word) || staged_load_mac(word) || staged_parallel_alu(word) || staged_parallel_product(word) || staged_parallel_load(word) ||
+		staged_lms(word) || staged_firs(word) || staged_load_mac(word) || staged_parallel_alu(word) || staged_parallel_product(word) || staged_parallel_load(word) ||
 		staged_distance(word) || staged_dual_arithmetic(word) || staged_mvdd(word) || staged_port_read(word) || smem_arithmetic ||
 		staged_bitfield(word);
 }
@@ -1826,6 +1831,8 @@ void tms320c54x_device::device_start()
 	save_item(NAME(m_pipeline_far_return_pending));
 	save_item(NAME(m_pipeline_long_store_pending));
 	save_item(NAME(m_pipeline_program_move_pending));
+	save_item(NAME(m_pipeline_coefficient_pending));
+	save_item(NAME(m_pipeline_coefficient_source));
 	save_item(NAME(m_pipeline_repeat_active));
 	save_item(NAME(m_pipeline_repeat_body_latched));
 	save_item(NAME(m_pipeline_repeat_stream));
@@ -3079,6 +3086,8 @@ void tms320c54x_device::reset_pipeline()
 	m_pipeline_far_return_pending = false;
 	m_pipeline_long_store_pending = false;
 	m_pipeline_program_move_pending = false;
+	m_pipeline_coefficient_pending = false;
+	m_pipeline_coefficient_source = 0;
 	m_pipeline_repeat_active = m_pipeline_repeat_body_latched = m_pipeline_repeat_stream = false;
 	m_pipeline_repeat_store_pending = false;
 	m_pipeline_repeat_store_address = 0;
@@ -3306,6 +3315,14 @@ void tms320c54x_device::pipeline_step()
 		u32 const source = (m_pipeline_address[4] & 0x7f0000) | m_pipeline_immediate[4];
 		m_pipeline_operand[4] = m_program.read_word(physical_program_address(source));
 		m_pipeline_program_move_pending = false;
+		return;
+	}
+	if (m_pipeline_coefficient_pending)
+	{
+		// Class 8 owns an extra program-bus cycle. Hold the sampled X/Y
+		// operands and captured physical coefficient address across it.
+		m_pipeline_immediate[4] = m_program.read_word(m_pipeline_coefficient_source);
+		m_pipeline_coefficient_pending = false;
 		return;
 	}
 	bool const read_peripheral = m_pipeline_valid[3] &&
@@ -3711,6 +3728,11 @@ void tms320c54x_device::pipeline_step()
 			m_pipeline_valid[2] = false;
 		}
 		u16 const word = m_pipeline_word[2];
+		if (m_pipeline_valid[2] && staged_firs(word) &&
+			(m_pipeline_repeat_active || m_pipeline_xc_active || m_pipeline_block_body[2] || m_pipeline_control_words))
+		{
+			logerror("%s: staged FIRS repeat/control composition is unsupported\n", machine().describe_context()); m_illegal = true; return;
+		}
 		if (m_pipeline_valid[2] && staged_extended_store(word) && (word & 0xfe00) == 0x8c00 &&
 			(m_pipeline_repeat_active || m_pipeline_xc_active || m_pipeline_block_body[2] || completing_t_store_delay))
 		{
@@ -4592,7 +4614,9 @@ void tms320c54x_device::pipeline_step()
 		}
 		if (mode != 0xf8 && BIT(mode, 7)) indirect_modify(mode, false, 3);
 	}
-	if (m_pipeline_valid[3] && (staged_dual_multiply(m_pipeline_word[3]) || staged_lms(m_pipeline_word[3]) || staged_load_mac(m_pipeline_word[3]) || staged_dual_arithmetic(m_pipeline_word[3]) || staged_distance(m_pipeline_word[3])))
+	if (m_pipeline_valid[3] && staged_firs(m_pipeline_word[3]))
+		m_pipeline_extension_first[3] = m_pipeline_immediate[3];
+	if (m_pipeline_valid[3] && (staged_dual_multiply(m_pipeline_word[3]) || staged_lms(m_pipeline_word[3]) || staged_firs(m_pipeline_word[3]) || staged_load_mac(m_pipeline_word[3]) || staged_dual_arithmetic(m_pipeline_word[3]) || staged_distance(m_pipeline_word[3])))
 	{
 		u8 const x = m_pipeline_word[3] >> 4, y = m_pipeline_word[3];
 		unsigned const xar = 2 + (x & 3), yar = 2 + (y & 3);
@@ -4613,10 +4637,16 @@ void tms320c54x_device::pipeline_step()
 		dual_modify(x, 3);
 		if (xar != yar) dual_modify(y, 3);
 	}
-	if (m_pipeline_valid[4] && (staged_dual_multiply(m_pipeline_word[4]) || staged_lms(m_pipeline_word[4]) || staged_load_mac(m_pipeline_word[4]) || staged_dual_arithmetic(m_pipeline_word[4]) || staged_distance(m_pipeline_word[4])))
+	if (m_pipeline_valid[4] && (staged_dual_multiply(m_pipeline_word[4]) || staged_lms(m_pipeline_word[4]) || staged_firs(m_pipeline_word[4]) || staged_load_mac(m_pipeline_word[4]) || staged_dual_arithmetic(m_pipeline_word[4]) || staged_distance(m_pipeline_word[4])))
 	{
 		m_pipeline_operand[4] = pipeline_read_data(m_pipeline_operand_address[4]);
 		m_pipeline_immediate[4] = pipeline_read_data(m_pipeline_immediate[4]);
+		if (staged_firs(m_pipeline_word[4]))
+		{
+			m_pipeline_t[4] = m_pipeline_immediate[4]; // Retain Y while the program bus supplies the coefficient.
+			m_pipeline_coefficient_source = physical_program_address((m_pipeline_address[4] & 0x7f0000) | m_pipeline_extension_first[4]);
+			m_pipeline_coefficient_pending = true;
+		}
 	}
 	if (m_pipeline_valid[3] && staged_conditional_store(m_pipeline_word[3]))
 	{
@@ -5380,6 +5410,15 @@ void tms320c54x_device::pipeline_step()
 			data_write(m_pipeline_operand_address[5], m_pipeline_operand[5]);
 			m_observed_mvdd_write = false;
 		}
+		else if (staged_firs(m_op))
+		{
+			s64 product = accumulator_high17(m_a) * s64(s16(m_pipeline_immediate[5]));
+			if (BIT(m_st1, 6)) product *= 2;
+			m_b = multiply_result((s64(m_b << 24) >> 24) + multiply_product(product), true);
+			m_a = add_sub((data_operand(m_pipeline_operand[5]) << 16) & ACC_MASK,
+				(data_operand(m_pipeline_t[5]) << 16) & ACC_MASK, false, false);
+			++m_pc;
+		}
 		else if (staged_distance(m_op))
 		{
 			// Both forms consume old A before the vector subtraction replaces it.
@@ -6045,7 +6084,7 @@ void tms320c54x_device::pipeline_accept_interrupt()
 		m_pipeline_address[3] == m_pipeline_control_address + 2 && staged_absolute_load(m_pipeline_word[3]);
 	bool const control_protected = m_pipeline_control_words && !(near_branch_retired && retained_load_delay);
 	if ((!intm_protected || m_nmi_pending) && !m_interrupt_entry_stage && !m_pipeline_vector_pending && !m_pipeline_decode_remaining &&
-		!m_pipeline_mvdp_wait && !m_pipeline_read_a_wait && !m_pipeline_write_a_wait && !m_pipeline_acc_transfer_pending && !m_pipeline_cc_pending && !m_pipeline_repeat_active && !m_pipeline_xc_active && !control_protected && !m_pipeline_long_store_pending && !m_pipeline_program_move_pending && !m_pipeline_dp_wait && accept_interrupt())
+		!m_pipeline_mvdp_wait && !m_pipeline_read_a_wait && !m_pipeline_write_a_wait && !m_pipeline_acc_transfer_pending && !m_pipeline_cc_pending && !m_pipeline_repeat_active && !m_pipeline_xc_active && !control_protected && !m_pipeline_long_store_pending && !m_pipeline_program_move_pending && !m_pipeline_coefficient_pending && !m_pipeline_dp_wait && accept_interrupt())
 	{
 		m_pipeline_return_pc = u16(m_pipeline_valid[1] ? m_pipeline_address[1] :
 			m_pipeline_valid[0] ? m_pipeline_address[0] : m_pipeline_fetch_address);

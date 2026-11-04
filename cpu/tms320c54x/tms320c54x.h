@@ -397,6 +397,8 @@ private:
 	bool m_pipeline_far_return_pending = false;
 	bool m_pipeline_long_store_pending = false;
 	bool m_pipeline_program_move_pending = false;
+	bool m_pipeline_coefficient_pending = false;
+	u32 m_pipeline_coefficient_source = 0;
 	bool m_pipeline_repeat_active = false;
 	bool m_pipeline_repeat_body_latched = false;
 	bool m_pipeline_repeat_stream = false;

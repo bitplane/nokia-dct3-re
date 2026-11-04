@@ -15,8 +15,8 @@ through an expression: 241 lines and 39,048 cases. Counts describe entire
 sections, not atomic-only case counts. Helpers and firmware integration sources
 are additional migration work. The common case defaults to staged.
 
-Current validated progress: 115 sections (11,202 cases plus restores) migrated;
-22 of the original explicitly atomic sections remain, containing 272 cases.
+Current validated progress: 117 sections (11,237 cases plus restores) migrated;
+20 of the original explicitly atomic sections remain, containing 239 cases.
 The baseline counts
 describe the retirement scope, not the current number of atomic assignments.
 The seven originally paired sections are now staged-only: 24,040 cases remain
@@ -76,6 +76,15 @@ gates and documentation also expose frontend variants.
 ## Section work queue
 
 ### Validated migrations
+
+`firs_sum` retains all 32 SXM/OVM/carry/sticky-overflow cases on staged, plus
+two coefficient-request/capture poison-and-replay cases (34 current). The
+Class-8 program-bus hold retains physical coefficient selection and X/Y words;
+repeat/control composition remains excluded. `repeat_status` now checks the
+documented Decode-owned BRAF clearance during the final iteration (SPRU131G
+7.5.8.2), with exact two-iteration Execute events and final CPL/BRC state.
+Its old `c800` accumulator expectation depended on atomic clearing BRAF after
+the endpoint; the correctly observed value is `4800`.
 
 `atomic_mmr_burst` retains both 12-register initialize/overwrite/pop/push
 cases. Staged STM now admits inactive RSA/REA setup alongside BRC, with
@@ -307,25 +316,17 @@ Further preserved atomic sections after isolated staged trials:
 
 | Section | First observed contrast | Follow-up |
 | --- | --- | --- |
-| `atomic_memory_address_literals` | Short RAM ADD repeats now issue through staged slots | Migrated; all 28 cases and restores pass |
-| `atomic_multiply_move_literals` | Case 6 reads mapped `0015=0000` as event 0 at clock 6 | Resolve mapped-source sampling |
 | `atomic_coefficient_fir_literals` | Case 0, MACP `788b`, sets ILLEGAL | Audit program-coefficient multiply admission |
 | `atomic_mapped_moves` | Case 2, MVMD/DAR progression, sets ILLEGAL | Audit mapped-move destination admission |
-| `atomic_delayed_call` | Combined AGT+AOV admitted with OVA consumption | Migrated; all nine cases and restores pass |
 | `atomic_far_edges` | Case 2, FBACCD, sets ILLEGAL after cold-PC correction | Audit accumulator far-branch admission |
-| `atomic_fast_return` | RETF checkpoint has PC `20702` rather than `20683` | Audit program replacement and retained-prefetch lifecycle |
 
 These are migration blockers, not established silicon defects. An atomic
 expectation is not automatically correct where implementations disagree.
 
 Additional shared-contract queue (original atomic sections retained):
 
-- `repeat_status`: first case B is `4800`, expected `c800`; inspect repeat/status timing.
 - `block_repeat_control`: first case AR1 is 4, expected 1; inspect block endpoint/count behavior.
-- `zero_bk` case 144 and `indirect_popm` case 0 hit staged admission limits.
-- `clock_control`, `firs_sum`,
-  `parallel_load_multiply` stop at ILLEGAL in their first case.
-  Resolve instruction families/profile selection, not their literal results.
+- `indirect_popm` case 0 hits staged admission limits.
 
 Sizing columns below record the retirement baseline; current case counts live
 in `fixtures/c54x_sections.json`. Dispositions are updated by isolated execution
@@ -341,7 +342,7 @@ sections independently; do not run the complete suite after every edit.
 | `atomic_conditional_return` | 96 | 33 | Re-derive timing/order; retain assertions |
 | `atomic_overflow_branch` | 32 | 31 | Validated staged migration; assertions retained |
 | `carry_branch` | 8 | 26 | Migrate independent assertions; check staged admission |
-| `repeat_status` | 1 | 14 | Re-derive timing/order; retain assertions |
+| `repeat_status` | 1 | 14 | Migrated; TI Decode-owned BRAF timing replaces atomic endpoint timing, exact loop sequence checked. |
 | `atomic_delayed_call` | 9 | 32 | Migrated; page/frame/predicate assertions retained, OVA clearance checked. |
 | `conditional_register_store` | 2,304 | 42 | Migrate independent assertions; check staged admission |
 | `zero_bk` | 208 | 27 | Migrated; pointer wrap preserved, MPY reads/result/T/IMR/IFR explicitly checked. |
@@ -353,7 +354,7 @@ sections independently; do not run the complete suite after every edit.
 | `shifted_arithmetic` | 104 | 34 | Migrate independent assertions; check staged admission |
 | `rounding` | 64 | 31 | Validated staged migration after RND/circular PORTW admission; assertions retained |
 | `square_difference` | 40 | 46 | Migrate independent assertions; check staged admission |
-| `firs_sum` | 32 | 35 | Migrate independent assertions; check staged admission |
+| `firs_sum` | 32 | 35 | Migrated; all baseline cases plus two coefficient hold/capture poison/replays (34 current). |
 | `arithmetic_boundaries` | 80 | 47 | Staged validated; ABDST/POLY boundaries, flags and old-source assertions retained |
 | `conditional_accumulator_store` | 168 | 50 | Migrate independent assertions; check staged admission |
 | `rounded_multiply` | 104 | 67 | Migrate independent assertions; check staged admission |

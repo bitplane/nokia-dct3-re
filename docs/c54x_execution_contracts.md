@@ -2260,6 +2260,30 @@ family includes cross-accumulator MAC, rounded MACR and MAS/MASR; physical
 bank timing and interrupt/repeat composition remain unvalidated. Execution
 of the original MAC is not proof of valid recording or audio.
 
+### FIRS coefficient and sum pipeline
+
+Standalone FIRS retains two RAM addresses in Access and X/Y values in Read.
+The captured physical coefficient address owns a separate program-bus hold;
+its one read supplies the retained coefficient before Execute. Both the pending
+request and its address are saved/reset. Execute accumulates old A(32–16)
+times the signed coefficient into B, then places `(X+Y)<<16` in A using the
+existing FRCT/SMUL/OVM/carry/sticky-overflow helpers (SPRU172C 4-59, Class 8).
+The extra program-bus cycle models the documented initial three-cycle cost;
+its precise silicon placement remains partial. Mapped operands and
+repeat/block/XC/control composition remain explicitly unqualified.
+
+`firs_sum` keeps all 32 independent status/result cases. Two added cases poison
+X/Y and the instruction literal after Read, with checkpoints before and after
+the coefficient read; the latter also poisons the coefficient afterward.
+Exact clocks (X/Y at 6, coefficient at 7), one read per operand, result and
+replay distinguish captured data from rereads or a lost pending request.
+
+`repeat_status` checks BRAF independently of CPL. SPRU131G 7.5.8.2 clears
+BRAF at Decode of the final iteration's first instruction, not after Execute
+of its endpoint. Its endpoint LDM therefore captures `4800`, not atomic's old
+`c800`; the exact two-iteration Execute sequence, BRC exhaustion and unchanged
+CPL/INTM bits are checked across restore.
+
 ### Dual multiply interrupt-register sources
 
 Dual MPY/MACSU (`0xa400..0xa7ff`) admits IMR/IFR as either source through
