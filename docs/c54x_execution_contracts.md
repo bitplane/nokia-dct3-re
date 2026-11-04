@@ -5274,6 +5274,24 @@ firmware service or a healthy wait. These pre-correction captures are not
 the current acceptance endpoint.
 It does not establish upload completion, RF acquisition or handset boot.
 
+## Mapped TRN publication and protected interrupt drain
+
+The `transition_register` fixture distinguishes adjacent ST-to-TRN / LDM
+from a separated readback: staged Read sees the old TRN before the older
+Execute store in the shared clock; a separating word reads the stored value.
+Both variants retain the final TRN store, circular pointer, flags and unrelated
+register assertions. Short indirect PSHM is qualified for TRN only, with
+page-zero addressing independent of DP/CPL and retained AR modification.
+Unqualified mapped sources and repeat/control compositions fail closed.
+
+`atomic_bus_timing` retains all operand intervals and checks that the target
+IDLE already decoded behind a delayed branch drains before IRQ entry. A second
+IDLE supplies its valid wake continuation. `atomic_xc_word_boundary` retains
+both selected words and the full data/I/O trace: the decoded successor PORTW's
+Read precedes IACK, its Write drains before the interrupt frame, and RTN points
+past that instruction. These are staged ordering assertions, not atomic
+instruction-boundary timing or measured silicon latency.
+
 ## STLM suspension of an interrupted loop
 
 Outside-body STLM to ST1 is admitted without delay/RPT/XC composition.

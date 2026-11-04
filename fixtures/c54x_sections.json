@@ -129,7 +129,7 @@
   "software_interrupt": 128,
   "compact_load": 28,
   "stack_address_dependency": 24,
-  "transition_register": 20,
+  "transition_register": 32,
   "compact_store": 640,
   "asm_store_capture": 5120,
   "asm_load": 6144,

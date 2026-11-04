@@ -351,7 +351,8 @@ constexpr bool staged_direct_mvdm(u16 word)
 
 constexpr bool staged_direct_push(u16 word)
 {
-	return (word & 0xffe0) == 0x4a00 || (word & 0xffe0) == 0x4a60;
+	return (word & 0xffe0) == 0x4a00 || (word & 0xffe0) == 0x4a60 ||
+		((word & 0xff00) == 0x4a00 && ((u8(word) >= 0x80 && u8(word) < 0x98) || (u8(word) >= 0xc0 && u8(word) < 0xe0)));
 }
 
 constexpr bool staged_mmr_pop(u16 word)
@@ -659,7 +660,9 @@ constexpr bool staged_asm_store(u16 word)
 constexpr bool decode_staged_store(u16 word)
 {
 	return ((word & 0xfc00) == 0x8000 && u8(word) < 0xe0) ||
-		((word & 0xfe00) == 0x8c00 && u8(word) < 0x98) || decode_staged_extended_store(word) || staged_asm_store(word);
+		((word & 0xfe00) == 0x8c00 && u8(word) < 0x98) ||
+		((word & 0xff00) == 0x8d00 && u8(word) >= 0xc0 && u8(word) < 0xe0) ||
+		decode_staged_extended_store(word) || staged_asm_store(word);
 }
 
 constexpr bool staged_accumulator_mmr_store(u16 word)
@@ -3875,6 +3878,11 @@ void tms320c54x_device::pipeline_step()
 			m_illegal = true; return;
 		}
 		bool const data_push = (word & 0xff00) == 0x4b00 && (u8(word) < 0x98 || staged_extended_push(word));
+		if (m_pipeline_valid[2] && staged_direct_push(word) && u8(word) >= 0x80 &&
+			(m_pipeline_delay_decode_words || m_pipeline_repeat_active || m_pipeline_xc_active || m_pipeline_block_body[2]))
+		{
+			logerror("%s: staged indirect PSHM control/repeat composition is unsupported\n", machine().describe_context()); m_illegal = true; return;
+		}
 		if (m_pipeline_valid[2] && (staged_extended_push(word) || staged_extended_pop(word)) && (m_pipeline_xc_active || m_pipeline_block_body[2]))
 		{
 			logerror("%s: staged extended stack conditional/block composition is unsupported\n", machine().describe_context()); m_illegal = true; return;
@@ -4859,8 +4867,16 @@ void tms320c54x_device::pipeline_step()
 	{
 		// Class 16A: retain the source read and stack destination separately.
 		// Read-owned SP allocation is a declared partial stage model;
-		// indirect PSHM and stack/DAGEN conflicts are not enabled here.
-		late_pushm_address = u8(m_pipeline_word[4]);
+		// Indirect mapped sources are qualified separately from stack aliases.
+		u8 const mode = m_pipeline_word[4];
+		unsigned const ar = indirect_ar(mode, 4);
+		u16 const previous_ar = m_ar[ar], previous_st0 = m_st0;
+		late_pushm_address = mode < 0x80 ? mode : mmr_address(mode, 4);
+		if (mode >= 0x80 && late_pushm_address != 0x0f)
+		{
+			m_ar[ar] = previous_ar; m_st0 = previous_st0;
+			logerror("%s: staged indirect PSHM source is unqualified\n", machine().describe_context()); m_illegal = true; return;
+		}
 		bool const stack_alias = late_pushm_address >= 0x60 && m_pipeline_valid[5] &&
 			staged_direct_push(m_pipeline_word[5]) && m_pipeline_operand_address[5] == late_pushm_address;
 		bool const t_publication = late_pushm_address == 0x0e && m_pipeline_valid[5] &&

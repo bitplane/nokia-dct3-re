@@ -15,8 +15,8 @@ through an expression: 241 lines and 39,048 cases. Counts describe entire
 sections, not atomic-only case counts. Helpers and firmware integration sources
 are additional migration work. The common case defaults to staged.
 
-Current validated progress: 125 sections (11,313 cases plus restores) migrated;
-12 of the original explicitly atomic sections remain, containing 166 cases.
+Current validated progress: 128 sections (11,351 cases plus restores) migrated;
+9 of the original explicitly atomic sections remain, containing 140 cases.
 The baseline counts
 describe the retirement scope, not the current number of atomic assignments.
 The seven originally paired sections are now staged-only: 24,040 cases remain
@@ -396,7 +396,7 @@ sections independently; do not run the complete suite after every edit.
 | `software_interrupt` | 128 | 35 | Migrated; TRAP preserves INTM/IFR while sharing vector/frame delivery. |
 | `compact_load` | 28 | 32 | Validated staged migration; assertions retained |
 | `stack_address_dependency` | 24 | 33 | Validated staged migration; assertions retained |
-| `transition_register` | 20 | 40 | Atomic retained; first staged contrast: C54x case=0 event=0 write=0 address=f value=abcd clock=7 |
+| `transition_register` | 20 | 40 | Migrated; twelve added separated-read contrasts (32 current) and indirect TRN PSHM preserve results. |
 | `compact_store` | 640 | 43 | Validated staged migration; assertions retained |
 | `reverse_carry` | 2,690 | 46 | Staged validated; independent reverse-carry addresses, RAM and full traversal assertions retained |
 | `interrupt_entry` | 12 | 53 | Atomic retained; first staged contrast: C54x case=0 event=1 write=0 address=700 value=0 clock=15 |
@@ -466,7 +466,7 @@ sections independently; do not run the complete suite after every edit.
 | `atomic_basic_alu_control` | 10 | 49 | Validated staged migration; assertions retained |
 | `atomic_basic_parallel_block` | 9 | 51 | Validated staged migration; assertions retained |
 | `atomic_accumulator_calls` | 3 | 31 | Staged validated; CALAD admission, frame/target/delay predicates and same-clock RET/ST order |
-| `atomic_bus_timing` | 3 | 37 | Atomic retained; first staged contrast: Section IRQ case=0 line=2 clock=15 data_events=3 previous_case=0 return_pc=0701 |
+| `atomic_bus_timing` | 3 | 37 | Migrated; exact operand intervals retained, decoded target IDLE drains before IRQ entry. |
 | `atomic_port_timing` | 15 | 65 | Validated staged migration after RND/circular PORTW admission; assertions retained |
 | `atomic_mac_saturation` | 7 | 44 | Migrate independent assertions; check staged admission |
 | `atomic_port_marked_operations` | 22 | 83 | Validated staged migration after RND/circular PORTW admission; assertions retained |
@@ -486,7 +486,7 @@ sections independently; do not run the complete suite after every edit.
 | `atomic_port_control_examples` | 6 | 37 | Staged validated; extended RPT source, corrected MAR words and modeled marker clocks; values retained |
 | `atomic_offset_transports` | 6 | 42 | Atomic retained; first staged contrast: C54x case atomic-offset-transport-or-stationary-AR0-load/0: register 22 actual=1 expected=0 mask=ffffffffffffffff |
 | `atomic_shift_peripheral_literals` | 10 | 52 | Validated staged migration; assertions retained |
-| `atomic_xc_word_boundary` | 3 | 37 | Atomic retained; first staged contrast: C54x case=2 event=2 write=0 address=100 value=1111 clock=14 |
+| `atomic_xc_word_boundary` | 3 | 37 | Migrated; two-word selection and decoded PORTW drain checked before the IRQ frame. |
 | `bio_atomic` | 29 | 50 | Staged validated; physical predicate samples, control results and logical polling loop retained |
 | `peripheral_cost_classes` | 20 | 36 | Atomic retained; first staged contrast: C54x case atomic-CPU-peripheral-and-scratch-cost-classes/2: register 22 actual=1 expected=0 mask=ffffffffffffffff |
 | `atomic_operand_order` | 46 | 63 | Atomic retained; first staged contrast: C54x case extensions-before-data-IO-and-program-operands/10: register 22 actual=1 expected=0 mask=ffffffffffffffff |

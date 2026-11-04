@@ -54,8 +54,9 @@ inline std::vector<clocked_register_case> section_cases()
 			initial.initial.push_back({int(r::STATE_AR0)+int(reg),0});
 			final.expected.push_back({int(r::STATE_AR0)+int(reg),0});
 		}
-		// Indirect POPM must resolve its destination before the bounded AR/SP guard.
-		unsigned const rejected_at = pop && address >= 0x80 && address < 0xe0 ? 4 : 3;
+		// Indirect mapped transfers resolve and roll back the AR before rejection.
+		bool const indirect_push = !pop && ((address >= 0x80 && address < 0x98) || (address >= 0xc0 && address < 0xe0));
+		unsigned const rejected_at = indirect_push ? 5 : pop && address >= 0x80 && address < 0xe0 ? 4 : 3;
 		clocked_register_case c{{{0,std::move(initial)},{rejected_at,std::move(final)}},encoding & 1 ? 7U : 4U,16};
 		c.require_idle = false; c.forbid_data_access = true;
 		cases.push_back(std::move(c));

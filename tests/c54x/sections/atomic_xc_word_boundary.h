@@ -16,15 +16,15 @@ inline std::vector<clocked_register_case> section_cases()
 		auto final = observation("XC-selected-slots-stack-and-final-output-continuation",{{STATE_GENPC,0x60b},
 			{r::STATE_A,accepted ? 1U : 0U},{r::STATE_B,irq ? 0U : accepted ? 2U : 1U},{r::STATE_SP,0x300}});
 		final.expected_data = initial.data;
-		if (irq) final.expected_data.back().value = 0x607;
-		clocked_register_case c{{{0,std::move(initial)},{1,observation("before-XC-markers",{{STATE_GENPC,0x601}})},
+		if (irq) final.expected_data.back().value = 0x60a;
+		clocked_register_case c{{{0,std::move(initial)},{1,observation("before-XC-markers",{{STATE_GENPC,0x600}})},
 			{2,observation("XC-markers-running",{})},{96,std::move(final)}},3,96};
-		c.pipeline_frontend = false;
+		c.pipeline_frontend = true;
 		if (irq) {
 			c.data_events = std::vector<clocked_data_event>{{false,0x100,0x1111,0,false},{false,0x120,1,0,false,2},
-				{true,0x2ff,0x607,0,false},{false,0x121,0,0,false},{false,0x2ff,0x607,0,false},{false,0x100,0x1111,0,false}};
-			// RTN at the second PORTW proves acceptance after the two-word ADD, before that output.
-			c.irqs = {{2,0,~0U,2,0x607,{{r::STATE_A,1},{r::STATE_B,0}},1}};
+				{false,0x100,0x1111,0,false},{true,0x2ff,0x60a,0,false},{false,0x121,0,0,false},{false,0x2ff,0x60a,0,false}};
+			// The selected two-word ADD and already-decoded PORTW drain before entry.
+			c.irqs = {{2,0,~0U,3,0x60a,{{r::STATE_A,1},{r::STATE_B,0}},1}};
 			c.io_events = std::vector<clocked_data_event>{{true,0x124,0x1111,0,false},{true,0x124,0x1111,0,false}};
 		} else {
 			c.observed_data_space = AS_IO;
