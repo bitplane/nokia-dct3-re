@@ -62,6 +62,11 @@ constexpr bool staged_lms(u16 word)
 	return (word & 0xff00) == 0xe100;
 }
 
+constexpr bool staged_load_mac(u16 word)
+{
+	return (word & 0xf800) == 0xa800; // LD Xmem || MAC[R]/MAS[R] Ymem.
+}
+
 constexpr bool staged_parallel_mac(u16 word)
 {
 	return (word & 0xf000) == 0xd000;
@@ -1534,7 +1539,7 @@ bool decode_staged_supported(u16 word, bool extended_program)
 		long_arithmetic || register_alu || direct_mmr_load || mmr_move || memory_dp || direct_move || data_copy || program_move ||
 		read_a || short_load || direct_store || immediate_store || long_load || rmw || staged_xmem_bit(word) || staged_xmem_load(word) ||
 		staged_xmem_arithmetic(word) || staged_xmem_store(word) || staged_conditional_store(word) || staged_dual_multiply(word) ||
-		staged_lms(word) || staged_parallel_alu(word) || staged_parallel_product(word) || staged_parallel_load(word) ||
+		staged_lms(word) || staged_load_mac(word) || staged_parallel_alu(word) || staged_parallel_product(word) || staged_parallel_load(word) ||
 		staged_distance(word) || staged_dual_arithmetic(word) || staged_mvdd(word) || staged_port_read(word) || smem_arithmetic ||
 		staged_bitfield(word);
 }
@@ -4582,7 +4587,7 @@ void tms320c54x_device::pipeline_step()
 		}
 		if (mode != 0xf8 && BIT(mode, 7)) indirect_modify(mode, false, 3);
 	}
-	if (m_pipeline_valid[3] && (staged_dual_multiply(m_pipeline_word[3]) || staged_lms(m_pipeline_word[3]) || staged_dual_arithmetic(m_pipeline_word[3]) || staged_distance(m_pipeline_word[3])))
+	if (m_pipeline_valid[3] && (staged_dual_multiply(m_pipeline_word[3]) || staged_lms(m_pipeline_word[3]) || staged_load_mac(m_pipeline_word[3]) || staged_dual_arithmetic(m_pipeline_word[3]) || staged_distance(m_pipeline_word[3])))
 	{
 		u8 const x = m_pipeline_word[3] >> 4, y = m_pipeline_word[3];
 		unsigned const xar = 2 + (x & 3), yar = 2 + (y & 3);
@@ -4599,7 +4604,7 @@ void tms320c54x_device::pipeline_step()
 		dual_modify(x, 3);
 		if (xar != yar) dual_modify(y, 3);
 	}
-	if (m_pipeline_valid[4] && (staged_dual_multiply(m_pipeline_word[4]) || staged_lms(m_pipeline_word[4]) || staged_dual_arithmetic(m_pipeline_word[4]) || staged_distance(m_pipeline_word[4])))
+	if (m_pipeline_valid[4] && (staged_dual_multiply(m_pipeline_word[4]) || staged_lms(m_pipeline_word[4]) || staged_load_mac(m_pipeline_word[4]) || staged_dual_arithmetic(m_pipeline_word[4]) || staged_distance(m_pipeline_word[4])))
 	{
 		m_pipeline_operand[4] = pipeline_read_data(m_pipeline_operand_address[4]);
 		m_pipeline_immediate[4] = pipeline_read_data(m_pipeline_immediate[4]);
@@ -5390,6 +5395,17 @@ void tms320c54x_device::pipeline_step()
 			if (BIT(m_st1, 6)) product *= 2;
 			m_b = multiply_result((s64(m_b << 24) >> 24) + multiply_product(product), true);
 		}
+		else if (staged_load_mac(m_op))
+		{
+			bool const destination_b = BIT(m_op, 8);
+			s64 product = s64(s16(m_pipeline_t[5])) * s16(m_pipeline_immediate[5]);
+			if (BIT(m_st1, 6)) product *= 2;
+			product = multiply_product(product);
+			s64 result = (s64(accumulator(!destination_b) << 24) >> 24) + (BIT(m_op, 10) ? -product : product);
+			if (BIT(m_op, 9)) result = (result + 0x8000) & ~s64(0xffff);
+			accumulator(!destination_b) = multiply_result(result, !destination_b);
+			accumulator(destination_b) = (data_operand(m_pipeline_operand[5]) << 16) & ACC_MASK;
+		}
 		else if (staged_dual_multiply(m_op))
 		{
 			bool const signed_mac = (m_op & 0xf000) == 0xb000;
@@ -5756,6 +5772,9 @@ void tms320c54x_device::pipeline_step()
 		// Retain T after older Execute but before younger Read publications;
 		// sampling live T in Execute could instead consume a following STM.
 		m_pipeline_operand[4] = m_t;
+	if (m_pipeline_valid[4] && staged_load_mac(m_pipeline_word[4]))
+		// Retain T after older Execute publications; X loads the accumulator, not T.
+		m_pipeline_t[4] = m_t;
 	if (smem_t_product_read || (m_pipeline_valid[4] && (staged_poly(m_pipeline_word[4]) || staged_parallel_product(m_pipeline_word[4]))))
 		m_pipeline_immediate[4] = m_t;
 	if (m_pipeline_valid[4] && (staged_dual_multiply(m_pipeline_word[4]) || (m_pipeline_word[4] & 0xff00) == 0x4c00))

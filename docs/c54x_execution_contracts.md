@@ -2258,6 +2258,18 @@ family includes cross-accumulator MAC, rounded MACR and MAS/MASR; physical
 bank timing and interrupt/repeat composition remain unvalidated. Execution
 of the original MAC is not proof of valid recording or audio.
 
+### Parallel load and multiply-accumulate
+
+`LD Xmem,A/B || MAC[R]/MAS[R] Ymem,other` (`0xa800..0xafff`) captures
+both RAM addresses in Access and both words in Read. Read also captures T after
+older Execute publications, without changing T. Execute loads X into the selected
+accumulator's high word and applies signed `T*Y` to the other accumulator,
+with FRCT, SMUL, rounding, OVM and sticky overflow handled by the existing
+arithmetic helpers (SPRU172C 4-74..77). `parallel_load_multiply` retains its
+64 independent combinations and one added T mutation/checkpoint at Read,
+covering result retention across restore. Mapped operands and repeated/control
+composition remain outside this admission.
+
 ### Indirect MMR addressing and DAGEN latency
 
 Staged LDM admits short indirect modes `0x80..0x97`; STLM admits those modes

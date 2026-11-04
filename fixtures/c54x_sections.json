@@ -116,7 +116,7 @@
   "memory_logic": 192,
   "logic_composition": 5,
   "bit_immediate": 512,
-  "parallel_load_multiply": 64,
+  "parallel_load_multiply": 65,
   "rounded_load": 64,
   "accumulator_field_store": 144,
   "store_double_load": 192,

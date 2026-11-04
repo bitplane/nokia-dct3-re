@@ -15,8 +15,8 @@ through an expression: 241 lines and 39,048 cases. Counts describe entire
 sections, not atomic-only case counts. Helpers and firmware integration sources
 are additional migration work. The common case defaults to staged.
 
-Current validated progress: 108 sections (10,856 cases plus restores) migrated;
-29 of the original explicitly atomic sections remain, containing 617 cases.
+Current validated progress: 109 sections (10,921 cases plus restores) migrated;
+28 of the original explicitly atomic sections remain, containing 553 cases.
 The baseline counts
 describe the retirement scope, not the current number of atomic assignments.
 The seven originally paired sections are now staged-only: 24,040 cases remain
@@ -76,6 +76,12 @@ gates and documentation also expose frontend variants.
 ## Section work queue
 
 ### Validated migrations
+
+`parallel_load_multiply` retains all 64 LD||MAC[R]/MAS[R] combinations on staged:
+both accumulators, rounding, subtract, SXM, FRCT and pointer updates. One added
+Read-T poison/checkpoint case checks that Execute and restore consume captured
+T rather than a later register value (65 current cases). Dual operands remain
+RAM-only, and repeat/control composition is not admitted by this migration.
 
 `atomic_absolute_literals` retains all 30 results/events on staged, adding
 indirect LDM and AR-destination STLM with page-zero addressing and pointer
@@ -331,7 +337,7 @@ sections independently; do not run the complete suite after every edit.
 | `store_shift` | 120 | 41 | Migrate independent assertions; check staged admission |
 | `smul_control` | 192 | 42 | Re-derive timing/order; retain assertions |
 | `bit_immediate` | 512 | 26 | Migrate independent assertions; check staged admission |
-| `parallel_load_multiply` | 64 | 30 | Migrate independent assertions; check staged admission |
+| `parallel_load_multiply` | 64 | 30 | Migrated; baseline cases plus one retained-T poison/replay check (65 current). |
 | `rounded_load` | 64 | 29 | Staged validated; SXM/result/flags/addressing/read/replay assertions retained |
 | `shifted_high_store` | 128 | 27 | Migrate independent assertions; check staged admission |
 | `offset_memory_test` | 8 | 24 | Migrate independent assertions; check staged admission |
