@@ -185,6 +185,9 @@ protected:
 			return 0;
 		}, "section_irq");
 		m_cases = c54x_test::section_cases();
+		for (unsigned i=0;i<m_cases.size();++i)
+			if (!m_cases[i].pipeline_frontend)
+				throw emu_fatalerror("Isolated C54x section contains atomic case %u",i);
 		m_fixture = std::make_unique<c54x_test::register_sequence_fixture>(machine(), *m_cpu, *m_timer,
 			m_cases.size(), [this](unsigned i) {
 #ifdef C54X_SECTION_CLOCK_RATES

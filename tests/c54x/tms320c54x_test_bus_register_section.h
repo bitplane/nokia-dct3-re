@@ -47,7 +47,7 @@ inline std::vector<clocked_register_case> bus_register_cases(bool standard)
 		final.expected.insert(final.expected.end(),{{r::STATE_B,0x55},{STATE_GENPC,0x42},{r::STATE_SP,0xfff}});
 		clocked_register_case c{{{0,std::move(initial)},{1,bus_register_observation(false,0x7fff,0xf000,0)},
 			{64,std::move(final)}},12,64};
-		c.pipeline_frontend=false; c.reset_cpu_before_case=true;
+		c.pipeline_frontend=true; c.reset_cpu_before_case=true;
 		c.initial_input_lines={{INPUT_LINE_HALT,CLEAR_LINE},{0,CLEAR_LINE}};
 		c.actions={{16,{},false,{},{{0,ASSERT_LINE},{0,CLEAR_LINE}}}};
 		c.data_events=std::vector<clocked_data_event>{{true,0xfff,0x601,0,false}};

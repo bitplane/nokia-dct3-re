@@ -5276,6 +5276,34 @@ It does not establish upload completion, RF acquisition or handset boot.
 
 ## Extended I/O and program transfer encoding
 
+Short repeated PORTW/PORTR retain their address, port, sampled value and wait
+state without using atomic continuation fields. Each later transfer has a RAM
+and I/O phase; seven software waits yield nine clocks between port accesses.
+READY can extend the held transfer without rereading its source or modifying
+AR twice. The twenty waited-control cases retain repeat counts 0..3, the
+two-word BCD delay transfer and RSBX-INTM follower; six added cases restore
+inside repeated software/READY holds or after operand capture. Distinct words,
+post-capture poison and complete RAM/I/O/frame traces protect the held value
+and once-only pointer/bus effects. Two more protect older mapped ports while
+a younger RPT enters Decode, a genuine native-boot regression caught by the
+5110 menu gate: repeat guards must match the body's address, not just a global
+active bit. IRQ is accepted after all transfers, with
+exact frames and repeated-access intervals. Nested control and mapped repeat
+operands remain guarded before the first side effect.
+
+External I/O helpers now vary forms, not execution models. Both bus profiles
+retain 1,440 staged cases; the 288 duplicate short-form atomic executions are
+removed. Extended words use assembler-checked offset/address ordering, and the
+source poison now targets the actual RAM/MMR operand. A self-aliasing mapped AR
+follows the declared Access-before-Read/Execute publication ordering, rather
+than the old atomic read/update sequence. Board-owned `0030` and AR destinations
+are qualified; no peripheral semantics are invented for board storage.
+
+CPU input-line delivery is queued by the scheduler. A checkpoint in the same
+observer callback as `set_input_line` can precede delivery and omit that queued
+edge on replay. The waited BCD fixture settles its protected IRQ edge one clock
+before capture; it does not compensate by forcing IFR or weakening replay.
+
 Long-offset PORTW/PORTR and MVDP/MVPD retain offset in the first extension
 and explicit port/program address in the second. GNU tic54x assembler output
 independently establishes the qualified encoding; SPRU131G's generic

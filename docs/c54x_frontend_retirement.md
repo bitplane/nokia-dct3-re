@@ -15,14 +15,19 @@ through an expression: 241 lines and 39,048 cases. Counts describe entire
 sections, not atomic-only case counts. Helpers and firmware integration sources
 are additional migration work. The common case defaults to staged.
 
-Current validated progress: 136 sections (11,482 cases plus restores) migrated;
-1 of the original explicitly atomic sections remains, containing 12 cases.
+Current isolated progress: all 137 original explicitly atomic sections migrated
+(11,502 current cases plus restores, including 34 added regression contrasts).
+Step 3 still requires final composition acceptance before being marked complete.
 The baseline counts
 describe the retirement scope, not the current number of atomic assignments.
 The seven originally paired sections are now staged-only: 24,040 cases remain
 from their 39,048-case baseline. Their original staged stimuli, assertions and
 checkpoints are unchanged; 15,008 atomic-side executions/replays are removed.
 Source admission retains all 23,748 staged cases, not an assumed half split.
+The extended I/O helper now selects operand forms, not a frontend: 1,440 staged
+cases cover both bus profiles, with 288 duplicate short-form executions removed.
+Its unique 1,152 extended/mapped cases retain waits, READY, IRQ/NMI, poisoning and
+replay. The additional helper-owned physical-IACK-disabled IRQ case is staged.
 
 ## Disposition rules
 
@@ -55,6 +60,12 @@ override. `nse1astd` and `nse1aclk` explicitly retain atomic comparison behavior
 Validate ordinary boot/menu, codecs, peripheral/audio integration, power/reset
 and save/restore without inheriting unrelated research overrides.
 Other HLE-backed products do not establish native DSP parity.
+
+Atomic comparison aliases and the cold/MU4 laboratory defaults are still live
+reference consumers. Generic-section migration does not qualify those full
+firmware applications on staged. Stage 4 must promote their required contracts
+or retire comparison-only entry points before removing the engine; do not infer
+that deleting the unit-test dimension alone makes that deletion safe.
 
 Production promotion acceptance passes menu hash/input, late input, short/long
 power presses and idle save/load replay. The audio harness uses `nse1obs`, an
@@ -348,9 +359,9 @@ specific peripheral conflict after the older Write. Two added replay prefixes
 cover either side of the Read; an added separated BRC-copy contrast checks the
 new word while the original adjacent copy explicitly reads the old word.
 The seven current cases preserve the original values outside that documented
-Read-before-Execute distinction. The remaining original atomic section covers
-waited I/O/control composition; the helper-selected extended I/O matrix also
-still needs migration.
+Read-before-Execute distinction. Waited I/O/control and the helper-selected
+extended I/O matrix are now migrated; remaining work is final composition
+acceptance, not another known atomic fixture family.
 
 These are migration questions, not established silicon defects. An atomic
 expectation is not automatically correct where implementations disagree.
@@ -497,7 +508,7 @@ sections independently; do not run the complete suite after every edit.
 | `atomic_operand_order` | 46 | 63 | Migrated; all independent bus/program order assertions retained using assembler-checked extension order. |
 | `atomic_intm_follower` | 3 | 33 | Migrated; exact decoded drain, frame and whole-follower completion checked. |
 | `atomic_xc_interrupt` | 8 | 40 | Migrated; speculative loop prefetch distinguished from two actual body executions; IRQ/NMI, selection and exact drained frames retained. |
-| `atomic_waited_io_control` | 12 | 36 | Atomic retained; first staged contrast: C54x case waited-port-control-defers-pending-IRQ/0: register 22 actual=1 expected=0 mask=ffffffffffffffff |
+| `atomic_waited_io_control` | 12 | 36 | Migrated; twenty current cases retain transfers/IRQs and add software/READY/operand replay plus older-port/younger-RPT ownership. |
 | `stopped_timer_reload` | 48 | 26 | Migrated; all divider/reload/PSC cases and restores retained with completed-RMW readback. |
 | `source_admission` | 38,464 | 54 | Validated staged subset; atomic dimension removed |
 | `idle_nmi` | 12 | 35 | Validated staged migration; terminal idle cleanup explicit where needed |

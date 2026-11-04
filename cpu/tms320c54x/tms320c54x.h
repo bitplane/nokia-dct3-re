@@ -177,6 +177,8 @@ private:
 	void pipeline_accept_interrupt();
 	void pipeline_delay_compiler_sp(u16 previous);
 	void pipeline_begin_repeat_stream();
+	void pipeline_repeat_port();
+	void pipeline_finish_repeat_iteration();
 	void pipeline_resume_after_repeat();
 	void pipeline_request_coefficient(u16 address);
 	void pipeline_update_braf(u32 address);
@@ -408,6 +410,8 @@ private:
 	bool m_pipeline_repeat_body_latched = false;
 	bool m_pipeline_repeat_stream = false;
 	bool m_pipeline_repeat_store_pending = false;
+	bool m_pipeline_repeat_io_started = false;
+	u16 m_pipeline_repeat_io_value = 0;
 	u16 m_pipeline_repeat_store_address = 0;
 	u16 m_pipeline_repeat_issue_remaining = 0;
 	u16 m_pipeline_repeat_word = 0;

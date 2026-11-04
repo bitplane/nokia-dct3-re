@@ -46,7 +46,7 @@ inline std::vector<clocked_register_case> section_cases()
 		clocked_register_case c{{{0,std::move(initial)},{20,std::move(final)}},checkpoint,20};
 		c.require_idle=false; c.forbid_data_access=true; c.forbid_program_writes=true;
 		c.io_events=std::vector<clocked_data_event>{};
-		c.pipeline_frontend=!(input.context&4);
+		c.pipeline_frontend=true;
 		c.reset_cpu_before_case=true;
 		cases.push_back(std::move(c));
 	}
