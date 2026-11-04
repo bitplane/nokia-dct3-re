@@ -6,7 +6,8 @@ namespace c54x_test {
 inline std::vector<clocked_register_case> section_cases()
 {
 	std::vector<clocked_register_case> cases;
-	for (bool delayed : {false,true}) for (bool staged : {false,true}) for (bool hazard : {false,true})
+	constexpr bool staged = true;
+	for (bool delayed : {false,true}) for (bool hazard : {false,true})
 	for (unsigned count : {0U,1U,2U,7U}) for (unsigned pair=0;pair<3;++pair) {
 		u32 const caller=std::array<u32,3>{0,0x20000,0x7f0000}[pair], target=std::array<u32,3>{0x20000,0x7f0000,0}[pair];
 		u16 const return_pc=delayed ? 0x607 : 0x605;

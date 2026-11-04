@@ -6,7 +6,8 @@ namespace c54x_test {
 inline std::vector<clocked_register_case> section_cases()
 {
 	std::vector<clocked_register_case> cases;
-	for(unsigned form=0;form<3;++form)for(bool staged : {false,true})for(u32 base : {0U,0x20000U})for(bool overlay : {false,true}){
+	constexpr bool staged = true;
+	for(unsigned form=0;form<3;++form)for(u32 base : {0U,0x20000U})for(bool overlay : {false,true}){
 		u32 const physical=overlay ? 0 : base;bool const two=form==2;
 		auto initial=initial_case("instruction-observer-is-Execute-not-program-bus",{0xf495});
 		for(auto &word : initial.program)word.address+=physical;

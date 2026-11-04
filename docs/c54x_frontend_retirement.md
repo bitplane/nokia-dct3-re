@@ -3,8 +3,8 @@
 ## Decision and scope
 
 Target one staged execution model, but do not delete atomic before migrating its
-unique assertions and the ordinary native 5110 composition. This is a static
-migration inventory, not a staged parity certificate. No section is approved for
+unique assertions and the ordinary native 5110 composition. This is a migration inventory with selected execution evidence, not a complete
+staged parity certificate. No section is approved for
 deletion solely because of its name or similarity to another section.
 
 The retirement baseline has 518 registered sections, 18,148 source lines and
@@ -18,6 +18,10 @@ are additional migration work. The common case defaults to staged.
 Current validated progress: 68 sections (6,963 cases plus restores) migrated;
 69 of the original explicitly atomic sections remain. The baseline counts
 describe the retirement scope, not the current number of atomic assignments.
+The seven originally paired sections are now staged-only: 24,040 cases remain
+from their 39,048-case baseline. Their original staged stimuli, assertions and
+checkpoints are unchanged; 15,008 atomic-side executions/replays are removed.
+Source admission retains all 23,748 staged cases, not an assumed half split.
 
 ## Disposition rules
 
@@ -168,16 +172,17 @@ Additional shared-contract queue (original atomic sections retained):
   `parallel_load_multiply` and `rounded_load` stop at ILLEGAL in their first case.
   Resolve instruction families/profile selection, not their literal results.
 
-Classifications below are routing priorities based on explicit frontend settings
-and contract families, not behavioral equivalence findings. Validate migrated
+Sizing columns below record the retirement baseline; current case counts live
+in `fixtures/c54x_sections.json`. Dispositions are updated by isolated execution
+evidence; untested entries remain routing priorities, not equivalence claims. Validate migrated
 sections independently; do not run the complete suite after every edit.
 
 | Section | Cases | Lines | Disposition |
 | --- | ---: | ---: | --- |
 | `signed_conditions` | 389 | 56 | Migrate independent assertions; check staged admission |
-| `return_barrier` | 12 | 29 | Trim paired dimension; preserve staged contrasts |
-| `xc_status` | 64 | 30 | Trim paired dimension; preserve staged contrasts |
-| `xc_latency` | 384 | 46 | Trim paired dimension; preserve staged contrasts |
+| `return_barrier` | 12 | 29 | Validated staged subset; atomic dimension removed |
+| `xc_status` | 64 | 30 | Validated staged subset; atomic dimension removed |
+| `xc_latency` | 384 | 46 | Validated staged subset; atomic dimension removed |
 | `atomic_conditional_return` | 96 | 33 | Re-derive timing/order; retain assertions |
 | `atomic_overflow_branch` | 32 | 31 | Validated staged migration; assertions retained |
 | `carry_branch` | 8 | 26 | Migrate independent assertions; check staged admission |
@@ -305,7 +310,7 @@ sections independently; do not run the complete suite after every edit.
 | `atomic_xc_interrupt` | 8 | 40 | Atomic retained; first staged contrast: Section IRQ case=0 line=2 clock=12 data_events=0 previous_case=0 return_pc=0804 |
 | `atomic_waited_io_control` | 12 | 36 | Re-derive timing/order; retain assertions |
 | `stopped_timer_reload` | 48 | 26 | Re-derive timing/order; retain assertions |
-| `source_admission` | 38,464 | 54 | Trim paired dimension; preserve staged contrasts |
+| `source_admission` | 38,464 | 54 | Validated staged subset; atomic dimension removed |
 | `idle_nmi` | 12 | 35 | Re-derive timing/order; retain assertions |
 | `idle_wake` | 6 | 36 | Re-derive timing/order; retain assertions |
 | `deep_idle_clocks` | 8 | 34 | Re-derive timing/order; retain assertions |
@@ -313,11 +318,11 @@ sections independently; do not run the complete suite after every edit.
 | `idle_dma` | 10 | 38 | Re-derive timing/order; retain assertions |
 | `idle3_pll` | 1 | 34 | Re-derive timing/order; retain assertions |
 | `repeat_endpoints` | 12 | 44 | Re-derive timing/order; retain assertions |
-| `block_repeat_pages` | 96 | 37 | Trim paired dimension; preserve staged contrasts |
+| `block_repeat_pages` | 96 | 37 | Validated staged subset; atomic dimension removed |
 | `initial_control_sequences` | 3 | 32 | Re-derive timing/order; retain assertions |
-| `receive_ring_copy` | 4 | 20 | Trim paired dimension; preserve staged contrasts |
+| `receive_ring_copy` | 4 | 20 | Validated staged subset; atomic dimension removed |
 | `disassembly` | 1 | 13 | Migrate independent assertions; check staged admission |
-| `instruction_observer` | 24 | 25 | Trim paired dimension; preserve staged contrasts |
+| `instruction_observer` | 24 | 25 | Validated staged subset; atomic dimension removed |
 
 ## Exit gates before deletion
 

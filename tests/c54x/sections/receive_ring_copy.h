@@ -5,7 +5,8 @@ namespace c54x_test {
 inline std::vector<clocked_register_case> section_cases()
 {
 	std::vector<clocked_register_case> cases;
-	for(bool staged : {false,true})for(unsigned start : {2U,81U}){
+	constexpr bool staged = true;
+	for(unsigned start : {2U,81U}){
 		auto initial=initial_case("MVDD-Y-AR2-circular-receive-ring-not-AR6",{0xec19,0xe59c,0xf4e1});
 		initial.initial.insert(initial.initial.end(),{{r::STATE_AR0,1},{r::STATE_AR2,0x880+start},{r::STATE_AR3,0x1300},{r::STATE_AR6,0x7777},{r::STATE_BK,82}});
 		auto final=observation("26-retained-ring-words-and-both-pointer-updates",{{STATE_GENPC,0x603},{r::STATE_AR2,0x880+(start+26)%82},{r::STATE_AR3,0x131a},{r::STATE_AR6,0x7777},{r::STATE_RC,0}});

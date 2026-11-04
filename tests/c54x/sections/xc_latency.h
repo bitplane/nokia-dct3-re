@@ -5,7 +5,7 @@ namespace c54x_test {
 inline std::vector<clocked_register_case> section_cases()
 {
 	std::vector<clocked_register_case> cases;
-	for (unsigned staged = 0; staged < 2; ++staged)
+	constexpr bool staged = true;
 	for (unsigned kind = 0; kind < 6; ++kind)
 	for (unsigned gap = 0; gap < 4; ++gap)
 	for (unsigned slots = 1; slots <= 2; ++slots)

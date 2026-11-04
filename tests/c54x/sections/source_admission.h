@@ -8,6 +8,7 @@ inline std::vector<clocked_register_case> section_cases()
 	std::vector<clocked_register_case> cases;
 	for (unsigned index=0;index<domain_total_cases;++index) {
 		auto const input=select_domain(index);
+		if (input.context&4) continue; // Retain precisely the original staged subset.
 		// Base/control inputs differ only in the old before/after checkpoint bit.
 		if (!input.checkpoint && (input.context&8)) continue;
 		unsigned const mac_start=domain_cases+domain_tc0_cases+domain_control_cases;

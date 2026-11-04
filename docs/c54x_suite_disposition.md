@@ -14,6 +14,11 @@ The [frontend retirement inventory](c54x_frontend_retirement.md) classifies the
 atomic migration surface. It does not authorize deletion of independent
 assertions or establish staged parity.
 
+The seven paired-frontend sections now retain only their original staged
+subsets, removing 15,008 atomic-side cases/replays without changing staged
+expectations. Current registration totals 1,462,903 cases in 518 sections.
+Selected migration runs do not renew the complete checkpoint below.
+
 The integration checkpoint passes all 518 registered sections, linked firmware
 context/cold controls, the full host suite and seven affected handset gates.
 The canonical disposition records exact counts, source identity, timings and
