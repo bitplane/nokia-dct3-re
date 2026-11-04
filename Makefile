@@ -1131,6 +1131,8 @@ check-dsp-rom4-cosim:
 .PHONY: check-mu4-storage-original
 # Native evidence can include large NAND images; never default to tmpfs.
 NATIVE_SCRATCH_ROOT ?= $(abspath tmp/native-gates)
+# Lua drives these headless CPU-acceptance gates; host device discovery is unnecessary.
+NATIVE_HEADLESS_OPTIONS := -noreadconfig -midiprovider none -keyboardprovider none -mouseprovider none -lightgunprovider none -joystickprovider none
 # The 1 ms/byte upload plus two complete readbacks at the evidenced reset
 # divider exceed 1200 emulated seconds in the reset/retained fixture.
 MU4_STORAGE_SECONDS ?= 1800
@@ -1761,7 +1763,7 @@ verify-5110-menu: build
 			-rompath $(abspath $(MAME_DIR))/roms -nvram_directory "$$tmp/nvram" \
 			-video none -sound none -log -verbose -skip_gameinfo -nothrottle \
 			-seconds_to_run 11 \
-			-autoboot_script "$$script" >/dev/null; \
+			$(NATIVE_HEADLESS_OPTIONS) -autoboot_script "$$script" >/dev/null; \
 		grep -q 'input-press: .* name=menu' error.log; \
 		grep -q 'input-release: .* name=menu' error.log; \
 		if grep -Eq 'rom4_reset_request|TMS320C54x.*illegal|unsupported.*staged|staged.*unsupported|unimplemented.*C54x' error.log; then \
@@ -1845,7 +1847,7 @@ verify-5110-save-state: build
 			-rompath $(abspath $(MAME_DIR))/roms -nvram_directory "$$tmp/nvram" \
 			-video none -sound none -log -verbose -skip_gameinfo -nothrottle \
 			-seconds_to_run 11 \
-			-autoboot_script $(abspath tools/c54x_rom4_codec_restore.lua) >/dev/null; \
+			$(NATIVE_HEADLESS_OPTIONS) -autoboot_script $(abspath tools/c54x_rom4_codec_restore.lua) >/dev/null; \
 		$(PYTHON) $(abspath tools/c54x_rom4_codec_contract.py) \
 			$(abspath $(MAME_DIR)/roms/noki5110/nse1_rom4_dsp_program.bin) \
 			--restore-log error.log --require-restore-replay; \
