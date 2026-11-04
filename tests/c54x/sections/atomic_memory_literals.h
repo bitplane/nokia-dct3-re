@@ -48,6 +48,15 @@ inline std::vector<clocked_register_case> section_cases()
 			{r::STATE_AR2,form == 3 ? 0xf05U : 0xf00U},{r::STATE_AR5,0xf90},{r::STATE_SP,0xf00}},
 			{{false,source,value,0,false},{true,source + 1,value,0,false}});
 	}
+	append("LTD-younger-Read-wins-older-STLM-T",{0x880e,0x4c83},{{r::STATE_A,0x1234},{r::STATE_T,0x4444}},
+		{{r::STATE_A,0x1234},{r::STATE_T,0x6cac},{r::STATE_AR3,0xf90}},
+		{{false,0xf90,0x6cac,7},{true,0xe,0x1234,7},{true,0xf91,0x6cac,8}});
+	cases.back().checkpoint = 7;
+	cases.back().states.insert(cases.back().states.end()-1,
+		{7,observation("LTD-Read-publishes-T-after-older-STLM",{{r::STATE_T,0x6cac}})});
+	// STLM's T write is intermediate; the younger LTD owns final T.
+	auto &memory = cases.back().states.back().observation.expected_data;
+	memory.erase(std::remove_if(memory.begin(),memory.end(),[](auto const &word) { return word.address == 0xe; }),memory.end());
 	for (unsigned logical = 0; logical != 2; ++logical)
 		append("SUB-half-arithmetic-versus-logical",{0xf43f},{{r::STATE_A,0xfffffffffcULL},{r::STATE_ST1,logical ? 0U : 0x100U}},
 			{{r::STATE_A,logical ? 0x7ffffffffeULL : 0xfffffffffeULL}});

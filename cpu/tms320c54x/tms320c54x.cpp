@@ -4215,10 +4215,7 @@ void tms320c54x_device::pipeline_step()
 		if (!extended && BIT(mode, 7)) indirect_modify(mode, false, 3);
 	}
 	if (m_pipeline_valid[4] && staged_delay_copy(m_pipeline_word[4]))
-	{
 		m_pipeline_operand[4] = pipeline_read_data(m_pipeline_operand_address[4]);
-		if (!BIT(m_pipeline_word[4], 8)) m_t = m_pipeline_operand[4]; // LTD publishes T at Read.
-	}
 	if (m_pipeline_valid[3] && staged_data_copy(m_pipeline_word[3]))
 	{
 		u8 const mode = m_pipeline_word[3];
@@ -5735,8 +5732,8 @@ void tms320c54x_device::pipeline_step()
 		m_pipeline_operand[4] = m_t;
 	if (smem_t_product_read || (m_pipeline_valid[4] && (staged_poly(m_pipeline_word[4]) || staged_parallel_product(m_pipeline_word[4]))))
 		m_pipeline_immediate[4] = m_t;
-	if (m_pipeline_valid[4] && staged_dual_multiply(m_pipeline_word[4]))
-		// MPY/MAC/MACSU load T in Read (SPRU172C 4-101/4-82/4-91). An older
+	if (m_pipeline_valid[4] && (staged_dual_multiply(m_pipeline_word[4]) || (m_pipeline_word[4] & 0xff00) == 0x4c00))
+		// MPY/MAC/MACSU/LTD load T in Read (SPRU172C 4-101/4-82/4-91/4-81). An older
 		// Execute write must not overwrite this younger publication.
 		m_t = m_pipeline_operand[4];
 	if (m_pipeline_valid[4] && staged_parallel_load(m_pipeline_word[4]) && (m_pipeline_word[4] & 0xfd00) == 0xe400)

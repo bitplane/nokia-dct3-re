@@ -3973,6 +3973,12 @@ copies with independent T, pointer and source/destination results. Their
 short matrix is not a full long-address matrix. Repeat/block/XC composition
 and physical bus arbitration remain outside this qualification.
 
+LTD's T publication follows older Execute, like other Read-owned T producers;
+the source bus Read itself remains earlier in that same clock. An adjacent
+STLM-to-T/LTD case in `atomic_memory_literals` fails on the former early
+publication, checks T at clock 7, and restores there before the retained
+successor copy writes at clock 8. The 24 original cases remain (25 current).
+
 ABDST now shares SQDST's retained dual-source path. It adds the magnitude
 of old A's signed high-17 field to B (doubled under FRCT), then replaces A
 with `(X-Y)<<16`, with the documented status effects (SPRU172C page 4-2).

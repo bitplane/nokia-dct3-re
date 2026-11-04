@@ -15,7 +15,7 @@ through an expression: 241 lines and 39,048 cases. Counts describe entire
 sections, not atomic-only case counts. Helpers and firmware integration sources
 are additional migration work. The common case defaults to staged.
 
-Current validated progress: 101 sections (10,650 cases plus restores) migrated;
+Current validated progress: 101 sections (10,651 cases plus restores) migrated;
 36 of the original explicitly atomic sections remain, containing 822 cases.
 The baseline counts
 describe the retirement scope, not the current number of atomic assignments.
@@ -235,6 +235,11 @@ Read followed by source poison and save/replay. All original four cases remain
 hold and Prefetch refill, not the atomic schedule. Ten focused sections pass
 25,089 cases/restores; host checks pass 354 CPU-tool and 84 runner tests.
 
+One additional `atomic_memory_literals` case protects LTD's Read-owned T
+publication against an older STLM-to-T Execute write. It fails on the former
+early publication, checks T immediately after the shared clock and restores
+before the successor RAM write. All 24 baseline cases remain (25 current).
+
 ### Unresolved migration contrasts
 
 `atomic_register_copy_sequences` remains atomic. It writes `7728` under the
@@ -333,7 +338,7 @@ sections independently; do not run the complete suite after every edit.
 | `atomic_pending_far` | 2 | 38 | Staged validated; first-delay retirement checkpoint derived; pending transfer replay retained |
 | `atomic_program_mapping` | 13 | 68 | Migrate independent assertions; check staged admission |
 | `coefficient_mac_literals` | 6 | 38 | Atomic retained; first staged contrast: C54x case MACP-coefficient-no-store/0: register 22 actual=1 expected=0 mask=ffffffffffffffff |
-| `atomic_memory_literals` | 24 | 91 | Staged validated; ABDST/LTD/SUBB and original arithmetic/status/bus assertions retained |
+| `atomic_memory_literals` | 24 | 91 | Staged validated; baseline assertions plus LTD/STLM T-publication replay regression (25 current cases) |
 | `atomic_double_stores` | 8 | 40 | Migrate independent assertions; check staged admission |
 | `atomic_address_literals` | 4 | 33 | Migrate independent assertions; check staged admission |
 | `atomic_shifted_loads` | 7 | 36 | Migrate independent assertions; check staged admission |

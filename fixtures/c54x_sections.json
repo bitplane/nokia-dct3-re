@@ -193,7 +193,7 @@
   "atomic_pending_far": 2,
   "atomic_program_mapping": 13,
   "coefficient_mac_literals": 6,
-  "atomic_memory_literals": 24,
+  "atomic_memory_literals": 25,
   "atomic_double_stores": 8,
   "atomic_address_literals": 4,
   "atomic_shifted_loads": 7,
