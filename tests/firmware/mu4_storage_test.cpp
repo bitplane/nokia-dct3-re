@@ -29,15 +29,16 @@ public:
 	{
 		// Initial configured rate is replaced by the evidenced compatibility reset.
 		TMS320C54X(config, m_cpu, 13'000'000);
+		m_cpu->set_pipeline_frontend(true);
+		m_cpu->set_c5416_bus_profile(true);
 		// Sheet 4: R101 pulls CLKMD1/2/3 high. SPRS095P table 3-8,
 		// matching C5416 PGE pin/MMIO layout: 111 -> 0000, Y101 / 2.
 		// This is a compatible reset contract, not DA150 die identification.
 		m_cpu->set_pll_reference_clock(11'995'200);
 		m_cpu->set_follow_clkmd(true);
 		m_cpu->set_reset_clkmd(0);
-		// Only the fail-closed original-firmware diagnostic opts into bus waits.
+		// Native initializers use the compatible SWWSR/SWCR register grammar.
 		// Program/data bank ownership and physical READY wiring remain unvalidated.
-		if (!strcmp(config.options().bios(), "bootrecstage") || !strcmp(config.options().bios(), "bootrecmeta") || !strcmp(config.options().bios(), "bootrecac") || !strcmp(config.options().bios(), "bootopenstage") || !strcmp(config.options().bios(), "bootplaystage") || !strcmp(config.options().bios(), "bootplaystop")) m_cpu->set_c5416_bus_profile(true);
 		m_cpu->system_clock_cb().set([this](u32 hz) {
 			m_dma->set_unscaled_clock(hz);
 			m_mcbsp->set_unscaled_clock(hz);
@@ -49,6 +50,11 @@ public:
 		});
 		m_cpu->set_extended_program(true);
 		m_cpu->instruction_observer_cb().set([this](offs_t address, u16 opcode) {
+			if (original_bootstrap_profile())
+			{
+				if (address == 0x0e41) ++m_native_bootstrap_execute_entries[0];
+				else if (address == 0x26d62) ++m_native_bootstrap_execute_entries[1];
+			}
 			if (recorder_ac_profile() && m_recorder_overlay_checked) observe_recorder_ingress(address,opcode);
 			if (recorder_ac_profile() && m_recorder_overlay_checked) observe_recording_transform(address,opcode);
 			if (measurement_profile() && (address == 0x3b021 || address == 0x3b02a || address == 0x3b034 || address == 0x3b038))
@@ -1081,6 +1087,7 @@ private:
 	unsigned m_native_reset_leg = 0;
 	unsigned m_native_reset_settings_mask = 0;
 	unsigned m_native_bootstrap_entries = 0, m_native_bootstrap_resident_entries = 0;
+	std::array<unsigned, 2> m_native_bootstrap_execute_entries = {};
 	unsigned m_native_bootstrap_paths[10] = {};
 	unsigned m_native_descriptor_reads = 0;
 	unsigned m_native_descriptor_writes = 0;
@@ -2302,7 +2309,7 @@ private:
 			m_command->adjust(attotime::from_msec(1));
 			return;
 		}
-		if (cold_saved_profile() && m_command_tx_words.size() > 14)
+		if (original_bootstrap_profile() && m_command_tx_words.size() > 14)
 		{
 			unsigned const begin = m_cold_response_begin;
 			if (m_command_tx_words.size() < begin + 2) return;
@@ -2533,7 +2540,7 @@ private:
 			position += length;
 		}
 		if (position != actual.size() || differences) fatalerror("MU4 native replay differs in %u registered emulation state items", differences);
-		logerror("mu4_native_replay: PASS mid_rx_byte=1 complete_legs=2 emulation_state_equal=1 compared_items=%u frontend_timer_items=%u rx_words=11 tx_words=14 processing=0\n", compared, frontend);
+		logerror("mu4_native_replay: PASS mid_rx_byte=1 complete_legs=2 emulation_state_equal=1 compared_items=%u frontend_timer_items=%u rx_words=%u tx_words=%u processing=0\n", compared, frontend, m_command_rx_irqs, unsigned(m_command_tx_words.size()));
 		return false;
 	}
 	TIMER_CALLBACK_MEMBER(command_input)
@@ -2904,8 +2911,8 @@ private:
 	{
 		auto const disable = machine().disable_side_effects();
 		auto &data = m_cpu->space(AS_DATA);
-		unsigned const rx_words = 11 + (cold_saved_profile() ? 3 * m_cold_notifications : 0);
-		unsigned const tx_words = 14 + (cold_saved_profile() ? 16 * m_cold_notifications : 0);
+		unsigned const rx_words = 11 + (original_bootstrap_profile() ? 3 * m_cold_notifications : 0);
+		unsigned const tx_words = 14 + (original_bootstrap_profile() ? 16 * m_cold_notifications : 0);
 		if (m_command_ack_cursor != 3 || m_command_tx_words.size() != tx_words || m_command_wire_bit_count ||
 			data.read_word(0x1657) != rx_words % 80 || data.read_word(0x1658) != rx_words % 80 || data.read_word(0x1659) != tx_words % 80 ||
 			data.read_word(0x165a) != tx_words % 80 || data.read_word(0x165e) || data.read_word(0x165d) || data.read_word(0xbb80))
@@ -3424,6 +3431,7 @@ private:
 			save_item(NAME(m_native_command_cursor)); save_item(NAME(m_native_command_waits));
 			save_item(NAME(m_cold_catalog_scans)); save_item(NAME(m_cold_metadata_reads));
 			save_item(NAME(m_cold_notifications)); save_item(NAME(m_cold_response_begin));
+			save_item(NAME(m_native_bootstrap_execute_entries));
 			save_item(NAME(m_cold_title_publications)); save_item(NAME(m_cold_title_verified));
 			save_item(NAME(m_playback_requests)); save_item(NAME(m_playback_inspections)); save_item(NAME(m_playback_decoder_loads));
 			save_item(NAME(m_playback_overlay_checked));
@@ -4140,7 +4148,12 @@ private:
 		}
 		// Disable the unrelated core timer so it cannot wake the completion IDLE.
 		program.write_word(0x17fe, 0x7726); program.write_word(0x17ff, 0x0010);
-		program.write_word(0xff80, 0xf073); program.write_word(0xff81, 0x17fe);
+		// Isolated routine calls bypass the firmware's memory-interface setup.
+		// Keep their existing zero-wait ABI explicit under the compatible bus
+		// profile. Native startup still executes its own SWWSR/SWCR initializer.
+		bool const routine_abi = m_phase < 25;
+		if (routine_abi) { program.write_word(0x17fc, 0x7728); program.write_word(0x17fd, 0); }
+		program.write_word(0xff80, 0xf073); program.write_word(0xff81, routine_abi ? 0x17fc : 0x17fe);
 		// These isolated routine fixtures bypass the original clock initializer.
 		// Their instruction-budget deadlines were established at 13 MHz; retain
 		// that budget at the selected reset clock without changing NAND latency.
@@ -4323,7 +4336,7 @@ private:
 						unsigned(m_playback_status_replied), m_native_command_cursor, m_playback_processing[2],
 						unsigned(m_cpu->state_int(tms320c54x_device::STATE_IDLE)), unsigned(m_cpu->state_int(STATE_GENPC)), machine().time().as_double());
 			}
-			if (!m_native_bootstrap_entries || m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL))
+			if (!m_native_bootstrap_execute_entries[0] || m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL))
 			{
 				if (staged_original_profile())
 					logerror("mu4_staged_stop: pc=%06x nand_reads=%u nand_strobes=%zu ar0=%04x ar1=%04x ar2=%04x ready=%u acceptance=0\n",
@@ -4336,7 +4349,7 @@ private:
 			}
 			auto const disable = machine().disable_side_effects();
 			logerror("mu4_original_bootstrap_frontier: entry_count=%u resident_count=%u pc=%06x st1=%04x imr=%04x ifr=%04x flag374d=%04x nand_reads=%u stream_words=%u tail_ms=20000 board_boot=0 music_decode=0\n",
-				m_native_bootstrap_entries, m_native_bootstrap_resident_entries, unsigned(m_cpu->state_int(STATE_GENPC)),
+				m_native_bootstrap_execute_entries[0], m_native_bootstrap_execute_entries[1], unsigned(m_cpu->state_int(STATE_GENPC)),
 				unsigned(m_cpu->state_int(tms320c54x_device::STATE_ST1)), unsigned(m_cpu->state_int(tms320c54x_device::STATE_IMR)),
 				unsigned(m_cpu->state_int(tms320c54x_device::STATE_IFR)), m_cpu->space(AS_DATA).read_word(0x374d), m_data_reads, m_stream_words);
 			auto &data = m_cpu->space(AS_DATA);
@@ -4448,7 +4461,7 @@ private:
 			if (finish_native_replay()) return;
 			if (system_bios() == 18)
 			{
-				if (m_native_reset_leg != 2 || m_native_bootstrap_entries != 2 || m_native_bootstrap_resident_entries != 2)
+				if (m_native_reset_leg != 2 || m_native_bootstrap_execute_entries != std::array<unsigned, 2>{2, 2})
 					fatalerror("MU4 full startup did not repeat after the mid-byte reset");
 				logerror("mu4_original_bootstrap_reset: PASS mid_rx_byte=1 controller_cleared=1 original_startup_legs=2 retained_nand=1 rx_words=11 tx_words=14 firmware_state_forcing=0 board_reset=0\n");
 			}
@@ -5180,8 +5193,14 @@ private:
 					if (found == std::end(candidates)) return;
 					unsigned &count = (write ? m_native_runtime_writes : m_native_runtime_reads)[found - std::begin(candidates)];
 					if (count++ < 16)
-						logerror("mu4_native_runtime_word: leg=%u access=%s address=%04x value=%04x pc=%06x\n",
-							m_native_reset_leg, write ? "write" : "read", unsigned(address), value, unsigned(m_cpu->state_int(STATE_GENPC)));
+					{
+						u32 owner = m_cpu->state_int(tms320c54x_device::STATE_EXECPC);
+						u16 opcode;
+						if (!write && !m_cpu->observe_staged_data_read(address, owner, opcode)) owner = 0xffffffff;
+						logerror("mu4_native_runtime_word: leg=%u access=%s address=%04x value=%04x pc=%06x owner=%06x\n",
+							m_native_reset_leg, write ? "write" : "read", unsigned(address), value,
+							unsigned(m_cpu->state_int(STATE_GENPC)), unsigned(owner));
+					}
 				};
 				m_cpu->space(AS_DATA).install_read_tap(0x374a, 0x3b13, "mu4_native_runtime_read",
 					[observe](offs_t address, u16 &value, u16) { observe(address, value, false); });
@@ -5650,7 +5669,7 @@ private:
 						fatalerror("MU4 unacknowledged status response did not reproduce three complete wire copies");
 					logerror("mu4_native_status_noack: PASS tx_words=36 pin_decode=1 response_copies=3 peer_ack=0 processing=0\n");
 				}
-				if (system_bios() >= 10 && system_bios() != 13 && system_bios() != 14 &&
+				if (system_bios() >= 10 && system_bios() != 13 &&
 					(system_bios() != 15 || m_native_command_paths[5]))
 				{
 					verify_native_status();
@@ -5663,9 +5682,10 @@ private:
 				if (m_native_reset_leg != 2 || m_native_reset_settings_mask != 15)
 					fatalerror("MU4 native reset fixture missed its reset or firmware-created settings file");
 				logerror("mu4_native_reset_storage: PASS mid_rx_byte=1 controller_cleared=1 retained_payloads=6 settings_mask=f original_reload=1\n");
-				if (m_native_command_cursor || m_command_rx_irqs || !m_command_tx_words.empty() || m_native_command_paths[5])
-					fatalerror("MU4 reset frontier changed; re-evaluate the native control-loop restart contract");
-				logerror("mu4_native_reset_frontier: control_restart=0 dispatcher=0 rx_words=0 tx_words=0 tail_ms=%u stream_equivalence=0 board_reset=0 music_decode=0\n", native_worker_tail_ms());
+				// Eight request words plus three independently tracked ACK words.
+				if (m_native_command_cursor != 8 || !m_native_command_paths[5])
+					fatalerror("MU4 reset did not restart its original command dispatcher");
+				logerror("mu4_native_reset_frontier: control_restart=1 rx_words=11 tx_words=14 tail_ms=%u stream_equivalence=0 board_reset=0 music_decode=0\n", native_worker_tail_ms());
 			}
 			capture_native_ram("settled");
 			if (system_bios() == 15)

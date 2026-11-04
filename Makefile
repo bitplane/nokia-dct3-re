@@ -1212,7 +1212,9 @@ check-mu4-storage-original: build
 			replay) grep -q 'mu4_native_status_transaction: PASS' error.log; grep -q 'mu4_native_receive_pins: PASS' error.log; grep -q 'mu4_native_replay: PASS' error.log;; \
 			reset) grep -q 'mu4_native_reset_storage: PASS' error.log; \
 				grep -q 'mu4_native_worker_activation: PASS' error.log; grep -q 'mu4_native_reset_request:' error.log; \
-				grep -q 'mu4_native_reset_controller:' error.log; grep -q 'mu4_native_reset_frontier: control_restart=0' error.log;; \
+				grep -q 'mu4_native_reset_controller:' error.log; \
+				grep -q 'mu4_native_status_transaction: PASS' error.log; grep -q 'mu4_native_receive_pins: PASS' error.log; \
+				grep -q 'mu4_native_reset_frontier: control_restart=1 rx_words=11 tx_words=14 ' error.log;; \
 			measure) grep -q 'mu4_native_measurement: PASS' error.log; grep -q 'mu4_native_measurement_result: PASS' error.log; grep -q 'mu4_native_tone: PASS' error.log; grep -q 'mu4_native_worker_activation: PASS' error.log;; esac
 
 .PHONY: check-mu4-retained-original
@@ -1230,6 +1232,7 @@ check-mu4-retained-original:
 		cmp "$$tmp/nvram/mu4nand_13/nand" "$$tmp/nvram/mu4nand_14/nand"; \
 		cd "$$tmp/retained"; $(abspath $(MAME_DIR)/mame) mu4nand -bios retained \
 			-rompath "$$tmp/seed/roms" -nvram_directory "$$tmp/nvram" \
+			$(NATIVE_HEADLESS_OPTIONS) \
 			-video none -sound none -nothrottle -debugger none -log -nonvram_save \
 			-seconds_to_run 1200 >output.log 2>&1 || { cat output.log; cat error.log; exit 1; }; \
 		cat output.log; cat error.log; \
@@ -1241,9 +1244,9 @@ check-mu4-retained-original:
 		grep -q 'mu4_native_status_transaction: PASS' error.log; \
 		grep -q 'mu4_native_receive_pins: PASS' error.log; \
 		grep -q 'mu4_native_retained_control: active=1 rx_words=11 tx_words=14 tail_ms=20000 ' error.log; \
-		grep -q 'mu4_native_runtime_word: leg=2 access=read address=374d value=0001 pc=0290ea' "$$tmp/seed/error.log"; \
-		grep -q 'mu4_native_runtime_word: leg=0 access=read address=374d value=0000 pc=0290ea' error.log; \
-		grep -q 'mu4_native_runtime_word: leg=0 access=write address=374d value=0001 pc=0290ef' error.log; \
+		grep -Eq 'mu4_native_runtime_word: leg=2 access=read address=374d value=0001 pc=[0-9a-f]+ owner=0290e8' "$$tmp/seed/error.log"; \
+		grep -Eq 'mu4_native_runtime_word: leg=0 access=read address=374d value=0000 pc=[0-9a-f]+ owner=0290e8' error.log; \
+		grep -Eq 'mu4_native_runtime_word: leg=0 access=write address=374d value=0001 pc=[0-9a-f]+ owner=0290ec' error.log; \
 		for snapshot in "$$tmp/seed/mu4_ram_loaded_leg0.bin" "$$tmp/seed/mu4_ram_loaded_leg2.bin" \
 			"$$tmp/seed/mu4_ram_settled_leg2.bin" "$$tmp/retained/mu4_ram_loaded_leg0.bin" \
 			"$$tmp/retained/mu4_ram_settled_leg0.bin"; do \
@@ -1288,6 +1291,7 @@ check-mu4-bootstrap-original: build
 		cp "$$input" "$$tmp/nvram/$$nvtag/nand"; \
 		cd "$$tmp"; $(abspath $(MAME_DIR)/mame) mu4nand -bios "$$bios" \
 			-rompath "$$source/seed/roms" -nvram_directory "$$tmp/nvram" \
+			$(NATIVE_HEADLESS_OPTIONS) \
 			-video none -sound none -nothrottle -debugger none -log -nonvram_save \
 			-seconds_to_run 60 >output.log 2>&1 || { cat output.log; cat error.log; exit 1; }; \
 		cat output.log; cat error.log; \

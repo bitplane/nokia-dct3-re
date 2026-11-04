@@ -2,6 +2,24 @@
 
 Original-application CPU composition, bus and atomic negative-control maps. [C54x execution contracts](c54x_execution_contracts.md) owns instruction qualification and the complete regression checkpoint. These application observations do not promote handset or waveform acceptance.
 
+## Current composition
+
+`mu4nand` uses staged execution and C5416-compatible SWWSR/BSCR/SWCR decoding.
+Native startup runs its original memory-interface initializer. Isolated routine
+wrappers explicitly supply their existing zero-wait ABI, since they bypass that
+initializer; deadlines and NAND timing are unchanged. AAC's separate ABI bench
+already used staged execution. Atomic comparisons below are archived evidence.
+
+Fresh setup, reset/reload and fresh-process retained storage pass all six
+complete-file comparisons and native status/pin checks. Full uploaded startup
+also passes mid-byte replay with exact registered-state comparison. Bootstrap
+entry counts use Execute observations, not speculative fetch counts. Runtime
+RAM observations distinguish the operand/Execute owner from the live PC.
+The bootstrap peer acknowledges the same validated class-0 selector-02
+notification grammar used by the saved-track fixture: sixteen words, checksum
+and next-token checks, with three-word ACKs. These are serial-peer inputs, not
+firmware state edits. Board/mask-ROM reset and music decoding remain separate.
+
 ## Absolute ADD from mapped SP
 
 Absolute ADD `00f8/01f8 0018` now reads mapped SP, independent of CPL.

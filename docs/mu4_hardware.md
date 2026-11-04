@@ -47,13 +47,14 @@ verifies six stereo sample-energy blocks against independent arithmetic from
 the live input reads, followed by an acknowledged response and mode-zero
 cleanup. The same profile independently verifies generated tone buffers,
 including phase wraparound; analog audio and music decoding remain unvalidated.
-The `reset` diagnostic verifies mid-byte controller reset and retained-file
-reload, but the resident command service does not resume in its bounded
-window. It is not a successful reboot acceptance profile.
+The `reset` diagnostic verifies mid-byte controller reset, retained-file reload
+and resumed resident command service through the exact 11-word receive and
+14-word transmit status exchange. This is routine-level software restart,
+not physical board or unavailable mask-ROM reset acceptance.
 The paired `check-mu4-retained-original` test saves the reset diagnostic's
-stalled-endpoint NAND, then a fresh `retained` process mounts the identical
+firmware-created NAND, then a fresh `retained` process mounts the identical
 image without erasure or a runtime snapshot and completes native status
-service. Persistent NAND contents alone do not explain the reset stall.
+service. Both processes preserve the six uploads and four settings files.
 The `bootstrap` profile loads the complete original `aa55` upload and
 executes its uploaded `ff80` reset-vector prelude, original context
 initializer, directory-selected resident loader and resident startup.
@@ -1889,18 +1890,17 @@ observes firmware-created `TRACKLST.BIN` (1,800 bytes) and
 fixture data. Reproduce with
 `make check-mu4-storage-original MU4_STORAGE_BIOS=reset`.
 
-This diagnostic does **not** establish successful restart. During the new
-20-second worker window, the resident command dispatcher is unobserved and
-no request bytes or response bytes complete. The gate checks that bounded
-frontier separately from storage/controller reset; it does not apply the
-erased-media boot's sustained-interrupt expectation to retained settings.
-This routine-level restart omits the original bootstrap's context
-initialization; it is a negative control, not the full-startup reset
-frontier. The complete uploaded software lifecycle below passes restart
-and native status service. Neither establishes physical board reset wiring
-or unavailable mask-ROM behavior.
+The staged-only composition completes the native status transaction in the
+20-second post-reset worker window: eight request words and three separately
+tracked ACK words are received through pins, fourteen response words are
+transmitted, and both queues settle empty with no retries. The gate requires
+the existing exact status/pin assertions as well as retained storage and an
+active dispatcher. The old atomic capture's silent-dispatcher expectation is
+not retained as a required failure. This routine-level restart omits the
+original bootstrap's context initialization; neither it nor the full uploaded
+software lifecycle establishes physical board reset or unavailable mask ROM.
 The paired `check-mu4-retained-original` gate runs the `reset` diagnostic
-and saves its stalled-endpoint medium through MAME's native NVRAM interface.
+and saves its firmware-created medium through MAME's native NVRAM interface.
 It validates the complete 69,206,016-byte device image, copies
 it unchanged to the fresh `retained` BIOS's NVRAM name, and disables saving
 in that second process. Separate working directories isolate the logs;
@@ -1912,8 +1912,7 @@ The complete images remain ignored run artifacts, not redistributed ROMs.
 The fresh process rereads all six payloads and all four settings entries,
 passes sustained streaming/interrupt checks, and completes the exact
 11-byte receive/14-byte transmit native status transaction with no retries
-and empty queues. Thus persistent NAND contents alone are insufficient to cause
-the routine-reset diagnostic's stall. The complete original startup
+and empty queues. The complete original startup
 preserves that medium and supplies its own initialization, as verified
 below; the comparison alone does not prove board reset behavior.
 
@@ -1921,7 +1920,14 @@ The paired gate also captures side-effect-disabled data-RAM observations at
 the completed loader and settled endpoints. Each file contains 65,408
 little-endian words for addresses `0080..ffff` (130,816 bytes); CPU/MMIO
 registers below `0080` are omitted. These are observations, never replay
-inputs. At the loaded boundary, the reset and fresh-process paths differ
+inputs. Runtime read logs identify the retained operand owner, and write logs
+identify Execute, rather than treating a speculative PC as an instruction
+address. The gate checks the `374d` read at `02:90e8` and write at `02:90ec`.
+
+The following initialization comparison is retained from the old atomic
+capture. Its literal/table census remains useful, but the silent-command
+frontier is superseded by the staged reset/status acceptance above.
+At the loaded boundary, the reset and fresh-process paths differed
 in 24,345 words. Within `2000..3fff`, only these nine differ:
 
 | Word | Reset | Fresh process |
