@@ -356,6 +356,7 @@ private:
 	u32 m_pipeline_block_fetch_remaining = 0;
 	std::array<bool, 6> m_pipeline_early_write_deferred = {};
 	std::array<bool, 6> m_pipeline_peripheral_wait_paid = {};
+	bool m_pipeline_peripheral_read_pending = false;
 	std::array<bool, 6> m_pipeline_io_wait_paid = {};
 	u8 m_pipeline_io_wait_remaining = 0;
 	bool m_pipeline_io_ready_required = false;

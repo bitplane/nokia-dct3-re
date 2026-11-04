@@ -5294,6 +5294,16 @@ instruction latency. Offset READA repeat/control compositions remain excluded.
 
 ## Mapped TRN publication and protected interrupt drain
 
+Adjacent STM CLKMD / LDM CLKMD is qualified without inserting a separating
+instruction. Both peripheral wait clocks are paid, the older Write completes,
+and a saved pending Read holds its slot for the next bus clock. IRQ acceptance
+is blocked until that Read completes. The original register-copy fixture retains
+CLKMD=3 readback and adds snapshots immediately before/after the deferred Read.
+Other simultaneous peripheral conflicts retain their explicit guards; this is
+a partial arbiter, not a measured silicon phase claim. MVMD BRC uses an ordinary
+Read sample: its adjacent STLM sees the old BRC, while a separating word sees
+the new one. Both copies and their exact bus sequences remain tested.
+
 `interrupt_entry` retains twelve entry-stage/save/vector-poison/cancellation
 cases and checks the handler's logical Execute words. Its IMR poison deliberately
 enables another pending source during entry; that unrelated source is masked

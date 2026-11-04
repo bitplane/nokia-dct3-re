@@ -336,7 +336,7 @@ constexpr bool staged_indexed_move(u16 word)
 
 constexpr bool staged_direct_mvmd(u16 word)
 {
-	return (word & 0xfff8) == 0x7310 || word == 0x7308 || word == 0x730b || word == 0x730e || word == 0x730f || word == 0x7319;
+	return (word & 0xfff8) == 0x7310 || word == 0x7308 || word == 0x730b || word == 0x730e || word == 0x730f || word == 0x7319 || word == 0x731a;
 }
 
 constexpr bool decode_staged_move(u16 word)
@@ -1787,6 +1787,7 @@ void tms320c54x_device::device_start()
 	save_item(NAME(m_pipeline_valid));
 	save_item(NAME(m_pipeline_early_write_deferred));
 	save_item(NAME(m_pipeline_peripheral_wait_paid));
+	save_item(NAME(m_pipeline_peripheral_read_pending));
 	save_item(NAME(m_pipeline_io_wait_paid));
 	save_item(NAME(m_pipeline_io_wait_remaining));
 	save_item(NAME(m_pipeline_io_ready_required));
@@ -3060,6 +3061,7 @@ void tms320c54x_device::reset_pipeline()
 	m_pipeline_block_start = m_pipeline_block_end_address = m_pipeline_block_fetch_remaining = 0;
 	m_pipeline_early_write_deferred.fill(false);
 	m_pipeline_peripheral_wait_paid.fill(false);
+	m_pipeline_peripheral_read_pending = false;
 	m_pipeline_io_wait_paid.fill(false);
 	m_pipeline_io_wait_remaining = 0;
 	m_pipeline_io_ready_required = false;
@@ -3142,6 +3144,15 @@ void tms320c54x_device::set_pipeline_frontend(bool enabled)
 void tms320c54x_device::pipeline_step()
 {
 	++m_pipeline_cycles;
+	if (m_pipeline_peripheral_read_pending)
+	{
+		// The older peripheral write used the preceding bus cycle. Retain
+		// this Read slot until its own access completes, without re-executing
+		// the older instruction or sampling the register twice.
+		m_pipeline_operand[4] = pipeline_read_data(m_pipeline_operand_address[4]);
+		m_pipeline_peripheral_read_pending = false;
+		return;
+	}
 	if (software_wait_enabled())
 	{
 		bool const read = m_pipeline_valid[3] && staged_port_read(m_pipeline_word[3]);
@@ -3370,7 +3381,9 @@ void tms320c54x_device::pipeline_step()
 	// peripheral conflicts still require their own ordering qualification.
 	bool const serial_retry_pair = read_peripheral && write_peripheral &&
 		m_pipeline_word[4] == 0x7721 && (m_pipeline_word[3] & 0xfeff) == 0x4820;
-	if (read_peripheral && write_peripheral && !serial_retry_pair)
+	bool const clock_read_after_write = read_peripheral && write_peripheral &&
+		m_pipeline_word[4] == 0x7758 && (m_pipeline_word[3] & 0xfeff) == 0x4858;
+	if (read_peripheral && write_peripheral && !serial_retry_pair && !clock_read_after_write)
 	{
 		logerror("%s: simultaneous staged peripheral read/write arbitration is unsupported read_pc=%06x read_op=%04x read_address=%04x write_pc=%06x write_op=%04x write_address=%04x read_wait_paid=%u write_wait_paid=%u\n",
 			machine().describe_context(), unsigned(m_pipeline_address[3]), m_pipeline_word[3], m_pipeline_operand_address[3],
@@ -3380,7 +3393,7 @@ void tms320c54x_device::pipeline_step()
 		m_illegal = true;
 		return;
 	}
-	unsigned const access_stage = serial_retry_pair && !m_pipeline_peripheral_wait_paid[4] ? 4 : read_peripheral || move_peripheral ? 3 : 4;
+	unsigned const access_stage = (serial_retry_pair || clock_read_after_write) && !m_pipeline_peripheral_wait_paid[4] ? 4 : read_peripheral || move_peripheral ? 3 : 4;
 	if ((read_peripheral || write_peripheral || move_peripheral) && !m_pipeline_peripheral_wait_paid[access_stage])
 	{
 		// SPRU172C establishes one extra peripheral-access clock. Holding
@@ -4835,7 +4848,8 @@ void tms320c54x_device::pipeline_step()
 	bool const late_mapped_t_read = read_memory_operand && smem_t_product_read && m_pipeline_operand_address[4] == 0x0e;
 	if (read_memory_operand && !late_mapped_accumulator_read && !late_mapped_t_read && !retained_ar_operand_read)
 	{
-		m_pipeline_operand[4] = pipeline_read_data(m_pipeline_operand_address[4]);
+		if (clock_read_after_write) m_pipeline_peripheral_read_pending = true;
+		else m_pipeline_operand[4] = pipeline_read_data(m_pipeline_operand_address[4]);
 		if (staged_memory_immediate_multiply(m_pipeline_word[4])) m_t = m_pipeline_operand[4];
 	}
 	// TRAP shares vector/stack entry, but preserves INTM and IFR (SPRU172C 4-193).
@@ -6233,7 +6247,7 @@ void tms320c54x_device::pipeline_accept_interrupt()
 		m_pipeline_address[3] == m_pipeline_control_address + 2 && staged_absolute_load(m_pipeline_word[3]);
 	bool const control_protected = m_pipeline_control_words && !(near_branch_retired && retained_load_delay);
 	if ((!intm_protected || m_nmi_pending) && !m_interrupt_entry_stage && !m_pipeline_vector_pending && !m_pipeline_decode_remaining &&
-		!m_pipeline_mvdp_wait && !m_pipeline_read_a_wait && !m_pipeline_write_a_wait && !m_pipeline_acc_transfer_pending && !m_pipeline_cc_pending && !m_pipeline_repeat_active && !m_pipeline_xc_active && !control_protected && !m_pipeline_long_store_pending && !m_pipeline_program_move_pending && !m_pipeline_coefficient_pending && !m_pipeline_dp_wait && accept_interrupt())
+		!m_pipeline_peripheral_read_pending && !m_pipeline_mvdp_wait && !m_pipeline_read_a_wait && !m_pipeline_write_a_wait && !m_pipeline_acc_transfer_pending && !m_pipeline_cc_pending && !m_pipeline_repeat_active && !m_pipeline_xc_active && !control_protected && !m_pipeline_long_store_pending && !m_pipeline_program_move_pending && !m_pipeline_coefficient_pending && !m_pipeline_dp_wait && accept_interrupt())
 	{
 		m_pipeline_return_pc = u16(m_pipeline_valid[1] ? m_pipeline_address[1] :
 			m_pipeline_valid[0] ? m_pipeline_address[0] : m_pipeline_fetch_address);

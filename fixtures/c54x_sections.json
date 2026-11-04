@@ -238,7 +238,7 @@
   "atomic_multiply_move_literals": 7,
   "atomic_conditional_slot_literals": 10,
   "atomic_mapped_load_sequences": 4,
-  "atomic_register_copy_sequences": 4,
+  "atomic_register_copy_sequences": 7,
   "atomic_guard_conditions": 18,
   "atomic_memory_alu_literals": 9,
   "atomic_mmr_transfer_literals": 4,

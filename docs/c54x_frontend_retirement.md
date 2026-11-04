@@ -15,8 +15,8 @@ through an expression: 241 lines and 39,048 cases. Counts describe entire
 sections, not atomic-only case counts. Helpers and firmware integration sources
 are additional migration work. The common case defaults to staged.
 
-Current validated progress: 134 sections (11,455 cases plus restores) migrated;
-3 of the original explicitly atomic sections remain, containing 36 cases.
+Current validated progress: 135 sections (11,462 cases plus restores) migrated;
+2 of the original explicitly atomic sections remain, containing 32 cases.
 The baseline counts
 describe the retirement scope, not the current number of atomic assignments.
 The seven originally paired sections are now staged-only: 24,040 cases remain
@@ -342,12 +342,14 @@ before the successor RAM write. All 24 baseline cases remain (25 current).
 
 ### Unresolved migration contrasts
 
-`atomic_register_copy_sequences` remains atomic. It writes `7728` under the
-legacy default bus profile. A standard-SWWSR trial of the register-copy sequence
-passes admission but rejects simultaneous staged peripheral arbitration:
-`4858` reads CLKMD at PC `0607` while `7758` writes it at PC `0605`.
-Resolve opcode admission and peripheral arbitration respectively, rather than
-weakening the illegal-state check or inserting gaps into the original sequence.
+`atomic_register_copy_sequences` now uses the standard SWWSR profile and keeps
+its adjacent CLKMD store/load intact. A saved pending Read serializes that
+specific peripheral conflict after the older Write. Two added replay prefixes
+cover either side of the Read; an added separated BRC-copy contrast checks the
+new word while the original adjacent copy explicitly reads the old word.
+The seven current cases preserve the original values outside that documented
+Read-before-Execute distinction. Remaining original atomic sections cover
+peripheral cost classes and waited I/O/control composition.
 
 These are migration questions, not established silicon defects. An atomic
 expectation is not automatically correct where implementations disagree.
@@ -448,7 +450,7 @@ sections independently; do not run the complete suite after every edit.
 | `atomic_multiply_move_literals` | 7 | 59 | Migrated; results retained, AR latency corrected to TI contract. |
 | `atomic_conditional_slot_literals` | 10 | 55 | Validated staged migration; assertions retained |
 | `atomic_mapped_load_sequences` | 4 | 53 | Staged validated; same-clock Read/Write ordering made explicit; values retained |
-| `atomic_register_copy_sequences` | 4 | 43 | Migrate independent assertions; check staged admission |
+| `atomic_register_copy_sequences` | 4 | 43 | Migrated; seven current cases cover serialized CLKMD Read, pending replay and adjacent/separated BRC copies. |
 | `atomic_guard_conditions` | 18 | 41 | Migrate independent assertions; check staged admission |
 | `atomic_memory_alu_literals` | 9 | 40 | Migrate independent assertions; check staged admission |
 | `atomic_mmr_transfer_literals` | 4 | 45 | Staged validated; same-clock peripheral Read/older Write order explicit; results retained |
