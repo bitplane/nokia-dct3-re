@@ -67,6 +67,8 @@ def main():
             result = subprocess.run([
                 str(binary), "nse5verify", "-bios", bios, "-rompath", str(run),
                 "-noreadconfig", "-video", "none", "-sound", "none", "-nothrottle",
+                "-joystickprovider", "none", "-midiprovider", "none",
+                "-keyboardprovider", "none", "-mouseprovider", "none", "-lightgunprovider", "none",
                 "-seconds_to_run", "3", "-skip_gameinfo", "-window", "-log"],
                 cwd=work, capture_output=True, text=True, timeout=45)
             output = result.stdout + result.stderr

@@ -18,6 +18,15 @@ public:
 	void verifier(machine_config &config)
 	{
 		TMS320C54X(config, m_cpu, 13'000'000);
+		m_cpu->set_pipeline_frontend(true);
+		m_cpu->set_standard_swwsr(true);
+		m_cpu->instruction_observer_cb().set([this](offs_t address, u16 opcode) {
+			// Prefetch may legitimately cross the end of the upload while a
+			// branch drains. Bound executed instructions, not that fetch cursor.
+			if ((address < 0x0f00 || address >= (nse5() ? 0x0fd2 : 0x0fdf)) &&
+					!(nse5() && address >= 0x8000))
+				throw emu_fatalerror(1, "NSM3 verifier escaped staged image: pc=%04x block=%u",unsigned(address),m_block);
+		});
 		NOKIA_COBBA(config, m_cobba, 0);
 		m_cpu->set_addrmap(AS_PROGRAM, &nsm3_verifier_state::program_map);
 		m_cpu->set_addrmap(AS_DATA, &nsm3_verifier_state::data_map);
@@ -71,7 +80,7 @@ private:
 			return value;
 		}
 		throw emu_fatalerror(1, "NSM3 verifier requires peripheral read: port=%04x pc=%04x blocks=%u",
-			u16(offset), u16(m_cpu->state_int(tms320c54x_device::STATE_PC)), m_block);
+			u16(offset), u16(m_cpu->state_int(tms320c54x_device::STATE_READPC)), m_block);
 	}
 	void io_w(offs_t offset, u16 data)
 	{
@@ -125,10 +134,11 @@ private:
 	{
 		auto &data = m_cpu->space(AS_DATA);
 		unsigned const pc = m_cpu->state_int(tms320c54x_device::STATE_PC);
-		if ((pc < 0x0f00 || pc >= (nse5() ? 0x0fd2 : 0x0fdf)) &&
-				!(nse5() && pc >= 0x8000))
-			throw emu_fatalerror(1, "NSM3 verifier escaped staged image: pc=%04x block=%u", pc, m_block);
-		if (data.read_word(0x0801) != 0xffff)
+		if (m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL))
+			throw emu_fatalerror(1, "NSM3 verifier rejected instruction: pc=%04x block=%u",pc,m_block);
+		// Publication copies three words before the terminal IDLE. Wait for
+		// that boundary rather than sampling a partial staged transfer.
+		if (data.read_word(0x0801) != 0xffff && m_cpu->state_int(tms320c54x_device::STATE_IDLE))
 			throw emu_fatalerror(0, "NSM3 verifier publication: blocks=%u word0=%04x word1=%04x word2=%04x word3=%04x pc=%04x fingerprint=%04x%04x pmst=%04x",
 				m_block, data.read_word(0x0800), data.read_word(0x0801), data.read_word(0x0802), data.read_word(0x0803), pc,
 				data.read_word(nse5() ? 0x1f0e : 0x04f7), data.read_word(nse5() ? 0x1f0f : 0x04f8), u16(m_cpu->state_int(tms320c54x_device::STATE_PMST)));

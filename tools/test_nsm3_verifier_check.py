@@ -5,13 +5,18 @@ from tools.nsm3_verifier_check import check, check_cobba
 
 class VerifierFrontierTest(unittest.TestCase):
     def setUp(self):
-        self.output = "NSM3 verifier requires peripheral read: port=002d pc=0f9f blocks=116"
+        self.output = "NSM3 verifier requires peripheral read: port=002d pc=0f9c blocks=116"
         self.trace = "".join(f"nsm3_verifier: block={i} flag=087f\n" for i in range(116))
         self.trace += "".join(f"nsm3_verifier: port_write={port} data={data} blocks=116\n"
                               for port, data in [("000e", "1387"), ("0000", "000d"), ("000c", "0010")])
 
     def test_frontier(self):
         check(self.output, self.trace, 1)
+
+    def test_fetch_cursor_is_not_the_read_owner(self):
+        for cursor in ("0f9f", "0fa2"):
+            with self.assertRaises(ValueError):
+                check(self.output.replace("pc=0f9c", f"pc={cursor}"), self.trace, 1)
 
     def test_no_invented_completion(self):
         with self.assertRaises(ValueError):

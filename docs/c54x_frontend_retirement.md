@@ -137,6 +137,18 @@ IDLE loop with four replay checkpoints (ten current cases). MU4's original
 two-word serial receive/ring assertion passes this boundary; full MU4
 application qualification remains separate from that focused result.
 
+The uploaded-program research device and standalone verifier now select staged
+with standard SWWSR decoding, as required by the original `STM 7728` initializer.
+The 3310/8210 (116 blocks), 6210 (232) and 7110 (228, supplied ROM4) verifier
+gates pass, including all existing peripheral/version sensitivity controls and
+stock-input fingerprints. The 6210 bootstrap gate also passes. Executed-image
+bounds use Execute observation, not speculative Prefetch; the fail-closed I/O
+message reports the actual Read owner (`0f9c` for the NSM-3-family fixture).
+Publication is checked only after its three-word copy reaches terminal IDLE,
+retaining the existing result values and PC assertion. Host input providers are
+disabled in these headless fixtures. This is not full application qualification
+for every uploaded-program product composition.
+
 These twelve added cases change the current catalogue from the step-3 snapshot;
 the complete step-3 acceptance above is not a renewed full-suite claim for this
 source revision. Atomic scheduling/state remains until the remaining firmware

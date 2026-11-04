@@ -15,6 +15,8 @@ nokia_dsp_staged_device::nokia_dsp_staged_device(const machine_config &config, c
 void nokia_dsp_staged_device::device_add_mconfig(machine_config &config)
 {
 	TMS320C54X(config, m_cpu, clock());
+	m_cpu->set_pipeline_frontend(true);
+	m_cpu->set_standard_swwsr(true);
 	m_cpu->set_addrmap(AS_PROGRAM, &nokia_dsp_staged_device::program_map);
 	m_cpu->set_addrmap(AS_DATA, &nokia_dsp_staged_device::data_map);
 	m_cpu->set_addrmap(AS_IO, &nokia_dsp_staged_device::io_map);

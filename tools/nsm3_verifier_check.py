@@ -13,7 +13,7 @@ except ModuleNotFoundError:
 
 
 def check(output, trace, returncode, count=116):
-    if returncode != 1 or f"port=002d pc=0f9f blocks={count}" not in output:
+    if returncode != 1 or f"port=002d pc=0f9c blocks={count}" not in output:
         raise ValueError("missing fail-closed NSM-3 peripheral-read frontier")
     blocks = [int(value) for value in re.findall(r"nsm3_verifier: block=(\d+) flag=", trace)]
     if blocks != list(range(count)):
@@ -68,8 +68,13 @@ def main():
         shutil.copyfile(flash, rom_dir / flash_name)
         log = run / "error.log"
         log.unlink(missing_ok=True)
+        # These CPU/peripheral fixtures have no host input or MIDI dependency.
+        providers = ["-joystickprovider", "none", "-midiprovider", "none",
+                     "-keyboardprovider", "none", "-mouseprovider", "none",
+                     "-lightgunprovider", "none"]
         result = subprocess.run([
             str(binary), system, "-rompath", str(run), "-noreadconfig",
+            *providers,
             "-video", "none", "-sound", "none", "-nothrottle", "-seconds_to_run", "3",
             "-skip_gameinfo", "-window", "-log"], cwd=run, capture_output=True,
             text=True, timeout=30)
@@ -83,6 +88,7 @@ def main():
             comparison_log.unlink(missing_ok=True)
             result = subprocess.run([
                 str(binary), system, "-bios", bios, "-rompath", str(run), "-noreadconfig",
+                *providers,
                 "-video", "none", "-sound", "none", "-nothrottle", "-seconds_to_run", "3",
                 "-skip_gameinfo", "-window", "-log"], cwd=comparison, capture_output=True,
                 text=True, timeout=30)
