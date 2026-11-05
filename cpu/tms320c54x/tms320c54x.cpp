@@ -3439,640 +3439,9 @@ void tms320c54x_device::pipeline_step()
 		// Tables 7-20/7-22: short SXM/ASM consumers sample before an
 		// older store retires. Long-offset Decode adds its documented gap.
 		m_pipeline_alu_mode[4] = m_st1 & 0x011f;
-	if (m_pipeline_valid[5])
-	{
-		u32 const address = m_pipeline_address[5];
-		m_pc = u16(address);
-		m_xpc = (address >> 16) & 0x7f;
-		m_op = m_pipeline_word[5];
-		bool const braf_before = bool(m_st1 & ST1_BRAF);
-		debugger_instruction_hook(address);
-		// XC's replacement NOP consumes a slot, not an original instruction entry.
-		if (!m_pipeline_annulled[5] && !m_instruction_observer_cb.isunset()) m_instruction_observer_cb(address, m_op);
-		++m_pc;
-		if (m_coverage && !m_coverage->count[m_op]++) m_coverage->first_pc[m_op] = address;
-		if (m_coverage && staged_shifted_smem(m_op))
-		{
-			bool const extended = u8(m_op) >= 0xe0;
-			std::array<u16, 4> const words = {u16(extended ? 3 : 2), m_op,
-				extended ? m_pipeline_extension_first[5] : m_pipeline_immediate[5],
-				extended ? m_pipeline_immediate[5] : u16(0)};
-			auto entry = m_coverage->extensions.find(words);
-			if (entry == m_coverage->extensions.end() && m_coverage->extensions.size() < opcode_coverage::MAX_TUPLES)
-				entry = m_coverage->extensions.emplace(words, opcode_coverage::extension_observation{address}).first;
-			if (entry != m_coverage->extensions.end()) ++entry->second.count;
-			else ++m_coverage->dropped_tuples;
-		}
-		if (staged_immediate_repeat(m_op) || staged_memory_repeat(m_op) || staged_short_repeat(m_op))
-		{
-			if ((m_op & 0xfeff) == 0xf071) accumulator(BIT(m_op, 8)) = 0;
-			m_rptc = staged_memory_repeat(m_op) ? m_pipeline_operand[5] : m_pipeline_immediate[5];
-			m_rpt_iteration = 0;
-			if (staged_immediate_repeat(m_op) || (staged_memory_repeat(m_op) && u8(m_op) >= 0xe0)) ++m_pc;
-		}
-		else if (staged_block_repeat(m_op))
-			++m_pc; // Setup belongs to complete Decode, not an atomic operand fetch.
-		else if (staged_idle(m_op))
-		{
-			enter_idle(BIT(m_op, 9) ? 2 : BIT(m_op, 8) ? 3 : 1);
-			m_pipeline_idle_barrier = false;
-			m_pipeline_idle_resume_pending = true;
-			m_pipeline_fetch_address = m_pipeline_idle_resume_address;
-			m_pipeline_valid.fill(false);
-			if (m_nmi_pending || (m_ifr & m_imr)) leave_idle();
-		}
-		else if (staged_software_intr(m_op))
-			m_data.write_word(m_pipeline_operand_address[5], m_pipeline_immediate[5]);
-		else if (m_op == 0xf49b || m_op == 0xf69b)
-			m_st1 &= ~u16(0x0800);
-		else if (staged_conditional_return(m_op) || staged_delayed_conditional_return(m_op))
-		{
-			if (m_pipeline_immediate[5] || staged_delayed_conditional_return(m_op))
-			{
-				m_pc = m_pipeline_operand[5];
-				m_pipeline_fetch_address = (address & 0x7f0000) | m_pc;
-				if (m_pipeline_immediate[5] && staged_delayed_conditional_return(m_op)) pipeline_restore_block_on_return(address);
-				m_pipeline_flush_front = false; m_pipeline_decode_flush = 0;
-			}
-		}
-		else if (m_op == 0xfc00 || m_op == 0xf4eb || m_op == 0xfe00)
-		{
-			m_pc = m_pipeline_operand[5];
-			m_pipeline_fetch_address = logical_program_address(m_pc);
-			if (m_op == 0xfc00 && m_pipeline_xc_active && m_pipeline_xc_end == ((address & 0x7f0000) | u16(address + 1)))
-				// The return discards the sequential second protected word.
-				// Retain protection for the first resumed instruction word.
-				m_pipeline_xc_end = m_pipeline_fetch_address;
-			pipeline_restore_block_on_return(address);
-			m_pipeline_flush_front = false;
-			if (m_op == 0xf4eb) m_st1 &= ~u16(0x0800);
-		}
-		else if ((m_op & 0xfcf0) == 0xf4b0)
-		{
-			if (m_op == 0xf6bf && m_pipeline_block_active && !m_pipeline_block_body[5])
-			{
-				// A forward exit annuls its body predictions, but does not clear
-				// architectural BRAF. Outside-body RSBX may retire that predictor
-				// only with no younger body in flight. In-loop six-word latency
-				// (SPRU131G 7.5.8.2) remains outside this bounded composition.
-				for (unsigned stage = 0; stage < 5; ++stage)
-					if (m_pipeline_valid[stage] && m_pipeline_block_body[stage])
-					{ logerror("%s: staged outside BRAF clear with pending block words is unsupported\n", machine().describe_context()); m_illegal = true; return; }
-				m_pipeline_block_active = m_pipeline_block_fetch_enabled = false;
-				m_pipeline_block_fetch_remaining = 0;
-			}
-			u16 &status = BIT(m_op, 9) ? m_st1 : m_st0;
-			u16 const mask = u16(1) << (m_op & 15);
-			status = BIT(m_op, 8) ? status | mask : status & ~mask;
-			if (BIT(m_op, 9)) status &= ~ST1_RESERVED;
-		}
-		else if ((m_op & 0xfdfe) == 0xf4e4)
-		{
-			m_xpc = m_extended_program ? m_pipeline_operand[5] & 0x7f : 0;
-			m_pc = m_pipeline_operand_address[5];
-			if (!BIT(m_op, 9))
-			{
-				m_pipeline_fetch_address = logical_program_address(m_pc);
-				pipeline_restore_block_on_return(address);
-			}
-			m_pipeline_flush_front = false;
-			if (BIT(m_op, 0)) m_st1 &= ~u16(0x0800);
-		}
-		else if (staged_banz(m_op))
-			m_pc += staged_extended_banz(m_op) ? 2 : 1; // Predicate, AR modification and target ownership belong to Access.
-		else if (staged_conditional_branch(m_op))
-		{
-			++m_pc;
-			// CCD retains its Read decision and one-word frame. Do not add
-			// the nondelayed CC hold to the complete two-word delay span.
-			if (staged_conditional_call(m_op) && BIT(m_op, 9) && m_pipeline_immediate[5])
-				data_write(m_pipeline_operand_address[5], u16(address + 4));
-			if (m_pipeline_immediate[5] && BIT(m_op, 9))
-			{
-				m_pipeline_fetch_address = (address & 0x7f0000) | m_pipeline_operand[5];
-				m_pipeline_decode_flush = 1;
-				if (m_pipeline_block_body[5] && !staged_conditional_call(m_op))
-					// Annul fall-through endpoint predictions, not Decode's count.
-					m_pipeline_block_fetch_remaining = u32(m_brc) + 1;
-			}
-		}
-		else if (staged_accumulator_transfer(m_op))
-		{
-			m_pipeline_flush_front = false;
-			m_pipeline_decode_flush = 0;
-			if (BIT(m_op, 9))
-			{
-				// Delayed accumulator transfers already redirected Prefetch in Read;
-				// only FCALAD owns a second frame word.
-				if (staged_accumulator_far_call(m_op)) data_write(m_pipeline_far_call_stack[5], m_pipeline_far_call_page[5], 5);
-				m_pc = u16(address + 1);
-			}
-			else
-			{
-				m_pc = u16(m_pipeline_acc_transfer_target);
-				m_xpc = (m_pipeline_acc_transfer_target >> 16) & 0x7f;
-				m_pipeline_fetch_address = m_pipeline_acc_transfer_target;
-			}
-		}
-		else if (staged_far_branch(m_op) || staged_far_call(m_op))
-		{
-			if (staged_far_call(m_op)) data_write(m_pipeline_far_call_stack[5], m_pipeline_far_call_page[5]);
-			if (BIT(m_op, 9))
-				m_pc = u16(address + 2); // Delay words retain the caller's architectural page.
-			else
-			{
-				m_xpc = m_op & 0x7f;
-				m_pc = m_pipeline_operand[5];
-			}
-		}
-		else if (m_op == 0xf073 || m_op == 0xf273 || staged_call(m_op))
-			++m_pc; // Target fetch was already redirected in Access.
-		else if ((m_op & 0xff00) == 0xee00)
-			; // FRAME's SP update already belongs to its Access stage.
-		else if (staged_mmr_move(m_op))
-			; // MVMM's retained Decode read and Access write are already complete.
-		else if ((m_op & 0xff00) == 0x7700)
-		{
-			if (staged_ram_stm(m_op)) data_write(m_pipeline_operand_address[5], m_pipeline_immediate[5]);
-			// Non-DAGEN PMST/IMR/bus controls retain their literal until Execute; do not
-			// inherit address-generator early publication. Phase is partial.
-			if (staged_accumulator_stm(m_op) || m_op == 0x771d || m_op == 0x7700 || staged_bus_control(m_op) || (staged_timer_control(m_op) || staged_serial_control(m_op) || staged_clock_control(m_op))) data_write(u8(m_op), m_pipeline_immediate[5]);
-			++m_pc;
-		}
-		else if (staged_write_a(m_op))
-		{
-			m_program.write_word(m_pipeline_write_a_target, m_pipeline_operand[5]);
-			if (u8(m_op) >= 0xe0) ++m_pc;
-		}
-		else if (staged_read_a(m_op))
-		{
-			data_write(m_pipeline_operand_address[5], m_pipeline_operand[5]);
-			if (u8(m_op) >= 0xe0) ++m_pc;
-			if (m_pipeline_repeat_active && m_pipeline_repeat_body_latched && address == m_pipeline_repeat_address) pipeline_begin_repeat_stream();
-		}
-		else if (staged_data_to_program(m_op))
-		{
-			m_program.write_word((u32(m_pipeline_immediate[5]) << 16) | m_pipeline_operand_address[5], m_pipeline_operand[5]);
-			m_pc += u8(m_op) >= 0xe0 ? 2 : 1;
-			if (m_pipeline_repeat_active && m_pipeline_repeat_body_latched && address == m_pipeline_repeat_address)
-			{
-				pipeline_begin_repeat_stream();
-				// Read reused the immediate field for the physical target's page;
-				// the low word still holds pmad, the repeat's incrementing base.
-				m_pipeline_repeat_source = m_pipeline_operand_address[5];
-			}
-		}
-		else if (staged_program_move(m_op))
-		{
-			data_write(m_pipeline_operand_address[5], m_pipeline_operand[5]);
-			m_pc += staged_extended_program_move(m_op) ? 2 : 1;
-			if (m_pipeline_repeat_active && m_pipeline_repeat_body_latched && m_pipeline_address[5] == m_pipeline_repeat_address)
-				pipeline_begin_repeat_stream();
-		}
-		else if (staged_delay_copy(m_op))
-		{
-			data_write(u16(m_pipeline_operand_address[5] + 1), m_pipeline_operand[5]);
-			m_pc += u8(m_op) >= 0xe0;
-		}
-		else if (staged_data_copy(m_op))
-		{
-			if (m_pipeline_operand_address[5] >= 0x20) data_write(m_pipeline_operand_address[5], m_pipeline_operand[5]);
-			m_pc += staged_extended_data_copy(m_op) ? 2 : 1;
-		}
-		else if (staged_move(m_op))
-			m_pc += staged_extended_move(m_op) ? 2 : 1; // Retained move already committed at its owned write clock.
-		else if (staged_memory_load(m_op))
-		{
-			u16 const status = m_st1;
-			m_st1 = (m_st1 & ~u16(0x011f)) | m_pipeline_alu_mode[5];
-			u64 const value = (m_op & 0xfe00) == 0x1200 ? m_pipeline_operand[5] : data_operand(m_pipeline_operand[5]);
-			accumulator(BIT(m_op, 8)) = (m_op & 0xfe00) == 0x1400 ? shifted_by_t(m_pipeline_operand[5], m_pipeline_immediate[5]) :
-				(m_op & 0xfe00) == 0x1600 ? ((value << 16) | 0x8000) & ACC_MASK :
-				(m_op & 0xfe00) == 0x4400 ? (value << 16) & ACC_MASK : value;
-			m_st1 = status;
-			if (staged_offset_load(m_op) || staged_absolute_load(m_op)) ++m_pc;
-		}
-		else if (staged_mmr_load(m_op))
-			accumulator(BIT(m_op, 8)) = m_pipeline_operand[5];
-		else if (staged_memory_dp(m_op))
-		{
-			m_st0 = (m_st0 & ~u16(0x1ff)) | (m_pipeline_operand[5] & 0x1ff);
-			if (m_op == 0x46f8) ++m_pc;
-		}
-		else if (register_product_form(m_op))
-			register_product_result(m_op, m_pipeline_operand[5]);
-		else if ((m_op & 0xfeff) == 0xf48d)
-		{
-			// SPRU172C 4-161: square A(32-16), not the signed 16-bit AH.
-			// The accumulator form does not publish T.
-			s64 const high = accumulator_high17(m_a);
-			accumulator(BIT(m_op, 8)) = multiply_result(high * high * (BIT(m_st1, 6) ? 2 : 1), BIT(m_op, 8));
-		}
-		else if (staged_minmax(m_op))
-		{
-			s64 const a = s64(m_a << 24) >> 24, b = s64(m_b << 24) >> 24;
-			bool const choose_a = BIT(m_op, 0) ? a < b : a > b;
-			accumulator(BIT(m_op, 8)) = choose_a ? m_a : m_b;
-			m_st0 = (m_st0 & ~u16(0x0800)) | (choose_a ? 0 : 0x0800);
-		}
-		else if (staged_norm(m_op))
-		{
-			accumulator(BIT(m_op, 8)) = shifted_load(accumulator(BIT(m_op, 9)), normalization_shift(m_pipeline_immediate[5]), BIT(m_op, 8));
-		}
-		else if (staged_long_arithmetic(m_op))
-		{
-			long_word_arithmetic(m_op, m_pipeline_operand[5], m_pipeline_immediate[5], m_pipeline_t[5]);
-			if (staged_extended_long_arithmetic(m_op)) ++m_pc;
-		}
-		else if (staged_dld(m_op))
-		{
-			u64 value = (u64(m_pipeline_operand[5]) << 16) | m_pipeline_immediate[5];
-			if (BIT(m_st1, 8) && BIT(m_pipeline_operand[5], 15)) value |= u64(0xff) << 32;
-			accumulator(BIT(m_op, 8)) = value;
-			if (staged_extended_dld(m_op)) ++m_pc;
-		}
-		else if (staged_dst(m_op))
-		{
-			m_data.write_word(m_pipeline_operand_address[5], m_pipeline_operand[5]);
-			m_pipeline_long_store_pending = true;
-			if (staged_extended_dst(m_op)) ++m_pc;
-		}
-		else if (staged_direct_push(m_op) || (m_op & 0xff00) == 0x4b00)
-		{
-			data_write(m_pipeline_operand_address[5], m_pipeline_operand[5]);
-			if (staged_extended_push(m_op)) ++m_pc;
-		}
-		else if ((m_op & 0xff00) == 0x8a00)
-		{
-			u16 const destination = m_pipeline_operand_address[5];
-			if (destination < 0x10 || destination > 0x19 || m_pipeline_early_write_deferred[5])
-			{
-				data_write(destination, m_pipeline_operand[5]);
-				if (destination == 0x18) pipeline_delay_compiler_sp(m_pipeline_direct_sp[5]);
-			}
-		}
-		else if ((m_op & 0xff00) == 0x8b00)
-		{
-			u16 const destination = m_pipeline_operand_address[5];
-			if (destination < 0x10 || destination > 0x19 || m_pipeline_early_write_deferred[5])
-				data_write(destination, m_pipeline_operand[5]);
-			if (staged_extended_pop(m_op)) ++m_pc;
-		}
-		else if (staged_accumulator_mmr_store(m_op))
-		{
-			// SPRU131G table 7-5: store-type DAGEN writes belong to Execute.
-			// Direct MMR addressing ignores DP/CPL (SPRU172C 4-175).
-			// PMST also publishes here; later Prefetch owns mapping (7.5.9).
-			u16 const value = u16(saturated_store(accumulator(BIT(m_op, 8))));
-			if (u8(m_op) == 7 && !(value & ST1_BRAF) && m_pipeline_block_active)
-			{
-				// Software may suspend an interrupted loop outside its body.
-				// Retire only the predictor; architectural BRC/RSA/REA remain
-				// available for the handler's own save/restore sequence.
-				for (unsigned stage = 0; stage < 5; ++stage)
-					if (m_pipeline_valid[stage] && m_pipeline_block_body[stage])
-					{ logerror("%s: staged outside STLM BRAF clear with pending block words is unsupported\n", machine().describe_context()); m_illegal = true; return; }
-				m_pipeline_block_active = m_pipeline_block_fetch_enabled = false;
-				m_pipeline_block_fetch_remaining = 0;
-			}
-			data_write(m_pipeline_operand_address[5], value);
-		}
-		else if (staged_store(m_op))
-		{
-			data_write(m_pipeline_operand_address[5], pipeline_store_word());
-			if (staged_extended_store(m_op)) ++m_pc;
-		}
-		else if (staged_rmw(m_op))
-		{
-			m_pc += staged_extended_rmw(m_op) || u8(m_op) == 0xf8 ? 2 : 1;
-			data_write(m_pipeline_operand_address[5], (m_op & 0xff00) == 0x6b00
-				? add_memory_word(m_pipeline_operand[5], m_pipeline_immediate[5]) : (m_op & 0xff00) == 0x6a00
-				? m_pipeline_operand[5] ^ m_pipeline_immediate[5] : BIT(m_op, 8)
-				? m_pipeline_operand[5] | m_pipeline_immediate[5]
-				: m_pipeline_operand[5] & m_pipeline_immediate[5]);
-		}
-		else if ((m_op & 0xff00) == 0x7600)
-		{
-			m_pc += u8(m_op) == 0xf8 || staged_extended_immediate_store(m_op) ? 2 : 1;
-			if (m_pipeline_operand_address[5] < 0x10 || m_pipeline_operand_address[5] > 0x19)
-				data_write(m_pipeline_operand_address[5], pipeline_store_word());
-			if (m_pipeline_repeat_active && m_pipeline_repeat_body_latched && address == m_pipeline_repeat_address) pipeline_begin_repeat_stream();
-		}
-		else if (staged_port_write(m_op))
-		{
-			m_io.write_word(m_pipeline_immediate[5], m_pipeline_operand[5]);
-			m_pc += u8(m_op) >= 0xe0 ? 2 : 1;
-			if (m_pipeline_repeat_active && m_pipeline_repeat_body_latched && address == m_pipeline_repeat_address) pipeline_begin_repeat_stream();
-		}
-		else if (staged_port_read(m_op))
-		{
-			data_write(m_pipeline_operand_address[5], m_pipeline_operand[5]);
-			m_pc += u8(m_op) >= 0xe0 ? 2 : 1;
-			if (m_pipeline_repeat_active && m_pipeline_repeat_body_latched && address == m_pipeline_repeat_address) pipeline_begin_repeat_stream();
-		}
-		else if (staged_conditional_store(m_op))
-			data_write(m_pipeline_operand_address[5], pipeline_store_word());
-		else if (staged_parallel_alu(m_op))
-		{
-			u64 const other = accumulator(!BIT(m_op, 8)) & ACC_MASK;
-			s64 const sample = m_pipeline_alu_mode[5] & 0x100 ? s16(m_pipeline_operand[5]) : s32(m_pipeline_operand[5]);
-			u64 const operand = u64(sample * 65536) & ACC_MASK;
-			data_write(m_pipeline_operand_address[5], pipeline_store_word());
-			// SUB reverses the usual accumulator-minus-memory order
-			// (SPRU172C 4-185); the old accumulator is stored first.
-			accumulator(BIT(m_op, 8)) = BIT(m_op, 10) ? add_sub(operand, other, true, BIT(m_op, 8)) : add_sub(other, operand, false, BIT(m_op, 8));
-		}
-		else if (staged_parallel_load(m_op))
-		{
-			// Store the old accumulator before replacing an aliased destination
-			// (SPRU172C 4-179). Retain the unresolved C policy.
-			data_write(m_pipeline_operand_address[5], pipeline_store_word());
-			if ((m_op & 0xfd00) != 0xe400)
-			{
-				s64 const value = m_pipeline_alu_mode[5] & 0x100 ? s16(m_pipeline_operand[5]) : s32(m_pipeline_operand[5]);
-				accumulator(BIT(m_op, 8)) = u64(value * 65536) & ACC_MASK;
-			}
-		}
-		else if (staged_parallel_mpy(m_op))
-		{
-			// The store consumes the old accumulator; MPY uses Read-owned X/T.
-			u16 const stored = pipeline_store_word();
-			s64 product = s64(s16(m_pipeline_operand[5])) * s16(m_pipeline_immediate[5]);
-			if (BIT(m_st1, 6)) product *= 2;
-			data_write(m_pipeline_operand_address[5], stored);
-			accumulator(BIT(m_op, 8)) = multiply_result(product, BIT(m_op, 8));
-		}
-		else if (staged_parallel_mac(m_op))
-		{
-			// Store before replacing an aliased accumulator (SPRU172C 4-180).
-			// C remains an implementation hypothesis, not qualified silicon behaviour.
-			u16 const stored = pipeline_store_word();
-			s64 product = s64(s16(m_pipeline_operand[5])) * s64(s16(m_pipeline_immediate[5]));
-			if (BIT(m_st1, 6)) product *= 2;
-			product = multiply_product(product);
-			s64 result = (s64(accumulator(BIT(m_op, 8)) << 24) >> 24) + (BIT(m_op, 11) ? -product : product);
-			if (BIT(m_op, 10)) result = (result + 0x8000) & ~s64(0xffff);
-			data_write(m_pipeline_operand_address[5], stored);
-			accumulator(BIT(m_op, 8)) = multiply_result(result, BIT(m_op, 8));
-		}
-		else if (staged_mvdd(m_op))
-		{
-			m_observed_mvdd_write = true;
-			data_write(m_pipeline_operand_address[5], m_pipeline_operand[5]);
-			m_observed_mvdd_write = false;
-		}
-		else if (staged_coefficient_mac(m_op))
-		{
-			bool const destination_b = BIT(m_op, 8);
-			s64 product = s64(s16(m_pipeline_operand[5])) * s16(m_pipeline_immediate[5]);
-			if (BIT(m_st1, 6)) product *= 2;
-			accumulator(destination_b) = multiply_result((s64(accumulator(destination_b) << 24) >> 24) + multiply_product(product), destination_b);
-			if (BIT(m_op, 9)) data_write(u16(m_pipeline_operand_address[5] + 1), m_pipeline_operand[5]);
-			m_pc += u8(m_op) >= 0xe0 ? 2 : 1;
-		}
-		else if (staged_firs(m_op))
-		{
-			s64 product = accumulator_high17(m_a) * s64(s16(m_pipeline_immediate[5]));
-			if (BIT(m_st1, 6)) product *= 2;
-			m_b = multiply_result((s64(m_b << 24) >> 24) + multiply_product(product), true);
-			m_a = add_sub((data_operand(m_pipeline_operand[5]) << 16) & ACC_MASK,
-				(data_operand(m_pipeline_t[5]) << 16) & ACC_MASK, false, false);
-			++m_pc;
-		}
-		else if (staged_distance(m_op))
-		{
-			// Both forms consume old A before the vector subtraction replaces it.
-			s64 const high = accumulator_high17(m_a);
-			s64 distance = BIT(m_op, 8) ? (high < 0 ? -high : high) : high * high;
-			if (BIT(m_st1, 6)) distance *= 2;
-			m_b = BIT(m_op, 8) ? add_sub(m_b, u64(distance), false, true) :
-				multiply_result((s64(m_b << 24) >> 24) + multiply_product(distance), true);
-			s64 const x = BIT(m_st1, 8) ? s64(s16(m_pipeline_operand[5])) : s64(m_pipeline_operand[5]);
-			s64 const y = BIT(m_st1, 8) ? s64(s16(m_pipeline_immediate[5])) : s64(m_pipeline_immediate[5]);
-			m_a = add_sub(u64(x * 65536) & ACC_MASK, u64(y * 65536) & ACC_MASK, true, false);
-		}
-		else if (staged_dual_arithmetic(m_op))
-		{
-			s64 const x = BIT(m_st1, 8) ? s64(s16(m_pipeline_operand[5])) : s64(m_pipeline_operand[5]);
-			s64 const y = BIT(m_st1, 8) ? s64(s16(m_pipeline_immediate[5])) : s64(m_pipeline_immediate[5]);
-			accumulator(BIT(m_op, 8)) = add_sub(u64(x * 0x10000) & ACC_MASK,
-				u64(y * 0x10000) & ACC_MASK, BIT(m_op, 9), BIT(m_op, 8));
-		}
-		else if (staged_lms(m_op))
-		{
-			s64 const x = BIT(m_st1, 8) ? s64(s16(m_pipeline_operand[5])) : s64(m_pipeline_operand[5]);
-			m_a = add_sub(m_a, u64(x * 65536 + 32768) & ACC_MASK, false, false);
-			s64 product = s64(s16(m_pipeline_operand[5])) * s16(m_pipeline_immediate[5]);
-			if (BIT(m_st1, 6)) product *= 2;
-			m_b = multiply_result((s64(m_b << 24) >> 24) + multiply_product(product), true);
-		}
-		else if (staged_load_mac(m_op))
-		{
-			bool const destination_b = BIT(m_op, 8);
-			s64 product = s64(s16(m_pipeline_t[5])) * s16(m_pipeline_immediate[5]);
-			if (BIT(m_st1, 6)) product *= 2;
-			product = multiply_product(product);
-			s64 result = (s64(accumulator(!destination_b) << 24) >> 24) + (BIT(m_op, 10) ? -product : product);
-			if (BIT(m_op, 9)) result = (result + 0x8000) & ~s64(0xffff);
-			accumulator(!destination_b) = multiply_result(result, !destination_b);
-			accumulator(destination_b) = (data_operand(m_pipeline_operand[5]) << 16) & ACC_MASK;
-		}
-		else if (staged_dual_multiply(m_op))
-		{
-			bool const signed_mac = (m_op & 0xf000) == 0xb000;
-			bool const accumulate = signed_mac || BIT(m_op, 9), destination_b = BIT(m_op, 8);
-			s64 product = (accumulate && !signed_mac ? s64(m_pipeline_operand[5]) : s64(s16(m_pipeline_operand[5]))) * s64(s16(m_pipeline_immediate[5]));
-			if (BIT(m_st1, 6)) product *= 2;
-			// X/Y and T belong to Read; source selection and feedback belong to
-			// Execute. SMUL applies before accumulation, rounding afterwards.
-			if (accumulate)
-			{
-				product = multiply_product(product);
-				if (signed_mac && BIT(m_op, 11)) product = -product;
-				product += s64(accumulator(signed_mac ? BIT(m_op, 9) : destination_b) << 24) >> 24;
-			}
-			if (signed_mac && BIT(m_op, 10)) product = (product + 0x8000) & ~s64(0xffff);
-			accumulator(destination_b) = multiply_result(product, destination_b);
-		}
-		else if (staged_xmem_store(m_op))
-		{
-			data_write(m_pipeline_operand_address[5], pipeline_store_word());
-		}
-		else if (staged_xmem_arithmetic(m_op))
-		{
-			u64 const operand = (data_operand(m_pipeline_operand[5]) << (m_op & 15)) & ACC_MASK;
-			u64 &destination = accumulator(BIT(m_op, 8));
-			destination = add_sub(destination, operand, BIT(m_op, 9), BIT(m_op, 8));
-		}
-		else if (staged_xmem_load(m_op))
-			accumulator(BIT(m_op, 8)) = shifted_load(data_operand(m_pipeline_operand[5]), m_op & 15, BIT(m_op, 8));
-		else if (staged_xmem_bit(m_op))
-			m_st0 = (m_st0 & ~u16(0x1000)) | (BIT(m_pipeline_operand[5], 15 - (m_op & 15)) ? 0x1000 : 0);
-		else if (staged_bitfield(m_op))
-		{
-			bool const tc = BIT(m_op, 8) ? bool(m_pipeline_operand[5] & m_pipeline_immediate[5]) : m_pipeline_operand[5] == m_pipeline_immediate[5];
-			m_st0 = (m_st0 & ~u16(0x1000)) | (tc ? 0x1000 : 0);
-			m_pc += staged_extended_bitfield(m_op) ? 2 : 1;
-		}
-		else if (staged_shifted_smem(m_op))
-		{
-			u16 const extension = m_pipeline_immediate[5];
-			int const shift = s8((extension & 0x1f) << 3) >> 3;
-			if (staged_shifted_memory_store(m_op, extension))
-			{
-				data_write(m_pipeline_operand_address[5], pipeline_store_word());
-			}
-			else if (staged_shifted_memory_arithmetic(extension))
-			{
-				u64 const operand = data_operand(m_pipeline_operand[5]);
-				u64 const shifted = shift < 0 ? (BIT(m_st1, 8) ? arithmetic_shift_right(operand, -shift) : operand >> -shift) : (operand << shift) & ACC_MASK;
-				accumulator(BIT(extension, 8)) = add_sub(accumulator(BIT(extension, 9)), shifted, BIT(extension, 5), BIT(extension, 8));
-			}
-			else accumulator(BIT(extension, 8)) = shifted_load(data_operand(m_pipeline_operand[5]), shift, BIT(extension, 8));
-			m_pc += u8(m_op) >= 0xe0 ? 2 : 1;
-		}
-		else if (staged_smem_special(m_op))
-		{
-			if ((m_op & 0xff00) == 0x3000)
-			{
-				// T was published in Read; retirement must not overwrite a newer T.
-			}
-			else if (staged_bitt(m_op))
-				m_st0 = (m_st0 & ~u16(0x1000)) | (BIT(m_pipeline_operand[5], 15 - (m_pipeline_immediate[5] & 15)) ? 0x1000 : 0);
-			else if ((m_op & 0xff00) == 0x3200)
-				m_st1 = (m_st1 & ~u16(0x001f)) | (m_pipeline_operand[5] & 0x001f);
-			else if ((m_op & 0xf000) == 0x2000)
-			{
-				u64 &destination = accumulator(BIT(m_op, 8));
-				destination = memory_t_multiply(m_op, m_pipeline_operand[5], m_pipeline_immediate[5], destination);
-			}
-			else if (staged_poly(m_op)) polynomial_step(m_pipeline_operand[5], m_pipeline_immediate[5]);
-			else if (square_accumulate(m_op)) square_accumulate_result(m_op, m_pipeline_operand[5]);
-			else accumulator_memory_multiply(m_op, m_pipeline_operand[5]);
-			if (staged_extended_smem_special(m_op)) ++m_pc;
-		}
-		else if (staged_smem_arithmetic(m_op))
-		{
-			u64 &destination = accumulator(BIT(m_op, 8));
-			bool const with_carry = (m_op & 0xfe00) == 0x0600;
-			bool const with_borrow = (m_op & 0xfe00) == 0x0e00;
-			bool const shift16 = (m_op & 0xfc00) == 0x3c00 || (m_op & 0xfc00) == 0x4000;
-			u64 const memory = with_carry || with_borrow || staged_unsigned_memory_arithmetic(m_op) ? m_pipeline_operand[5] : data_operand(m_pipeline_operand[5]);
-			// ADDC/SUBB retain unsigned Smem in Read, but consume the accumulator
-			// and carry in Execute, including an adjacent ALU's carry output.
-			u64 const operand = with_carry ? memory + unsigned(BIT(m_st0, 11)) : with_borrow ? memory + unsigned(!BIT(m_st0, 11)) : staged_ts_arithmetic(m_op) ? shifted_by_t(m_pipeline_operand[5], m_pipeline_immediate[5]) : shift16 ? (memory << 16) & ACC_MASK : memory;
-			destination = (m_op & 0xfe00) == 0x1e00 ? conditional_subtract(destination, m_pipeline_operand[5], BIT(m_op, 8)) :
-				add_sub(shift16 ? accumulator(BIT(m_op, 9)) : destination, operand, shift16 ? (m_op & 0xfc00) == 0x4000 : BIT(m_op, 11), BIT(m_op, 8), shift16);
-			if (staged_extended_smem_arithmetic(m_op)) ++m_pc;
-		}
-		else if (staged_absolute_add(m_op))
-		{
-			u64 &destination = accumulator(BIT(m_op, 8));
-			destination = add_sub(destination, data_operand(m_pipeline_operand[5]), false, BIT(m_op, 8));
-			++m_pc;
-		}
-		else if (staged_immediate_multiply(m_op))
-		{
-			s64 product = s64(s16(m_pipeline_operand[5])) * s16(m_pipeline_immediate[5]);
-			if (BIT(m_st1, 6)) product *= 2;
-			if ((m_op & 0xfcff) == 0xf067 || (m_op & 0xfc00) == 0x6400)
-			{
-				product = multiply_product(product);
-				u64 const source = accumulator(BIT(m_op, 9));
-				product += s64(source << 24) >> 24;
-			}
-			accumulator(BIT(m_op, 8)) = multiply_result(product, BIT(m_op, 8));
-			m_pc += staged_memory_immediate_multiply(m_op) && u8(m_op) >= 0xe0 ? 2 : 1;
-		}
-		else if (staged_immediate_alu(m_op))
-		{
-			++m_pc;
-			bool const high_immediate = (m_op & 0xfcf8) == 0xf060;
-			unsigned const operation = high_immediate ? m_op & 7 : (m_op >> 4) & 15;
-			u64 const source = accumulator(BIT(m_op, 9));
-			u64 &destination = accumulator(BIT(m_op, 8));
-			if (operation <= 1)
-			{
-				u64 const operand = (data_operand(m_pipeline_immediate[5]) << (high_immediate ? 16 : m_op & 15)) & ACC_MASK;
-				destination = add_sub(source, operand, operation == 1, BIT(m_op, 8));
-			}
-			else
-			{
-				u64 const operand = u64(m_pipeline_immediate[5]) << (high_immediate ? 16 : m_op & 15);
-				destination = operation == 3 ? source & operand : operation == 4 ? source | operand : source ^ operand;
-			}
-		}
-		else if ((m_op & 0xfef0) == 0xf020 || (m_op & 0xfeff) == 0xf062)
-		{
-			++m_pc;
-			unsigned const shift = (m_op & 0xff) == 0x62 ? 16 : m_op & 15;
-			accumulator(BIT(m_op, 8)) = (data_operand(m_pipeline_operand[5]) << shift) & ACC_MASK;
-		}
-		else if (staged_memory_logic(m_op))
-		{
-			if (staged_extended_logic(m_op)) ++m_pc;
-			u64 &destination = accumulator(BIT(m_op, 8));
-			u64 const operand = m_pipeline_operand[5]; // Logical Smem is zero-extended, independent of SXM.
-			unsigned const operation = (m_op >> 9) & 3;
-			destination = (operation == 0 ? destination & operand : operation == 1 ? destination | operand : destination ^ operand) & ACC_MASK;
-		}
-		else if (staged_immediate_arp(m_op))
-			; // Access publication must not overwrite a younger indirect ARP update.
-		else if (staged_immediate_asm(m_op))
-			// SPRU131G example 7-52: the following ASM consumer has no gap.
-			m_st1 = (m_st1 & ~u16(0x001f)) | (m_op & 0x001f);
-		else if ((m_op & 0xfcf8) == 0xf4a8)
-			m_st0 = (m_st0 & ~u16(0x1000)) | (m_pipeline_operand[5] ? 0x1000 : 0);
-		else if (staged_mar(m_op))
-		{
-			if (staged_long_mar(m_op)) ++m_pc;
-		}
-		else if ((m_op & 0xfcff) == 0xf480 || (m_op & 0xfcff) == 0xf481 || (m_op & 0xfcff) == 0xf482)
-		{
-			u16 const status = m_st1;
-			m_st1 = (m_st1 & ~u16(0x011f)) | m_pipeline_alu_mode[5];
-			execute_one(m_op);
-			m_st1 = status;
-		}
-		else if (!staged_xc(m_op))
-			execute_one(m_op);
-		if ((m_op & 0xfeff) == 0xf6bf && bool(m_st1 & ST1_BRAF) != braf_before) pipeline_update_braf(address);
-		if (staged_pipelined_repeat(m_op) && m_pipeline_repeat_active && m_pipeline_repeat_body_latched && address == m_pipeline_repeat_address)
-		{
-			if (m_rptc) { --m_rptc; ++m_rpt_iteration; }
-			else
-			{
-				m_pipeline_repeat_active = m_pipeline_repeat_body_latched = false;
-				m_rpt_iteration = 0;
-				pipeline_resume_after_repeat();
-			}
-		}
-		if ((m_op == 0xf495 || staged_write_a(m_op) || staged_repeat_accumulator_load(m_op) || (m_op & 0xfe00) == 0x1e00) && m_pipeline_repeat_active && m_pipeline_repeat_body_latched && address == m_pipeline_repeat_address)
-			pipeline_begin_repeat_stream();
-		// A younger decoded XC extends protection. In a short repeat loop,
-		// an older instance can retire at the same PC as the newer span's end;
-		// that older retirement must not clear the younger owner's protection.
-		if (m_pipeline_xc_active && (address & 0x7f0000) == (m_pipeline_xc_end & 0x7f0000) &&
-			u16(m_pipeline_xc_end - address) < ((staged_opcode_descriptor[m_op] >> 2) & 3))
-		{
-			bool younger_xc = false;
-			for (unsigned stage = 2; stage < 5; ++stage)
-				younger_xc |= m_pipeline_valid[stage] && staged_xc(m_pipeline_word[stage]);
-			if (!younger_xc) m_pipeline_xc_active = false;
-		}
-		// A backward branch can retire alongside its target IDLE's Decode.
-		// That older branch must not consume the younger one-word guard.
-		if (m_pipeline_control_words && (address & 0x7f0000) == (m_pipeline_control_address & 0x7f0000) &&
-			(address == m_pipeline_control_address || (!staged_idle(m_pipeline_control_word) && u16(address - m_pipeline_control_address) <= 3)))
-		{
-			unsigned const words = (staged_opcode_descriptor[m_op] >> 2) & 3;
-			m_pipeline_control_words = words >= m_pipeline_control_words ? 0 : m_pipeline_control_words - words;
-		}
-		if (m_pipeline_vector_pending && u16(address) == m_interrupt_vector_pc)
-			m_pipeline_vector_pending = false;
-		m_pipeline_intm_protected[5] = false;
-		update_xf();
-	}
+	// Older Execute follows operand capture, but precedes Read-owned register
+	// publications below. Preserve this order when separating further phases.
+	if (!pipeline_execute()) return;
 
 	if (m_pipeline_valid[4] && m_pipeline_valid[5] &&
 		(staged_immediate_asm(m_pipeline_word[5]) || (m_pipeline_word[5] & 0xff00) == 0x3200))
@@ -4241,54 +3610,7 @@ void tms320c54x_device::pipeline_step()
 			if (stage == 3) m_pipeline_operand_address[stage] = basic_address(stage, u8(word));
 		}
 	}
-	if (m_pipeline_valid[4] && register_product_form(m_pipeline_word[4]))
-		// SPRU131G 7.5.6/table 7-13: multiply is not a Category-I TS consumer.
-		// Retain T after older Execute but before younger Read publications;
-		// sampling live T in Execute could instead consume a following STM.
-		m_pipeline_operand[4] = m_t;
-	if (m_pipeline_valid[4] && staged_load_mac(m_pipeline_word[4]))
-		// Retain T after older Execute publications; X loads the accumulator, not T.
-		m_pipeline_t[4] = m_t;
-	if (smem_t_product_read || (m_pipeline_valid[4] && (staged_poly(m_pipeline_word[4]) || staged_parallel_product(m_pipeline_word[4]))))
-		m_pipeline_immediate[4] = m_t;
-	if (m_pipeline_valid[4] && (staged_dual_multiply(m_pipeline_word[4]) || staged_coefficient_mac(m_pipeline_word[4]) || (m_pipeline_word[4] & 0xff00) == 0x4c00))
-		// MPY/MAC/MACSU/LTD load T in Read (SPRU172C 4-101/4-82/4-91/4-81). An older
-		// Execute write must not overwrite this younger publication.
-		m_t = m_pipeline_operand[4];
-	if (m_pipeline_valid[4] && staged_parallel_load(m_pipeline_word[4]) && (m_pipeline_word[4] & 0xfd00) == 0xe400)
-		// The load side owns T in Read; do not republish it in Execute or
-		// let an older Execute write erase this younger publication.
-		m_t = m_pipeline_operand[4];
-	if (m_pipeline_valid[4] && staged_smem_special(m_pipeline_word[4]))
-	{
-		// LD T, memory SQUR and MPYA/MACA/MASA publish T in Read after older Execute.
-		// T-based Smem MPY/MAC/MAS consume retained T without publishing it.
-		if ((m_pipeline_word[4] & 0xfe00) == 0x2600 ||
-			((m_pipeline_word[4] & 0xf000) != 0x2000 && (m_pipeline_word[4] & 0xff00) != 0x3200 && !staged_poly(m_pipeline_word[4]) && !staged_bitt(m_pipeline_word[4])))
-			m_t = m_pipeline_operand[4];
-	}
-	if (m_pipeline_valid[4] && staged_dst(m_pipeline_word[4]))
-	{
-		// Retain the source after older Execute writes, then occupy both
-		// write clocks (SPRU172C classes 13A/13B). Placement is a partial model.
-		u32 const value = saturated_store(accumulator(BIT(m_pipeline_word[4], 8)));
-		m_pipeline_operand[4] = u16(value >> 16);
-		m_pipeline_immediate[4] = u16(value);
-	}
-	if (m_pipeline_valid[4] && (m_pipeline_word[4] & 0xfffe) == 0xf4e4)
-	{
-		// An adjacent PSHM commits its stack word in older Execute first.
-		m_pipeline_operand[4] = data_read(m_sp++);
-		m_pipeline_far_return_pending = true;
-	}
-	if (m_pipeline_valid[4] && (m_pipeline_word[4] & 0xfffe) == 0xf6e4)
-	{
-		m_pipeline_operand_address[4] = data_read(m_sp++);
-		m_pipeline_fetch_address = ((m_pipeline_operand[4] & 0x7f) << 16) | m_pipeline_operand_address[4];
-		pipeline_restore_block_on_return(m_pipeline_address[4]);
-		// Both delay words have reached Decode; discard the next sequential word.
-		m_pipeline_decode_flush = 1;
-	}
+	pipeline_publish_read_results(smem_t_product_read);
 	if (entry_stage == 2)
 	{
 		m_interrupt_stack_address = --m_sp;
@@ -4372,6 +3694,701 @@ void tms320c54x_device::pipeline_step()
 			else m_pipeline_block_active = false;
 		}
 	}
+	pipeline_prefetch(prefetch_bubble, software_intr_prefetch, software_intr_physical);
+	pipeline_accept_interrupt();
+}
+
+bool tms320c54x_device::pipeline_execute()
+{
+	if (!m_pipeline_valid[5]) return true;
+	u32 const address = m_pipeline_address[5];
+	m_pc = u16(address);
+	m_xpc = (address >> 16) & 0x7f;
+	m_op = m_pipeline_word[5];
+	bool const braf_before = bool(m_st1 & ST1_BRAF);
+	debugger_instruction_hook(address);
+	// XC's replacement NOP consumes a slot, not an original instruction entry.
+	if (!m_pipeline_annulled[5] && !m_instruction_observer_cb.isunset()) m_instruction_observer_cb(address, m_op);
+	++m_pc;
+	if (m_coverage && !m_coverage->count[m_op]++) m_coverage->first_pc[m_op] = address;
+	if (m_coverage && staged_shifted_smem(m_op))
+	{
+		bool const extended = u8(m_op) >= 0xe0;
+		std::array<u16, 4> const words = {u16(extended ? 3 : 2), m_op,
+			extended ? m_pipeline_extension_first[5] : m_pipeline_immediate[5],
+			extended ? m_pipeline_immediate[5] : u16(0)};
+		auto entry = m_coverage->extensions.find(words);
+		if (entry == m_coverage->extensions.end() && m_coverage->extensions.size() < opcode_coverage::MAX_TUPLES)
+			entry = m_coverage->extensions.emplace(words, opcode_coverage::extension_observation{address}).first;
+		if (entry != m_coverage->extensions.end()) ++entry->second.count;
+		else ++m_coverage->dropped_tuples;
+	}
+	if (staged_immediate_repeat(m_op) || staged_memory_repeat(m_op) || staged_short_repeat(m_op))
+	{
+		if ((m_op & 0xfeff) == 0xf071) accumulator(BIT(m_op, 8)) = 0;
+		m_rptc = staged_memory_repeat(m_op) ? m_pipeline_operand[5] : m_pipeline_immediate[5];
+		m_rpt_iteration = 0;
+		if (staged_immediate_repeat(m_op) || (staged_memory_repeat(m_op) && u8(m_op) >= 0xe0)) ++m_pc;
+	}
+	else if (staged_block_repeat(m_op))
+		++m_pc; // Setup belongs to complete Decode, not an atomic operand fetch.
+	else if (staged_idle(m_op))
+	{
+		enter_idle(BIT(m_op, 9) ? 2 : BIT(m_op, 8) ? 3 : 1);
+		m_pipeline_idle_barrier = false;
+		m_pipeline_idle_resume_pending = true;
+		m_pipeline_fetch_address = m_pipeline_idle_resume_address;
+		m_pipeline_valid.fill(false);
+		if (m_nmi_pending || (m_ifr & m_imr)) leave_idle();
+	}
+	else if (staged_software_intr(m_op))
+		m_data.write_word(m_pipeline_operand_address[5], m_pipeline_immediate[5]);
+	else if (m_op == 0xf49b || m_op == 0xf69b)
+		m_st1 &= ~u16(0x0800);
+	else if (staged_conditional_return(m_op) || staged_delayed_conditional_return(m_op))
+	{
+		if (m_pipeline_immediate[5] || staged_delayed_conditional_return(m_op))
+		{
+			m_pc = m_pipeline_operand[5];
+			m_pipeline_fetch_address = (address & 0x7f0000) | m_pc;
+			if (m_pipeline_immediate[5] && staged_delayed_conditional_return(m_op)) pipeline_restore_block_on_return(address);
+			m_pipeline_flush_front = false; m_pipeline_decode_flush = 0;
+		}
+	}
+	else if (m_op == 0xfc00 || m_op == 0xf4eb || m_op == 0xfe00)
+	{
+		m_pc = m_pipeline_operand[5];
+		m_pipeline_fetch_address = logical_program_address(m_pc);
+		if (m_op == 0xfc00 && m_pipeline_xc_active && m_pipeline_xc_end == ((address & 0x7f0000) | u16(address + 1)))
+			// The return discards the sequential second protected word.
+			// Retain protection for the first resumed instruction word.
+			m_pipeline_xc_end = m_pipeline_fetch_address;
+		pipeline_restore_block_on_return(address);
+		m_pipeline_flush_front = false;
+		if (m_op == 0xf4eb) m_st1 &= ~u16(0x0800);
+	}
+	else if ((m_op & 0xfcf0) == 0xf4b0)
+	{
+		if (m_op == 0xf6bf && m_pipeline_block_active && !m_pipeline_block_body[5])
+		{
+			// A forward exit annuls its body predictions, but does not clear
+			// architectural BRAF. Outside-body RSBX may retire that predictor
+			// only with no younger body in flight. In-loop six-word latency
+			// (SPRU131G 7.5.8.2) remains outside this bounded composition.
+			for (unsigned stage = 0; stage < 5; ++stage)
+				if (m_pipeline_valid[stage] && m_pipeline_block_body[stage])
+				{ logerror("%s: staged outside BRAF clear with pending block words is unsupported\n", machine().describe_context()); m_illegal = true; return false; }
+			m_pipeline_block_active = m_pipeline_block_fetch_enabled = false;
+			m_pipeline_block_fetch_remaining = 0;
+		}
+		u16 &status = BIT(m_op, 9) ? m_st1 : m_st0;
+		u16 const mask = u16(1) << (m_op & 15);
+		status = BIT(m_op, 8) ? status | mask : status & ~mask;
+		if (BIT(m_op, 9)) status &= ~ST1_RESERVED;
+	}
+	else if ((m_op & 0xfdfe) == 0xf4e4)
+	{
+		m_xpc = m_extended_program ? m_pipeline_operand[5] & 0x7f : 0;
+		m_pc = m_pipeline_operand_address[5];
+		if (!BIT(m_op, 9))
+		{
+			m_pipeline_fetch_address = logical_program_address(m_pc);
+			pipeline_restore_block_on_return(address);
+		}
+		m_pipeline_flush_front = false;
+		if (BIT(m_op, 0)) m_st1 &= ~u16(0x0800);
+	}
+	else if (staged_banz(m_op))
+		m_pc += staged_extended_banz(m_op) ? 2 : 1; // Predicate, AR modification and target ownership belong to Access.
+	else if (staged_conditional_branch(m_op))
+	{
+		++m_pc;
+		// CCD retains its Read decision and one-word frame. Do not add
+		// the nondelayed CC hold to the complete two-word delay span.
+		if (staged_conditional_call(m_op) && BIT(m_op, 9) && m_pipeline_immediate[5])
+			data_write(m_pipeline_operand_address[5], u16(address + 4));
+		if (m_pipeline_immediate[5] && BIT(m_op, 9))
+		{
+			m_pipeline_fetch_address = (address & 0x7f0000) | m_pipeline_operand[5];
+			m_pipeline_decode_flush = 1;
+			if (m_pipeline_block_body[5] && !staged_conditional_call(m_op))
+				// Annul fall-through endpoint predictions, not Decode's count.
+				m_pipeline_block_fetch_remaining = u32(m_brc) + 1;
+		}
+	}
+	else if (staged_accumulator_transfer(m_op))
+	{
+		m_pipeline_flush_front = false;
+		m_pipeline_decode_flush = 0;
+		if (BIT(m_op, 9))
+		{
+			// Delayed accumulator transfers already redirected Prefetch in Read;
+			// only FCALAD owns a second frame word.
+			if (staged_accumulator_far_call(m_op)) data_write(m_pipeline_far_call_stack[5], m_pipeline_far_call_page[5], 5);
+			m_pc = u16(address + 1);
+		}
+		else
+		{
+			m_pc = u16(m_pipeline_acc_transfer_target);
+			m_xpc = (m_pipeline_acc_transfer_target >> 16) & 0x7f;
+			m_pipeline_fetch_address = m_pipeline_acc_transfer_target;
+		}
+	}
+	else if (staged_far_branch(m_op) || staged_far_call(m_op))
+	{
+		if (staged_far_call(m_op)) data_write(m_pipeline_far_call_stack[5], m_pipeline_far_call_page[5]);
+		if (BIT(m_op, 9))
+			m_pc = u16(address + 2); // Delay words retain the caller's architectural page.
+		else
+		{
+			m_xpc = m_op & 0x7f;
+			m_pc = m_pipeline_operand[5];
+		}
+	}
+	else if (m_op == 0xf073 || m_op == 0xf273 || staged_call(m_op))
+		++m_pc; // Target fetch was already redirected in Access.
+	else if ((m_op & 0xff00) == 0xee00)
+		; // FRAME's SP update already belongs to its Access stage.
+	else if (staged_mmr_move(m_op))
+		; // MVMM's retained Decode read and Access write are already complete.
+	else if ((m_op & 0xff00) == 0x7700)
+	{
+		if (staged_ram_stm(m_op)) data_write(m_pipeline_operand_address[5], m_pipeline_immediate[5]);
+		// Non-DAGEN PMST/IMR/bus controls retain their literal until Execute; do not
+		// inherit address-generator early publication. Phase is partial.
+		if (staged_accumulator_stm(m_op) || m_op == 0x771d || m_op == 0x7700 || staged_bus_control(m_op) || (staged_timer_control(m_op) || staged_serial_control(m_op) || staged_clock_control(m_op))) data_write(u8(m_op), m_pipeline_immediate[5]);
+		++m_pc;
+	}
+	else if (staged_write_a(m_op))
+	{
+		m_program.write_word(m_pipeline_write_a_target, m_pipeline_operand[5]);
+		if (u8(m_op) >= 0xe0) ++m_pc;
+	}
+	else if (staged_read_a(m_op))
+	{
+		data_write(m_pipeline_operand_address[5], m_pipeline_operand[5]);
+		if (u8(m_op) >= 0xe0) ++m_pc;
+		if (m_pipeline_repeat_active && m_pipeline_repeat_body_latched && address == m_pipeline_repeat_address) pipeline_begin_repeat_stream();
+	}
+	else if (staged_data_to_program(m_op))
+	{
+		m_program.write_word((u32(m_pipeline_immediate[5]) << 16) | m_pipeline_operand_address[5], m_pipeline_operand[5]);
+		m_pc += u8(m_op) >= 0xe0 ? 2 : 1;
+		if (m_pipeline_repeat_active && m_pipeline_repeat_body_latched && address == m_pipeline_repeat_address)
+		{
+			pipeline_begin_repeat_stream();
+			// Read reused the immediate field for the physical target's page;
+			// the low word still holds pmad, the repeat's incrementing base.
+			m_pipeline_repeat_source = m_pipeline_operand_address[5];
+		}
+	}
+	else if (staged_program_move(m_op))
+	{
+		data_write(m_pipeline_operand_address[5], m_pipeline_operand[5]);
+		m_pc += staged_extended_program_move(m_op) ? 2 : 1;
+		if (m_pipeline_repeat_active && m_pipeline_repeat_body_latched && m_pipeline_address[5] == m_pipeline_repeat_address)
+			pipeline_begin_repeat_stream();
+	}
+	else if (staged_delay_copy(m_op))
+	{
+		data_write(u16(m_pipeline_operand_address[5] + 1), m_pipeline_operand[5]);
+		m_pc += u8(m_op) >= 0xe0;
+	}
+	else if (staged_data_copy(m_op))
+	{
+		if (m_pipeline_operand_address[5] >= 0x20) data_write(m_pipeline_operand_address[5], m_pipeline_operand[5]);
+		m_pc += staged_extended_data_copy(m_op) ? 2 : 1;
+	}
+	else if (staged_move(m_op))
+		m_pc += staged_extended_move(m_op) ? 2 : 1; // Retained move already committed at its owned write clock.
+	else if (staged_memory_load(m_op))
+	{
+		u16 const status = m_st1;
+		m_st1 = (m_st1 & ~u16(0x011f)) | m_pipeline_alu_mode[5];
+		u64 const value = (m_op & 0xfe00) == 0x1200 ? m_pipeline_operand[5] : data_operand(m_pipeline_operand[5]);
+		accumulator(BIT(m_op, 8)) = (m_op & 0xfe00) == 0x1400 ? shifted_by_t(m_pipeline_operand[5], m_pipeline_immediate[5]) :
+			(m_op & 0xfe00) == 0x1600 ? ((value << 16) | 0x8000) & ACC_MASK :
+			(m_op & 0xfe00) == 0x4400 ? (value << 16) & ACC_MASK : value;
+		m_st1 = status;
+		if (staged_offset_load(m_op) || staged_absolute_load(m_op)) ++m_pc;
+	}
+	else if (staged_mmr_load(m_op))
+		accumulator(BIT(m_op, 8)) = m_pipeline_operand[5];
+	else if (staged_memory_dp(m_op))
+	{
+		m_st0 = (m_st0 & ~u16(0x1ff)) | (m_pipeline_operand[5] & 0x1ff);
+		if (m_op == 0x46f8) ++m_pc;
+	}
+	else if (register_product_form(m_op))
+		register_product_result(m_op, m_pipeline_operand[5]);
+	else if ((m_op & 0xfeff) == 0xf48d)
+	{
+		// SPRU172C 4-161: square A(32-16), not the signed 16-bit AH.
+		// The accumulator form does not publish T.
+		s64 const high = accumulator_high17(m_a);
+		accumulator(BIT(m_op, 8)) = multiply_result(high * high * (BIT(m_st1, 6) ? 2 : 1), BIT(m_op, 8));
+	}
+	else if (staged_minmax(m_op))
+	{
+		s64 const a = s64(m_a << 24) >> 24, b = s64(m_b << 24) >> 24;
+		bool const choose_a = BIT(m_op, 0) ? a < b : a > b;
+		accumulator(BIT(m_op, 8)) = choose_a ? m_a : m_b;
+		m_st0 = (m_st0 & ~u16(0x0800)) | (choose_a ? 0 : 0x0800);
+	}
+	else if (staged_norm(m_op))
+	{
+		accumulator(BIT(m_op, 8)) = shifted_load(accumulator(BIT(m_op, 9)), normalization_shift(m_pipeline_immediate[5]), BIT(m_op, 8));
+	}
+	else if (staged_long_arithmetic(m_op))
+	{
+		long_word_arithmetic(m_op, m_pipeline_operand[5], m_pipeline_immediate[5], m_pipeline_t[5]);
+		if (staged_extended_long_arithmetic(m_op)) ++m_pc;
+	}
+	else if (staged_dld(m_op))
+	{
+		u64 value = (u64(m_pipeline_operand[5]) << 16) | m_pipeline_immediate[5];
+		if (BIT(m_st1, 8) && BIT(m_pipeline_operand[5], 15)) value |= u64(0xff) << 32;
+		accumulator(BIT(m_op, 8)) = value;
+		if (staged_extended_dld(m_op)) ++m_pc;
+	}
+	else if (staged_dst(m_op))
+	{
+		m_data.write_word(m_pipeline_operand_address[5], m_pipeline_operand[5]);
+		m_pipeline_long_store_pending = true;
+		if (staged_extended_dst(m_op)) ++m_pc;
+	}
+	else if (staged_direct_push(m_op) || (m_op & 0xff00) == 0x4b00)
+	{
+		data_write(m_pipeline_operand_address[5], m_pipeline_operand[5]);
+		if (staged_extended_push(m_op)) ++m_pc;
+	}
+	else if ((m_op & 0xff00) == 0x8a00)
+	{
+		u16 const destination = m_pipeline_operand_address[5];
+		if (destination < 0x10 || destination > 0x19 || m_pipeline_early_write_deferred[5])
+		{
+			data_write(destination, m_pipeline_operand[5]);
+			if (destination == 0x18) pipeline_delay_compiler_sp(m_pipeline_direct_sp[5]);
+		}
+	}
+	else if ((m_op & 0xff00) == 0x8b00)
+	{
+		u16 const destination = m_pipeline_operand_address[5];
+		if (destination < 0x10 || destination > 0x19 || m_pipeline_early_write_deferred[5])
+			data_write(destination, m_pipeline_operand[5]);
+		if (staged_extended_pop(m_op)) ++m_pc;
+	}
+	else if (staged_accumulator_mmr_store(m_op))
+	{
+		// SPRU131G table 7-5: store-type DAGEN writes belong to Execute.
+		// Direct MMR addressing ignores DP/CPL (SPRU172C 4-175).
+		// PMST also publishes here; later Prefetch owns mapping (7.5.9).
+		u16 const value = u16(saturated_store(accumulator(BIT(m_op, 8))));
+		if (u8(m_op) == 7 && !(value & ST1_BRAF) && m_pipeline_block_active)
+		{
+			// Software may suspend an interrupted loop outside its body.
+			// Retire only the predictor; architectural BRC/RSA/REA remain
+			// available for the handler's own save/restore sequence.
+			for (unsigned stage = 0; stage < 5; ++stage)
+				if (m_pipeline_valid[stage] && m_pipeline_block_body[stage])
+				{ logerror("%s: staged outside STLM BRAF clear with pending block words is unsupported\n", machine().describe_context()); m_illegal = true; return false; }
+			m_pipeline_block_active = m_pipeline_block_fetch_enabled = false;
+			m_pipeline_block_fetch_remaining = 0;
+		}
+		data_write(m_pipeline_operand_address[5], value);
+	}
+	else if (staged_store(m_op))
+	{
+		data_write(m_pipeline_operand_address[5], pipeline_store_word());
+		if (staged_extended_store(m_op)) ++m_pc;
+	}
+	else if (staged_rmw(m_op))
+	{
+		m_pc += staged_extended_rmw(m_op) || u8(m_op) == 0xf8 ? 2 : 1;
+		data_write(m_pipeline_operand_address[5], (m_op & 0xff00) == 0x6b00
+			? add_memory_word(m_pipeline_operand[5], m_pipeline_immediate[5]) : (m_op & 0xff00) == 0x6a00
+			? m_pipeline_operand[5] ^ m_pipeline_immediate[5] : BIT(m_op, 8)
+			? m_pipeline_operand[5] | m_pipeline_immediate[5]
+			: m_pipeline_operand[5] & m_pipeline_immediate[5]);
+	}
+	else if ((m_op & 0xff00) == 0x7600)
+	{
+		m_pc += u8(m_op) == 0xf8 || staged_extended_immediate_store(m_op) ? 2 : 1;
+		if (m_pipeline_operand_address[5] < 0x10 || m_pipeline_operand_address[5] > 0x19)
+			data_write(m_pipeline_operand_address[5], pipeline_store_word());
+		if (m_pipeline_repeat_active && m_pipeline_repeat_body_latched && address == m_pipeline_repeat_address) pipeline_begin_repeat_stream();
+	}
+	else if (staged_port_write(m_op))
+	{
+		m_io.write_word(m_pipeline_immediate[5], m_pipeline_operand[5]);
+		m_pc += u8(m_op) >= 0xe0 ? 2 : 1;
+		if (m_pipeline_repeat_active && m_pipeline_repeat_body_latched && address == m_pipeline_repeat_address) pipeline_begin_repeat_stream();
+	}
+	else if (staged_port_read(m_op))
+	{
+		data_write(m_pipeline_operand_address[5], m_pipeline_operand[5]);
+		m_pc += u8(m_op) >= 0xe0 ? 2 : 1;
+		if (m_pipeline_repeat_active && m_pipeline_repeat_body_latched && address == m_pipeline_repeat_address) pipeline_begin_repeat_stream();
+	}
+	else if (staged_conditional_store(m_op))
+		data_write(m_pipeline_operand_address[5], pipeline_store_word());
+	else if (staged_parallel_alu(m_op))
+	{
+		u64 const other = accumulator(!BIT(m_op, 8)) & ACC_MASK;
+		s64 const sample = m_pipeline_alu_mode[5] & 0x100 ? s16(m_pipeline_operand[5]) : s32(m_pipeline_operand[5]);
+		u64 const operand = u64(sample * 65536) & ACC_MASK;
+		data_write(m_pipeline_operand_address[5], pipeline_store_word());
+		// SUB reverses the usual accumulator-minus-memory order
+		// (SPRU172C 4-185); the old accumulator is stored first.
+		accumulator(BIT(m_op, 8)) = BIT(m_op, 10) ? add_sub(operand, other, true, BIT(m_op, 8)) : add_sub(other, operand, false, BIT(m_op, 8));
+	}
+	else if (staged_parallel_load(m_op))
+	{
+		// Store the old accumulator before replacing an aliased destination
+		// (SPRU172C 4-179). Retain the unresolved C policy.
+		data_write(m_pipeline_operand_address[5], pipeline_store_word());
+		if ((m_op & 0xfd00) != 0xe400)
+		{
+			s64 const value = m_pipeline_alu_mode[5] & 0x100 ? s16(m_pipeline_operand[5]) : s32(m_pipeline_operand[5]);
+			accumulator(BIT(m_op, 8)) = u64(value * 65536) & ACC_MASK;
+		}
+	}
+	else if (staged_parallel_mpy(m_op))
+	{
+		// The store consumes the old accumulator; MPY uses Read-owned X/T.
+		u16 const stored = pipeline_store_word();
+		s64 product = s64(s16(m_pipeline_operand[5])) * s16(m_pipeline_immediate[5]);
+		if (BIT(m_st1, 6)) product *= 2;
+		data_write(m_pipeline_operand_address[5], stored);
+		accumulator(BIT(m_op, 8)) = multiply_result(product, BIT(m_op, 8));
+	}
+	else if (staged_parallel_mac(m_op))
+	{
+		// Store before replacing an aliased accumulator (SPRU172C 4-180).
+		// C remains an implementation hypothesis, not qualified silicon behaviour.
+		u16 const stored = pipeline_store_word();
+		s64 product = s64(s16(m_pipeline_operand[5])) * s64(s16(m_pipeline_immediate[5]));
+		if (BIT(m_st1, 6)) product *= 2;
+		product = multiply_product(product);
+		s64 result = (s64(accumulator(BIT(m_op, 8)) << 24) >> 24) + (BIT(m_op, 11) ? -product : product);
+		if (BIT(m_op, 10)) result = (result + 0x8000) & ~s64(0xffff);
+		data_write(m_pipeline_operand_address[5], stored);
+		accumulator(BIT(m_op, 8)) = multiply_result(result, BIT(m_op, 8));
+	}
+	else if (staged_mvdd(m_op))
+	{
+		m_observed_mvdd_write = true;
+		data_write(m_pipeline_operand_address[5], m_pipeline_operand[5]);
+		m_observed_mvdd_write = false;
+	}
+	else if (staged_coefficient_mac(m_op))
+	{
+		bool const destination_b = BIT(m_op, 8);
+		s64 product = s64(s16(m_pipeline_operand[5])) * s16(m_pipeline_immediate[5]);
+		if (BIT(m_st1, 6)) product *= 2;
+		accumulator(destination_b) = multiply_result((s64(accumulator(destination_b) << 24) >> 24) + multiply_product(product), destination_b);
+		if (BIT(m_op, 9)) data_write(u16(m_pipeline_operand_address[5] + 1), m_pipeline_operand[5]);
+		m_pc += u8(m_op) >= 0xe0 ? 2 : 1;
+	}
+	else if (staged_firs(m_op))
+	{
+		s64 product = accumulator_high17(m_a) * s64(s16(m_pipeline_immediate[5]));
+		if (BIT(m_st1, 6)) product *= 2;
+		m_b = multiply_result((s64(m_b << 24) >> 24) + multiply_product(product), true);
+		m_a = add_sub((data_operand(m_pipeline_operand[5]) << 16) & ACC_MASK,
+			(data_operand(m_pipeline_t[5]) << 16) & ACC_MASK, false, false);
+		++m_pc;
+	}
+	else if (staged_distance(m_op))
+	{
+		// Both forms consume old A before the vector subtraction replaces it.
+		s64 const high = accumulator_high17(m_a);
+		s64 distance = BIT(m_op, 8) ? (high < 0 ? -high : high) : high * high;
+		if (BIT(m_st1, 6)) distance *= 2;
+		m_b = BIT(m_op, 8) ? add_sub(m_b, u64(distance), false, true) :
+			multiply_result((s64(m_b << 24) >> 24) + multiply_product(distance), true);
+		s64 const x = BIT(m_st1, 8) ? s64(s16(m_pipeline_operand[5])) : s64(m_pipeline_operand[5]);
+		s64 const y = BIT(m_st1, 8) ? s64(s16(m_pipeline_immediate[5])) : s64(m_pipeline_immediate[5]);
+		m_a = add_sub(u64(x * 65536) & ACC_MASK, u64(y * 65536) & ACC_MASK, true, false);
+	}
+	else if (staged_dual_arithmetic(m_op))
+	{
+		s64 const x = BIT(m_st1, 8) ? s64(s16(m_pipeline_operand[5])) : s64(m_pipeline_operand[5]);
+		s64 const y = BIT(m_st1, 8) ? s64(s16(m_pipeline_immediate[5])) : s64(m_pipeline_immediate[5]);
+		accumulator(BIT(m_op, 8)) = add_sub(u64(x * 0x10000) & ACC_MASK,
+			u64(y * 0x10000) & ACC_MASK, BIT(m_op, 9), BIT(m_op, 8));
+	}
+	else if (staged_lms(m_op))
+	{
+		s64 const x = BIT(m_st1, 8) ? s64(s16(m_pipeline_operand[5])) : s64(m_pipeline_operand[5]);
+		m_a = add_sub(m_a, u64(x * 65536 + 32768) & ACC_MASK, false, false);
+		s64 product = s64(s16(m_pipeline_operand[5])) * s16(m_pipeline_immediate[5]);
+		if (BIT(m_st1, 6)) product *= 2;
+		m_b = multiply_result((s64(m_b << 24) >> 24) + multiply_product(product), true);
+	}
+	else if (staged_load_mac(m_op))
+	{
+		bool const destination_b = BIT(m_op, 8);
+		s64 product = s64(s16(m_pipeline_t[5])) * s16(m_pipeline_immediate[5]);
+		if (BIT(m_st1, 6)) product *= 2;
+		product = multiply_product(product);
+		s64 result = (s64(accumulator(!destination_b) << 24) >> 24) + (BIT(m_op, 10) ? -product : product);
+		if (BIT(m_op, 9)) result = (result + 0x8000) & ~s64(0xffff);
+		accumulator(!destination_b) = multiply_result(result, !destination_b);
+		accumulator(destination_b) = (data_operand(m_pipeline_operand[5]) << 16) & ACC_MASK;
+	}
+	else if (staged_dual_multiply(m_op))
+	{
+		bool const signed_mac = (m_op & 0xf000) == 0xb000;
+		bool const accumulate = signed_mac || BIT(m_op, 9), destination_b = BIT(m_op, 8);
+		s64 product = (accumulate && !signed_mac ? s64(m_pipeline_operand[5]) : s64(s16(m_pipeline_operand[5]))) * s64(s16(m_pipeline_immediate[5]));
+		if (BIT(m_st1, 6)) product *= 2;
+		// X/Y and T belong to Read; source selection and feedback belong to
+		// Execute. SMUL applies before accumulation, rounding afterwards.
+		if (accumulate)
+		{
+			product = multiply_product(product);
+			if (signed_mac && BIT(m_op, 11)) product = -product;
+			product += s64(accumulator(signed_mac ? BIT(m_op, 9) : destination_b) << 24) >> 24;
+		}
+		if (signed_mac && BIT(m_op, 10)) product = (product + 0x8000) & ~s64(0xffff);
+		accumulator(destination_b) = multiply_result(product, destination_b);
+	}
+	else if (staged_xmem_store(m_op))
+	{
+		data_write(m_pipeline_operand_address[5], pipeline_store_word());
+	}
+	else if (staged_xmem_arithmetic(m_op))
+	{
+		u64 const operand = (data_operand(m_pipeline_operand[5]) << (m_op & 15)) & ACC_MASK;
+		u64 &destination = accumulator(BIT(m_op, 8));
+		destination = add_sub(destination, operand, BIT(m_op, 9), BIT(m_op, 8));
+	}
+	else if (staged_xmem_load(m_op))
+		accumulator(BIT(m_op, 8)) = shifted_load(data_operand(m_pipeline_operand[5]), m_op & 15, BIT(m_op, 8));
+	else if (staged_xmem_bit(m_op))
+		m_st0 = (m_st0 & ~u16(0x1000)) | (BIT(m_pipeline_operand[5], 15 - (m_op & 15)) ? 0x1000 : 0);
+	else if (staged_bitfield(m_op))
+	{
+		bool const tc = BIT(m_op, 8) ? bool(m_pipeline_operand[5] & m_pipeline_immediate[5]) : m_pipeline_operand[5] == m_pipeline_immediate[5];
+		m_st0 = (m_st0 & ~u16(0x1000)) | (tc ? 0x1000 : 0);
+		m_pc += staged_extended_bitfield(m_op) ? 2 : 1;
+	}
+	else if (staged_shifted_smem(m_op))
+	{
+		u16 const extension = m_pipeline_immediate[5];
+		int const shift = s8((extension & 0x1f) << 3) >> 3;
+		if (staged_shifted_memory_store(m_op, extension))
+		{
+			data_write(m_pipeline_operand_address[5], pipeline_store_word());
+		}
+		else if (staged_shifted_memory_arithmetic(extension))
+		{
+			u64 const operand = data_operand(m_pipeline_operand[5]);
+			u64 const shifted = shift < 0 ? (BIT(m_st1, 8) ? arithmetic_shift_right(operand, -shift) : operand >> -shift) : (operand << shift) & ACC_MASK;
+			accumulator(BIT(extension, 8)) = add_sub(accumulator(BIT(extension, 9)), shifted, BIT(extension, 5), BIT(extension, 8));
+		}
+		else accumulator(BIT(extension, 8)) = shifted_load(data_operand(m_pipeline_operand[5]), shift, BIT(extension, 8));
+		m_pc += u8(m_op) >= 0xe0 ? 2 : 1;
+	}
+	else if (staged_smem_special(m_op))
+	{
+		if ((m_op & 0xff00) == 0x3000)
+		{
+			// T was published in Read; retirement must not overwrite a newer T.
+		}
+		else if (staged_bitt(m_op))
+			m_st0 = (m_st0 & ~u16(0x1000)) | (BIT(m_pipeline_operand[5], 15 - (m_pipeline_immediate[5] & 15)) ? 0x1000 : 0);
+		else if ((m_op & 0xff00) == 0x3200)
+			m_st1 = (m_st1 & ~u16(0x001f)) | (m_pipeline_operand[5] & 0x001f);
+		else if ((m_op & 0xf000) == 0x2000)
+		{
+			u64 &destination = accumulator(BIT(m_op, 8));
+			destination = memory_t_multiply(m_op, m_pipeline_operand[5], m_pipeline_immediate[5], destination);
+		}
+		else if (staged_poly(m_op)) polynomial_step(m_pipeline_operand[5], m_pipeline_immediate[5]);
+		else if (square_accumulate(m_op)) square_accumulate_result(m_op, m_pipeline_operand[5]);
+		else accumulator_memory_multiply(m_op, m_pipeline_operand[5]);
+		if (staged_extended_smem_special(m_op)) ++m_pc;
+	}
+	else if (staged_smem_arithmetic(m_op))
+	{
+		u64 &destination = accumulator(BIT(m_op, 8));
+		bool const with_carry = (m_op & 0xfe00) == 0x0600;
+		bool const with_borrow = (m_op & 0xfe00) == 0x0e00;
+		bool const shift16 = (m_op & 0xfc00) == 0x3c00 || (m_op & 0xfc00) == 0x4000;
+		u64 const memory = with_carry || with_borrow || staged_unsigned_memory_arithmetic(m_op) ? m_pipeline_operand[5] : data_operand(m_pipeline_operand[5]);
+		// ADDC/SUBB retain unsigned Smem in Read, but consume the accumulator
+		// and carry in Execute, including an adjacent ALU's carry output.
+		u64 const operand = with_carry ? memory + unsigned(BIT(m_st0, 11)) : with_borrow ? memory + unsigned(!BIT(m_st0, 11)) : staged_ts_arithmetic(m_op) ? shifted_by_t(m_pipeline_operand[5], m_pipeline_immediate[5]) : shift16 ? (memory << 16) & ACC_MASK : memory;
+		destination = (m_op & 0xfe00) == 0x1e00 ? conditional_subtract(destination, m_pipeline_operand[5], BIT(m_op, 8)) :
+			add_sub(shift16 ? accumulator(BIT(m_op, 9)) : destination, operand, shift16 ? (m_op & 0xfc00) == 0x4000 : BIT(m_op, 11), BIT(m_op, 8), shift16);
+		if (staged_extended_smem_arithmetic(m_op)) ++m_pc;
+	}
+	else if (staged_absolute_add(m_op))
+	{
+		u64 &destination = accumulator(BIT(m_op, 8));
+		destination = add_sub(destination, data_operand(m_pipeline_operand[5]), false, BIT(m_op, 8));
+		++m_pc;
+	}
+	else if (staged_immediate_multiply(m_op))
+	{
+		s64 product = s64(s16(m_pipeline_operand[5])) * s16(m_pipeline_immediate[5]);
+		if (BIT(m_st1, 6)) product *= 2;
+		if ((m_op & 0xfcff) == 0xf067 || (m_op & 0xfc00) == 0x6400)
+		{
+			product = multiply_product(product);
+			u64 const source = accumulator(BIT(m_op, 9));
+			product += s64(source << 24) >> 24;
+		}
+		accumulator(BIT(m_op, 8)) = multiply_result(product, BIT(m_op, 8));
+		m_pc += staged_memory_immediate_multiply(m_op) && u8(m_op) >= 0xe0 ? 2 : 1;
+	}
+	else if (staged_immediate_alu(m_op))
+	{
+		++m_pc;
+		bool const high_immediate = (m_op & 0xfcf8) == 0xf060;
+		unsigned const operation = high_immediate ? m_op & 7 : (m_op >> 4) & 15;
+		u64 const source = accumulator(BIT(m_op, 9));
+		u64 &destination = accumulator(BIT(m_op, 8));
+		if (operation <= 1)
+		{
+			u64 const operand = (data_operand(m_pipeline_immediate[5]) << (high_immediate ? 16 : m_op & 15)) & ACC_MASK;
+			destination = add_sub(source, operand, operation == 1, BIT(m_op, 8));
+		}
+		else
+		{
+			u64 const operand = u64(m_pipeline_immediate[5]) << (high_immediate ? 16 : m_op & 15);
+			destination = operation == 3 ? source & operand : operation == 4 ? source | operand : source ^ operand;
+		}
+	}
+	else if ((m_op & 0xfef0) == 0xf020 || (m_op & 0xfeff) == 0xf062)
+	{
+		++m_pc;
+		unsigned const shift = (m_op & 0xff) == 0x62 ? 16 : m_op & 15;
+		accumulator(BIT(m_op, 8)) = (data_operand(m_pipeline_operand[5]) << shift) & ACC_MASK;
+	}
+	else if (staged_memory_logic(m_op))
+	{
+		if (staged_extended_logic(m_op)) ++m_pc;
+		u64 &destination = accumulator(BIT(m_op, 8));
+		u64 const operand = m_pipeline_operand[5]; // Logical Smem is zero-extended, independent of SXM.
+		unsigned const operation = (m_op >> 9) & 3;
+		destination = (operation == 0 ? destination & operand : operation == 1 ? destination | operand : destination ^ operand) & ACC_MASK;
+	}
+	else if (staged_immediate_arp(m_op))
+		; // Access publication must not overwrite a younger indirect ARP update.
+	else if (staged_immediate_asm(m_op))
+		// SPRU131G example 7-52: the following ASM consumer has no gap.
+		m_st1 = (m_st1 & ~u16(0x001f)) | (m_op & 0x001f);
+	else if ((m_op & 0xfcf8) == 0xf4a8)
+		m_st0 = (m_st0 & ~u16(0x1000)) | (m_pipeline_operand[5] ? 0x1000 : 0);
+	else if (staged_mar(m_op))
+	{
+		if (staged_long_mar(m_op)) ++m_pc;
+	}
+	else if ((m_op & 0xfcff) == 0xf480 || (m_op & 0xfcff) == 0xf481 || (m_op & 0xfcff) == 0xf482)
+	{
+		u16 const status = m_st1;
+		m_st1 = (m_st1 & ~u16(0x011f)) | m_pipeline_alu_mode[5];
+		execute_one(m_op);
+		m_st1 = status;
+	}
+	else if (!staged_xc(m_op))
+		execute_one(m_op);
+	if ((m_op & 0xfeff) == 0xf6bf && bool(m_st1 & ST1_BRAF) != braf_before) pipeline_update_braf(address);
+	if (staged_pipelined_repeat(m_op) && m_pipeline_repeat_active && m_pipeline_repeat_body_latched && address == m_pipeline_repeat_address)
+	{
+		if (m_rptc) { --m_rptc; ++m_rpt_iteration; }
+		else
+		{
+			m_pipeline_repeat_active = m_pipeline_repeat_body_latched = false;
+			m_rpt_iteration = 0;
+			pipeline_resume_after_repeat();
+		}
+	}
+	if ((m_op == 0xf495 || staged_write_a(m_op) || staged_repeat_accumulator_load(m_op) || (m_op & 0xfe00) == 0x1e00) && m_pipeline_repeat_active && m_pipeline_repeat_body_latched && address == m_pipeline_repeat_address)
+		pipeline_begin_repeat_stream();
+	// A younger decoded XC extends protection. In a short repeat loop,
+	// an older instance can retire at the same PC as the newer span's end;
+	// that older retirement must not clear the younger owner's protection.
+	if (m_pipeline_xc_active && (address & 0x7f0000) == (m_pipeline_xc_end & 0x7f0000) &&
+		u16(m_pipeline_xc_end - address) < ((staged_opcode_descriptor[m_op] >> 2) & 3))
+	{
+		bool younger_xc = false;
+		for (unsigned stage = 2; stage < 5; ++stage)
+			younger_xc |= m_pipeline_valid[stage] && staged_xc(m_pipeline_word[stage]);
+		if (!younger_xc) m_pipeline_xc_active = false;
+	}
+	// A backward branch can retire alongside its target IDLE's Decode.
+	// That older branch must not consume the younger one-word guard.
+	if (m_pipeline_control_words && (address & 0x7f0000) == (m_pipeline_control_address & 0x7f0000) &&
+		(address == m_pipeline_control_address || (!staged_idle(m_pipeline_control_word) && u16(address - m_pipeline_control_address) <= 3)))
+	{
+		unsigned const words = (staged_opcode_descriptor[m_op] >> 2) & 3;
+		m_pipeline_control_words = words >= m_pipeline_control_words ? 0 : m_pipeline_control_words - words;
+	}
+	if (m_pipeline_vector_pending && u16(address) == m_interrupt_vector_pc)
+		m_pipeline_vector_pending = false;
+	m_pipeline_intm_protected[5] = false;
+	update_xf();
+	return true;
+}
+
+void tms320c54x_device::pipeline_publish_read_results(bool smem_t_product_read)
+{
+	if (m_pipeline_valid[4] && register_product_form(m_pipeline_word[4]))
+		// SPRU131G 7.5.6/table 7-13: multiply is not a Category-I TS consumer.
+		// Retain T after older Execute but before younger Read publications;
+		// sampling live T in Execute could instead consume a following STM.
+		m_pipeline_operand[4] = m_t;
+	if (m_pipeline_valid[4] && staged_load_mac(m_pipeline_word[4]))
+		// Retain T after older Execute publications; X loads the accumulator, not T.
+		m_pipeline_t[4] = m_t;
+	if (smem_t_product_read || (m_pipeline_valid[4] && (staged_poly(m_pipeline_word[4]) || staged_parallel_product(m_pipeline_word[4]))))
+		m_pipeline_immediate[4] = m_t;
+	if (m_pipeline_valid[4] && (staged_dual_multiply(m_pipeline_word[4]) || staged_coefficient_mac(m_pipeline_word[4]) || (m_pipeline_word[4] & 0xff00) == 0x4c00))
+		// MPY/MAC/MACSU/LTD load T in Read (SPRU172C 4-101/4-82/4-91/4-81). An older
+		// Execute write must not overwrite this younger publication.
+		m_t = m_pipeline_operand[4];
+	if (m_pipeline_valid[4] && staged_parallel_load(m_pipeline_word[4]) && (m_pipeline_word[4] & 0xfd00) == 0xe400)
+		// The load side owns T in Read; do not republish it in Execute or
+		// let an older Execute write erase this younger publication.
+		m_t = m_pipeline_operand[4];
+	if (m_pipeline_valid[4] && staged_smem_special(m_pipeline_word[4]))
+	{
+		// LD T, memory SQUR and MPYA/MACA/MASA publish T in Read after older Execute.
+		// T-based Smem MPY/MAC/MAS consume retained T without publishing it.
+		if ((m_pipeline_word[4] & 0xfe00) == 0x2600 ||
+			((m_pipeline_word[4] & 0xf000) != 0x2000 && (m_pipeline_word[4] & 0xff00) != 0x3200 && !staged_poly(m_pipeline_word[4]) && !staged_bitt(m_pipeline_word[4])))
+			m_t = m_pipeline_operand[4];
+	}
+	if (m_pipeline_valid[4] && staged_dst(m_pipeline_word[4]))
+	{
+		// Retain the source after older Execute writes, then occupy both
+		// write clocks (SPRU172C classes 13A/13B). Placement is a partial model.
+		u32 const value = saturated_store(accumulator(BIT(m_pipeline_word[4], 8)));
+		m_pipeline_operand[4] = u16(value >> 16);
+		m_pipeline_immediate[4] = u16(value);
+	}
+	if (m_pipeline_valid[4] && (m_pipeline_word[4] & 0xfffe) == 0xf4e4)
+	{
+		// An adjacent PSHM commits its stack word in older Execute first.
+		m_pipeline_operand[4] = data_read(m_sp++);
+		m_pipeline_far_return_pending = true;
+	}
+	if (m_pipeline_valid[4] && (m_pipeline_word[4] & 0xfffe) == 0xf6e4)
+	{
+		m_pipeline_operand_address[4] = data_read(m_sp++);
+		m_pipeline_fetch_address = ((m_pipeline_operand[4] & 0x7f) << 16) | m_pipeline_operand_address[4];
+		pipeline_restore_block_on_return(m_pipeline_address[4]);
+		// Both delay words have reached Decode; discard the next sequential word.
+		m_pipeline_decode_flush = 1;
+	}
+}
+
+void tms320c54x_device::pipeline_prefetch(bool prefetch_bubble, bool software_intr_prefetch, u32 software_intr_physical)
+{
 	if (!m_pipeline_flush_front && !prefetch_bubble && !m_pipeline_idle_barrier && !m_pipeline_idle_resume_pending && !m_pipeline_repeat_body_latched && !m_idle)
 	{
 		m_pipeline_address[0] = m_pipeline_fetch_address;
@@ -4392,7 +4409,6 @@ void tms320c54x_device::pipeline_step()
 				if (--m_pipeline_block_fetch_remaining) m_pipeline_fetch_address = (m_pipeline_address[0] & 0x7f0000) | m_rsa;
 		}
 	}
-	pipeline_accept_interrupt();
 }
 
 void tms320c54x_device::pipeline_begin_repeat_stream()
@@ -4480,7 +4496,8 @@ void tms320c54x_device::pipeline_request_coefficient(u16 address)
 
 void tms320c54x_device::pipeline_finish_repeat_iteration()
 {
-	if (m_coverage) ++m_coverage->count[m_pipeline_repeat_word];
+	if (m_coverage && !m_coverage->count[m_pipeline_repeat_word]++)
+		m_coverage->first_pc[m_pipeline_repeat_word] = m_pipeline_repeat_address;
 	if (!--m_rptc)
 	{
 		m_pipeline_repeat_active = m_pipeline_repeat_body_latched = m_pipeline_repeat_stream = false;

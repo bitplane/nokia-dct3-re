@@ -170,6 +170,9 @@ private:
 	void interrupt_entry_step();
 	void reset_pipeline();
 	void pipeline_step();
+	bool pipeline_execute();
+	void pipeline_publish_read_results(bool smem_t_product_read);
+	void pipeline_prefetch(bool prefetch_bubble, bool software_intr_prefetch, u32 software_intr_physical);
 	void pipeline_accept_interrupt();
 	void pipeline_delay_compiler_sp(u16 previous);
 	void pipeline_begin_repeat_stream();
