@@ -11,7 +11,7 @@ import sys
 
 
 OPCODE = re.compile(
-    r"^\[opcov\] op=([0-9a-fA-F]{4}) first_pc=([0-9a-fA-F]{4})(?: count=(\d+))?$"
+    r"^\[opcov\] op=([0-9a-fA-F]{4}) first_pc=([0-9a-fA-F]{4}(?:[0-9a-fA-F]{2})?)(?: count=(\d+))?$"
 )
 ASSERTION = re.compile(r"^(?:\[:\] )?\[opassert\] op=([0-9a-fA-F]{4})$")
 DECODE = re.compile(r"^\[opdecode\] op=([0-9a-fA-F]{4}) supported=([01]) words=(\d+)$")
@@ -63,11 +63,15 @@ def summarize(text: str) -> dict[str, object]:
     extensions = {}
     tuple_decoded = {}
     for line in text.splitlines():
+        if line.startswith('[opwords_limit]'):
+            raise ValueError('truncated fetched-extension coverage')
         match = OPCODE.match(line)
         if line.startswith("[opcov]") and not match:
             raise ValueError("malformed opcode execution record")
         if match:
             opcode, pc = (int(value, 16) for value in match.groups()[:2])
+            if pc > 0x7fffff:
+                raise ValueError('opcode execution address exceeds program space')
             if match.group(3) is not None and not int(match.group(3)):
                 raise ValueError("opcode execution count must be positive")
             first_pc.setdefault(opcode, pc)

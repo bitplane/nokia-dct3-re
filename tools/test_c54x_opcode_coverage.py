@@ -12,6 +12,13 @@ from tools.c54x_opcode_coverage import (decoder_declared_words, group_gaps, main
 
 
 class C54xOpcodeCoverageTest(unittest.TestCase):
+    def test_extended_addresses_and_truncation_are_explicit(self):
+        self.assertEqual(summarize('[opcov] op=f495 first_pc=01ffff count=1')['first_pc'], {0xf495: 0x1ffff})
+        with self.assertRaisesRegex(ValueError, 'address'):
+            summarize('[opcov] op=f495 first_pc=ffffff count=1')
+        with self.assertRaisesRegex(ValueError, 'truncated'):
+            summarize('[opcov] op=f495 first_pc=01ffff count=1\n[opwords_limit] dropped=1')
+
     def test_malformed_primary_records_cannot_disappear_from_coverage(self):
         valid = '[opcov] op=8194 first_pc=05e3 count=1\n'
         for record in (

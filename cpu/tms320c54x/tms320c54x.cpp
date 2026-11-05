@@ -1673,7 +1673,7 @@ void tms320c54x_device::device_start()
 		fatalerror("C54x CLKMD rate selection requires an input clock");
 	if (m_reset_clkmd_enabled && BIT(m_reset_clkmd, 0) != BIT(m_reset_clkmd, 1))
 		fatalerror("C54x reset CLKMD requires matching requested and actual source selection");
-	m_opcode_first_pc.fill(0xffff);
+	if (machine().options().verbose()) m_coverage = std::make_unique<opcode_coverage>();
 	m_timer = timer_alloc(FUNC(tms320c54x_device::timer_expired), this);
 	m_pll_timer = timer_alloc(FUNC(tms320c54x_device::pll_transition_complete), this);
 	m_clock_timer = timer_alloc(FUNC(tms320c54x_device::selected_clock_complete), this);
@@ -1867,7 +1867,7 @@ void tms320c54x_device::device_start()
 
 void tms320c54x_device::device_stop()
 {
-	if (!machine().options().verbose())
+	if (!m_coverage)
 		return;
 
 	class opcode_buffer : public util::disasm_interface::data_buffer
@@ -1881,11 +1881,11 @@ void tms320c54x_device::device_stop()
 	private:
 		u16 const m_opcode;
 	};
-	for (unsigned opcode = 0; opcode != m_opcode_first_pc.size(); ++opcode)
-		if (m_opcode_first_pc[opcode] != 0xffff)
+	for (unsigned opcode = 0; opcode != m_coverage->count.size(); ++opcode)
+		if (m_coverage->count[opcode])
 		{
-			machine().logerror("[opcov] op=%04x first_pc=%04x count=%u\n",
-					opcode, m_opcode_first_pc[opcode], m_opcode_count[opcode]);
+			machine().logerror("[opcov] op=%04x first_pc=%06x count=%llu\n",
+					opcode, m_coverage->first_pc[opcode], (unsigned long long)m_coverage->count[opcode]);
 			opcode_buffer const buffer(opcode);
 			std::ostringstream text;
 			u32 const result = get_disassembler().disassemble(text, 0, buffer, buffer);
@@ -1910,10 +1910,12 @@ void tms320c54x_device::device_stop()
 	private:
 		std::array<u16, 4> const &m_words;
 	};
-	for (auto const &[words, observation] : m_extension_observations)
+	if (m_coverage->dropped_tuples)
+		machine().logerror("[opwords_limit] dropped=%llu\n", (unsigned long long)m_coverage->dropped_tuples);
+	for (auto const &[words, observation] : m_coverage->extensions)
 	{
-		machine().logerror("[opwords] op=%04x words=%u ext1=%04x ext2=%04x first_pc=%06x count=%u\n",
-			words[1], words[0], words[2], words[3], observation.first_pc, observation.count);
+		machine().logerror("[opwords] op=%04x words=%u ext1=%04x ext2=%04x first_pc=%06x count=%llu\n",
+			words[1], words[0], words[2], words[3], observation.first_pc, (unsigned long long)observation.count);
 		fetched_buffer const buffer(words);
 		std::ostringstream text;
 		u32 const result = get_disassembler().disassemble(text, 0, buffer, buffer);
@@ -2230,6 +2232,7 @@ void tms320c54x_device::device_post_load()
 	m_st1 &= ~ST1_RESERVED;
 	// The output cache is derived; re-drive the restored architectural level.
 	update_xf(true);
+	m_peripheral_clock_stop_cb(m_idle_mode >= 2);
 	m_pll_clock_stop_cb(m_idle_mode == 3);
 	m_system_clock_cb(clock());
 	publish_bus_controls();
@@ -5015,16 +5018,18 @@ void tms320c54x_device::pipeline_step()
 		// XC's replacement NOP consumes a slot, not an original instruction entry.
 		if (!m_pipeline_annulled[5] && !m_instruction_observer_cb.isunset()) m_instruction_observer_cb(address, m_op);
 		++m_pc;
-		if (m_opcode_first_pc[m_op] == 0xffff) m_opcode_first_pc[m_op] = u16(address);
-		++m_opcode_count[m_op];
-		if (staged_shifted_smem(m_op) && machine().options().verbose())
+		if (m_coverage && !m_coverage->count[m_op]++) m_coverage->first_pc[m_op] = address;
+		if (m_coverage && staged_shifted_smem(m_op))
 		{
 			bool const extended = u8(m_op) >= 0xe0;
 			std::array<u16, 4> const words = {u16(extended ? 3 : 2), m_op,
 				extended ? m_pipeline_extension_first[5] : m_pipeline_immediate[5],
 				extended ? m_pipeline_immediate[5] : u16(0)};
-			auto entry = m_extension_observations.try_emplace(words, extension_observation{address}).first;
-			++entry->second.count;
+			auto entry = m_coverage->extensions.find(words);
+			if (entry == m_coverage->extensions.end() && m_coverage->extensions.size() < opcode_coverage::MAX_TUPLES)
+				entry = m_coverage->extensions.emplace(words, opcode_coverage::extension_observation{address}).first;
+			if (entry != m_coverage->extensions.end()) ++entry->second.count;
+			else ++m_coverage->dropped_tuples;
 		}
 		if (staged_immediate_repeat(m_op) || staged_memory_repeat(m_op) || staged_short_repeat(m_op))
 		{
@@ -6043,7 +6048,7 @@ void tms320c54x_device::pipeline_request_coefficient(u16 address)
 
 void tms320c54x_device::pipeline_finish_repeat_iteration()
 {
-	++m_opcode_count[m_pipeline_repeat_word];
+	if (m_coverage) ++m_coverage->count[m_pipeline_repeat_word];
 	if (!--m_rptc)
 	{
 		m_pipeline_repeat_active = m_pipeline_repeat_body_latched = m_pipeline_repeat_stream = false;
@@ -7586,13 +7591,6 @@ void tms320c54x_device::execute_one(u16 op)
 	case 0xf793:
 		accumulator(BIT(op, 8)) = ~accumulator(BIT(op, 9)) & ACC_MASK;
 		return;
-	case 0xf065: // XOR #lk, 16, source accumulator, destination accumulator
-	case 0xf165:
-	case 0xf265:
-	case 0xf365:
-		accumulator(BIT(op, 8)) =
-				(accumulator(BIT(op, 9)) ^ (u64(fetch()) << 16)) & ACC_MASK;
-		return;
 	case 0xf495: // NOP
 		return;
 	case 0xf1c0: // XOR A, B
@@ -7600,19 +7598,6 @@ void tms320c54x_device::execute_one(u16 op)
 		return;
 	case 0xf2a0: // OR B, A
 		m_a = (m_a | m_b) & ACC_MASK;
-		return;
-	case 0xf48d: // SQUR A,A
-	case 0xf58d: // SQUR A,B
-	{
-		s64 product = s64(accumulator_high17(m_a)) * s64(accumulator_high17(m_a));
-		if (BIT(m_st1, 6))
-			product *= 2;
-		accumulator(BIT(op, 8)) = multiply_result(product, BIT(op, 8));
-		return;
-	}
-	case 0xf062: // LD #lk, 16, A
-	case 0xf162: // LD #lk, 16, B
-		accumulator(BIT(op, 8)) = (data_operand(fetch()) << 16) & ACC_MASK;
 		return;
 	case 0xf491: // ROL A through carry
 	case 0xf591: // ROL B through carry

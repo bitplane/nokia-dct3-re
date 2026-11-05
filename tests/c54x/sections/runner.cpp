@@ -100,7 +100,10 @@ public:
 #endif
 #ifdef C54X_SECTION_DEEP_IDLE_CLOCKS
 		TMS320C54X_MCBSP(c, m_mcbsp, 13'000'000);
-		m_cpu->peripheral_clock_stop_cb().set(m_mcbsp,FUNC(tms320c54x_mcbsp_device::internal_clock_stop_w));
+		m_cpu->peripheral_clock_stop_cb().set([this](int level) {
+			m_peripheral_stop_level = bool(level);
+			m_mcbsp->internal_clock_stop_w(level);
+		});
 		m_mcbsp->tx_word_cb().set([this](u16 value) {
 			if (value!=0xa55a || ++m_serial_words!=1) throw emu_fatalerror("Deep-idle serial word/count mismatch");
 		});
@@ -536,6 +539,8 @@ private:
 			m_frozen_tcr=m_cpu->state_int(tms320c54x_device::STATE_TCR);
 		}
 		if (now==1300 || now==2599) {
+			if (!m_peripheral_stop_level)
+				throw emu_fatalerror("Deep-idle peripheral clock-stop output was not restored");
 			{
 				auto const disable=machine().disable_side_effects();
 				if (m_serial_words || (index<4 && (m_frozen_tim>=100 ||
@@ -552,6 +557,9 @@ private:
 		}
 		if (now==3899 && m_serial_words!=unsigned(index>=4 || (index&1)))
 			throw emu_fatalerror("Deep-idle serial clock did not complete exactly the eligible word");
+		// This external output observer is deliberately unsaved. CPU post-load
+		// must re-drive its stopped level, independently of McBSP's saved latch.
+		if (now==3899 && m_fixture->restores()==m_fixture->count()) m_peripheral_stop_level=false;
 #endif
 #ifdef C54X_SECTION_INSTRUCTION_EVENTS
 		// Bus inspection is not execution, with or without debugger scope.
@@ -617,6 +625,7 @@ private:
 	u32 m_serial_words=0;
 	u16 m_frozen_tim=0, m_frozen_tcr=0;
 	bool m_serial_external=false;
+	bool m_peripheral_stop_level=false;
 #endif
 	emu_timer *m_timer = nullptr;
 	std::vector<c54x_test::clocked_register_case> m_cases;

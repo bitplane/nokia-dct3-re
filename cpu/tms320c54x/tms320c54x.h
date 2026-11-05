@@ -392,11 +392,17 @@ private:
 	u32 m_pipeline_repeat_program_source = 0;
 	u8 m_pipeline_dp_wait = 0;
 	u64 m_pipeline_cycles = 0;
-	std::array<u16, 0x10000> m_opcode_first_pc;
-	std::array<u32, 0x10000> m_opcode_count = {};
-	// Verbose-only observations, not architectural state or prefetched operands.
-	struct extension_observation { u32 first_pc; u32 count = 0; };
-	std::map<std::array<u16, 4>, extension_observation> m_extension_observations;
+	// Allocated only for explicit verbose coverage; never architectural state.
+	struct opcode_coverage
+	{
+		static constexpr unsigned MAX_TUPLES = 4096;
+		std::array<u32, 0x10000> first_pc{};
+		std::array<u64, 0x10000> count{};
+		struct extension_observation { u32 first_pc; u64 count = 0; };
+		std::map<std::array<u16, 4>, extension_observation> extensions;
+		u64 dropped_tuples = 0;
+	};
+	std::unique_ptr<opcode_coverage> m_coverage;
 	int m_icount = 0;
 };
 
