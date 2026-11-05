@@ -227,7 +227,7 @@ def run_section(command, output, name, count, build_seconds, negative=False, gro
         if run.returncode != 3 or 'expected=1' not in text or 'C54x section: PASS' in text:
             raise SystemExit('negative control did not detect the wrong expectation')
         print('C54x negative control: PASS (wrong expectation rejected)')
-    elif run.returncode != 3 or f'C54x section: PASS cases={count} restores={count}' not in text or 'C54x section complete' not in text:
+    elif run.returncode != 3 or f'C54x section: PASS cases={count} restores={count}' not in text.splitlines() or 'C54x section complete' not in text:
         raise SystemExit('section failed')
 
 

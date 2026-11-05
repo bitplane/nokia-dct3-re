@@ -54,6 +54,7 @@ class SectionCatalogTests(unittest.TestCase):
         for code, text, passes in [(3, good, True), (0, good, False),
                 (3, good.replace('cases=2', 'cases=3'), False),
                 (3, good.replace('restores=2', 'restores=1'), False),
+                (3, good.replace('restores=2', 'restores=20'), False),
                 (3, good.replace('C54x section complete', ''), False)]:
             with self.subTest(code=code, text=text), tempfile.TemporaryDirectory() as directory, \
                     patch('tools.run_c54x_section.subprocess.run',
