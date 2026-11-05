@@ -13,11 +13,34 @@ work after fixture state changes. It does not reset architectural registers or
 peripherals. The former boolean selection API and test-case mode field are
 removed; fixture setup and clear-before-restore still perform the same reset.
 
-The 520-section catalogue has 507 generic CPU sections and thirteen copied
-firmware sections. Ninety-one former atomic-named sections now use operation
-names; no cases or independent assertions were removed by that rename.
+The 487-section catalogue has 474 generic CPU sections and thirteen copied
+firmware sections. Family tables retain independent numeric expectations
+alongside generated timing, ownership and restoration contracts.
 See [the test suite](c54x_test_suite.md) for execution and coverage policy and
 [instruction contracts](c54x_execution_contracts.md) for bounded qualifications.
+
+## Source ownership
+
+- `tms320c54x.cpp/.h`: CPU state, memory/register interfaces, clock/interrupt
+  behavior and pipeline scheduling. `pipeline_execute`,
+  `pipeline_publish_read_results` and `pipeline_prefetch` run at their original
+  points within `pipeline_step`; they are not independently reordered stages.
+- `tms320c54x_decode.h`: opcode predicates and shared cached classification/
+  admission metadata, with no guest state or firmware addresses.
+- `tms320c54x_dasm.cpp/.h`: disassembly and instruction formatting, registered
+  through MAME's disassembler build list.
+- Separate BSP, DMA and McBSP components retain their peripheral contracts.
+
+`execute_one` is a residual effects dispatcher, not an alternate engine.
+Some retained bus-capable branches still require per-family reachability
+proofs; removing the proven redundant XOR/LD-immediate/SQUR tails does not
+establish that every remaining branch is necessary. Admission/arbitration is
+still the largest scheduling block and remains a bounded partial model.
+
+Opcode diagnostics allocate and collect only with MAME `-verbose`. Counts and
+full extended PCs are observations, not saved architectural state. Fetched
+tuples have a 4,096-entry diagnostic budget; overflow emits `opwords_limit`
+and coverage tools reject the truncated capture instead of claiming closure.
 
 ## Compositions and interfaces
 
@@ -51,6 +74,10 @@ alone is not proof of an atomic engine or renewed acceptance.
 
 ## Load-bearing details
 
+- Post-load re-drives peripheral clock-stop as well as PLL-stop, XF and bus
+  outputs. The deep-idle fixture poisons an unsaved external observer before
+  restore, so a peripheral's independently saved latch cannot mask omission.
+
 - MVDK owns its source in Access. It must use the same pending on-chip RAM
   forwarding as Read-stage consumers (SPRU131G section 7.3.2). The
   `rmw_move_bypass` section retains 160 alias/nonalias, addressing, operation,
@@ -76,18 +103,19 @@ alone is not proof of an atomic engine or renewed acceptance.
 ## Acceptance
 
 All five retirement stages are complete. The consolidated catalogue independently
-passes all 487 sections and 1,461,937 cases and restores (2,982.044 seconds).
+passes all 487 sections and 1,461,937 cases and restores (2,929.482 seconds).
 Its manifest SHA-256 is
 `031bff8c6519d5e07acf10d428c31483c3ea6b234496a98bc527d156b2e07dd6`.
 Fixture consolidation removes no cases, expected results or restore execution.
-Fresh integration checks pass 358 linked ROM4 context cases, the 32-frame FR
-encoder with replay, and 5110 menu/save-state. The host checks pass 358 C54x,
-81 runner and 34 patch/keypad tests. Every catalogue completion also passes
+Fresh integration checks pass 358 linked ROM4 context cases, cold execution,
+FR/EFR codecs, RF bitmap, clocked serial/replay, backend BSP/requests,
+MU4 original bootstrap with exact 1,339-item replay, and 5110 menu/save-state.
+The host checks pass 359 C54x, 81 runner and 59 device-split/patch/keypad tests.
+Every catalogue completion also passes
 exact case/restore line validation, including rejection of count suffixes.
 
-The unchanged CPU retains the earlier ROM4 cold, FR/EFR/RF, serial/pin audio,
-uploaded-program verifier, backend BSP/request and MU4 qualification. Those
-broader gates were not all rerun for test-fixture-only consolidation. These
+The uploaded-program verifier and broader handset qualification remain earlier
+results, not renewed certificates from this structural pass. These
 results do not expand physical coverage; suite sizing and build accounting
 are recorded in [the suite guide](c54x_test_suite.md#acceptance).
 

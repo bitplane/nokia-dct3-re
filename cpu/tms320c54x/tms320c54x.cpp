@@ -4766,8 +4766,9 @@ u16 tms320c54x_device::add_memory_word(u16 value, u16 immediate, bool publish_st
 
 void tms320c54x_device::execute_one(u16 op)
 {
-	// Instruction effects only. Stage-owned decoding handles control flow,
-	// bus transactions and timing before dispatching the remaining ALU work.
+	// Residual instruction effects. Stage handlers intercept qualified bus and
+	// control forms; retained bus-capable branches still need per-family
+	// reachability proofs. This is not a complete instruction execution engine.
 	const u8 low = op;
 	// SPRU131G table 5-4: short MOD=3 is write-only, including RMW
 	// exclusions. f8 alone is the admitted absolute form; f9..ff remain

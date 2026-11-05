@@ -57,7 +57,7 @@ The complete catalogue passes with no coverage reductions. Consolidation keeps
 independent literal expectations alongside generated timing/ownership tests;
 opcode overlap alone did not justify deleting either contract.
 
-| Measure | Before consolidation | Current |
+| Measure | Before consolidation | Consolidated Checkpoint (`f4cf9496`) |
 | --- | ---: | ---: |
 | Registered sections | 520 | 487 |
 | Cases, each with restore execution | 1,461,937 | 1,461,937 |
@@ -66,9 +66,9 @@ opcode overlap alone did not justify deleting either contract.
 | C++ fixture bytes | 1,507,089 | 1,502,600 |
 | Recorded complete-run wall time | 3,860.357 s | 2,982.044 s |
 
-C++ sizing includes `tests/c54x/**/*.h` and the section runner, not Python tools
+C++ checkpoint sizing includes `tests/c54x/**/*.h` and the section runner, not Python tools
 or copied-firmware headers. The added batch planning/validation code is outside
-that sizing. Current recorded build time totals 2,395.196 s and emulator runs
+that sizing. Consolidation-checkpoint build time totals 2,395.196 s and emulator runs
 570.491 s; remaining wall time is orchestration. The predecessor wall run
 included a pause, so this is an observed comparison, not a controlled benchmark.
 The four-section pilot built in 6.696 s and ran in separate processes.
