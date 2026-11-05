@@ -4764,7 +4764,7 @@ u16 tms320c54x_device::add_memory_word(u16 value, u16 immediate, bool publish_st
 		? u16(std::clamp(result, s32(-0x8000), s32(0x7fff))) : u16(result);
 }
 
-void tms320c54x_device::execute_one(u16 op)
+void tms320c54x_device::execute_one(u16 const op)
 {
 	// Residual instruction effects. Stage handlers intercept qualified bus and
 	// control forms; retained bus-capable branches still need per-family
