@@ -67,7 +67,7 @@ the model's silicon-timing claims.
 
 Standalone RND (`f49f` with source/destination bits) is admitted through the
 shared register-only Execute implementation. The `rounding` and
-`shift_literals` sections retain independent numeric/OVM/flag expectations
+the shift table in `register_literals` retain independent numeric/OVM/flag expectations
 on staged. RND is a one-word class-1 operation; this does not qualify repeated
 RND (nonrepeatable in [SPRU172C, 4-142](https://www.ti.com/lit/ug/spru172c/spru172c.pdf)).
 PORTW now admits the short circular modes `c0..df` already handled by the shared
@@ -2403,11 +2403,11 @@ only when the resolved destination is AR0..AR7. Access retains the page-zero
 address, modifies the selected pointer once and clears its upper nine bits
 (SPRU131G 5.6, SPRU172C 4-73/4-175). LDM consumes the retained Read value;
 STLM writes its retained destination in Execute. Direct MMR behavior is
-unchanged. `absolute_literals` retains independent unsigned-load,
+unchanged. The absolute table in `memory_literals` retains independent unsigned-load,
 masked-address, pointer-update and store values. Its TCR readback is separated
 from the write, not a claim of simultaneous peripheral arbitration.
 
-`multiply_move_literals`' STLM AR5 / MVDD / MVMM sequence requires two
+The multiply/move table in `product_literals` has an STLM AR5 / MVDD / MVMM sequence requiring two
 intervening words before using AR5 (SPRU131G table 7-3). Inserting one NOP
 supplies that separation without changing its seven independent result
 cases. The copy's Read precedes STLM's Execute and MVMM's Decode at clock 7;
@@ -2427,12 +2427,12 @@ testing OV clears OVA even if the combined predicate is false (SPRU172C
 Short `ADD Smem,A/B` bodies (direct or indirect modes below `0x98`) are
 admitted to pipelined single-instruction repeats. Each iteration captures its
 own address/source before Execute updates the accumulator; mapped/peripheral
-sources remain rejected before a bus read. `memory_address_literals`
+sources remain rejected before a bus read. The address table in `memory_literals`
 retains the fifteen-add result and read count, and `repeat_irq` checks
 four/65,536 additions, exact count exhaustion, and the pending IRQ's continuation
 frame only after the repeat completes. Both retain save/replay coverage.
 
-`port_marked_memory` keeps eleven independent result/address/flag cases.
+The base table in `port_marked_memory` keeps eleven independent result/address/flag cases.
 Its six-ADD body executes at clocks 10..15, between marker writes at 8 and 21:
 the 13-clock interval includes the declared Prefetch/refill and two-word marker
 Decode. All other marker intervals retain their existing expectations. This

@@ -51,6 +51,31 @@ Use focused sections between edits. Run the complete catalogue once at an
 integration checkpoint, not after every change. A complete build/run takes
 about an hour; cached focused builds usually take seconds.
 
+## Acceptance
+
+The complete catalogue passes with no coverage reductions. Consolidation keeps
+independent literal expectations alongside generated timing/ownership tests;
+opcode overlap alone did not justify deleting either contract.
+
+| Measure | Before consolidation | Current |
+| --- | ---: | ---: |
+| Registered sections | 520 | 487 |
+| Cases, each with restore execution | 1,461,937 | 1,461,937 |
+| Builds per complete run | 520 | 381 |
+| C++ fixture lines | 24,333 | 24,195 |
+| C++ fixture bytes | 1,507,089 | 1,502,600 |
+| Recorded complete-run wall time | 3,860.357 s | 2,982.044 s |
+
+C++ sizing includes `tests/c54x/**/*.h` and the section runner, not Python tools
+or copied-firmware headers. The added batch planning/validation code is outside
+that sizing. Current recorded build time totals 2,395.196 s and emulator runs
+570.491 s; remaining wall time is orchestration. The predecessor wall run
+included a pause, so this is an observed comparison, not a controlled benchmark.
+The four-section pilot built in 6.696 s and ran in separate processes.
+Full-run reports and per-section/batch timing records remain ignored artifacts;
+the current manifest and integration qualification live in
+[the execution model](c54x_frontend_retirement.md#acceptance).
+
 ## Fixture contracts
 
 Small independent literal tables are grouped into `register_literals`,

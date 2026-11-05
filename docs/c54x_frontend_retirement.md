@@ -75,22 +75,21 @@ alone is not proof of an atomic engine or renewed acceptance.
 
 ## Acceptance
 
-The stage-4 single-engine checkpoint passes all 520 sections: 1,461,937 cases
-and restores. It also passes ordinary 5110 menu/input/power/save-state tests,
-358 linked ROM4 context cases, CRC/packing, 32-frame FR and 163-frame bit-exact
-EFR codecs, serial/pin audio and replay, four uploaded-program verifier families,
-MU4 provisioning/retained-storage/bootstrap/replay/reset, and backend BSP/slot
-requests. The CPU was 978 net lines smaller than the pre-removal checkpoint.
-
-All five retirement stages are complete. The normalized catalogue independently
-passes all 520 sections and 1,461,937 cases and restores (3,860.357 seconds).
+All five retirement stages are complete. The consolidated catalogue independently
+passes all 487 sections and 1,461,937 cases and restores (2,982.044 seconds).
 Its manifest SHA-256 is
-`20173d1de10d112c5a1f78e9802a7901fe4e5a191a140128315042af3f553e81`.
-Renewed acceptance also passes canonical ROM4 cold/context, FR/EFR and RF
-algorithms; 5110 menu, late input, power and save-state; clocked serial audio,
-backend BSP/requests; and MU4 original bootstrap with exact 1,339-item replay.
-The host checks pass 354 C54x, 81 runner and 34 patch/keypad tests. These results
-validate the normalized interfaces without claiming broader physical coverage.
+`031bff8c6519d5e07acf10d428c31483c3ea6b234496a98bc527d156b2e07dd6`.
+Fixture consolidation removes no cases, expected results or restore execution.
+Fresh integration checks pass 358 linked ROM4 context cases, the 32-frame FR
+encoder with replay, and 5110 menu/save-state. The host checks pass 358 C54x,
+81 runner and 34 patch/keypad tests. Every catalogue completion also passes
+exact case/restore line validation, including rejection of count suffixes.
+
+The unchanged CPU retains the earlier ROM4 cold, FR/EFR/RF, serial/pin audio,
+uploaded-program verifier, backend BSP/request and MU4 qualification. Those
+broader gates were not all rerun for test-fixture-only consolidation. These
+results do not expand physical coverage; suite sizing and build accounting
+are recorded in [the suite guide](c54x_test_suite.md#acceptance).
 
 ## Limits
 
