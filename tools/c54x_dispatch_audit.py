@@ -394,13 +394,21 @@ class Flow:
         return incoming, 0, 0
 
 
-def audit(source_path, header, directory, compiler='g++', library=None, callee='execute_one'):
+def audit(source_path, header, directory, compiler='g++', library=None, callee='execute_register_effects'):
     source = source_path.read_bytes()
     reader = Reader(lex(source, library))
     if not any(reader.words[i:i+8] == ['::', callee, '(', 'u16', 'const', 'op', ')', '{']
                for i in range(len(reader.words)-7)):
         raise ValueError('the residual opcode parameter must be const for this proof')
     execute, step, residual = [reader.function(name) for name in ('pipeline_execute', 'pipeline_step', callee)]
+    gate = ('m_pipeline_valid [ 2 ] && ! BIT ( staged_opcode_descriptor [ word ] , '
+            'm_extended_program ? 5 : 4 ) && ! staged_bus_control ( word )')
+    admission = [node for node in reader.walk(step) if node.kind == 'if' and node.expression == gate]
+    if len(admission) != 1:
+        raise ValueError('the reviewed base/extended Decode admission gate changed')
+    gate_body = reader.expression(admission[0].children[0].start, admission[0].children[0].end)
+    if 'm_illegal = true ; return ;' not in gate_body:
+        raise ValueError('Decode admission does not reject before execution')
     repeat = [n for n in step.children if n.kind == 'if' and n.expression == 'm_pipeline_repeat_stream']
     if len(repeat) != 1:
         raise ValueError('expected one accelerated repeat scope')
@@ -439,7 +447,8 @@ def audit(source_path, header, directory, compiler='g++', library=None, callee='
             combined |= bits
     if reader.calls(execute, callee) != 2 or reader.calls(step, callee) != 1:
         raise ValueError('caller inventory changed; review all call sites')
-    if sum(t.text == callee and i+1 < len(reader.tokens) and reader.words[i+1] == '(' for i, t in enumerate(reader.tokens)) != 4:
+    references = [i for i, token in enumerate(reader.tokens) if token.text == callee]
+    if len(references) != 4 or any(reader.words[i+1] != '(' for i in references):
         raise ValueError('unclassified dispatcher definition/caller')
     flow = Flow(reader, guards, callee)
     fallthrough, _, _ = flow.run(residual, combined)
@@ -468,7 +477,7 @@ def main():
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--compiler', default='g++')
     parser.add_argument('--libclang')
-    parser.add_argument('--callee', default='execute_one')
+    parser.add_argument('--callee', default='execute_register_effects')
     parser.add_argument('--check', type=Path, help='require the reviewed caller opcode sets')
     args = parser.parse_args()
     with tempfile.TemporaryDirectory(prefix='c54x-dispatch-') as temp:

@@ -145,20 +145,14 @@ private:
 	void register_write(u16 address, u16 value);
 	u16 direct_address(u8 mode) const;
 	u16 short_smem_address(u8 mode, unsigned stage = 6) const;
-	u16 prepare_smem_address(u8 mode);
-	void finish_smem_access(u8 mode);
-	u16 indirect_read(u8 mode);
-	u16 immediate_smem_read(u8 mode, u16 &immediate);
 	u16 mmr_address(u8 mode, unsigned stage = 6);
-	void indirect_write(u8 mode, u16 value);
-	u16 long_offset_address(u8 mode);
 	u16 long_offset_address(u8 mode, unsigned ar, s16 offset, unsigned stage = 6);
 	bool indirect_compatibility(unsigned stage) const;
 	unsigned indirect_ar(u8 mode, unsigned stage = 6) const;
 	void indirect_modify(u8 mode, bool long_operand = false, unsigned stage = 6);
 	void dual_modify(u8 operand, unsigned stage = 6);
 	void circular_modify(unsigned ar, s16 step, unsigned stage = 6);
-	void execute_one(u16 op);
+	void execute_register_effects(u16 op);
 	bool software_wait_enabled() const { return m_standard_swwsr || m_c5416_bus_profile; }
 	bool staged_bus_control(u16 op) const { return (software_wait_enabled() && op == 0x7728) || (m_c5416_bus_profile && (op == 0x7729 || op == 0x772b)); }
 	bool staged_timer_control(u16 op) const { return op >= 0x7724 && op <= 0x7726; }
@@ -184,8 +178,6 @@ private:
 	bool pipeline_early_braf_clear(unsigned stage, u16 value) const;
 	void pipeline_restore_block_on_return(u32 address);
 	void enter_idle(u8 mode);
-	void push(u16 value);
-	u16 pop();
 	u64 data_operand(u16 value) const;
 	u64 shifted_by_t(u16 memory, u16 t) const;
 	u16 add_memory_word(u16 value, u16 immediate, bool publish_status = true);
@@ -205,7 +197,6 @@ private:
 	s64 multiply_product(s64 product) const;
 	u64 multiply_result(s64 result, bool destination_b);
 	u32 saturated_store(u64 value) const;
-	void parallel_store(u16 op, u16 address);
 	u64 arithmetic_shift_right(u64 value, unsigned shift) const;
 	u64 &accumulator(bool b) { return b ? m_b : m_a; }
 

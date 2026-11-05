@@ -35,9 +35,17 @@ DECODER_EXACT = re.compile(r"\bop\s*==\s*0x([0-9a-fA-F]{4})\b")
 DECODER_CASE = re.compile(r"\bcase\s+0x([0-9a-fA-F]{4})\s*:")
 
 
-def decoder_declared_words(source: str) -> set[int]:
-    """Overapproximate top-level decoder matches; nested validity is not proven."""
-    start = source.index("void tms320c54x_device::execute_one(u16 op)")
+def effects_candidate_words(source: str) -> set[int]:
+    """Syntactic effects-helper candidates, not full pipeline admission.
+
+    Archived execute_one sources remain readable. Use c54x_dispatch_audit for
+    ordered caller reachability; these regex matches establish neither that
+    an instruction is admitted nor that a helper branch can actually run.
+    """
+    matches = list(re.finditer(r'void tms320c54x_device::(?:execute_one|execute_register_effects)\(u16 (?:const )?op\)', source))
+    if len(matches) != 1:
+        raise ValueError('expected one residual-effects helper')
+    start = matches[0].start()
     end = source.index("void tms320c54x_device::execute_run()", start)
     body = source[start:end]
     masks = [(int(mask, 16), int(value, 16))
@@ -240,7 +248,7 @@ def main() -> int:
     parser.add_argument("--additional-fixture-log", type=pathlib.Path, action="append", default=[],
                         help="include another independently completed CPU fixture in assertion coverage")
     parser.add_argument("--decoder-source", type=pathlib.Path,
-                        help="report source-declared opcode matches absent from the fixture")
+                        help="report residual-effects syntactic candidates, not pipeline admission")
     parser.add_argument("--group-report", action="store_true",
                         help="rank unasserted ROM4 executions by opcode high byte")
     parser.add_argument("--variant-report", action="store_true",
@@ -293,7 +301,7 @@ def main() -> int:
             for text in fixture_texts:
                 summarize(text)
             fixture = summarize("\n".join(fixture_texts))
-        declared = decoder_declared_words(args.decoder_source.read_text()) if args.decoder_source else None
+        declared = effects_candidate_words(args.decoder_source.read_text()) if args.decoder_source else None
         if args.require_rom4_idle:
             require_rom4_idle(primary)
     except (OSError, ValueError) as error:
@@ -357,7 +365,7 @@ def main() -> int:
                 groups[opcode >> 8] = groups.get(opcode >> 8, 0) + 1
             no_fixture_groups = sorted(group for group in groups
                                        if not any(opcode >> 8 == group for opcode in fixture_only))
-            print(f"Decoder-declared words: {len(declared)}; fixture-executed: "
+            print(f"Residual-effects source candidates: {len(declared)}; fixture-executed: "
                   f"{len(declared & fixture_only)}; not fixture-executed: {len(untested)}")
             print("  Static match only: nested validity and behavior are not verified")
             print(f"  High-byte groups with no fixture word: {len(no_fixture_groups)}")

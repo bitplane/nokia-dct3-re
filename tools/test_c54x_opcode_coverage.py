@@ -5,7 +5,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
-from tools.c54x_opcode_coverage import (decoder_declared_words, group_gaps, main,
+from tools.c54x_opcode_coverage import (effects_candidate_words, group_gaps, main,
                                         ranked_gaps, ranked_variant_candidates, summarize,
                                         require_rom4_idle, require_extension_capture,
                                         require_extension_decoding, decoded_boundaries)
@@ -238,10 +238,12 @@ case 0xfc00: return;
 }
 void tms320c54x_device::execute_run() {}
 """
-        declared = decoder_declared_words(source)
+        declared = effects_candidate_words(source)
         self.assertEqual(len(declared), 16 + 256 + 2)
         self.assertTrue({0xabc7, 0x12fe, 0xfc00, 0x4567} <= declared)
         self.assertFalse({0xfc01, 0xabd0, 0x1300} & declared)
+        self.assertEqual(effects_candidate_words(source.replace('execute_one(u16 op)',
+                         'execute_register_effects(u16 const op)')), declared)
 
     def test_group_gaps_uses_rom4_execution_counts_and_assertion_class(self):
         rom4 = summarize("\n".join((
