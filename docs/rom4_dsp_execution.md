@@ -802,12 +802,12 @@ independent-transfer scan snapshot supersedes both historical counts.
 The earlier save-state pass protects its tested restoration boundary, not
 RF acquisition or handset speech.
 
-### Staged frontend prototype
+### Stage-owned execution
 
-The optional `set_pipeline_frontend` path owns Prefetch, Fetch, Decode,
-Access, Read and Execute slots inside the existing CPU, reusing its semantic
-backend and interrupt-source/entry operations. The separate `nse1pipe`
-research machine enables it; ordinary handset and MU4 configurations do not.
+The CPU owns Prefetch, Fetch, Decode, Access, Read and Execute slots, sharing
+instruction effects and interrupt-source/entry operations. All native handset,
+uploaded-program and MU4 compositions use this engine. Research aliases can
+differ in bus or clock attachment, not CPU execution mode.
 The basic memory/ALU subset covers NOP, one-word immediate loads, two-word
 shifted immediate loads, direct DP-relative loads and STL/STH stores, and
 short indirect loads using plain, post-decrement, post-increment or
@@ -817,8 +817,7 @@ RETF/RETFD with one-word load/NOP or two-word immediate-load delay slots.
 Two-word unconditional B/BD use the same retained-literal and redirect path.
 ADDM now shares the retained RAM read/modify/write path with ANDM/ORM.
 SPRU172C page 4-9 specifies SXM/OVM-dependent arithmetic and C/OVA updates,
-not unconditional 16-bit wrapping. The atomic and staged frontends use one
-unchanged arithmetic helper: staged Read retains the source word, address
+not unconditional 16-bit wrapping. Read retains the source word, address
 and immediate; Execute publishes the result and flags once. The original
 worker's `6b82 0002` form is included. There are 768 replay cases across
 DP-relative, stationary/postincrement AR2 and absolute RAM addresses, eight
@@ -1106,7 +1105,7 @@ there is no synthetic continuation inside this composition.
 This closes the original outer-handler/body composition for the supplied
 CPU fixtures. Real worker operand provenance, application foreground
 progress under short recurring interrupts and coherent native
-recording remain unvalidated; handsets and MU4 still use the atomic frontend.
+recording remain unvalidated.
 
 Non-delayed staged FB retains both the seven-bit target page and its
 16-bit target word (SPRU172C page 4-53, class 29A). It uses the existing
@@ -1277,7 +1276,7 @@ result without a post-return guard, timer divisor change or forced
 continuation. This is a bounded 138-word staged composition, not acceptance
 of native warm startup or measured silicon interrupt timing. Global flag
 writers, complete surrounding opcode coverage and native warm scheduling
-remain open; production MU4 profiles still use the atomic frontend.
+remain open.
 
 Non-delayed staged FCALL now retains a distinct caller-page and page-stack
 destination alongside the PC return word (SPRU172C page 4-57, class 29B).
@@ -1537,7 +1536,7 @@ A following unsupported Decode can stop an older accepted instruction before
 retirement, so advancing the reported opcode boundary alone does not prove
 the external write occurred. With compiler immediate ST covered below, the
 sink now observes value `00df` at port `0080`; its external meaning remains
-unknown. Existing atomic profiles are unchanged.
+unknown.
 
 Short immediate ST now retains complete-Decode CPL/DP and Access SP for its
 direct destination, admitting compiler stack-frame stores. Read presents the
@@ -1571,7 +1570,7 @@ intervening NOPs and saves after Decode, Read or Execute. Each leg verifies
 one register write, one consumer read, an unchanged source accumulator and
 the old/new pointer boundary at two intervening instructions. Original MU4
 startup advances through `8811` at `00:3092`. This remains coverage evidence,
-not native startup or recorder acceptance; existing atomic profiles are unchanged.
+not native startup or recorder acceptance.
 
 Extended DST A/B now retains its second-word offset/absolute address in
 Decode. Access applies table 5-4's ordinary offset (AR unchanged), linear
@@ -3125,7 +3124,7 @@ PSHM AR1/SP and POPM AR1/BL, LD/ST and both spacings, restoring after the SP
 sample and before consumer Read. Each verifies the operand or destination, untouched
 alternate address, retained push value and final SP. Remaining SP producer classes,
 extended-shift category-II consumers, indirect forms and physical stage
-placement remain unvalidated. The atomic frontend is unchanged.
+placement remain unvalidated.
 
 POPM SP is distinct: it publishes the popped value instead of leaving
 the postincremented stack address, while a basic compiler-mode consumer
@@ -3424,7 +3423,7 @@ field; three use the new field. Every case restores after consumer Decode,
 before its address is generated, and reproduces the selected address and
 untouched alternate location. Other DP producers, extended-shift category-II
 consumers, SP conflicts and immediate/RMW direct forms are not established
-by this gate. The atomic frontend and handset configurations are unchanged.
+by this gate.
 
 The staged `LD #k9,DP` form forwards the nearest in-flight immediate DP to a
 basic direct consumer's retained Decode state, implementing the zero-latency
@@ -3577,7 +3576,6 @@ then executes NOPs at the reserved continuation, leaving the original image
 and firmware runs unchanged. This establishes the skip-worker routine path,
 not its real interrupt-entry integration or live recorder completion. The
 worker-call path is not executed by this fixture.
-Native handset/recorder execution still uses the atomic core.
 
 The read-only `mu4_context_contract.py` pins 51 original AA22 words through
 `02:3da5` against the R060 source identity. `487e; f030 c004; f050 c004`
@@ -3629,11 +3627,10 @@ direct-mask stack restoration; the indirect result remains an observation,
 not a passing completion claim. It demonstrates that the staged frontend
 does not generally solve short-period starvation.
 
-Staged taps observe program bus reads without the atomic backend's
-PC-at-fetch guard. Reload/mask/final observations include PRD, TIM, TCR,
+Program-bus taps must not infer execution from a PC-at-fetch guard.
+Reload/mask/final observations include PRD, TIM, TCR,
 IMR, IFR and ST1; they separate a live timer from deferred acceptance.
-Evidence: `tmp/c54x-staged-timer-audit.log`. The atomic probe still stalls
-for short PRD and completes for long PRD; its behavior is unchanged.
+The short-period result is an implementation observation, not silicon timing.
 
 The capped continuation trace distinguishes loss from repeated entry. In the
 short-period indirect gap control, the first entry stacks PC `060e` at clock

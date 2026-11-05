@@ -54,7 +54,7 @@ struct clocked_data_event
 {
 	bool write; std::uint32_t address; u16 value; unsigned cycle; bool check_cycle = true;
 	std::optional<int> raise_input{}; // Assert a physical input after accepting this bus event.
-	std::optional<unsigned> cycles_from_previous{}; // CPU clocks between selected bus events, including atomic execution.
+	std::optional<unsigned> cycles_from_previous{}; // CPU clocks between selected bus events, including bus wait intervals.
 	std::optional<unsigned> cycles_from_first{};
 	std::vector<register_check> registers{}; // State visible inside the selected bus callback.
 	std::optional<unsigned> minimum_program_events{}; // Required prior program events, e.g. instruction extensions.

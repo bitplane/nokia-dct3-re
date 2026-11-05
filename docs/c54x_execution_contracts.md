@@ -5,15 +5,15 @@
 The implementation lives in `cpu/tms320c54x/`. Current generic acceptance
 uses `tests/c54x/sections/` and `tools/run_c54x_section.py`.
 `fixtures/c54x_sections.json` owns section registration and expected counts;
-the [disposition table](c54x_section_trial.md) owns replacement decisions,
-deliberate coverage reductions and validation limits.
+the [test-suite contract](c54x_test_suite.md) owns coverage policy, execution
+scopes and validation limits.
 
 Execution is stage-owned only. Historical atomic comparisons below do not name
 a selectable engine; [frontend retirement](c54x_frontend_retirement.md) owns
 the migration and its independent firmware acceptance.
 
 Copied/acquired firmware integrations live in `tests/firmware/`.
-`tools/run_c54x_core.py` selects only `rom4-context` and `cold-pipeline`;
+`tools/run_c54x_core.py` selects only `rom4-context` and `cold`;
 codec and handset runners retain separate acceptance contracts.
 The retired generic BIOS profiles and phase-chain checkpoints are not current
 execution interfaces or renewed acceptance evidence. Complete replacement-suite,
@@ -67,7 +67,7 @@ the model's silicon-timing claims.
 
 Standalone RND (`f49f` with source/destination bits) is admitted through the
 shared register-only Execute implementation. The `rounding` and
-`atomic_shift_literals` sections retain independent numeric/OVM/flag expectations
+`shift_literals` sections retain independent numeric/OVM/flag expectations
 on staged. RND is a one-word class-1 operation; this does not qualify repeated
 RND (nonrepeatable in [SPRU172C, 4-142](https://www.ti.com/lit/ug/spru172c/spru172c.pdf)).
 PORTW now admits the short circular modes `c0..df` already handled by the shared
@@ -554,11 +554,11 @@ not swap their independently expected source address or arithmetic result.
 
 SPRU172C page 4-9 explicitly marks ADDM nonrepeatable; GNU as 2.43 also warns
 that `rpt *(0x0918)` followed by `addm #1, *(0x091a)` is undefined.
-`atomic_basic_repeat_sequences` therefore replaces its former expected
+`basic_repeat_sequences` therefore replaces its former expected
 repeated-ADDM success with a fail-closed emulator check: the count source is
 read once, ILLEGAL latches and the ADDM destination remains unchanged. This
 is an admission policy, not a claimed silicon trap. Legitimate memory-count
-repeats retain their positive coverage in `atomic_conditional_repeat`.
+repeats retain their positive coverage in `conditional_repeat`.
 
 `memory_immediate_product` owns 7,424 independent cases/replays. Numerical
 coverage uses one RAM form: all 64 word/literal pairs, FRCT/OVM for MPY,
@@ -1086,7 +1086,7 @@ the default 3210 semantic acceptance also passes. The
 [core checkpoint](#retained-suite-acceptance) additionally qualifies the
 complete default suite with these source guards and corrected fixtures.
 
-`atomic_operand_order` checks 46 independently reset instruction/form cases.
+`operand_order` checks 46 independently reset instruction/form cases.
 Ordered program traces include every extension and any program operand;
 data and IO events require the extension cursor to have reached the complete
 instruction before operand access. This preserves cross-bus ordering, not just
@@ -1097,7 +1097,7 @@ decoder or certify those encodings. No physical timing claim is made.
 
 Operand role is essential. MVKD/MVDM, PORTR, MVPD and POPD encode a
 destination and must not inherit a read-only Smem restriction. In particular,
-`7c9a` in `atomic_operand_order` is a valid MVPD destination, not a missed
+`7c9a` in `operand_order` is a valid MVPD destination, not a missed
 source rejection. Xmem/Ymem have separate grammars. For `6fxx`, classify the
 operation extension before deciding source versus destination; shifted
 STL/STH remain unchanged. Rejection support does not imply positive staged
@@ -1849,7 +1849,7 @@ nondelayed FCALA. Neither form may be repeated or placed inside RPTB.
 Near CALAD (SPRU172C page 4-25) uses the same retained two-word delay span
 and PC+3 return, but takes only source bits 15-0 on the caller's page and
 pushes no XPC word. It now shares the delayed accumulator-transfer path.
-`atomic_accumulator_calls` retains CALA A/B and CALAD A's independent target,
+`accumulator_calls` retains CALA A/B and CALAD A's independent target,
 frame, delay-overwrite, return and replay checks. RET's Read and its preceding
 literal store's Execute are observed in that order within their shared clock.
 
@@ -2222,8 +2222,8 @@ traversals retain their original register snapshots and ordered bus events.
 
 Short indirect MAR also uses the pipelined single-repeat engine: each injected
 iteration modifies its pointer once in Access, with count retirement owned by
-Execute. `atomic_transfer_repeat_literals` retains all 256 eight-bit counts
-for postincrement AR1; `atomic_conditional_repeat` retains AR3 postincrement
+Execute. `transfer_repeat_literals` retains all 256 eight-bit counts
+for postincrement AR1; `conditional_repeat` retains AR3 postincrement
 with indirect/absolute memory-sourced counts sampled once. Their final RC,
 count+1 pointer effects, continuation and replay predicates are unchanged.
 This does not qualify direct/long-offset MAR or all interrupt compositions.
@@ -2233,7 +2233,7 @@ long-offset stationary/preupdate/circular forms. Read consumes the retained
 offset once, samples the count and performs the source's owned AR update;
 it must not also apply a short-mode modification. Absolute/long count headers
 have two words for retirement/protection as well as Decode. Three added count
-cases in `atomic_conditional_repeat` check a clock-7 Read, pointer results,
+cases in `conditional_repeat` check a clock-7 Read, pointer results,
 source poisoning after Read, and replay from that captured-count boundary.
 The two original memory-count forms and XC carry cases remain. Count-Read
 holds and repeat-tail refill are declared model timing, not silicon measurements.
@@ -2289,7 +2289,7 @@ delay handling already used by calls. Accumulator targets are captured in
 Read before delay words can replace the source. Delayed transfers redirect
 Prefetch while preserving the caller's page for the delay instructions;
 branches reserve no stack frame. Nested control transfers in delay slots
-remain rejected. `atomic_far_edges` retains all 23 encoding/mask/page/frame/
+remain rejected. `far_edges` retains all 23 encoding/mask/page/frame/
 delay cases; neighboring pending-call, return and IRQ cases guard shared paths.
 
 The memory-mapped XPC view is modeled read-only to ordinary guest data writes.
@@ -2333,7 +2333,7 @@ Pipelined FIRS and short MACP repeats retain the decoded opcode, advance PAR
 once per iteration, and use PB for coefficients instead of refetching opcode
 extensions. The first request owns an extra program-bus hold; later iterations
 read one coefficient per clock. The stream-start flag and held physical request
-are saved/reset. Two extra `atomic_coefficient_fir_literals` cases snapshot
+are saved/reset. Two extra `coefficient_fir_literals` cases snapshot
 the held first MACP request and MACD before its successor write, poisoning
 already-read RAM/literals/coefficients/T as appropriate. Exact reads, writes,
 products, final input poison and replay are checked. Repeated MACD, extended
@@ -2385,7 +2385,7 @@ unchanged.
 
 STM BRC/RSA/REA (`0x771a..0x771c`) shares the retained literal/early-write
 path for loop-register setup; in-body mutation of these registers remains
-rejected. `atomic_mmr_burst` retains both twelve-register initialize/pop/push
+rejected. `mmr_burst` retains both twelve-register initialize/pop/push
 cases, including complete restored register and stack-word comparisons.
 PSHM T is not a Category-I consumer, so an older POPM/STLM T publication must
 precede its retained Read (SPRU131G table 7-13). This forwarding reuses the
@@ -2403,11 +2403,11 @@ only when the resolved destination is AR0..AR7. Access retains the page-zero
 address, modifies the selected pointer once and clears its upper nine bits
 (SPRU131G 5.6, SPRU172C 4-73/4-175). LDM consumes the retained Read value;
 STLM writes its retained destination in Execute. Direct MMR behavior is
-unchanged. `atomic_absolute_literals` retains independent unsigned-load,
+unchanged. `absolute_literals` retains independent unsigned-load,
 masked-address, pointer-update and store values. Its TCR readback is separated
 from the write, not a claim of simultaneous peripheral arbitration.
 
-`atomic_multiply_move_literals`' STLM AR5 / MVDD / MVMM sequence requires two
+`multiply_move_literals`' STLM AR5 / MVDD / MVMM sequence requires two
 intervening words before using AR5 (SPRU131G table 7-3). Inserting one NOP
 supplies that separation without changing its seven independent result
 cases. The copy's Read precedes STLM's Execute and MVMM's Decode at clock 7;
@@ -2416,7 +2416,7 @@ clocks replace atomic whole-instruction bus serialization.
 
 ### Combined conditional calls
 
-`atomic_delayed_call` retains nine staged CCD cases with page-local return
+`delayed_call` retains nine staged CCD cases with page-local return
 frames and accumulator changes in both delay words. The combined AGT+AOV
 condition (`0x76`) samples the positive predicate and OVA before those words;
 testing OV clears OVA even if the combined predicate is false (SPRU172C
@@ -2427,12 +2427,12 @@ testing OV clears OVA even if the combined predicate is false (SPRU172C
 Short `ADD Smem,A/B` bodies (direct or indirect modes below `0x98`) are
 admitted to pipelined single-instruction repeats. Each iteration captures its
 own address/source before Execute updates the accumulator; mapped/peripheral
-sources remain rejected before a bus read. `atomic_memory_address_literals`
-retains the fifteen-add result and read count, and `atomic_repeat_irq` checks
+sources remain rejected before a bus read. `memory_address_literals`
+retains the fifteen-add result and read count, and `repeat_irq` checks
 four/65,536 additions, exact count exhaustion, and the pending IRQ's continuation
 frame only after the repeat completes. Both retain save/replay coverage.
 
-`atomic_port_marked_memory` keeps eleven independent result/address/flag cases.
+`port_marked_memory` keeps eleven independent result/address/flag cases.
 Its six-ADD body executes at clocks 10..15, between marker writes at 8 and 21:
 the 13-clock interval includes the declared Prefetch/refill and two-word marker
 Decode. All other marker intervals retain their existing expectations. This
@@ -2448,7 +2448,7 @@ destination restrictions remain enforced before bus/pointer effects.
 MVMD retains its interleaved source reads and RAM writes; MVDM publishes each
 AR destination in Read as in its existing nonrepeated path.
 
-`atomic_mapped_moves` keeps all four baseline source/destination progressions
+`mapped_moves` keeps all four baseline source/destination progressions
 plus a DP=0 checkpoint mid-repeat. `repeat_endpoints` retains twelve
 short/long-count, page-end, IRQ/NMI and final-copy cases with exact continuation
 frames, no fourth destination write, and restore after frame publication.
@@ -2469,7 +2469,7 @@ TRAP shares Decode-owned RTN, vector redirection and frame delivery with INTR,
 but leaves INTM and IFR unchanged (SPRU172C 4-193). This broader functional
 coverage does not substitute for `software_intr_pipeline`'s publication clocks.
 
-`atomic_intm_follower` retains all three complete-follower cases on staged after
+`intm_follower` retains all three complete-follower cases on staged after
 INTM clear: one-word LD, three-word ST and RET. SPRU131G 6.10.7 requires the
 decoded pipeline to drain, excluding Prefetch/Fetch; it does not require
 atomic's immediate-next-instruction return boundary. The staged frame returns
@@ -2525,7 +2525,7 @@ and profile are removed.
 
 ### Atomic waited I/O control
 
-`atomic_waited_io_control` retains 12 independent cases/replays: four repeat
+`waited_io_control` retains 12 independent cases/replays: four repeat
 lengths and one delayed-branch/INTM program in each transfer direction.
 Seven C5416 software waits remain configured. Physical IRQ0 is asserted
 while the protected sequence runs; its sole acknowledgement follows every
@@ -2656,7 +2656,7 @@ saved frame without accounting for the older pipeline slots.
 
 BIO/NBIO predicates are also admitted for conditional calls, returns and XC.
 Calls/returns sample the physical line once in Read; XC samples once in Access,
-matching the existing owners for their other predicates. `bio_atomic` retains
+matching the existing owners for their other predicates. `bio_conditions` retains
 all 28 opcode/level contrasts and its physical polling case on staged. The
 polling test changes the pin at clock 13, checks Read samples at 7/12/17,
 and observes two taken logical BC executions followed by the untaken BC,
@@ -3451,7 +3451,7 @@ exact physical pipeline PC. This is a declared pipeline-ownership
 contract, not measured interrupt latency for physical NOP gaps. Restoring
 IFR/NMI state does not resubmit an external line before scheduler settlement.
 
-`atomic_xc_interrupt` separately retains all eight atomic XC/follower and
+`xc_interrupt` separately retains all eight atomic XC/follower and
 loop-wrap controls. A physical IRQ/NMI is asserted on the actual trigger-word
 Fetch; a zero-valued normal RAM read in the ISR observes A at that bus boundary.
 Frame words, two-word protection, loop redirection and RETE where applicable
@@ -3492,20 +3492,14 @@ sequentially. `tmp/c54x-section-trial/cpu-summary.json` records only successful
 children and leaves `complete=false` on failure/interruption. The retired
 default-chain captures do not qualify the replacement suite.
 
-The complete generic run passes 506 sections / 1,476,141 cases and restores;
-the separate copied-firmware run passes 12 sections / 1,770 cases and restores.
-The [disposition checkpoint](c54x_section_trial.md#validation-checkpoint)
-records source revision, catalogue identity and measured build/runtime.
-The moved linked firmware context integration passes358 cases/restores with its
-expected digest; acquired-ROM cold-pipeline also passes. The3210 two-BIOS and
-native5110 menus plus3310/3330/3410/5210 frontier gates pass existing oracles.
-The C54x-related host tests pass 438 checks in the project virtualenv; mocked
-runners and helper tests do not renew native acceptance. Firmware code and
-copied programs remain separate from generic CPU acceptance, including codec,
-RF and handset claims.
+The [execution-model checkpoint](c54x_frontend_retirement.md#acceptance)
+owns current full-suite counts and native integration results. The manifest,
+not an old migration table, owns registration. Firmware code and copied programs
+remain separate from generic CPU acceptance, including codec, RF and handset
+claims. Mocked runners and helper tests do not renew native acceptance.
 
-`instruction_observer` passes 24 independent cases and save/replays covering
-repeat/XC1/XC2, atomic/staged frontends, two logical pages and OVLY clear/set.
+`instruction_observer` has twelve independent cases and save/replays covering
+repeat/XC1/XC2, two logical pages and OVLY clear/set.
 Four checkpoints are distributed. Repeat cases observe seven ordered
 instruction entries, including three real repeat iterations; XC cases observe
 only the selected instruction identities. Ordinary
@@ -3803,18 +3797,18 @@ timing and arbitrary block/interrupt composition are not proved here.
 The acquired EFR loop uses AR5 as a postincremented counter while `c8ba`
 also performs its X read; atomic and staged traces agree on that deliberate
 low-address sequence. Qualified peripheral reads let that loop complete.
-Both atomic and staged EFR encoders pass all 163 complete reference frames:
+The EFR encoder passes all 163 complete reference frames:
 9,291 parameters, 326 VAD/SP flags and 2,771 packed output words, including
 all 65,440 ordinary RAM words on every frame's save/replay. The repeatable
 gate is `make check-c54x-rom4-efr-encoder-staged`; it verifies the independent
-ETSI fixture and retains the atomic comparison requirements. Staged FR
+ETSI fixture and retains strict comparison requirements. FR
 encoder and decoder retain their separate 32-frame controls. These isolated
 DTX-disabled algorithm results do not prove handset speech or physical bus
 timing; DTX has its own acceptance below. The staged decoder separately
 passes 163 clean speech frames and all 26,080 PCM samples, with full-RAM
 replays, through `make check-c54x-rom4-efr-decoder-staged`. Its existing
-ten-case delayed-repeat preflight remains atomic; decoder reset and every
-speech frame run on the staged frontend with an explicit selection marker.
+ten-case delayed-repeat preflight, decoder reset and every speech frame use
+the same stage-owned engine, with an explicit execution marker.
 
 Both staged EFR homing suites also pass their independent 46-frame fixtures
 with full-RAM replays: encoder 2,622 parameters, 92 flags and 782 packed
@@ -4180,7 +4174,7 @@ and physical bus arbitration remain outside this qualification.
 
 LTD's T publication follows older Execute, like other Read-owned T producers;
 the source bus Read itself remains earlier in that same clock. An adjacent
-STLM-to-T/LTD case in `atomic_memory_literals` fails on the former early
+STLM-to-T/LTD case in `memory_literals` fails on the former early
 publication, checks T at clock 7, and restores there before the retained
 successor copy writes at clock 8. The 24 original cases remain (25 current).
 
@@ -5334,8 +5328,8 @@ disassembly, and both frontend fixtures use the same corrected words. Existing
 832 program-transfer and 41 MVDP cases retain their pointer/mapping poison,
 bus values, exact stage checkpoints and restores after re-encoding.
 
-`atomic_operand_order` retains all 46 independent data/I/O/program sequences
-and extension-before-operand checks. `atomic_memory_route_literals` retains
+`operand_order` retains all 46 independent data/I/O/program sequences
+and extension-before-operand checks. `memory_route_literals` retains
 26 result/marker cases, including long preupdated READA. The six transport
 cases retain pointers, flags, unrelated accumulators and actual transfers;
 PORTR's input Read is two clocks after the preceding PORTW Write and four
@@ -5367,11 +5361,11 @@ cases and checks the handler's logical Execute words. Its IMR poison deliberatel
 enables another pending source during entry; that unrelated source is masked
 after the five captured-entry checks so the terminal IDLE can remain asleep.
 Leaving it enabled correctly wakes staged IDLE despite INTM, and is not evidence
-of failed interrupt restoration. `atomic_xc_interrupt` checks both IRQ and NMI,
+of failed interrupt restoration. `xc_interrupt` checks both IRQ and NMI,
 accepted/annulled words, two-word spans and loop wrap. Speculative second-loop
 Prefetch is recorded separately from exactly two body executions. Entry drains
 the already-decoded terminal IDLE; the non-loop return has a second IDLE as its
-valid continuation. `atomic_port_delayed_branch` retains all six condition/slot
+valid continuation. `port_delayed_branch` retains all six condition/slot
 contrasts and actual marker values; both continuations are nine model clocks
 after the initial marker.
 
@@ -5383,9 +5377,9 @@ register assertions. Short indirect PSHM is qualified for TRN only, with
 page-zero addressing independent of DP/CPL and retained AR modification.
 Unqualified mapped sources and repeat/control compositions fail closed.
 
-`atomic_bus_timing` retains all operand intervals and checks that the target
+`bus_timing` retains all operand intervals and checks that the target
 IDLE already decoded behind a delayed branch drains before IRQ entry. A second
-IDLE supplies its valid wake continuation. `atomic_xc_word_boundary` retains
+IDLE supplies its valid wake continuation. `xc_word_boundary` retains
 both selected words and the full data/I/O trace: the decoded successor PORTW's
 Read precedes IACK, its Write drains before the interrupt frame, and RTN points
 past that instruction. These are staged ordering assertions, not atomic
@@ -5887,7 +5881,7 @@ with AR4=`0010` selecting AR0 in both frontends. Its staged continuation
 completes all 163 frames with the same PCM hash as atomic execution. The
 recovery-policy reference differences remain characterized, not accepted as
 conformance; the strict staged erasure comparison still rejects them.
-`efr-loss-pipe` and `efr-erasure-pipe` load the same hashed inputs as their
+`efr-loss-observe` and `efr-erasure` load the same hashed inputs as their
 atomic controls. Observation requires its own staged marker, full frame/RAM
 replay and a valid driver; a completed characterization cannot satisfy the
 strict conformance checker.
@@ -6236,28 +6230,13 @@ sequence. The volatile endpoint is sampled once and the real memory write
 still occurs once per PORTR. This qualifies the logical on-chip RAM contract,
 not measured bank contention or peripheral forwarding.
 
-Duration-matched ten-second cold controls separate frontend and SWWSR selection:
-
-| Machine | Frontend | SWWSR | Host consumer advances | RF-control writes | Outcome |
-|---|---|---|---|---|---|
-| `noki5110` | atomic | legacy | 22 | 262 | Challenge accepted; ILLEGAL clear. |
-| `nse1astd` | atomic | standard | 22 | 262 | Challenge accepted; ILLEGAL clear. |
-| `nse1pipe` | staged | standard | 22 | 262 | Challenge accepted; separate physical Menu/lifecycle gates pass. |
-| `nse1plg` | staged | legacy | 0 | 0 | Existing `7728` guard at `0f05`; not a hardware result. |
-
-All three live controls end at 10.016666667 s from fresh own-model EEPROMs.
-Their first 32 RF-control pairs match after ignoring instruction-PC context
-and timestamps; so do the first eight logged host-consumer transitions. This
-is bounded prefix agreement, not whole-session parity. Atomic/legacy,
-atomic/standard and staged/standard respectively have 4,242/4,239/4,234 frame
-expiries, 134,816/134,720/134,560 RF reads, and 2,889/2,885/2,878 transfer
-expiries. Their endpoint mode cells differ: atomic has `mode_aa=0,mode_ac=4`,
-staged has `mode_aa=1,mode_ac=0xc`. Neither those differences nor equal prefix
-values establish which bus dialect or clock timing is physical. Wider
-state/traffic agreement remains open. The clean trace includes first-header reads (`0a05` at
-contexts `3871/387f`). The passive tap counts twenty-two nonzero consumer
-advances but logs only the first eight. The eighth changes `0033` to `002f`;
-consumer advances are not independently counted packets.
+Ordinary `noki5110` and its standard-bus observation fixture use stage-owned
+execution and standard SWWSR decoding. The legacy-dialect negative control
+`nse1plg` still stops on the original `7728` initializer; it is a bus-profile
+contrast, not an atomic engine or a hardware verdict. The standard composition
+accepts the challenge, advances host consumers and passes separate physical
+Menu, power and save-state tests. Matching bounded RF/control prefixes do not
+establish physical timing, acquisition or whole-session parity.
 `make check-c54x-rom4-staged` generates fresh own-model EEPROM/NVRAM and
 checks the reset-free ten-second capture against the reviewed structured
 fixture `fixtures/c54x_rom4_staged_checkpoint.json`. The fixture is a
@@ -6280,7 +6259,7 @@ are not further execution. RF-control
 and transfer-expiry parity remain open; these are calibrated bench-device
 events, not RF acquisition.
 
-The four-second atomic coherent gate requires two full six-write descriptor
+The four-second native coherent gate requires two full six-write descriptor
 bursts followed by `2813/0030` at PC context `4028` (thirteen controls total),
 plus the firmware queue producer. The five-write partial fingerprint is
 rejected, not retained as another accepted profile. Its minimum-frame bound

@@ -13,7 +13,7 @@ inline std::vector<clocked_register_case> section_cases()
 		std::vector<u16> words;
 		for (unsigned i = 0; i != 2; ++i) { words.push_back(opcode); if (!read) words.push_back(0xff00); }
 		words.push_back(0xf4e1);
-		auto initial = initial_case("atomic-CPU-peripheral-and-scratch-cost-classes",{0xf495});
+		auto initial = initial_case("CPU-peripheral-and-scratch-cost-classes",{0xf495});
 		for (unsigned i = 0; i != words.size(); ++i) initial.program[1+i].value = words[i];
 		initial.initial.insert(initial.initial.end(),{{r::STATE_A,0x5678},{r::STATE_AR2,0xff00},{r::STATE_PRD,0xff00},
 			{r::STATE_ST0,0},{r::STATE_ST1,0x800}});

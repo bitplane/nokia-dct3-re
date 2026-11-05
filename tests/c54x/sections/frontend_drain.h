@@ -30,7 +30,7 @@ inline std::vector<clocked_register_case> section_cases()
 	initial.initial.push_back({r::STATE_AR1,0});
 	initial.expected.clear();
 	clocked_register_case unsupported{{{0,std::move(initial)}},1,3};
-	auto rejected = observation("no-atomic-fallback", {{r::STATE_ILLEGAL,1},{r::STATE_AR1,0}});
+	auto rejected = observation("unsupported-form-stops", {{r::STATE_ILLEGAL,1},{r::STATE_AR1,0}});
 	rejected.expected.pop_back();
 	unsupported.states.push_back({3,std::move(rejected)});
 	unsupported.require_idle = false;

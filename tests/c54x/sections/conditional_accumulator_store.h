@@ -38,7 +38,7 @@ inline std::vector<clocked_register_case> section_cases()
 		c.states.push_back({24,observation("predicate-store-and-unconditional-address-update", {{r::STATE_A,a},{r::STATE_B,b},
 			{r::STATE_AR2,u16(0x500 + delta[mode])},{r::STATE_ST0,st0},{r::STATE_ST1,st1},{STATE_GENPC,0x602}},
 			{{0x500,take ? word : u16(0xa55a)}})});
-		// Atomic backend reads and writes back even for a false predicate.
+		// A false predicate still reads and writes back the destination.
 		// This protects current bus behavior, not a measured silicon claim.
 		c.data_events = std::vector<clocked_data_event>{{false,0x500,0xa55a,0,false},
 			{true,0x500,take ? word : u16(0xa55a),0,false}};

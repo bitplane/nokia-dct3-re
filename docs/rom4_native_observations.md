@@ -17,14 +17,14 @@ words, with exact-word assertion coverage checked separately. The supplied
 1 MHz bit clock, 8 kHz frame cadence and sync phase are laboratory inputs,
 not recovered production handset wiring. See the authoritative
 [physical-clock contract](rom4_audio_transport.md#nse-1-physical-clock-contract).
-The paired `nse1aclk`/`nse1pclk` laboratory configurations hold standard
-SWWSR and pin clocks constant while changing atomic/staged CPU execution.
-Run `tools.run_c54x_rom4_pcm_clock --staged --coverage` with its required
-MAME/ROM paths: atomic pin-clocked boot and key-tone acceptance passes.
+`nse1pin` is the canonical pin-clocked composition. The duplicate `nse1pclk`
+and retired atomic-clock aliases are removed. Run
+`tools.run_c54x_rom4_pcm_clock --clocked-loopback --coverage` with its required
+MAME/ROM paths; `--restore` also checks partial-word continuation.
 Staged `7721` (`STM` to BDXR) at `0x0e61` now retains its literal until
 Execute, using the existing partial peripheral-access model rather than
 DAGEN's early-write path. The backend pin test executes the same store on
-both frontends: no ready/echo without clocks, then the original `0x0aaa`
+the single engine with both retained RX-word inputs: no ready/echo without clocks, then the original `0x0aaa`
 word and independent RX/TX sources with accumulators/status preserved.
 The boot retry's overlap is specifically older `7721` at `0x0e61` and
 younger `4920` at `0x0e5c` (BDXR write/BDRR read). This independent endpoint

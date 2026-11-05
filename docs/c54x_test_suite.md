@@ -1,0 +1,88 @@
+# C54x test suite
+
+## Authority
+
+`fixtures/c54x_sections.json` owns section names and expected case counts.
+`tests/c54x/sections/` owns generic processor cases; `tests/firmware/c54x_*.h`
+owns copied-firmware cases. Each registration must resolve to exactly one
+source. Missing, ambiguous, duplicate or unregistered sections fail discovery.
+There is one execution engine; cases do not select a frontend.
+
+[Execution contracts](c54x_execution_contracts.md) records instruction-level
+qualification and unresolved silicon behavior. [The execution model](c54x_frontend_retirement.md)
+records integration acceptance. Neither a host-parser test nor a source-string
+invariant establishes processor behavior.
+
+## Running
+
+```sh
+python3 tools/run_c54x_section.py --list --scope all
+python3 tools/run_c54x_section.py SECTION
+python3 tools/run_c54x_section.py SECTION --negative-control
+python3 tools/run_c54x_section.py all --scope all --jobs 8
+```
+
+`all` defaults to generic CPU scope; copied firmware requires `--scope firmware`
+or `--scope all`. `make build-c54x-isa C54X_SECTION=NAME` builds one section
+without executing it. It defaults to `instruction_examples`.
+
+The runner replaces the isolated `c54xisa` fixture, not the CPU implementation.
+Overlay changed CPU sources before testing. Sections share one object tree:
+build sequentially, including relative to the main MAME and benchmark builds.
+Do not retain an emulator binary per section.
+
+Each section's logs and build/run times are under ignored
+`tmp/c54x-section-trial/SECTION/`. Complete runs write
+`tmp/c54x-section-trial/SCOPE-summary.json`, including completed sections,
+case totals and an explicit completion flag. A failure/interruption leaves the
+run incomplete; cached passes are not credited as new execution.
+
+Use focused sections between edits. Run the complete catalogue once at an
+integration checkpoint, not after every change. A complete build/run takes
+about an hour; cached focused builds usually take seconds.
+
+## Fixture contracts
+
+- Expectations belong to the case, not opcode-specific branches in the runner.
+  Keep independent arithmetic, flags, addresses, guards and rejection limits.
+- Observe ordered data/program/I/O events, widths and source identity where
+  relevant. A speculative fetch is not Execute or an operand owner. Exact bus
+  callbacks establish once-only side effects more reliably than polling PC.
+- Poison opcodes, extension words, sources and pointers after their capture
+  when the test claims retained ownership. Check both intermediate publication
+  and final state where their distinction matters.
+- Check IRQ/NMI source selection, whole delayed/repeated-operation drain,
+  return frames and pending sources. Waking from IDLE is not necessarily
+  accepting an interrupt; INTM-blocked wake can resume foreground code.
+- Every registered case includes restore execution. Cover meaningful pipeline,
+  pending peripheral and control boundaries; selected cases clear the live
+  pipeline before restoring to prove the saved state is sufficient.
+- `reset_execution_pipeline()` discards in-flight execution/interrupt-entry
+  work without resetting architectural registers or peripherals. Preserve
+  this operation when restructuring fixture setup or restore paths.
+- Rejection assertions describe supported implementation boundaries, not
+  necessarily silicon traps. Cycle assertions describe the software model,
+  not measured physical pipeline or external-bank timing.
+
+## Coverage budget
+
+The suite deliberately distributes pages, checkpoints and other orthogonal
+dimensions instead of repeating every Cartesian combination. This does not
+claim all correlations are covered. Preserve non-orthogonal contrasts: mapped
+versus RAM operands, aliases, addressing forms, flag/carry boundaries, repeat
+counts, delay-slot ownership, source poisoning and interrupt/replay order.
+
+Deleting a duplicate requires a named retained contract covering its inputs,
+observable effects and restore behavior. A similar filename or a green final
+register snapshot is insufficient. Do not reintroduce duplicated execution-mode
+dimensions or dense per-tick polling where ordered bus events establish the
+contract. Deliberate redistribution must leave a concise local explanation;
+closed migration chronology belongs in Git, not a parallel progress table.
+
+## Firmware boundary
+
+Private ROMs and application ABI assumptions remain outside generic ISA tests.
+`tools/run_c54x_core.py` selects the linked `rom4-context` or acquired-ROM `cold`
+fixture; codec and handset runners have separate gates. The linked ROM4 context
+digest, bit-exact codec results, serial/pin replay and handset menu tests are
+integration evidence, not substitutes for CPU sections or physical validation.

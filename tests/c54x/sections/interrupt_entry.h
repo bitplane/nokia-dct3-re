@@ -11,7 +11,7 @@ inline std::vector<clocked_register_case> section_cases()
 		unsigned const checkpoint = index % 5 + 1;
 		u16 const vector = nmi ? 4 : 0x40;
 		int const line = nmi ? INPUT_LINE_NMI : 0;
-		auto initial = initial_case("atomic-entry-stage-restoration", {0xf4e1});
+		auto initial = initial_case("entry-stage-restoration", {0xf4e1});
 		for (auto &word : initial.program) word.address += 0x200;
 		initial.program.insert(initial.program.end(),{{vector,0xf020},{vector + 1,0x1234},{vector + 2,0xf4e1}});
 		initial.data = {{0xfff,0xbeef}};

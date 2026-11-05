@@ -55,8 +55,8 @@ distinction.
 | `cross_rom_confidence.md` | Cross-product and cross-ROM boot, idle, and input evidence. |
 | `model_coverage.md` | Evidence-gated per-product compatibility and fidelity matrix. |
 | `c54x_execution_contracts.md` | Processor-owned instruction/composition contracts and the current complete C54x regression checkpoint; separate from handset and loader acceptance. |
-| `c54x_section_trial.md` | Canonical replacement-suite disposition, coverage reductions, catalogue identity and measured acceptance. |
-| `c54x_suite_disposition.md` | Entry point to the canonical CPU-suite disposition and execution scopes. |
+| `c54x_test_suite.md` | CPU/firmware test boundaries, independent expectations, coverage budget and focused/checkpoint workflow. |
+| `c54x_frontend_retirement.md` | Single-engine execution/reset contract, composition differences and integration acceptance. |
 | `5110i_bringup.md` | Own NSE-2 inputs, NV integrity, native ROM4 compatibility, graphical/input/security, cold SIM contacts, offline SMS storage and receive-supervision boundary. |
 | `6110_bringup.md` | Authoritative NSE-3 hardware/firmware map and blocked resumption boundary. |
 | `6130_bringup.md` | Own NSK-3 inputs, physical Net monitor exit and cold idle, bounded SIM storage/security, native radio/liveness boundaries. |

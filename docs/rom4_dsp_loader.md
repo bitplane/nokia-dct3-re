@@ -148,11 +148,11 @@ observed input length absent from the recovered catalogue.
 
 ### Staged frontend integration boundary
 
-The separate `tms54rom4 -bios cold-pipeline` fixture uses the same acquired
+The separate `tms54rom4 -bios cold` fixture uses the same acquired
 mask ROM and cold data, without register seeding. It reaches the empty
 `000f00` loader fetch with PC `0f01`, SP `0000` and PMST `ffa8` after 12
 staged clocks. `tools/run_c54x_core.py --mame mame/mame --rompath mame/roms
---profile cold-pipeline` requires that exact boundary; this does not supply
+--profile cold` requires that exact boundary; this does not supply
 or execute a loader.
 
 `nse1pipe` is a separate research machine using the ordinary NSE-1 MCU,

@@ -297,8 +297,7 @@ execute before either return path. TC-set reaches the delayed return at
 algorithm fixture. Eight bounded signed vectors, both TC states and FRCT
 off/on give 32 cases and full 65440-word ordinary-RAM replays. Each case
 checks the independently computed dot/cross result, T, history/current-pair
-words, guards, final AR2/AR3, TC and balanced caller stack. `--staged`
-independently repeats the same matrix on the staged frontend. No input or
+words, guards, final AR2/AR3, TC and balanced caller stack. No input or
 result is injected into a handset. The vectors avoid overflow with OVM and
 SMUL clear; saturation, other mode combinations, physical timing, I/Q
 identity and sample cadence are not established by this fixture.
@@ -590,7 +589,7 @@ staged CPUs. Inputs cover silence, impulses, alternating signed samples and
 deterministic pseudorandom PCM encoded by the independent codec. Each native
 frame is replayed from its prepared input/history snapshot, comparing all
 65,440 ordinary RAM words without advancing the reference twice. The staged
-`fr-decoder-pipe` BIOS loads the same program/DROM and checks the decoder
+`fr-decoder` BIOS loads the same program/DROM and checks the decoder
 entry words. This is isolated decoder acceptance, not handset RF acquisition,
 a fitted codec clock or end-to-end speech.
 
@@ -609,7 +608,7 @@ documented in [ROM4 DSP loader](rom4_dsp_loader.md). Other MMR sources,
 mapped destinations and general interrupt compositions are not inferred
 from successful decoder execution.
 
-`tools/run_c54x_rom4_crc.py --fr-decoder --trace-fr` (optionally `--staged`)
+`tools/run_c54x_rom4_crc.py --fr-decoder --trace-fr`
 retains frame-8 entry RAM/registers and execution-owned instruction/data traces.
 Only CPU-executing data accesses are logged; comparison/replay reads and
 debugger peeks are excluded. Trace PC contexts are not operand-owner labels.
@@ -618,7 +617,7 @@ diagnostic capture into acceptance.
 
 `check-c54x-rom4-fr-encoder-staged` validates the transmit direction on the
 staged frontend; `check-c54x-rom4-fr-encoder` remains its atomic control.
-`fr-encoder-pipe` loads the acquired program/DROM and verifies its entry words
+`fr-encoder` loads the acquired program/DROM and verifies its entry words
 before running reset, preprocessing and encoding. Both frontends match all
 2,432 parameters over 32 frames: eight each of silence, impulse, alternating
 and deterministic random PCM. Preprocessing histories match independently.

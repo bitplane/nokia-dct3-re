@@ -2,6 +2,10 @@
 
 Bounded independent EFR encoder/decoder, DTX, erasure, recovery and homing qualifications. These are isolated algorithm fixtures, not native handset speech or physical COBBA acceptance. [COBBA control](cobba_control_boundary.md) owns that hardware boundary.
 
+Current runners use one stage-owned CPU and canonical BIOS names. Earlier
+atomic/staged comparisons below are archived observations, not selectable
+engines; they do not renew whole-sequence or silicon-timing acceptance.
+
 ## Bounded EFR table and CRC contracts
 
 `tools/c54x_rom4_efr_tables.py` checks the acquired NSE-1 ROM4 data image
@@ -64,13 +68,12 @@ acceptance boundaries below; none of these fixtures attaches a handset clock.
 
 ## Independent EFR speech reference
 
-EFR encoder qualification is independent of FR. Both atomic and staged
-frontends pass all 163 complete speech frames: 9,291 parameters, 326 VAD/SP
+EFR encoder qualification is independent of FR. It passes all 163 complete
+speech frames: 9,291 parameters, 326 VAD/SP
 flags and 2,771 packed words, with full-RAM save/replay of every frame.
 `make check-c54x-rom4-efr-encoder-staged` verifies the acquired ETSI fixture
-and selects `efr-encoder-pipe`; it retains the atomic gate's strict comparison
-requirements. Both BIOSes load the same hashed PCM and expected-vector files,
-not merely the same DSP program/data images.
+and selects `efr-encoder`, with strict comparison requirements and hashed PCM,
+expected vectors and DSP program/data inputs.
 
 The [CPU qualifications](rom4_dsp_loader.md) cover the admitted instruction
 compositions and operand-retention rules. First-frame entry snapshots match
@@ -116,8 +119,8 @@ microtests occupy separate fixture program addresses.
 
 `make check-c54x-rom4-efr-decoder-staged` uses the same hashed input/PCM
 and the same 163-frame, 26,080-sample and full-RAM replay requirements.
-Its ten-case delayed-repeat preflight remains atomic, then an explicit
-frontend marker precedes staged decoder reset and all speech frames.
+Its ten-case delayed-repeat preflight uses the same engine; an explicit
+execution marker precedes decoder reset and all speech frames.
 The required [BD READA composition](c54x_execution_contracts.md#reada-in-unconditional-bd-delay-words)
 has its own 512-case cleared-pipeline replay matrix. This is algorithm and
 ordering evidence, not measured physical bus timing.
@@ -342,7 +345,7 @@ Both atomic and staged execution of original native `c941`/`c8dc` match all
 original RX-invalid-SID bit at `09c0`: it is set for the five invalid received
 SID events and clear elsewhere. Output differs from clean DTX in 101 frames,
 so the input changes are not merely accepted and ignored. The staged gate is
-`check-c54x-rom4-efr-invalid-sid-staged`: its short `efr-isid-pipe` BIOS loads
+`check-c54x-rom4-efr-invalid-sid-staged`: its short `efr-invalid-sid` BIOS loads
 the same hashed program, cold data and vectors as the atomic profile. The runner
 requires exactly one invalid-SID-specific staged selection marker and rejects
 driver-validity errors, incomplete comparisons and missing replay evidence.
@@ -370,7 +373,7 @@ the unobserved decoder before accepting the generated output.
 | `lost_sid.dec` | `98af464e95397ad9cfd14f23905060770b170ad706261766941294204ffc57d6` |
 | `lost_sid.out` | `771374b3a45dcd5286b4886b8d15ad55d3c5f6beace0b56a63ab3886fcc020c0` |
 
-Distinct native BIOS profiles `efr-lost-sid` and `efr-lsid-pipe` load this
+Distinct native BIOS profiles `efr-lost-sid` and `efr-lost-sid` load this
 declared input/output pair without replacing clean-DTX data. Both strict
 runs match all15520 PCM samples in frames0..96, then stop at97 with86
 sample differences. Thus the complete518-frame fixture is not reference-
@@ -398,7 +401,6 @@ After preparing the declared reference files in the bench ROM directory:
 ```sh
 python3 tools/run_c54x_rom4_crc.py --mame mame/mame --rompath mame/roms \
   --efr-lost-sid --observe-dtx-history
-# Add --staged for the independent staged frontend; both return failure.
 python3 tools/c54x_rom4_efr_dtx_history_check.py RUN/error.log \
   --lost-sid-failure-console RUN/console.log
 ```
@@ -430,7 +432,6 @@ rejects any earlier R2/LSF/pitch or code-gain difference. Reproduce with:
 ```sh
 python3 tools/run_c54x_rom4_crc.py --mame mame/mame --rompath mame/roms \
   --efr-lost-sid --observe-lost-sid-state
-# Strict failure is retained; add --staged for the other frontend.
 python3 tools/c54x_rom4_efr_lost_sid_state_check.py RUN/error.log REFERENCE/state.log
 ```
 
@@ -439,7 +440,7 @@ remaining420-frame result or handset speech claim is inferred from this
 prefix alone. The surviving native/reference mismatch should not be repaired
 by deleting the acquired recovery patch or importing the reference codec.
 
-The separate `efr-lsid-observe` / `efr-lso-pipe` profiles execute all518
+The separate `efr-lsid-observe` / `efr-lsid-observe` profiles execute all518
 frames without suppressing the recorded differences. Each frame captures
 all160 output samples and replays65440 ordinary RAM words; the independent
 checker recomputes every mismatch count from that PCM and requires complete
@@ -455,7 +456,6 @@ this fixture still does not execute the bit0100-set writer alternative.
 ```sh
 python3 tools/run_c54x_rom4_crc.py --mame mame/mame --rompath mame/roms \
   --efr-lost-sid-observe --observe-dtx-history
-# Add --staged to compare the full staged result.
 ```
 
 The runner retains `native.pcm`, per-frame statistics and input/source hashes.
@@ -488,7 +488,6 @@ differences above. The strict prefix control still rejects frame 97 with
 ```sh
 python3 tools/run_c54x_rom4_crc.py --mame mame/mame --rompath mame/roms \
   --efr-lost-sid-observe --observe-lost-sid-state
-# Repeat with --staged, retaining independent PCM/replay characterization.
 python3 tools/c54x_rom4_efr_lost_sid_state_check.py RUN/error.log \
   REFERENCE/state.log --complete --output RUN/semantic-characterization.json
 ```
@@ -919,7 +918,7 @@ and PCM. The separate
 independently recomputes PCM differences and requires all 49 full-RAM frame
 replays. A completed observation is not a conformance pass.
 
-`observe-c54x-rom4-efr-homing-errors-staged` selects `efr-herr-pipe` with the
+`observe-c54x-rom4-efr-homing-errors-staged` selects `efr-home-errors` with the
 same hash-pinned program, cold data and vectors as the atomic bench. Both
 frontends reproduce all 49 frames, 7,840 PCM samples and 65,440 ordinary RAM
 words per frame. Their comparison reports differ only in the frontend label:
@@ -1011,7 +1010,7 @@ alternative. Synthetic checker tests cover rejection and both Boolean
 store values; those tests are not acquired-code execution evidence.
 Reproduce with BIOS `efr-dtx-decoder`, debugger enabled and
 `tools/c54x_rom4_efr_dtx_history_observe.lua` as the zero-delay autoboot
-script; use `efr-dtx-dec-pipe` for staged execution or `efr-invalid-sid`
+script; use `efr-dtx-decoder` for staged execution or `efr-invalid-sid`
 for the invalid-SID fixture. Run
 `python3 tools/c54x_rom4_efr_dtx_history_check.py PATH/error.log` and retain
 the ordinary fixture PCM/replay checker as well as the trace.
@@ -1020,13 +1019,12 @@ Atomic/staged write callbacks report different advanced PCs for the same
 tail store; neither sampled PC is relabeled as the opcode's owner address.
 
 Reproduce with the isolated `tms54rom4` fixture, BIOS `efr-home-errors` or
-`efr-herr-pipe`, debugger enabled and
+`efr-home-errors`, debugger enabled and
 `tools/c54x_rom4_efr_homing_observe.lua` as the zero-delay autoboot script.
 Then check the acquired big-endian program and isolated `error.log`:
 
 ```sh
 .venv/bin/python tools/c54x_rom4_efr_homing_path_check.py mame/roms/tms54rom4/dsp_full.bin RUN_DIR/error.log
-# Add --staged for efr-herr-pipe.
 ```
 
 The independent full-PCM/reset checker remains mandatory alongside this

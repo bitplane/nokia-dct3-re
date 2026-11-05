@@ -4957,7 +4957,7 @@ void tms320c54x_device::pipeline_step()
 		if (staged_extended_immediate_store(m_pipeline_word[4]))
 		{
 			// Three-word Decode retains the offset separately from its value.
-			// Share address arithmetic with atomic/DST/DSUB, never fetch here.
+			// Share DST/DSUB address arithmetic; never fetch here.
 			m_pipeline_operand_address[4] = long_offset_address(mode, indirect_ar(mode, 4), s16(m_pipeline_operand_address[4]), 4);
 			if (m_pipeline_operand_address[4] < 0x20)
 			{
@@ -5348,7 +5348,7 @@ void tms320c54x_device::pipeline_step()
 		else if (staged_parallel_load(m_op))
 		{
 			// Store the old accumulator before replacing an aliased destination
-			// (SPRU172C 4-179). Retain the atomic model's unresolved C policy.
+			// (SPRU172C 4-179). Retain the unresolved C policy.
 			data_write(m_pipeline_operand_address[5], pipeline_store_word());
 			if ((m_op & 0xfd00) != 0xe400)
 			{
@@ -5368,7 +5368,7 @@ void tms320c54x_device::pipeline_step()
 		else if (staged_parallel_mac(m_op))
 		{
 			// Store before replacing an aliased accumulator (SPRU172C 4-180).
-			// C remains the existing atomic-model hypothesis, not qualified silicon behaviour.
+			// C remains an implementation hypothesis, not qualified silicon behaviour.
 			u16 const stored = pipeline_store_word();
 			s64 product = s64(s16(m_pipeline_operand[5])) * s64(s16(m_pipeline_immediate[5]));
 			if (BIT(m_st1, 6)) product *= 2;
