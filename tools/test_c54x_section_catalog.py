@@ -89,7 +89,11 @@ class SectionCatalogTests(unittest.TestCase):
 
     def test_invalid_build_modes_do_not_start_a_build(self):
         for arguments in (['all', '--build-only'],
-                          ['immediate_store', '--build-only', '--negative-control']):
+                          ['immediate_store', '--build-only', '--negative-control'],
+                          ['--batch', 'immediate_store', 'immediate_store'],
+                          ['--batch', 'immediate_store', '--negative-control'],
+                          ['--batch', 'c5416_io_extended'],
+                          ['immediate_store', '--batch', 'paired_store']):
             with self.subTest(arguments=arguments), patch('sys.argv', ['runner', *arguments]), \
                     patch('tools.run_c54x_section.subprocess.run') as run, \
                     contextlib.redirect_stderr(io.StringIO()):

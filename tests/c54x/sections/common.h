@@ -33,5 +33,19 @@ inline clocked_register_case literal_sequence(instruction_case initial, instruct
 	return {{{0,std::move(initial)},{1,std::move(before)},
 		{2,observation("literal-running",{})},{finish,std::move(final)}},checkpoint,finish};
 }
+inline instruction_case marked_program(char const *name, std::vector<u16> const &words)
+{
+	auto initial = initial_case(name,{0xf495});
+	for (unsigned i = 0; i != words.size(); ++i) initial.program.at(1+i).value = words[i];
+	return initial;
+}
+inline clocked_register_case marked_sequence(instruction_case initial, instruction_case final,
+	unsigned finish, unsigned checkpoint)
+{
+	auto c = literal_sequence(std::move(initial),observation("before-port-program",{{STATE_GENPC,0x600}}),
+		std::move(final),finish,checkpoint);
+	c.observed_data_space = AS_IO;
+	return c;
+}
 }
 #endif // C54X_SECTION_COMMON_H

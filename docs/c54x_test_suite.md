@@ -59,6 +59,9 @@ Small independent literal tables are grouped into `register_literals`,
 expected values, checkpoint selection and bus events; `literal_sequence` only
 constructs the shared before/running/final snapshot cadence. Family grouping
 does not replace these literals with expectations computed by the CPU model.
+Port-marker tables live in `port_marked_operations`, `port_marked_memory` and
+`port_timing`. Their shared helpers construct the program and snapshot cadence;
+ordered I/O values, absolute clocks and inter-marker intervals stay in the rows.
 
 - Expectations belong to the case, not opcode-specific branches in the runner.
   Keep independent arithmetic, flags, addresses, guards and rejection limits.

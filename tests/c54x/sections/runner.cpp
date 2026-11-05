@@ -185,6 +185,9 @@ protected:
 			return 0;
 		}, "section_irq");
 		m_cases = c54x_test::section_cases();
+#ifdef C54X_SECTION_NEGATIVE_CONTROL
+		m_cases.front().states.back().observation.expected.push_back({tms320c54x_device::STATE_ILLEGAL,1});
+#endif
 		m_fixture = std::make_unique<c54x_test::register_sequence_fixture>(machine(), *m_cpu, *m_timer,
 			m_cases.size(), [this](unsigned i) {
 #ifdef C54X_SECTION_CLOCK_RATES

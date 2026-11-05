@@ -177,11 +177,7 @@ def main():
         copy_changed(selected_source, overlay / 'c54x_section_selected.h')
     if args.negative_control:
         selected = overlay / 'c54x_section_selected.h'
-        text = selected.read_text()
-        if text.count('return cases;') != 1:
-            parser.error('negative control requires one section return')
-        selected.write_text(text.replace('return cases;',
-            'cases.front().states.back().observation.expected.push_back({r::STATE_ILLEGAL,1}); return cases;'))
+        selected.write_text('#define C54X_SECTION_NEGATIVE_CONTROL\n' + selected.read_text())
     start = time.monotonic()
     sources = 'src/mame/nokia/tms320c54x_test_isa.cpp'
     if args.section in ('mcbsp_control', 'deep_idle_clocks', 'clock_rates'):

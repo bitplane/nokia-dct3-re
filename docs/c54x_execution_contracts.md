@@ -5365,7 +5365,7 @@ of failed interrupt restoration. `xc_interrupt` checks both IRQ and NMI,
 accepted/annulled words, two-word spans and loop wrap. Speculative second-loop
 Prefetch is recorded separately from exactly two body executions. Entry drains
 the already-decoded terminal IDLE; the non-loop return has a second IDLE as its
-valid continuation. `port_delayed_branch` retains all six condition/slot
+valid continuation. The delayed-branch table in `port_marked_operations` retains all six condition/slot
 contrasts and actual marker values; both continuations are nine model clocks
 after the initial marker.
 
