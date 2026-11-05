@@ -609,14 +609,14 @@ private:
 			logerror("[opassert] op=7721\n");
 			if (m_case == 128)
 			{
-				// Repeat the same pending-word/pin contract with staged execution;
-				// this does not assert the silicon's peripheral-write phase.
+				// Repeat with the RX word retained from the first echo, rather
+				// than the preceding joined-pin pattern. This is a data contrast,
+				// not another execution engine or a physical-phase claim.
 				m_cpu->reset_execution_pipeline();
 				++m_case; m_stage = 80;
 				m_timer->adjust(attotime::from_usec(100)); return;
 			}
-			osd_printf_info("C54x native backend BSP clocked store: PASS opcode=7721 pending_without_clocks=1 echo=0aaa untimed=0 sources=4,5 handset_clock_claim=0\n");
-			osd_printf_info("C54x staged backend BSP clocked store: PASS opcode=7721 pending_without_clocks=1 echo=0aaa untimed=0 sources=4,5 physical_phase_claim=0\n");
+			osd_printf_info("C54x native backend BSP clocked store: PASS opcode=7721 previous_word_cases=2 pending_without_clocks=1 echo=0aaa untimed=0 sources=4,5 handset_clock_claim=0 physical_phase_claim=0\n");
 			throw emu_fatalerror(0, "C54x backend BSP tests complete");
 		}
 		++m_stage; m_timer->adjust(attotime::from_usec(100));

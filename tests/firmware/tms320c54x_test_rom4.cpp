@@ -221,27 +221,13 @@ void tms320c54x_test_state::start_rom4_delayed_repeat(unsigned index)
 
 bool tms320c54x_test_state::rom4_codec_is(char const *name) const
 {
-	std::string_view bios(machine().options().bios());
-	if(bios.size()>5 && bios.substr(bios.size()-5)=="-pipe") bios.remove_suffix(5);
-	if(bios=="efr-dtx-enc") bios="efr-dtx-encoder";
-	else if(bios=="efr-dtx-dec") bios="efr-dtx-decoder";
-	else if(bios=="efr-ehome") bios="efr-enc-homing";
-	else if(bios=="efr-isid") bios="efr-invalid-sid";
-	else if(bios=="efr-lsid") bios="efr-lost-sid";
-	else if(bios=="efr-lso") bios="efr-lsid-observe";
-	else if(bios=="efr-loss") bios="efr-loss-observe";
-	else if(bios=="efr-herr") bios="efr-home-errors";
-	return bios==name;
+	return profile_is(name);
 }
 
-void tms320c54x_test_state::enable_rom4_codec_pipeline(char const *kind)
+void tms320c54x_test_state::prepare_rom4_codec(char const *kind)
 {
-	std::string_view const bios(machine().options().bios());
-	if(bios.size()>5 && bios.substr(bios.size()-5)=="-pipe")
-	{
-		m_cpu->reset_execution_pipeline();
-		osd_printf_info("ROM4 %s frontend: staged handset_audio_claim=0\n",kind);
-	}
+	m_cpu->reset_execution_pipeline();
+	osd_printf_info("ROM4 %s frontend: staged handset_audio_claim=0\n",kind);
 }
 
 void tms320c54x_test_state::start_rom4_efr_encoder(unsigned frame, bool initialize)
@@ -920,13 +906,7 @@ bool tms320c54x_test_state::check_rom4_fr_decoder_results()
 		}
 		if (index < 9) { start_rom4_delayed_repeat(index + 1); return true; }
 		osd_printf_info("TMS320C54x ROM4 delayed repeat: PASS cases=10 replay=10 controls=BD,RETD counts=0,1,2,9,39\n");
-		if(profile_is("efr-decoder-pipe"))
-		{
-			// The existing delayed-repeat preflight is atomic; the acquired
-			// decoder reset and every frame below use the staged frontend.
-			m_cpu->reset_execution_pipeline();
-			osd_printf_info("ROM4 EFR decoder frontend: staged handset_audio_claim=0\n");
-		}
+		prepare_rom4_codec("EFR decoder");
 		start_rom4_efr_decoder(0, true); return true;
 	}
 	return false;

@@ -32,19 +32,19 @@ void tms320c54x_test_state::machine_reset()
 			(rom4_codec_is("efr-dtx-decoder") || rom4_codec_is("efr-erasure") || rom4_codec_is("efr-loss-observe") ||
 			 rom4_codec_is("efr-homing") || rom4_codec_is("efr-home-errors") || rom4_codec_is("efr-invalid-sid") || rom4_codec_is("efr-lost-sid") || rom4_codec_is("efr-lsid-observe")))
 	{
-		enable_rom4_codec_pipeline(rom4_codec_is("efr-lost-sid") || rom4_codec_is("efr-lsid-observe") ? "EFR lost SID decoder" : rom4_codec_is("efr-dtx-decoder") ? "EFR DTX decoder" : rom4_codec_is("efr-invalid-sid") ? "EFR invalid SID decoder" : rom4_codec_is("efr-erasure") || rom4_codec_is("efr-loss-observe") ? "EFR erasure decoder" : "EFR homing decoder");
+		prepare_rom4_codec(rom4_codec_is("efr-lost-sid") || rom4_codec_is("efr-lsid-observe") ? "EFR lost SID decoder" : rom4_codec_is("efr-dtx-decoder") ? "EFR DTX decoder" : rom4_codec_is("efr-invalid-sid") ? "EFR invalid SID decoder" : rom4_codec_is("efr-erasure") || rom4_codec_is("efr-loss-observe") ? "EFR erasure decoder" : "EFR homing decoder");
 		start_rom4_efr_decoder(0, true);
 		return;
 	}
 	if (!strcmp(machine().system().name, "tms54rom4") &&
 			(rom4_codec_is("efr-encoder") || rom4_codec_is("efr-dtx-encoder") || rom4_codec_is("efr-enc-homing")))
 	{
-		enable_rom4_codec_pipeline(rom4_codec_is("efr-dtx-encoder") ? "EFR DTX encoder" : rom4_codec_is("efr-enc-homing") ? "EFR homing encoder" : "EFR encoder");
+		prepare_rom4_codec(rom4_codec_is("efr-dtx-encoder") ? "EFR DTX encoder" : rom4_codec_is("efr-enc-homing") ? "EFR homing encoder" : "EFR encoder");
 		start_rom4_efr_encoder(0, true);
 		return;
 	}
 	if (!strcmp(machine().system().name, "tms54rom4") &&
-			(profile_is("efr-decoder") || profile_is("efr-decoder-pipe")))
+			(profile_is("efr-decoder")))
 	{
 		start_rom4_delayed_repeat(0);
 		return;
@@ -62,24 +62,16 @@ void tms320c54x_test_state::machine_reset()
 		return;
 	}
 	if (!strcmp(machine().system().name, "tms54rom4") &&
-			(profile_is("fr-encoder") || profile_is("fr-encoder-pipe")))
+			(profile_is("fr-encoder")))
 	{
-		if (profile_is("fr-encoder-pipe"))
-		{
-			m_cpu->reset_execution_pipeline();
-			osd_printf_info("ROM4 FR encoder frontend: staged handset_audio_claim=0\n");
-		}
+		prepare_rom4_codec("FR encoder");
 		start_rom4_fr_encoder(0, 0);
 		return;
 	}
 	if (!strcmp(machine().system().name, "tms54rom4") &&
-			(profile_is("fr-decoder") || profile_is("fr-decoder-pipe")))
+			(profile_is("fr-decoder")))
 	{
-		if (profile_is("fr-decoder-pipe"))
-		{
-			m_cpu->reset_execution_pipeline();
-			osd_printf_info("ROM4 FR decoder frontend: staged handset_audio_claim=0\n");
-		}
+		prepare_rom4_codec("FR decoder");
 		start_rom4_fr_decoder(0, true);
 		return;
 	}
@@ -103,18 +95,18 @@ void tms320c54x_test_state::machine_reset()
 	}
 	if (!strcmp(machine().system().name, "tms54rom4") && rom4_codec_is("rf-pairs"))
 	{
-		enable_rom4_codec_pipeline("RF pairs");
+		prepare_rom4_codec("RF pairs");
 		start_rom4_pairs(0);
 		return;
 	}
 	if (!strcmp(machine().system().name, "tms54rom4") && rom4_codec_is("rf-bitmap"))
 	{
-		enable_rom4_codec_pipeline("RF bitmap");
+		prepare_rom4_codec("RF bitmap");
 		start_rom4_bitmap(0);
 		return;
 	}
 	if (!strcmp(machine().system().name, "tms54rom4") &&
-			(profile_is("cold") || profile_is("cold-pipeline")))
+			(profile_is("cold")))
 	{
 		m_phase = rom4_staged_cold_phase;
 		m_rom4_checks = 0;
@@ -224,26 +216,26 @@ void tms320c54x_test_state::test(machine_config &config)
 void tms320c54x_test_state::rom4(machine_config &config)
 {
 	TMS320C54X(config, m_cpu, 13'000'000);
-	bool const trace_encoder = !strcmp(config.options().bios(),"fr-encoder") || !strcmp(config.options().bios(),"fr-encoder-pipe");
-	if (config.options().verbose() && (trace_encoder || !strcmp(config.options().bios(), "fr-decoder") || !strcmp(config.options().bios(), "fr-decoder-pipe")))
+	bool const trace_encoder = !strcmp(config.options().bios(),"fr-encoder");
+	if (config.options().verbose() && (trace_encoder || !strcmp(config.options().bios(), "fr-decoder")))
 		m_cpu->instruction_observer_cb().set([this,trace_encoder](offs_t address, u16 opcode) {
 			if (m_phase != (trace_encoder ? 74002U : 72017U) || m_rom4_codec_replay) return;
 			if (++m_rom4_fr_trace_count <= 200000) trace_rom4_fr_state("execute", address, opcode);
 		});
-	if (config.options().verbose() && (!strcmp(config.options().bios(), "efr-encoder") || !strcmp(config.options().bios(), "efr-encoder-pipe")))
+	if (config.options().verbose() && (!strcmp(config.options().bios(), "efr-encoder")))
 		m_cpu->instruction_observer_cb().set([this](offs_t address, u16 opcode) {
 			if (m_phase == 304000 && ++m_rom4_fr_trace_count <= 8192)
 				trace_rom4_fr_state("efr_reset_execute", address, opcode);
 			else if (m_phase == 304001 && !m_rom4_codec_replay && ++m_rom4_fr_trace_count <= 200000)
 				trace_rom4_fr_state("efr_frame_execute", address, opcode);
 		});
-	if (!strcmp(config.options().bios(), "efr-loss-observe") || !strcmp(config.options().bios(), "efr-loss-pipe"))
+	if (!strcmp(config.options().bios(), "efr-loss-observe"))
 		m_cpu->instruction_observer_cb().set([this](offs_t address,u16 opcode) {
 			observe_rom4_efr_state(address,opcode);
 			if (machine().options().verbose() && m_phase == 302009 && !m_rom4_codec_replay && ++m_rom4_fr_trace_count <= 200000)
 				trace_rom4_fr_state("efr_loss_execute",address,opcode);
 		});
-	if (!strcmp(config.options().bios(), "efr-home-errors") || !strcmp(config.options().bios(), "efr-herr-pipe"))
+	if (!strcmp(config.options().bios(), "efr-home-errors"))
 		m_cpu->instruction_observer_cb().set([this](offs_t address, u16 opcode) {
 			// Original recovery may edit an input parameter before the full DHF
 			// comparison. Observe it; never repair the parameter or reset flag.

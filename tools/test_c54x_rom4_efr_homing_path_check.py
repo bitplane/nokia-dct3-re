@@ -43,7 +43,7 @@ class HomingPathTest(unittest.TestCase):
         text='\n'.join(row.replace('sp=1ec3','sp=1ec2')
                        if 'pc=c8de ' in row or 'pc=2870 ' in row else row for row in rows)
         text=text.replace('efr_history_write: pc=c8b4','efr_history_write: pc=c8b3')
-        self.assertEqual(check_trace(text,staged=True),[1,24,47])
+        self.assertEqual(check_trace(text,legacy_capture=False),[1,24,47])
         with self.assertRaises(ValueError): check_trace(text)
 
     def test_truncation_redirect_replay_and_mutation_changes_rejected(self):

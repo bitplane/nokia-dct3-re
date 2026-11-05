@@ -57,7 +57,6 @@ def main():
     parser.add_argument('--wire', action='store_true', help='also test explicit 1 MHz edges with assumed one-clock sync and RX/TX fan-out')
     parser.add_argument('--coverage', action='store_true', help='retain native opcode/extension observations using MAME verbose teardown')
     parser.add_argument('--clocked-loopback', action='store_true', help='also test pin-clocked boot loopback with the untimed word path disabled')
-    parser.add_argument('--staged', action='store_true', help='validate staged standard-SWWSR CPU with laboratory pin clocks')
     args = parser.parse_args()
     repo = Path(__file__).resolve().parent.parent
     args.output_root.mkdir(parents=True, exist_ok=True)
@@ -88,10 +87,6 @@ def main():
             cases.append(('wire_restore', True, 'nse1bit'))
         if args.clocked_loopback:
             cases.append(('pin_restore', True, 'nse1pin'))
-    if args.staged:
-        cases.append(('staged_pin', True, 'nse1pclk'))
-        if args.restore:
-            cases.append(('staged_pin_restore', True, 'nse1pclk'))
     for label, clock, machine in cases:
         restoring = label.endswith('restore')
         case = root / label
@@ -109,7 +104,7 @@ def main():
                    '-autoboot_script', str(restore_observer if restoring else observer)]
         command.extend(['-joystickprovider', 'none', '-midiprovider', 'none',
                         '-keyboardprovider', 'none', '-mouseprovider', 'none', '-lightgunprovider', 'none'])
-        if args.coverage or args.staged:
+        if args.coverage:
             command.append('-verbose')
         (case / 'invocation.json').write_text(json.dumps(dict(command=command, cwd=str(case),
             fixture_env={key: value for key, value in env.items() if key.startswith('NOKIA_DCT3_')},
@@ -122,22 +117,22 @@ def main():
             check_observer_health((case / 'console.log').read_text())
             text = (case / 'error.log').read_text()
             reject_native_faults(text)
-            wire = machine in ('nse1bit', 'nse1pin', 'nse1pclk')
+            wire = machine in ('nse1bit', 'nse1pin')
             if restoring:
                 result = check_restore(text, wire=wire)
             else:
                 result = check_wire(text) if wire else check(text, clock=clock)
-            if machine in ('nse1pin', 'nse1pclk'):
-                result['clocked_boot'] = check_clocked_boot(text, staged=True)
+            if machine == 'nse1pin':
+                result['clocked_boot'] = check_clocked_boot(text, legacy_capture=False)
                 reference_machine = 'nse1bit' if args.wire else 'nse1pcm'
                 reference_case = ('wire_restore' if args.wire else 'restore') if restoring else ('wire' if args.wire else 'clock')
                 result['screen'] = paired_screen(case / 'snap' / machine / '0000.png',
                     root / reference_case / 'snap' / reference_machine / '0000.png')
-            result['codec_demand'] = demand_transitions(text, staged=True)
+            result['codec_demand'] = demand_transitions(text, legacy_capture=False)
             if args.coverage:
                 # Staged/standard runs independently reproduced these opcode sets;
                 # retain the drift gate, not an instruction-correctness claim.
-                profile = 'control' if not clock else 'pin_boot' if machine in ('nse1pin', 'nse1pclk') else 'tone'
+                profile = 'control' if not clock else 'pin_boot' if machine == 'nse1pin' else 'tone'
                 result['instruction_observations'] = instruction_report(text, profile)
             result['status'] = 'pass'
         except (OSError, ValueError) as error:

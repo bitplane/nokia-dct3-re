@@ -1395,9 +1395,7 @@ check-c54x-rom4-efr-decoder: build prepare-c54x-rom4-fixture
 	$(PYTHON) tools/run_c54x_rom4_crc.py --mame $(MAME_DIR)/mame --rompath $(MAME_DIR)/roms --efr-decoder
 
 .PHONY: check-c54x-rom4-efr-decoder-staged
-check-c54x-rom4-efr-decoder-staged: build prepare-c54x-rom4-fixture
-	$(PYTHON) tools/verify_etsi_efr_reference.py $(ETSI_EFR_ARCHIVE) --fixture-dir $(MAME_DIR)/roms/tms54rom4
-	$(PYTHON) tools/run_c54x_rom4_crc.py --mame $(MAME_DIR)/mame --rompath $(MAME_DIR)/roms --efr-decoder --staged
+check-c54x-rom4-efr-decoder-staged: check-c54x-rom4-efr-decoder
 
 .PHONY: check-c54x-rom4-efr-encoder
 check-c54x-rom4-efr-encoder: build prepare-c54x-rom4-fixture
@@ -1405,9 +1403,7 @@ check-c54x-rom4-efr-encoder: build prepare-c54x-rom4-fixture
 	$(PYTHON) tools/run_c54x_rom4_crc.py --mame $(MAME_DIR)/mame --rompath $(MAME_DIR)/roms --efr-encoder
 
 .PHONY: check-c54x-rom4-efr-encoder-staged
-check-c54x-rom4-efr-encoder-staged: build prepare-c54x-rom4-fixture
-	$(PYTHON) tools/verify_etsi_efr_reference.py $(ETSI_EFR_ARCHIVE) --fixture-dir $(MAME_DIR)/roms/tms54rom4
-	$(PYTHON) tools/run_c54x_rom4_crc.py --mame $(MAME_DIR)/mame --rompath $(MAME_DIR)/roms --efr-encoder --staged
+check-c54x-rom4-efr-encoder-staged: check-c54x-rom4-efr-encoder
 
 .PHONY: check-c54x-rom4-efr-dtx-decoder
 .PHONY: check-c54x-rom4-efr-erasure-decoder
@@ -1418,27 +1414,21 @@ check-c54x-rom4-efr-homing-encoder: build prepare-c54x-rom4-fixture
 	$(PYTHON) tools/run_c54x_rom4_crc.py --mame $(MAME_DIR)/mame --rompath $(MAME_DIR)/roms --efr-homing-encoder
 
 .PHONY: check-c54x-rom4-efr-homing-encoder-staged
-check-c54x-rom4-efr-homing-encoder-staged: build prepare-c54x-rom4-fixture
-	$(PYTHON) tools/verify_etsi_efr_reference.py $(ETSI_EFR_ARCHIVE) --encoder-homing-fixture --fixture-dir $(MAME_DIR)/roms/tms54rom4
-	$(PYTHON) tools/run_c54x_rom4_crc.py --mame $(MAME_DIR)/mame --rompath $(MAME_DIR)/roms --efr-homing-encoder --staged
+check-c54x-rom4-efr-homing-encoder-staged: check-c54x-rom4-efr-homing-encoder
 
 check-c54x-rom4-efr-homing-decoder: build prepare-c54x-rom4-fixture
 	$(PYTHON) tools/verify_etsi_efr_reference.py $(ETSI_EFR_ARCHIVE) --homing-fixture --fixture-dir $(MAME_DIR)/roms/tms54rom4
 	$(PYTHON) tools/run_c54x_rom4_crc.py --mame $(MAME_DIR)/mame --rompath $(MAME_DIR)/roms --efr-homing-decoder
 
 .PHONY: check-c54x-rom4-efr-homing-decoder-staged
-check-c54x-rom4-efr-homing-decoder-staged: build prepare-c54x-rom4-fixture
-	$(PYTHON) tools/verify_etsi_efr_reference.py $(ETSI_EFR_ARCHIVE) --homing-fixture --fixture-dir $(MAME_DIR)/roms/tms54rom4
-	$(PYTHON) tools/run_c54x_rom4_crc.py --mame $(MAME_DIR)/mame --rompath $(MAME_DIR)/roms --efr-homing-decoder --staged
+check-c54x-rom4-efr-homing-decoder-staged: check-c54x-rom4-efr-homing-decoder
 
 check-c54x-rom4-efr-erasure-decoder: build prepare-c54x-rom4-fixture
 	$(PYTHON) tools/verify_etsi_efr_reference.py $(ETSI_EFR_ARCHIVE) --erasure-fixture --fixture-dir $(MAME_DIR)/roms/tms54rom4
 	$(PYTHON) tools/run_c54x_rom4_crc.py --mame $(MAME_DIR)/mame --rompath $(MAME_DIR)/roms --efr-erasure-decoder
 
 .PHONY: check-c54x-rom4-efr-erasure-decoder-staged
-check-c54x-rom4-efr-erasure-decoder-staged: build prepare-c54x-rom4-fixture
-	$(PYTHON) tools/verify_etsi_efr_reference.py $(ETSI_EFR_ARCHIVE) --erasure-fixture --fixture-dir $(MAME_DIR)/roms/tms54rom4
-	$(PYTHON) tools/run_c54x_rom4_crc.py --mame $(MAME_DIR)/mame --rompath $(MAME_DIR)/roms --efr-erasure-decoder --staged
+check-c54x-rom4-efr-erasure-decoder-staged: check-c54x-rom4-efr-erasure-decoder
 
 .PHONY: observe-c54x-rom4-efr-loss
 observe-c54x-rom4-efr-loss: build prepare-c54x-rom4-fixture
@@ -1448,7 +1438,7 @@ observe-c54x-rom4-efr-loss: build prepare-c54x-rom4-fixture
 .PHONY: observe-c54x-rom4-efr-loss-staged
 observe-c54x-rom4-efr-loss-staged: build prepare-c54x-rom4-fixture
 	$(PYTHON) tools/verify_etsi_efr_reference.py $(ETSI_EFR_ARCHIVE) --erasure-fixture --fixture-dir $(MAME_DIR)/roms/tms54rom4
-	$(PYTHON) tools/run_c54x_rom4_crc.py --mame $(MAME_DIR)/mame --rompath $(MAME_DIR)/roms --efr-erasure-observe --staged
+	$(PYTHON) tools/run_c54x_rom4_crc.py --mame $(MAME_DIR)/mame --rompath $(MAME_DIR)/roms --efr-erasure-observe
 
 .PHONY: check-c54x-rom4-efr-invalid-sid
 check-c54x-rom4-efr-invalid-sid: build prepare-c54x-rom4-fixture
@@ -1456,16 +1446,13 @@ check-c54x-rom4-efr-invalid-sid: build prepare-c54x-rom4-fixture
 	$(PYTHON) tools/run_c54x_rom4_crc.py --mame $(MAME_DIR)/mame --rompath $(MAME_DIR)/roms --efr-invalid-sid
 
 .PHONY: check-c54x-rom4-efr-invalid-sid-staged
-check-c54x-rom4-efr-invalid-sid-staged: build prepare-c54x-rom4-fixture
-	$(PYTHON) tools/verify_etsi_efr_reference.py $(ETSI_EFR_ARCHIVE) --invalid-sid-fixture --fixture-dir $(MAME_DIR)/roms/tms54rom4
-	$(PYTHON) tools/run_c54x_rom4_crc.py --mame $(MAME_DIR)/mame --rompath $(MAME_DIR)/roms --efr-invalid-sid --staged
+check-c54x-rom4-efr-invalid-sid-staged: check-c54x-rom4-efr-invalid-sid
 
 .PHONY: check-c54x-rom4-rf-bitmap check-c54x-rom4-rf-bitmap-staged
 check-c54x-rom4-rf-bitmap: build prepare-c54x-rom4-fixture
 	$(PYTHON) tools/run_c54x_rom4_crc.py --mame $(MAME_DIR)/mame --rompath $(MAME_DIR)/roms --rf-bitmap
 
-check-c54x-rom4-rf-bitmap-staged: build prepare-c54x-rom4-fixture
-	$(PYTHON) tools/run_c54x_rom4_crc.py --mame $(MAME_DIR)/mame --rompath $(MAME_DIR)/roms --rf-bitmap --staged
+check-c54x-rom4-rf-bitmap-staged: check-c54x-rom4-rf-bitmap
 
 .PHONY: check-c54x-rom4-efr-homing-errors
 check-c54x-rom4-efr-homing-errors: build prepare-c54x-rom4-fixture
@@ -1480,20 +1467,16 @@ observe-c54x-rom4-efr-homing-errors: build prepare-c54x-rom4-fixture
 .PHONY: observe-c54x-rom4-efr-homing-errors-staged check-c54x-rom4-efr-homing-errors-staged
 observe-c54x-rom4-efr-homing-errors-staged: build prepare-c54x-rom4-fixture
 	$(PYTHON) tools/verify_etsi_efr_reference.py $(ETSI_EFR_ARCHIVE) --homing-error-fixture --fixture-dir $(MAME_DIR)/roms/tms54rom4
-	$(PYTHON) tools/run_c54x_rom4_crc.py --mame $(MAME_DIR)/mame --rompath $(MAME_DIR)/roms --efr-homing-errors --observe-homing-errors --staged
+	$(PYTHON) tools/run_c54x_rom4_crc.py --mame $(MAME_DIR)/mame --rompath $(MAME_DIR)/roms --efr-homing-errors --observe-homing-errors
 
-check-c54x-rom4-efr-homing-errors-staged: build prepare-c54x-rom4-fixture
-	$(PYTHON) tools/verify_etsi_efr_reference.py $(ETSI_EFR_ARCHIVE) --homing-error-fixture --fixture-dir $(MAME_DIR)/roms/tms54rom4
-	$(PYTHON) tools/run_c54x_rom4_crc.py --mame $(MAME_DIR)/mame --rompath $(MAME_DIR)/roms --efr-homing-errors --staged
+check-c54x-rom4-efr-homing-errors-staged: check-c54x-rom4-efr-homing-errors
 
 check-c54x-rom4-efr-dtx-decoder: build prepare-c54x-rom4-fixture
 	$(PYTHON) tools/verify_etsi_efr_reference.py $(ETSI_EFR_ARCHIVE) --dtx-fixture --fixture-dir $(MAME_DIR)/roms/tms54rom4
 	$(PYTHON) tools/run_c54x_rom4_crc.py --mame $(MAME_DIR)/mame --rompath $(MAME_DIR)/roms --efr-dtx-decoder
 
 .PHONY: check-c54x-rom4-efr-dtx-decoder-staged
-check-c54x-rom4-efr-dtx-decoder-staged: build prepare-c54x-rom4-fixture
-	$(PYTHON) tools/verify_etsi_efr_reference.py $(ETSI_EFR_ARCHIVE) --dtx-fixture --fixture-dir $(MAME_DIR)/roms/tms54rom4
-	$(PYTHON) tools/run_c54x_rom4_crc.py --mame $(MAME_DIR)/mame --rompath $(MAME_DIR)/roms --efr-dtx-decoder --staged
+check-c54x-rom4-efr-dtx-decoder-staged: check-c54x-rom4-efr-dtx-decoder
 
 .PHONY: check-c54x-rom4-efr-dtx-encoder
 check-c54x-rom4-efr-dtx-encoder: build prepare-c54x-rom4-fixture
@@ -1501,9 +1484,7 @@ check-c54x-rom4-efr-dtx-encoder: build prepare-c54x-rom4-fixture
 	$(PYTHON) tools/run_c54x_rom4_crc.py --mame $(MAME_DIR)/mame --rompath $(MAME_DIR)/roms --efr-dtx-encoder
 
 .PHONY: check-c54x-rom4-efr-dtx-encoder-staged
-check-c54x-rom4-efr-dtx-encoder-staged: build prepare-c54x-rom4-fixture
-	$(PYTHON) tools/verify_etsi_efr_reference.py $(ETSI_EFR_ARCHIVE) --dtx-fixture --fixture-dir $(MAME_DIR)/roms/tms54rom4
-	$(PYTHON) tools/run_c54x_rom4_crc.py --mame $(MAME_DIR)/mame --rompath $(MAME_DIR)/roms --efr-dtx-encoder --staged
+check-c54x-rom4-efr-dtx-encoder-staged: check-c54x-rom4-efr-dtx-encoder
 
 check-c54x-rom4-efr-packing: build prepare-c54x-rom4-fixture
 	$(PYTHON) tools/c54x_rom4_efr_tables.py $(MAME_DIR)/roms/tms54rom4/dsp_cold_data.bin
@@ -1517,16 +1498,14 @@ check-c54x-rom4-fr-decoder: build prepare-c54x-rom4-fixture
 	$(PYTHON) tools/run_c54x_rom4_crc.py --mame $(MAME_DIR)/mame --rompath $(MAME_DIR)/roms --fr-decoder
 
 .PHONY: check-c54x-rom4-fr-decoder-staged
-check-c54x-rom4-fr-decoder-staged: build prepare-c54x-rom4-fixture
-	$(PYTHON) tools/run_c54x_rom4_crc.py --mame $(MAME_DIR)/mame --rompath $(MAME_DIR)/roms --fr-decoder --staged
+check-c54x-rom4-fr-decoder-staged: check-c54x-rom4-fr-decoder
 
 .PHONY: check-c54x-rom4-fr-encoder
 check-c54x-rom4-fr-encoder: build prepare-c54x-rom4-fixture
 	$(PYTHON) tools/run_c54x_rom4_crc.py --mame $(MAME_DIR)/mame --rompath $(MAME_DIR)/roms --fr-encoder
 
 .PHONY: check-c54x-rom4-fr-encoder-staged
-check-c54x-rom4-fr-encoder-staged: build prepare-c54x-rom4-fixture
-	$(PYTHON) tools/run_c54x_rom4_crc.py --mame $(MAME_DIR)/mame --rompath $(MAME_DIR)/roms --fr-encoder --staged
+check-c54x-rom4-fr-encoder-staged: check-c54x-rom4-fr-encoder
 
 # Diagnostic observation only: the short-period outcome is deliberately not
 # asserted until interrupt recognition/drain timing has an independent oracle.
@@ -1636,8 +1615,7 @@ check-c54x-rom4-clocked-boot: build
 
 .PHONY: check-c54x-rom4-staged
 .PHONY: check-c54x-rom4-staged-codec
-check-c54x-rom4-staged-codec: build
-	$(VENV)/bin/python -m tools.run_c54x_rom4_pcm_clock --mame $(MAME_DIR)/mame --rompath $(MAME_DIR)/roms --output-root tmp --staged --restore --coverage
+check-c54x-rom4-staged-codec: check-c54x-rom4-clocked-boot
 
 check-c54x-rom4-staged: build
 	@set -eu; mkdir -p "$(NATIVE_SCRATCH_ROOT)"; \

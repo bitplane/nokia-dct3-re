@@ -12,7 +12,7 @@ def reject_native_faults(text):
         raise ValueError('native DSP fault or baseband reset during clocked comparison')
 
 
-def check_clocked_boot(text, *, staged=False):
+def check_clocked_boot(text, *, legacy_capture=True):
     """Require a pin-completed native self-test, not the untimed word echo."""
     summaries = re.findall(r'native_pcm_fixture_echo_summary: words=(\d+) untimed=(\d+) handset_clock_claim=0', text)
     echoes = re.findall(r'native_pcm_fixture_echo_word: value=([0-9a-f]{4}) t=([0-9.]+)', text)
@@ -24,7 +24,7 @@ def check_clocked_boot(text, *, staged=False):
     # A memory tap reports the frontend's current PC, not necessarily the
     # instruction owning its retained operand. Keep the observed contexts
     # explicit instead of interpreting staged e60 as another LDM instruction.
-    read_pc = '0e60' if staged else '0e5d'
+    read_pc = '0e5d' if legacy_capture else '0e60'
     reads = [float(time) for time in re.findall(r'rom4_codec_boot_echo: value=0aaa pc=' + read_pc + r' t=([0-9.]+)', text)]
     completed = [float(time) for value, time in echoes if value == '0aaa']
     if not writes or len(reads) != 1 or not completed or not writes[0] < completed[0] <= reads[0] or reads[0] - writes[0] < 16e-6 - 2e-9:
@@ -38,9 +38,9 @@ def check_clocked_boot(text, *, staged=False):
                 handset_clock_claim=False)
 
 
-def demand_transitions(text, *, staged=False):
+def demand_transitions(text, *, legacy_capture=True):
     entries = re.compile(r'rom4_codec_demand_entry: hit=(\d+) operation=(acquire|release) mask=([0-9a-f]{4}) previous=([0-9a-f]{4}) t=([0-9.]+)')
-    acquire_pc, release_pc = ('00a4c3', '00a4df') if staged else ('00a4c4', '00a4e0')
+    acquire_pc, release_pc = ('00a4c4', '00a4e0') if legacy_capture else ('00a4c3', '00a4df')
     writes = re.compile(r'rom4_tone_access: owner=codec_demand direction=write address=0000ef value=([0-9a-f]{4}) mask=ffff pc=(' + acquire_pc + '|' + release_pc + r') t=([0-9.]+)')
     totals = re.findall(r'rom4_codec_demand_summary: entries=(\d+) t=([0-9.]+)', text)
     events = sorted([(match.start(), 'entry', match) for match in entries.finditer(text)] +

@@ -3147,7 +3147,6 @@ ROM_END
 #define rom_nam2c3 rom_noki2100
 #define rom_nse1bit rom_noki5110
 #define rom_nse1pin rom_noki5110
-#define rom_nse1pclk rom_noki5110
 #define rom_nse1pipe rom_noki5110
 #define rom_nse1plg rom_noki5110
 
@@ -3174,7 +3173,6 @@ SYST( 2026, nse1pcm, noki5110, 0, nse1pcm, noki5110, dct3_pcm_fixture_state, emp
 SYST( 2026, nse1obs, noki5110, 0, nse1obs, noki5110, dct3_pcm_fixture_state, empty_init, "Research", "NSE-1 production composition with passive execution observation", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2026, nse1bit, noki5110, 0, nse1bit, noki5110, dct3_pcm_fixture_state, empty_init, "Research", "NSE-1 external 1 MHz PCM wire fixture (not product clock wiring)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2026, nse1pin, noki5110, 0, nse1pin, noki5110, dct3_pcm_fixture_state, empty_init, "Research", "NSE-1 clocked boot-loopback fixture (not product clock wiring)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
-SYST( 2026, nse1pclk, noki5110, 0, nse1pclk, noki5110, dct3_pcm_fixture_state, empty_init, "Research", "NSE-1 staged standard-SWWSR laboratory codec clocks", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2026, nse1pipe, noki5110, 0, nse1pipe, noki5110, nse1_pipeline_fixture_state, empty_init, "Research", "NSE-1 staged DSP frontend integration probe", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2026, nse1plg, noki5110, 0, nse1plg, noki5110, nse1_pipeline_fixture_state, empty_init, "Research", "NSE-1 staged DSP with legacy SWWSR comparison fixture", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 1997, noki6110, 0,      0,      noki6110, noki6110, nokia_dct3_state, empty_init, "Nokia", "Nokia 6110 (NSE-3)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )

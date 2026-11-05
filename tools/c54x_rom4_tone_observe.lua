@@ -134,7 +134,7 @@ watch(dsp, 'io', 0x002d, 'cobba_data')
 -- entry, not a data read of its opcode; the stack read is ordinary RAM.
 local control_calls = 0
 local demand_entries = 0
-local execution_profiles = { nse1obs=true, nse1pcm=true, nse1bit=true, nse1pin=true, nse1aclk=true, nse1pclk=true }
+local execution_profiles = { nse1obs=true, nse1pcm=true, nse1bit=true, nse1pin=true }
 local execution_demand = execution_profiles[machine.system.name] or false
 for _, address in ipairs({0xa484, 0xa4cb}) do
     taps[#taps + 1] = dsp.spaces['program']:install_read_tap(

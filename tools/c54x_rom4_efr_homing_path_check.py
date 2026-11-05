@@ -32,7 +32,7 @@ def check_program(image):
             raise ValueError(f'acquired patch words differ at {address:04x}')
 
 
-def check_trace(text,staged=False):
+def check_trace(text,legacy_capture=True):
     groups=[]
     history=[]
     for line in text.splitlines():
@@ -56,7 +56,7 @@ def check_trace(text,staged=False):
         if path!=[0xc8de,0x2697,0x269e,0x2870,0x28b0,0x28f7,0xc8ff]:
             raise ValueError('original return-address interception path differs')
         # Debug hooks sample frontend execution, not a shared retirement boundary.
-        entry_sp=0x1ec2 if staged else 0x1ec3
+        entry_sp=0x1ec3 if legacy_capture else 0x1ec2
         if group[0][6]!=entry_sp or group[1][5:]!=(0x1ec2,0x1ec0) or group[3][5:]!=(0x1344,entry_sp):
             raise ValueError('patch return-stack/parameter-pointer contract differs')
         if group[0][4]!=group[-1][4]:
@@ -67,7 +67,7 @@ def check_trace(text,staged=False):
             changed.append(frame)
     if changed!=[1,24,47]: raise ValueError('recovery frame set differs')
     # Write callbacks report an advanced/sample PC, not necessarily the opcode.
-    tail_pc=0xc8b3 if staged else 0xc8b4
+    tail_pc=0xc8b4 if legacy_capture else 0xc8b3
     expected=Counter({(tail_pc,0,0):92,(tail_pc,1,1):6,
                       (0xc8c6,0,0):7,(0x28f1,0,0):6})
     if Counter(row[:3] for row in history)!=expected:
@@ -81,11 +81,11 @@ def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('program',type=Path)
     parser.add_argument('log',type=Path)
-    parser.add_argument('--staged',action='store_true')
+    parser.add_argument('--capture-format',choices=('stage-owned','instruction-boundary'),default='stage-owned')
     args=parser.parse_args()
     try:
         check_program(args.program.read_bytes())
-        changed=check_trace(args.log.read_text(encoding='utf-8-sig'),staged=args.staged)
+        changed=check_trace(args.log.read_text(encoding='utf-8-sig'),legacy_capture=args.capture_format=='instruction-boundary')
     except (OSError,ValueError) as error:
         parser.exit(1,f'EFR patch path: FAIL: {error}\n')
     print(f'PASS: 49 paired original patch paths; recovery mutation frames={changed}; conformance_claim=0')

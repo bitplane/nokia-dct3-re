@@ -21,7 +21,7 @@ def lost(frame):
     return frame == 8 or 32 <= frame < 35 or 80 <= frame < 88 or 120 <= frame < 136
 
 
-def characterize(text, returncode, reference, serial, verbose_teardown=False, lost_sid=False, staged=False):
+def characterize(text, returncode, reference, serial, verbose_teardown=False, lost_sid=False, require_frontend_marker=False):
     frames = 518 if lost_sid else FRAMES
     row_pattern = LOST_SID_ROW if lost_sid else ROW
     row_prefix = 'ROM4 EFR lost SID observation:' if lost_sid else 'ROM4 EFR loss observation:'
@@ -86,7 +86,7 @@ def characterize(text, returncode, reference, serial, verbose_teardown=False, lo
         if [(int(i), int(a, 16), int(b, 16)) for i, a, b in flags] != [(95, 0x290, 0x290), (96, 0x2c0, 0x2c0), (97, 0x401, 0x501), (356, 0x401, 0x401)]:
             raise ValueError('original lost-SID flag-policy observations differ')
         frontend = 'ROM4 EFR lost SID decoder frontend: staged handset_audio_claim=0'
-        if lines.count(frontend) != int(staged):
+        if lines.count(frontend) != int(require_frontend_marker):
             raise ValueError('lost-SID frontend selection differs')
     changed = [row['frame'] for row in records if row['mismatches']]
     report = dict(schema=1, status='characterized', frames=frames, samples=frames * SAMPLES,

@@ -104,7 +104,7 @@ private:
 
 
 	bool rom4_codec_is(char const *name) const;
-	void enable_rom4_codec_pipeline(char const *kind);
+	void prepare_rom4_codec(char const *kind);
 	void start_rom4_efr_encoder(unsigned frame, bool initialize);
 
 	struct efr_decoder_fixture

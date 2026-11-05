@@ -25,7 +25,7 @@ class FirmwareResultTests(unittest.TestCase):
     def test_profiles_have_unique_declared_owners(self):
         from tools.c54x_profiles import machine_for_profile
         self.assertEqual({name: machine_for_profile(name) for name in EXTRA_PROFILES},
-                         {'rom4-context': 'tms54test', 'cold-pipeline': 'tms54rom4'})
+                         {'rom4-context': 'tms54test', 'cold': 'tms54rom4'})
 
     def test_retired_generic_profile_is_not_accepted(self):
         with self.assertRaises(ValueError):

@@ -4,11 +4,11 @@ import unittest
 from tools.c54x_rom4_efr_loss_check import characterize, LOST_SID_REPLAY, LOST_SID_COMPLETE
 
 
-def fixture(staged=False):
+def fixture(require_frontend_marker=False):
     sids = {51, 71, 95, 259, 263, 287, 311, 335}
     erased = set([i for i in range(518) if i not in sids][:135]) | {71, 95}
     serial, rows = bytearray(), []
-    if staged:
+    if require_frontend_marker:
         rows.append('ROM4 EFR lost SID decoder frontend: staged handset_audio_claim=0')
     for frame in range(518):
         serial.extend(struct.pack('<247H', int(frame in erased), *([0] * 244),
@@ -33,8 +33,8 @@ class LostSidCompleteTests(unittest.TestCase):
         self.assertEqual(len(pcm), 165760)
 
     def test_staged_selection_required(self):
-        text, reference, serial = fixture(staged=True)
-        characterize(text, 3, reference, serial, lost_sid=True, staged=True)
+        text, reference, serial = fixture(require_frontend_marker=True)
+        characterize(text, 3, reference, serial, lost_sid=True, require_frontend_marker=True)
         with self.assertRaisesRegex(ValueError, 'frontend'):
             characterize(text, 3, reference, serial, lost_sid=True)
 

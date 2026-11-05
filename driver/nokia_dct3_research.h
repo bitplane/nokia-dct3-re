@@ -30,7 +30,6 @@ public:
 	void nse1obs(machine_config &config);
 	void nse1bit(machine_config &config);
 	void nse1pin(machine_config &config);
-	void nse1pclk(machine_config &config);
 protected:
 	virtual void machine_start() override;
 	virtual void machine_reset() override;

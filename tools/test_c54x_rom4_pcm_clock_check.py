@@ -64,11 +64,11 @@ class NativeClockTests(unittest.TestCase):
         self.assertEqual(result['untimed_loopbacks'], 0)
         self.assertAlmostEqual(result['first_echo_latency_us'], 17)
         staged = text.replace('pc=0e5d', 'pc=0e60')
-        self.assertEqual(check_clocked_boot(staged, staged=True), result)
+        self.assertEqual(check_clocked_boot(staged, legacy_capture=False), result)
         with self.assertRaises(ValueError):
             check_clocked_boot(staged)
         with self.assertRaises(ValueError):
-            check_clocked_boot(text, staged=True)
+            check_clocked_boot(text, legacy_capture=False)
         for bad in ('', text + text, text.replace('untimed=0', 'untimed=1'),
                     text.replace('words=1', 'words=2'), text.replace('value=0aaa', 'value=0555'),
                     text.replace('pc=0e5d', 'pc=3464'), text.replace('t=0.100017000', 't=0.100015000'),
@@ -99,7 +99,7 @@ class NativeClockTests(unittest.TestCase):
                 'rom4_codec_demand_summary: entries=2 t=2.0\n')
         self.assertEqual(demand_transitions(text)['transitions'], 2)
         staged = text.replace('pc=00a4c4', 'pc=00a4c3').replace('pc=00a4e0', 'pc=00a4df')
-        self.assertEqual(demand_transitions(staged, staged=True), demand_transitions(text))
+        self.assertEqual(demand_transitions(staged, legacy_capture=False), demand_transitions(text))
         with self.assertRaises(ValueError):
             demand_transitions(staged)
         for bad in (text.replace('value=0003', 'value=0001'),

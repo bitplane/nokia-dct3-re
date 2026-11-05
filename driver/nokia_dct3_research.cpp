@@ -885,11 +885,6 @@ void dct3_pcm_fixture_state::nse1pin(machine_config &config)
 	m_clocked_loopback = true;
 }
 
-void dct3_pcm_fixture_state::nse1pclk(machine_config &config)
-{
-	nse1pin(config);
-}
-
 void dct3_pcm_fixture_state::machine_start()
 {
 	nokia_dct3_state::machine_start();

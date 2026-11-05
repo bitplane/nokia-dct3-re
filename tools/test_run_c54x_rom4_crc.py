@@ -65,8 +65,8 @@ class Rom4HelperResultTest(unittest.TestCase):
         complete = 'Fatal error: TMS320C54x ROM4 EFR lost SID decoder complete'
         text = '\n'.join((frames, replay, marker, complete))
         check_result(text, 3, efr_lost_sid=True)
-        staged = 'ROM4 EFR lost SID decoder frontend: staged handset_audio_claim=0\n' + text
-        check_result(staged, 3, efr_lost_sid=True, staged=True)
+        require_frontend_marker = 'ROM4 EFR lost SID decoder frontend: staged handset_audio_claim=0\n' + text
+        check_result(require_frontend_marker, 3, efr_lost_sid=True, require_frontend_marker=True)
         for bad in (text.replace(replay, ''), text.replace('frame=97 mismatches=0', 'frame=97 mismatches=1'),
                     text.replace('frame=517 mismatches=0', 'frame=516 mismatches=0'),
                     text.replace('lost_sid=2', 'lost_sid=0'), text.replace(complete, '')):
@@ -75,32 +75,32 @@ class Rom4HelperResultTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             check_result(text, 0, efr_lost_sid=True)
         with self.assertRaises(ValueError):
-            check_result(text, 3, efr_lost_sid=True, staged=True)
+            check_result(text, 3, efr_lost_sid=True, require_frontend_marker=True)
 
     def test_native_rf_pair_math_and_history_require_both_tc_paths(self):
         marker='TMS320C54x ROM4 RF pairs: PASS cases=32 vectors=8 tc=2 frct=2 replay=32 ram_words=65440 dot_cross_both_tc=1 history_copy_tc_only=1 rf_acquisition_claim=0'
         complete='Fatal error: TMS320C54x ROM4 RF pairs complete'
         text=marker+'\n'+complete+'\n'
         check_rf_pairs(text,3)
-        staged='ROM4 RF pairs frontend: staged handset_audio_claim=0\n'+text
-        check_rf_pairs(staged,3,staged=True)
+        require_frontend_marker='ROM4 RF pairs frontend: staged handset_audio_claim=0\n'+text
+        check_rf_pairs(require_frontend_marker,3,require_frontend_marker=True)
         for field in marker.split():
             if '=' in field:
                 with self.subTest(field=field),self.assertRaises(ValueError):
                     check_rf_pairs(text.replace(field,field.split('=')[0]+'=invalid'),3)
         for bad in ('c54x_failure: phase=711000\n'+text, 'NOT FOUND\n'+text, complete+'\n'+text,
-                    text+marker+'\n', 'Fatal error: other\n'+text, staged):
+                    text+marker+'\n', 'Fatal error: other\n'+text, require_frontend_marker):
             with self.assertRaises(ValueError):check_rf_pairs(bad,3)
         with self.assertRaises(ValueError):check_rf_pairs(text,0)
-        with self.assertRaises(ValueError):check_rf_pairs(text,3,staged=True)
+        with self.assertRaises(ValueError):check_rf_pairs(text,3,require_frontend_marker=True)
 
     def test_native_rf_bitmap_basis_and_replay(self):
         marker='TMS320C54x ROM4 RF bitmap: PASS cases=515 basis=512 controls=empty,full,alternating replay=515 ram_words=65440 rf_acquisition_claim=0'
         complete='Fatal error: TMS320C54x ROM4 RF bitmap complete'
         text=marker+'\n'+complete+'\n'
         check_rf_bitmap(text,3)
-        staged='ROM4 RF bitmap frontend: staged handset_audio_claim=0\n'+text
-        check_rf_bitmap(staged,3,staged=True)
+        require_frontend_marker='ROM4 RF bitmap frontend: staged handset_audio_claim=0\n'+text
+        check_rf_bitmap(require_frontend_marker,3,require_frontend_marker=True)
         for bad in (text.replace('basis=512','basis=511'),
                     text.replace('replay=515','replay=514'),
                     text.replace('ram_words=65440','ram_words=1'),
@@ -110,34 +110,36 @@ class Rom4HelperResultTest(unittest.TestCase):
             with self.subTest(bad=bad),self.assertRaises(ValueError):
                 check_rf_bitmap(bad,3)
         with self.assertRaises(ValueError): check_rf_bitmap(text,0)
-        with self.assertRaises(ValueError): check_rf_bitmap(text,3,staged=True)
+        with self.assertRaises(ValueError): check_rf_bitmap(text,3,require_frontend_marker=True)
 
-    def test_efr_lifecycle_frontends_load_the_same_vectors(self):
+    def test_canonical_efr_profiles_load_the_required_vectors(self):
         source = (Path(__file__).resolve().parents[1] / 'tests/firmware/tms320c54x_test_rom4_machine.cpp').read_text()
         body = source.split('ROM_START(tms54rom4)', 1)[1].split('ROM_END', 1)[0]
         bios = dict((name, int(number)) for number, name in
                     re.findall(r'ROM_SYSTEM_BIOS\((\d+), "([^"]+)"', body))
         cases = (
-            ('efr-dtx-encoder', 'efr-dtx-enc-pipe', (('efr_dtx_encoder_pcm', 'dtx.inp'), ('efr_dtx_encoder_serial', 'dtx.cod'))),
-            ('efr-dtx-decoder', 'efr-dtx-dec-pipe', (('efr_dtx_input', 'dtx.dec'), ('efr_dtx_pcm', 'dtx.out'))),
-            ('efr-enc-homing', 'efr-ehome-pipe', (('efr_homing_encoder_pcm', 'homing_enc.inp'), ('efr_homing_encoder_serial', 'homing_enc.cod'))),
-            ('efr-homing', 'efr-homing-pipe', (('efr_homing_input', 'homing.dec'), ('efr_homing_pcm', 'homing.out'))),
-            ('efr-invalid-sid', 'efr-isid-pipe', (('efr_invalid_sid_input', 'invalid_sid.dec'), ('efr_invalid_sid_pcm', 'invalid_sid.out'))),
-            ('efr-lost-sid', 'efr-lsid-pipe', (('efr_lost_sid_input', 'lost_sid.dec'), ('efr_lost_sid_pcm', 'lost_sid.out'))),
-            ('efr-lsid-observe', 'efr-lso-pipe', (('efr_lost_sid_input', 'lost_sid.dec'), ('efr_lost_sid_pcm', 'lost_sid.out'))),
-            ('efr-erasure', 'efr-erasure-pipe', (('efr_erasure_input', 'erasure.dec'), ('efr_erasure_pcm', 'erasure.out'))),
-            ('efr-loss-observe', 'efr-loss-pipe', (('efr_erasure_input', 'erasure.dec'), ('efr_erasure_pcm', 'erasure.out'))),
+            ('efr-decoder', (('efr_reference_input', 'spch_dos.dec'), ('efr_reference_pcm', 'spch_dos.out'))),
+            ('efr-encoder', (('efr_encoder_pcm', 'spch_dos.inp'), ('efr_encoder_serial', 'spch_dos.cod'))),
+            ('efr-dtx-encoder', (('efr_dtx_encoder_pcm', 'dtx.inp'), ('efr_dtx_encoder_serial', 'dtx.cod'))),
+            ('efr-dtx-decoder', (('efr_dtx_input', 'dtx.dec'), ('efr_dtx_pcm', 'dtx.out'))),
+            ('efr-enc-homing', (('efr_homing_encoder_pcm', 'homing_enc.inp'), ('efr_homing_encoder_serial', 'homing_enc.cod'))),
+            ('efr-homing', (('efr_homing_input', 'homing.dec'), ('efr_homing_pcm', 'homing.out'))),
+            ('efr-invalid-sid', (('efr_invalid_sid_input', 'invalid_sid.dec'), ('efr_invalid_sid_pcm', 'invalid_sid.out'))),
+            ('efr-lost-sid', (('efr_lost_sid_input', 'lost_sid.dec'), ('efr_lost_sid_pcm', 'lost_sid.out'))),
+            ('efr-lsid-observe', (('efr_lost_sid_input', 'lost_sid.dec'), ('efr_lost_sid_pcm', 'lost_sid.out'))),
+            ('efr-erasure', (('efr_erasure_input', 'erasure.dec'), ('efr_erasure_pcm', 'erasure.out'))),
+            ('efr-loss-observe', (('efr_erasure_input', 'erasure.dec'), ('efr_erasure_pcm', 'erasure.out'))),
         )
         self.assertTrue(all(len(name) <= 16 for name in bios))
-        for name, staged, regions in cases:
+        for name, regions in cases:
             for region, filename in regions:
                 with self.subTest(profile=name, region=region):
                     content = body.split(f'"{region}", 0)', 1)[1].split('ROM_REGION', 1)[0]
                     loads = re.findall(r'ROMX_LOAD\("' + re.escape(filename) +
                                        r'"(.*), ROM_BIOS\((\d+)\)\)', content)
                     by_bios = {int(number): payload for payload, number in loads}
-                    self.assertEqual(len(loads), 4 if region.startswith(('efr_erasure_', 'efr_lost_sid_')) else 2)
-                    self.assertEqual(by_bios[bios[name]], by_bios[bios[staged]])
+                    self.assertEqual(len(loads), 2 if region.startswith(('efr_erasure_', 'efr_lost_sid_')) else 1)
+                    self.assertIn(bios[name], by_bios)
 
     def test_staged_efr_lifecycle_requires_its_own_frontend_and_full_result(self):
         cases = (
@@ -154,7 +156,7 @@ class Rom4HelperResultTest(unittest.TestCase):
             result = '\n'.join((frames, replay, marker, complete))
             output = frontend + '\n' + result
             with self.subTest(kind=kind):
-                check_result(output, 3, staged=True, **mode)
+                check_result(output, 3, require_frontend_marker=True, **mode)
                 for bad in (result, frontend + '\n' + output,
                             'Driver tms54rom4 (file tms320c54x_test.cpp): 3 errors, 0 warnings\n' + output,
                             output.replace(frontend, 'ROM4 EFR encoder frontend: staged handset_audio_claim=0'),
@@ -162,55 +164,10 @@ class Rom4HelperResultTest(unittest.TestCase):
                             output.replace(f'frame={count-1} mismatches=0', f'frame={count-1} mismatches=1'),
                             output + '\ntrailer'):
                     with self.assertRaises(ValueError):
-                        check_result(bad, 3, staged=True, **mode)
+                        check_result(bad, 3, require_frontend_marker=True, **mode)
 
-    def test_efr_lifecycle_frontends_load_the_same_roms(self):
-        source = (Path(__file__).resolve().parents[1] / 'tests/firmware/tms320c54x_test_rom4_machine.cpp').read_text()
-        body = source.split('ROM_START(tms54rom4)', 1)[1].split('ROM_END', 1)[0]
-        bios = dict((name, int(number)) for number, name in
-                    re.findall(r'ROM_SYSTEM_BIOS\((\d+), "([^"]+)"', body))
-        for region, filename in (('dspprg', 'dsp_full.bin'),
-                                 ('dspdata', 'dsp_cold_data.bin')):
-            content = body.split(f'"{region}", 0)', 1)[1].split('ROM_REGION', 1)[0]
-            loads = re.findall(r'ROMX_LOAD\("' + re.escape(filename) +
-                               r'"(.*?)ROM_BIOS\((\d+)\)\)', content, re.S)
-            by_bios = {int(number): re.sub(r'\s+', ' ', payload).strip()
-                       for payload, number in loads}
-            for atomic, staged in (('efr-invalid-sid', 'efr-isid-pipe'),
-                                   ('efr-erasure', 'efr-erasure-pipe'),
-                                   ('efr-loss-observe', 'efr-loss-pipe')):
-                with self.subTest(region=region, atomic=atomic):
-                    self.assertEqual(by_bios[bios[atomic]], by_bios[bios[staged]], region)
 
-    def test_efr_decoder_frontends_load_the_same_vectors(self):
-        source = (Path(__file__).resolve().parents[1] / 'tests/firmware/tms320c54x_test_rom4_machine.cpp').read_text()
-        body = source.split('ROM_START(tms54rom4)', 1)[1].split('ROM_END', 1)[0]
-        bios = dict((name, int(number)) for number, name in
-                    re.findall(r'ROM_SYSTEM_BIOS\((\d+), "([^"]+)"', body))
-        for region, filename in (('efr_reference_input', 'spch_dos.dec'),
-                                 ('efr_reference_pcm', 'spch_dos.out')):
-            content = body.split(f'"{region}", 0)', 1)[1].split('ROM_REGION', 1)[0]
-            loads = re.findall(r'ROMX_LOAD\("' + re.escape(filename) +
-                               r'"(.*), ROM_BIOS\((\d+)\)\)', content)
-            by_bios = {int(number): payload for payload, number in loads}
-            self.assertEqual(len(loads), 2, region)
-            self.assertEqual(by_bios[bios['efr-decoder']],
-                             by_bios[bios['efr-decoder-pipe']], region)
 
-    def test_efr_encoder_frontends_load_the_same_vectors(self):
-        source = (Path(__file__).resolve().parents[1] / 'tests/firmware/tms320c54x_test_rom4_machine.cpp').read_text()
-        body = source.split('ROM_START(tms54rom4)', 1)[1].split('ROM_END', 1)[0]
-        bios = dict((name, int(number)) for number, name in
-                    re.findall(r'ROM_SYSTEM_BIOS\((\d+), "([^"]+)"', body))
-        for region, filename in (('efr_encoder_pcm', 'spch_dos.inp'),
-                                 ('efr_encoder_serial', 'spch_dos.cod')):
-            content = body.split(f'"{region}", 0)', 1)[1].split('ROM_REGION', 1)[0]
-            loads = re.findall(r'ROMX_LOAD\("' + re.escape(filename) +
-                               r'"(.*), ROM_BIOS\((\d+)\)\)', content)
-            by_bios = {int(number): payload for payload, number in loads}
-            self.assertEqual(len(loads), 2, region)
-            self.assertEqual(by_bios[bios['efr-encoder']],
-                             by_bios[bios['efr-encoder-pipe']], region)
 
     def test_every_rom4_bios_loads_program_and_data(self):
         source = (Path(__file__).resolve().parents[1] / 'tests/firmware/tms320c54x_test_rom4_machine.cpp').read_text()
@@ -314,20 +271,20 @@ class Rom4HelperResultTest(unittest.TestCase):
         text = "\n".join((frames, EFR_ENCODER_REPLAY, EFR_ENCODER_PASS, EFR_ENCODER_COMPLETE))
         check_result(text, 3, efr_encoder=True)
         frontend = 'ROM4 EFR encoder frontend: staged handset_audio_claim=0'
-        staged = frontend + '\n' + text
-        check_result(staged, 3, efr_encoder=True, staged=True)
+        require_frontend_marker = frontend + '\n' + text
+        check_result(require_frontend_marker, 3, efr_encoder=True, require_frontend_marker=True)
         teardown = '\nEnter sdlwindow_exit\nLeave sdlwindow_exit'
-        check_result(staged + teardown, 3, efr_encoder=True, staged=True, verbose_teardown=True)
+        check_result(require_frontend_marker + teardown, 3, efr_encoder=True, require_frontend_marker=True, verbose_teardown=True)
         with self.assertRaises(ValueError):
-            check_result(staged + teardown, 3, efr_encoder=True, staged=True)
+            check_result(require_frontend_marker + teardown, 3, efr_encoder=True, require_frontend_marker=True)
         with self.assertRaises(ValueError):
-            check_result(staged + teardown + '\nunexpected', 3, efr_encoder=True, staged=True, verbose_teardown=True)
-        for bad in (text, staged.replace('EFR encoder frontend', 'FR encoder frontend'),
-                    frontend + '\n' + staged,
-                    staged.replace('frame=162 mismatches=0', 'frame=162 mismatches=1'),
-                    staged.replace(EFR_ENCODER_REPLAY, '')):
-            with self.subTest(staged=bad[-200:]), self.assertRaises(ValueError):
-                check_result(bad, 3, efr_encoder=True, staged=True)
+            check_result(require_frontend_marker + teardown + '\nunexpected', 3, efr_encoder=True, require_frontend_marker=True, verbose_teardown=True)
+        for bad in (text, require_frontend_marker.replace('EFR encoder frontend', 'FR encoder frontend'),
+                    frontend + '\n' + require_frontend_marker,
+                    require_frontend_marker.replace('frame=162 mismatches=0', 'frame=162 mismatches=1'),
+                    require_frontend_marker.replace(EFR_ENCODER_REPLAY, '')):
+            with self.subTest(require_frontend_marker=bad[-200:]), self.assertRaises(ValueError):
+                check_result(bad, 3, efr_encoder=True, require_frontend_marker=True)
         check_result(text + "\nAverage speed: 1234.56% (6 seconds)", 3, efr_encoder=True)
         for invalid in (text.replace("frame=162 mismatches=0", "frame=162 mismatches=1"),
                         text.replace("frame=0 mismatches=0", "frame=1 mismatches=0"),
@@ -350,15 +307,15 @@ class Rom4HelperResultTest(unittest.TestCase):
         check_result(text, 3, efr_decoder=True)
 
         frontend = 'ROM4 EFR decoder frontend: staged handset_audio_claim=0'
-        staged = frontend + '\n' + text
-        check_result(staged, 3, efr_decoder=True, staged=True)
-        for invalid in (text, staged.replace('EFR decoder frontend', 'EFR encoder frontend'),
-                        frontend + '\n' + staged,
-                        staged.replace('frame=162 mismatches=0', 'frame=162 mismatches=1'),
-                        staged.replace(EFR_DECODER_REPLAY, ''),
-                        staged.replace(DELAYED_REPEAT_PASS, '')):
-            with self.subTest(staged=invalid[-200:]), self.assertRaises(ValueError):
-                check_result(invalid, 3, efr_decoder=True, staged=True)
+        require_frontend_marker = frontend + '\n' + text
+        check_result(require_frontend_marker, 3, efr_decoder=True, require_frontend_marker=True)
+        for invalid in (text, require_frontend_marker.replace('EFR decoder frontend', 'EFR encoder frontend'),
+                        frontend + '\n' + require_frontend_marker,
+                        require_frontend_marker.replace('frame=162 mismatches=0', 'frame=162 mismatches=1'),
+                        require_frontend_marker.replace(EFR_DECODER_REPLAY, ''),
+                        require_frontend_marker.replace(DELAYED_REPEAT_PASS, '')):
+            with self.subTest(require_frontend_marker=invalid[-200:]), self.assertRaises(ValueError):
+                check_result(invalid, 3, efr_decoder=True, require_frontend_marker=True)
         check_result(text + "\nAverage speed: 1234.56% (6 seconds)", 3, efr_decoder=True)
         for invalid in (text.replace("frame=162 mismatches=0", "frame=162 mismatches=1"),
                         text.replace("frame=0 mismatches=0", "frame=1 mismatches=0"),
@@ -434,26 +391,26 @@ class Rom4HelperResultTest(unittest.TestCase):
         marker = 'ROM4 FR decoder frontend: staged handset_audio_claim=0'
         result = '\n'.join((DECODER_COMPARISON, DECODER_REPLAY, DECODER_PASS, DECODER_COMPLETE))
         text = marker + '\n' + result
-        check_result(text, 3, fr_decoder=True, staged=True)
+        check_result(text, 3, fr_decoder=True, require_frontend_marker=True)
         for invalid in (result, marker + '\n' + text,
                         text.replace('mismatches=0', 'mismatches=1'),
                         text.replace(DECODER_REPLAY, '')):
             with self.subTest(text=invalid), self.assertRaises(ValueError):
-                check_result(invalid, 3, fr_decoder=True, staged=True)
+                check_result(invalid, 3, fr_decoder=True, require_frontend_marker=True)
         with self.assertRaises(ValueError):
-            check_result(text, 3, staged=True)
+            check_result(text, 3, require_frontend_marker=True)
 
     def test_staged_encoder_requires_selection_parameters_and_replay(self):
         marker = 'ROM4 FR encoder frontend: staged handset_audio_claim=0'
         result = '\n'.join((ENCODER_COMPARISON, ENCODER_REPLAY, ENCODER_PASS, PCM_MUTE_PASS, ENCODER_COMPLETE))
         text = marker + '\n' + result
-        check_result(text, 3, fr_encoder=True, staged=True)
+        check_result(text, 3, fr_encoder=True, require_frontend_marker=True)
         for invalid in (result, marker + '\n' + text,
                         text.replace('FR encoder frontend', 'FR decoder frontend'),
                         text.replace('mismatches=0', 'mismatches=1'),
                         text.replace(ENCODER_REPLAY, ''), text.replace(PCM_MUTE_PASS, '')):
             with self.subTest(text=invalid), self.assertRaises(ValueError):
-                check_result(invalid, 3, fr_encoder=True, staged=True)
+                check_result(invalid, 3, fr_encoder=True, require_frontend_marker=True)
 
     def test_encoder_verbose_footer_does_not_waive_parameters_or_replay(self):
         result = '\n'.join((ENCODER_COMPARISON, ENCODER_REPLAY, ENCODER_PASS, PCM_MUTE_PASS, ENCODER_COMPLETE))

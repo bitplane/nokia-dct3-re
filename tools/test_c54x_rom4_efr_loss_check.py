@@ -3,7 +3,7 @@ import struct
 import unittest
 
 from tools.c54x_rom4_efr_loss_check import COMPLETE, REPLAY, characterize, lost
-from tools.run_c54x_rom4_crc import check_result, check_staged_frontend
+from tools.run_c54x_rom4_crc import check_result, check_frontend_marker
 
 
 def fixture(changes=True):
@@ -38,16 +38,16 @@ class EfrLossObservationTests(unittest.TestCase):
     def test_staged_selection_does_not_promote_characterization(self):
         text, reference, serial = fixture()
         marker = 'ROM4 EFR erasure decoder frontend: staged handset_audio_claim=0'
-        staged = marker + '\n' + text
-        check_staged_frontend(staged, 'EFR erasure decoder')
-        report, _ = characterize(staged, 3, reference, serial)
+        require_frontend_marker = marker + '\n' + text
+        check_frontend_marker(require_frontend_marker, 'EFR erasure decoder')
+        report, _ = characterize(require_frontend_marker, 3, reference, serial)
         self.assertFalse(report['conformance_claim'])
         with self.assertRaises(ValueError):
-            check_result(staged, 3, efr_erasure_decoder=True, staged=True)
-        for bad in (text, marker + '\n' + staged,
-                    staged.replace('erasure decoder frontend', 'decoder frontend')):
+            check_result(require_frontend_marker, 3, efr_erasure_decoder=True, require_frontend_marker=True)
+        for bad in (text, marker + '\n' + require_frontend_marker,
+                    require_frontend_marker.replace('erasure decoder frontend', 'decoder frontend')):
             with self.subTest(text=bad[:90]), self.assertRaises(ValueError):
-                check_staged_frontend(bad, 'EFR erasure decoder')
+                check_frontend_marker(bad, 'EFR erasure decoder')
 
     def test_driver_validity_errors_invalidate_complete_observation(self):
         text, reference, serial = fixture()

@@ -13,7 +13,7 @@ from tools.run_c54x_core import main, EXTRA_PROFILES
 
 class FirmwareCliTests(unittest.TestCase):
     def test_profiles_select_owner_and_preserve_process_status(self):
-        for profile, machine in (('rom4-context', 'tms54test'), ('cold-pipeline', 'tms54rom4')):
+        for profile, machine in (('rom4-context', 'tms54test'), ('cold', 'tms54rom4')):
             for verbose in (False, True):
                 with self.subTest(profile=profile, verbose=verbose), tempfile.TemporaryDirectory() as directory:
                     command = []

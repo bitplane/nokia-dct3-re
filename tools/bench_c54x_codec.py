@@ -58,13 +58,13 @@ def bench_handset(root, binary, output, env, repeats):
     for repeat in range(repeats):
         directory = output / f'handset-{repeat}'
         directory.mkdir()
-        nvram = directory / 'nvram/nse1pipe/eeprom'
+        nvram = directory / 'nvram/noki5110/eeprom'
         nvram.parent.mkdir(parents=True)
         subprocess.run([sys.executable, str(root / 'tools/make_5110_eeprom_profile.py'),
                         '--eeprom', str(root / 'roms/noki5110/nse-1.bin'),
                         '--flash', str(root / 'roms/noki5110/5110f530.fls'), '--output', str(nvram)], check=True,
                        capture_output=True, text=True)
-        command = [str(binary), 'nse1pipe', '-rompath', str(root / 'mame/roms'),
+        command = [str(binary), 'noki5110', '-rompath', str(root / 'mame/roms'),
                    '-nvram_directory', str(directory / 'nvram'), '-video', 'none', '-sound', 'none',
                    '-nothrottle', '-noreadconfig', '-joystickprovider', 'none', '-midiprovider', 'none',
                    '-log', '-seconds_to_run', '30']
@@ -94,8 +94,8 @@ def main():
     parser.add_argument('--frame-timing', action='store_true', help='require per-frame timing from a current fixture')
     parser.add_argument('--handset', action='store_true', help='measure 5110 staged boot/idle and estimate paired budget')
     parser.add_argument('--cpu', type=int, help='pin this benchmark and its children to one available logical CPU')
-    parser.add_argument('--bios', nargs='+', default=['efr-decoder-pipe', 'efr-encoder-pipe'],
-                        choices=['efr-decoder', 'efr-decoder-pipe', 'efr-encoder', 'efr-encoder-pipe'])
+    parser.add_argument('--bios', nargs='+', default=['efr-decoder', 'efr-encoder'],
+                        choices=['efr-decoder', 'efr-encoder'])
     args = parser.parse_args()
     if args.repeats < 1:
         parser.error('--repeats must be positive')
@@ -127,7 +127,7 @@ def main():
             text = run.stdout + run.stderr
             (output / f'{bios}-{repeat}.log').write_text(text)
             check_result(text, run.returncode, efr_encoder='encoder' in bios,
-                         efr_decoder='decoder' in bios, staged=bios.endswith('-pipe'))
+                         efr_decoder='decoder' in bios, require_frontend_marker=True)
             if args.frame_timing:
                 frame_times.append(parse_frames(text))
             execution = re.findall(r'^ROM4 EFR (?:encoder|decoder) execution: frames=163 audio_seconds=3\.26 host_seconds=([0-9.]+) replay_included=0$', text, re.M)
@@ -158,13 +158,12 @@ def main():
     if args.handset:
         report['handset'] = bench_handset(root, binary, output, env, args.repeats)
     by_bios = {result['bios']: result for result in report['results']}
-    for suffix in ('', '-pipe'):
-        enc, dec = by_bios.get('efr-encoder' + suffix), by_bios.get('efr-decoder' + suffix)
-        if enc and dec and args.frame_timing:
-            report['paired_budget' + suffix] = paired_budget(enc['frame_seconds'], dec['frame_seconds'])
-            if args.handset and suffix == '-pipe':
-                report['paired_with_handset_idle_budget'] = paired_budget(
-                    enc['frame_seconds'], dec['frame_seconds'], 100 / report['handset']['median_realtime_percent'])
+    enc, dec = by_bios.get('efr-encoder'), by_bios.get('efr-decoder')
+    if enc and dec and args.frame_timing:
+        report['paired_budget'] = paired_budget(enc['frame_seconds'], dec['frame_seconds'])
+        if args.handset:
+            report['paired_with_handset_idle_budget'] = paired_budget(
+                enc['frame_seconds'], dec['frame_seconds'], 100 / report['handset']['median_realtime_percent'])
     report['complete'] = True
     (output / 'results.json').write_text(json.dumps(report, indent=2) + '\n')
 
