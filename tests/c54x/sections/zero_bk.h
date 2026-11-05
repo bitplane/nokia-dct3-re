@@ -23,7 +23,6 @@ inline std::vector<clocked_register_case> section_cases()
 			if (addresses[position] >= 0x60) initial.data.push_back({addresses[position],sample});
 		}
 		clocked_register_case c{{{0,std::move(initial)}},(form + position + stride) & 1 ? 3U : 1U,24};
-		c.pipeline_frontend = true;
 		c.states.push_back({24,observation("linear-modulo-address", {
 			{r::STATE_AR2,u16(int(addresses[position]) + step)},{r::STATE_AR3,0xf00}})});
 		if (form == 4) {

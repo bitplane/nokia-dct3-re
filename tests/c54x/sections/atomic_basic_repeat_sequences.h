@@ -36,7 +36,7 @@ inline std::vector<clocked_register_case> section_cases()
 		}
 		clocked_register_case c{{{0,std::move(initial)},{1,observation("pre-sequence-snapshot",{{STATE_GENPC,0x600}})},
 			{2,observation("sequence-running",{})},{64,std::move(final)}},1,64};
-		c.pipeline_frontend = true; c.data_events = std::move(events); c.program_events = std::move(program);
+		c.data_events = std::move(events); c.program_events = std::move(program);
 		if (variant == 2) { c.require_idle = false; c.states[2].observation.expected.clear(); }
 		cases.push_back(std::move(c));
 	}
@@ -49,7 +49,6 @@ inline std::vector<clocked_register_case> section_cases()
 			{r::STATE_B,0xffedcba987ULL},{r::STATE_AR4,0xabcd}},{{0x910,0x5678},{0x912,0xabcd},{0x914,0x1234},{0x915,0x5678}});
 		clocked_register_case c{{{0,std::move(initial)},{1,observation("pre-mixed-sequence-snapshot",{{STATE_GENPC,0x600}})},
 			{2,observation("mixed-sequence-running",{})},{64,std::move(final)}},1,64};
-		c.pipeline_frontend = true;
 		c.data_events = std::vector<clocked_data_event>{{true,0x910,0x5678,0,false},{false,0x912,0xabcd,0,false},
 			{true,0x14,0xabcd,0,false},{false,0x914,0x1234,0,false},{false,0x915,0x5678,0,false}};
 		cases.push_back(std::move(c));

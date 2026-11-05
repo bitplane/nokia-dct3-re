@@ -20,7 +20,6 @@ inline std::vector<clocked_register_case> section_cases()
 			{r::STATE_IFR,0},{r::STATE_IMR,imr},{r::STATE_ST1,0x800}},{{0xfff,0x981}});
 		clocked_register_case c{{{0,std::move(initial)},{16,std::move(asleep)},{17,std::move(pending)},
 			{21,observation("NMI-vector-entry-running",{})},{80,std::move(final)}},17,80};
-		c.pipeline_frontend = true;
 		c.initial_input_lines={{INPUT_LINE_NMI,CLEAR_LINE},{INPUT_LINE_HALT,CLEAR_LINE}};
 		// HALT is a fixture execution hold, not a claim about a C54x board pin.
 		c.actions={{16,{{r::STATE_IFR,0x8008}},false,{},{{INPUT_LINE_HALT,ASSERT_LINE},{INPUT_LINE_NMI,ASSERT_LINE}}},

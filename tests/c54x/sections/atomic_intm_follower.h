@@ -21,7 +21,6 @@ inline std::vector<clocked_register_case> section_cases()
 			{24,observation("one-complete-follower-before-vector-entry",{{STATE_GENPC,0x10041},{r::STATE_SP,stack},
 				{r::STATE_RTN,continuation},{r::STATE_A,kind == 0 ? 7U : 0U},{r::STATE_ST1,0x800},{r::STATE_IFR,0}},
 				{{stack,continuation},{0x501,u16(kind == 1 ? 7 : 0)}})}},1,24};
-		c.pipeline_frontend = true;
 		c.data_events = std::vector<clocked_data_event>{};
 		if (kind == 1) c.data_events->push_back({true,0x501,7,0,false});
 		if (kind == 2) c.data_events->push_back({false,0x1000,0x9e0,0,false});

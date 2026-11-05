@@ -30,7 +30,7 @@ inline std::vector<clocked_register_case> section_cases()
 		{idle3_pll_settled_tick,{},false,{},{{INPUT_LINE_HALT,ASSERT_LINE}}},
 		{752,{},false,{}, {},{{0x58,0x77ff}}}};
 	c.initial_input_lines={{INPUT_LINE_HALT,ASSERT_LINE},{0,CLEAR_LINE}};
-	c.pipeline_frontend = true; c.reset_cpu_before_case=true;
+	c.reset_cpu_before_case=true;
 	c.observation_subticks=16; c.observation_clock_hz=13'000'000;
 	c.data_events=std::vector<clocked_data_event>{{true,0,0,0,false}};
 	c.data_events->front().registers={{r::STATE_IFR,1},{r::STATE_IMR,1}};

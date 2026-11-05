@@ -44,7 +44,7 @@ inline std::vector<clocked_register_case> section_cases()
 		}
 		clocked_register_case c{{{0,std::move(initial)},{1,observation("pre-basic-operation-snapshot",{{STATE_GENPC,0x600}})},
 			{2,observation("basic-operation-running",{})},{96,std::move(final)}},1,96};
-		c.pipeline_frontend = true; c.data_events = std::move(data); c.program_events = std::move(program); cases.push_back(std::move(c));
+		c.data_events = std::move(data); c.program_events = std::move(program); cases.push_back(std::move(c));
 	}
 	return cases;
 }

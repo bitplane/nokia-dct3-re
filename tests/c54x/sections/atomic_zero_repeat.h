@@ -18,7 +18,7 @@ inline std::vector<clocked_register_case> section_cases()
 		else final.expected.push_back({r::STATE_BRC,0});
 		clocked_register_case c{{{0,std::move(initial)},{1,observation("pre-repeat-snapshot", {{STATE_GENPC,0x5ff}})},
 			{2,observation("repeat-running", {})},{32,std::move(final)}},1,32};
-		c.pipeline_frontend = true; c.data_events = std::vector<clocked_data_event>{};
+		c.data_events = std::vector<clocked_data_event>{};
 		// Speculative Prefetch may revisit a word; prove one logical body Execute.
 		c.instruction_events = std::vector<memory_word>{{0x5ff,0xf495},{0x600,u16(form == 0 ? 0xf071 : form == 1 ? 0xf272 : 0xf072)}};
 		for (unsigned pc = 0x602; pc != (form == 1 ? 0x605U : 0x603U); ++pc)

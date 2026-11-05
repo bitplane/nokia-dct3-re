@@ -21,7 +21,7 @@ inline std::vector<clocked_register_case> section_cases()
 			{r::STATE_AR4,v.out4},{r::STATE_AR5,v.out5}},{{0xf90,v.x},{0xf91,v.y}});
 		clocked_register_case c{{{0,std::move(initial)},{1,observation("pre-dual-operation-snapshot",{{STATE_GENPC,0x600}})},
 			{2,observation("dual-operation-running",{})},{32,std::move(final)}},1,32};
-		c.pipeline_frontend = true; c.data_events = std::vector<clocked_data_event>{{false,0xf90,v.x,0,false},{false,0xf91,v.y,0,false}};
+		c.data_events = std::vector<clocked_data_event>{{false,0xf90,v.x,0,false},{false,0xf91,v.y,0,false}};
 		cases.push_back(std::move(c));
 	}
 	return cases;

@@ -23,7 +23,6 @@ inline std::vector<clocked_register_case> section_cases()
 		final.expected_data = {{0x100,u16(variant == 5 ? 0x1234 : fractional ? 0x8000 : 1)},{0x110,1},{0x120,1}};
 		clocked_register_case c{{{0,std::move(initial)},{1,observation("before-MAC",{{STATE_GENPC,0x600}})},
 			{2,observation("MAC-running",{})},{24,std::move(final)}},1,24};
-		c.pipeline_frontend = true;
 		if (variant == 4) c.data_events = std::vector<clocked_data_event>{{false,0x120,1,0,false},{false,0x110,1,0,false}};
 		else if (variant == 5) c.data_events = std::vector<clocked_data_event>{{false,0x110,1,0,false},{true,0x100,0x1234,0,false}};
 		else c.data_events = std::vector<clocked_data_event>{{false,0x100,u16(fractional ? 0x8000 : 1),0,false}};
@@ -36,7 +35,6 @@ inline std::vector<clocked_register_case> section_cases()
 	final.expected_data = {{0x100,0x5678},{0x101,0xdead}};
 	clocked_register_case c{{{0,std::move(initial)},{1,observation("before-store",{{STATE_GENPC,0x600}})},
 		{2,observation("store-running",{})},{24,std::move(final)}},1,24};
-	c.pipeline_frontend = true;
 	c.data_events = std::vector<clocked_data_event>{{true,0x100,0x5678,0,false}};
 	cases.push_back(std::move(c));
 	return cases;

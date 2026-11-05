@@ -25,7 +25,6 @@ inline std::vector<clocked_register_case> section_cases()
 		auto final=observation("all-transfers-before-single-IRQ-at-owned-continuation",{{r::STATE_AR1,0x1400+transfers},
 			{r::STATE_RTN,context==1 ? 0x702U : context==2 ? 0x606U : 0x603U},{r::STATE_SP,0xfff}});
 		clocked_register_case c{{{0,std::move(initial)},{1,observation("atomic-control-running",{})},{64,std::move(final)}},4,64};
-		c.pipeline_frontend=true;
 		if (context==1) {
 			c.states.insert(c.states.begin()+2,{6,observation("retained-branch-predicate-input",{{r::STATE_A,0}})});
 			c.program_events={{false,0x601,0x700,0,false},{false,0x700,0xf495,0,false}};

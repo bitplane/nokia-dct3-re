@@ -18,7 +18,6 @@ inline std::vector<clocked_register_case> section_cases()
 			{r::STATE_T,3},{r::STATE_ST0,0x800},{r::STATE_ST1,u64(0x800 | (sxm ? 0x100 : 0) | (fractional ? 0x40 : 0))},
 			{r::STATE_AR5,0x500},{r::STATE_AR3,0x600}});
 		clocked_register_case c{{{0,std::move(initial)}},index & 1 ? 3U : 1U,24};
-		c.pipeline_frontend = true;
 		c.states.push_back({24,observation("old-T-and-other-accumulator", {{r::STATE_A,b ? u64(sum) : load},
 			{r::STATE_B,b ? load : u64(sum)},{r::STATE_T,3},{r::STATE_ST0,0x800},
 			{r::STATE_AR5,update ? 0x501U : 0x500U},{r::STATE_AR3,update ? 0x601U : 0x600U},{STATE_GENPC,0x602}})});

@@ -20,7 +20,6 @@ inline std::vector<clocked_register_case> section_cases()
 			{r::STATE_A,variant == 2 ? 0x1235U : 3U},{r::STATE_SP,0x300},{r::STATE_AR2,0x100},{r::STATE_AR3,0x101}});
 		clocked_register_case c{{{0,std::move(initial)},{1,observation("pre-timing-program-snapshot",{{STATE_GENPC,0x600}})},
 			{2,observation("timing-program-running",{})},{96,std::move(final)}},1,96};
-		c.pipeline_frontend = true;
 		if (variant == 1) c.checkpoint = 5; // Replay with the first operand timestamp already recorded.
 		if (variant == 0) {
 			c.data_events = std::vector<clocked_data_event>{{false,0x100,1,0,false},{false,0x100,1,0,false,2,3},

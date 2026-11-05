@@ -2989,9 +2989,8 @@ void tms320c54x_device::reset_pipeline()
 	m_pipeline_cycles = 0;
 }
 
-void tms320c54x_device::set_pipeline_frontend(bool enabled)
+void tms320c54x_device::reset_execution_pipeline()
 {
-	if (!enabled) fatalerror("C54x atomic frontend has been retired");
 	m_vector_prefetch_valid = false;
 	m_interrupt_entry_stage = 0;
 	reset_pipeline();

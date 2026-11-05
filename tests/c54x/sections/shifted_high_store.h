@@ -15,7 +15,6 @@ inline std::vector<clocked_register_case> section_cases()
 		initial.initial.insert(initial.initial.end(), {{r::STATE_A,0x12345678},{r::STATE_B,0xff87654321ULL},
 			{r::STATE_AR3,0x507},{r::STATE_ST0,0xaa5},{r::STATE_ST1,0x900},{r::STATE_PMST,sst ? 1U : 0U}});
 		clocked_register_case c{{{0,std::move(initial)}},index & 1 ? 3U : 1U,24};
-		c.pipeline_frontend = true;
 		c.states.push_back({24,observation("shift-before-store-saturation", {{r::STATE_A,0x12345678},{r::STATE_B,0xff87654321ULL},
 			{r::STATE_AR3,decrement ? 0x506U : 0x507U},{r::STATE_ST0,0xaa5},{r::STATE_ST1,0x900},
 			{r::STATE_PMST,sst ? 1U : 0U},{STATE_GENPC,0x602}},{{0x507,word},{0x508,0xabcd}})});

@@ -23,7 +23,6 @@ inline std::vector<clocked_register_case> section_cases()
 			{r::STATE_ST0,0},{r::STATE_ST1,index >= 64 ? 0x100U : 0U}});
 		initial.data = {{0x600,word}};
 		clocked_register_case c{{{0,std::move(initial)}},index & 1 ? 3U : 1U,24};
-		c.pipeline_frontend = true;
 		c.states.push_back({24,observation("independent-alu-selectors", {{r::STATE_A,selectors & 1 ? 10 : result},
 			{r::STATE_B,selectors & 1 ? result : 30},{r::STATE_AR2,0x600},{STATE_GENPC,0x603}},{{0x600,word}})});
 		c.data_events = std::vector<clocked_data_event>{{false,0x600,word,0,false}};

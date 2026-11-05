@@ -16,7 +16,7 @@ inline std::vector<clocked_register_case> section_cases()
 		auto final = observation(name,checks); final.expected.push_back({STATE_GENPC,0x601 + unsigned(words.size())});
 		final.expected.insert(final.expected.end(),{{r::STATE_A,0x12345678},{r::STATE_B,0x87654321},
 			{r::STATE_AR2,0xd00},{r::STATE_AR3,0xd10}});
-		clocked_register_case c{{},1,32}; c.pipeline_frontend = true;
+		clocked_register_case c{{},1,32};
 		c.data_events = std::vector<clocked_data_event>{{false,address,operand,0,false}};
 		if (written) {
 			u16 const target = destination.value_or(address);

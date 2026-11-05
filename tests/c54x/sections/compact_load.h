@@ -18,7 +18,6 @@ inline std::vector<clocked_register_case> section_cases()
 			{r::STATE_ST1,st1},{r::STATE_AR2,0x1000}});
 		if (!dp) initial.data = {{0x1000,0x8123}};
 		clocked_register_case c{{{0,std::move(initial)}},index & 1 ? 3U : 1U,24};
-		c.pipeline_frontend = true;
 		c.states.push_back({24,observation("compact-load-result", {{r::STATE_A,dp ? 0x123456789aULL : b ? 0x1234 : result},
 			{r::STATE_B,dp ? 0x9876543210ULL : b ? result : 0x1234},{r::STATE_ST1,st1},
 			{r::STATE_AR2,dp ? 0x1000U : 0x1001U},{STATE_GENPC,0x602}})});

@@ -17,7 +17,6 @@ inline std::vector<clocked_register_case> section_cases()
 		initial.initial.insert(initial.initial.end(), {{r::STATE_A,0x12345678},{r::STATE_B,0x12345678},
 			{r::STATE_ST0,0xe00},{r::STATE_ST1,u64(0xa00 | (sxm ? 0x100 : 0))},{r::STATE_AR0,0xf66}});
 		clocked_register_case c{{{0,std::move(initial)}},index & 1 ? 3U : 1U,24};
-		c.pipeline_frontend = true;
 		c.states.push_back({24,observation("rounded-high-word", {{r::STATE_A,b ? 0x12345678 : result},
 			{r::STATE_B,b ? result : 0x12345678},{r::STATE_ST0,0xe00},{r::STATE_ST1,u64(0xa00 | (sxm ? 0x100 : 0))},
 			{r::STATE_AR0,mode == 2 ? 0xf65U : 0xf66U},{STATE_GENPC,mode == 3 ? 0x603U : 0x602U}})});

@@ -12,7 +12,7 @@ inline std::vector<clocked_register_case> section_cases()
 			{r::STATE_A,out_a},{r::STATE_B,out_b},{r::STATE_ST0,flags,mask},{r::STATE_ST1,st1}});
 		clocked_register_case c{{{0,std::move(initial)},{1,observation("pre-ASM-snapshot",{{STATE_GENPC,0x600}})},
 			{2,observation("ASM-running",{})},{24,std::move(final)}},1,24};
-		c.pipeline_frontend = true; c.data_events = std::vector<clocked_data_event>{}; cases.push_back(std::move(c));
+		c.data_events = std::vector<clocked_data_event>{}; cases.push_back(std::move(c));
 	};
 	struct row { u16 opcode,st0,st1; u64 a,b,out_a,out_b; u16 flags,mask; };
 	constexpr row boundaries[]{

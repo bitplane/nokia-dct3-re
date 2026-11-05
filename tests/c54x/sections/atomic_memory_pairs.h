@@ -21,7 +21,7 @@ inline std::vector<clocked_register_case> section_cases()
 			for (auto &value : final.expected_data) if (value.address == word.address) value.value = word.value;
 		clocked_register_case c{{{0,std::move(initial)},{1,observation("pre-pair-snapshot",{{STATE_GENPC,0x600}})},
 			{2,observation("pair-running",{})},{48,std::move(final)}},1,48};
-		c.pipeline_frontend = true; c.data_events = std::move(events); cases.push_back(std::move(c));
+		c.data_events = std::move(events); cases.push_back(std::move(c));
 	};
 	add("store-decrement-feeds-store-increment",{0x768a,0xabcd,0x8092},
 		{{r::STATE_A,0x12345678},{r::STATE_AR2,0xd80},{r::STATE_ST1,0}},{{r::STATE_A,0x12345678},{r::STATE_AR2,0xd80}},

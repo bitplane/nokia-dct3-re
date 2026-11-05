@@ -53,7 +53,7 @@ inline std::vector<clocked_register_case> section_cases()
 			{r::STATE_ST0,v.st0_after},{r::STATE_ST1,v.st1}});
 		clocked_register_case c{{{0,std::move(initial)},{1,observation("pre-shift-snapshot", {{r::STATE_A,v.a_before},{r::STATE_B,v.b_before}})},
 			{2,observation("shift-running", {})},{32,std::move(final)}},1,32};
-		c.pipeline_frontend = true; c.forbid_data_access = true;
+		c.forbid_data_access = true;
 		cases.push_back(std::move(c));
 	}
 	return cases;

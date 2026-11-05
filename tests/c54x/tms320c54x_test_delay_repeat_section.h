@@ -7,7 +7,6 @@ namespace c54x_test {
 inline std::vector<clocked_register_case> delay_repeat_cases(unsigned owner)
 {
 	std::vector<clocked_register_case> cases;
-	constexpr bool staged=true;
 	for(unsigned kind=0;kind<3;++kind)for(unsigned count : {0U,1U,8U,39U,255U})for(unsigned pattern=0;pattern<4;++pattern)
 	for(unsigned condition=0;condition<(owner==3 ? 12U : 1U);++condition){
 		unsigned const selector=kind+count+pattern+condition;
@@ -20,7 +19,7 @@ inline std::vector<clocked_register_case> delay_repeat_cases(unsigned owner)
 		u64 poison=0;for(u64 value : {0ULL,1ULL,0xffffffffffULL})if(test(value)!=taken){poison=value;break;}
 		u16 const seed=std::array<u16,4>{0,0xffff,0x8001,0x0fff}[pattern];
 		u64 const a=owner==3 && condition<6 ? tested : 0x1234560000ULL|seed, b=owner==3 && condition>=6 ? tested : 0xfeabcd0000ULL|u16(~seed);
-		u64 const final_a=owner==3 && staged && condition<6 ? poison : a, final_b=owner==3 && staged && condition>=6 ? poison : b;
+		u64 const final_a=owner==3 && condition<6 ? poison : a, final_b=owner==3 && condition>=6 ? poison : b;
 		u16 const body_pc=owner==2 ? 0x602 : 0x603, end=target==0x500 ? 0x604 : 0x605, continuation=taken ? target : 0x604;
 		auto initial=initial_case("delay-owned-repeat-drains-before-fresh-continuation",{u16(owner==0 ? 0xf273 : owner==1 ? 0xf274 : owner==2 ? 0xfe00 : owner==3 ? 0xfa40|(condition<6 ? condition+2 : condition+4) : 0xf272),u16(owner==4 ? end : target)});
 		for(auto &word : initial.program)word.address+=base;
@@ -42,13 +41,13 @@ inline std::vector<clocked_register_case> delay_repeat_cases(unsigned owner)
 		for(unsigned i=0;i<32;++i){initial.data.push_back({0x2000+i,0xdead});final.expected_data.push_back({0x2000+i,u16(i<=following ? final_b : 0xdead)});}
 		for(u16 at : {0x17ff,0x1900,0x1bff,0x1d00,0x1fff,0x2020}){initial.data.push_back({at,0x2468});final.expected_data.push_back({at,0x2468});}
 		unsigned const finish=4*(count+following+2)+100,checkpoint=std::array<unsigned,4>{3,8,9+count/2,20+count}[selector%4];
-		clocked_register_case c{{{0,std::move(initial)},{finish,std::move(final)}},checkpoint,finish};c.pipeline_frontend=staged;c.clear_pipeline_before_restore=true;
+		clocked_register_case c{{{0,std::move(initial)},{finish,std::move(final)}},checkpoint,finish};c.clear_pipeline_before_restore=true;
 		c.retired_instruction=retired_instruction_check{base+body_pc,body,count+1};
 		if(owner!=4){
 			clocked_register_action change{};change.tick=owner==2 ? 8 : 5;
 			if(owner==2)change.data={{0x2fff,0x620}};else change.program={{base+0x601,0x620}};c.actions.push_back(change);
 		}
-		if(staged && owner!=4){clocked_register_action change{};change.tick=6;change.program={{base+body_pc,0xe8ff}};
+		if(owner!=4){clocked_register_action change{};change.tick=6;change.program={{base+body_pc,0xe8ff}};
 			if(owner==3)change.values={{r::STATE_A,final_a},{r::STATE_B,final_b}};
 			c.actions.push_back(change);if(owner==2)std::swap(c.actions[0],c.actions[1]);
 		}
@@ -56,11 +55,10 @@ inline std::vector<clocked_register_case> delay_repeat_cases(unsigned owner)
 		if(owner==1)c.data_events->push_back({true,0x2fff,0x604,0,false});
 		if(owner==2)c.data_events->push_back({false,0x2fff,target,0,false});
 		for(unsigned i=0;i<=count;++i){
-			if(kind==1){c.data_events->push_back({false,0x1800+i,u16(seed+i*257),0,false});if(staged && i)c.data_events->push_back({true,0x1c00+i-1,u16(seed+(i-1)*257),0,false});}
+			if(kind==1){c.data_events->push_back({false,0x1800+i,u16(seed+i*257),0,false});if(i)c.data_events->push_back({true,0x1c00+i-1,u16(seed+(i-1)*257),0,false});}
 			if(kind==0)c.data_events->push_back({true,0x1800+i,u16(final_a),0,false});
-			if(kind==1 && !staged)c.data_events->push_back({true,0x1c00+i,u16(seed+i*257),0,false});
 		}
-		if(kind==1 && staged)c.data_events->push_back({true,0x1c00+count,u16(seed+count*257),0,false});
+		if(kind==1)c.data_events->push_back({true,0x1c00+count,u16(seed+count*257),0,false});
 		for(unsigned i=0;i<=following;++i)c.data_events->push_back({true,0x2000+i,u16(final_b),0,false});
 		if(owner==1)c.data_events->push_back({false,0x2fff,0x604,0,false});
 		cases.push_back(std::move(c));

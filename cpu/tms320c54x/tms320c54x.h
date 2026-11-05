@@ -29,9 +29,9 @@ public:
 	auto clkout_divisor_cb() { return m_clkout_divisor_cb.bind(); }
 	auto iack_enable_cb() { return m_iack_enable_cb.bind(); }
 	auto ready_in_cb() { return m_ready_in_cb.bind(); }
-	// Compatibility reset entry point: only true is accepted. Execution is
-	// always stage-owned; unsupported instruction forms stop without fallback.
-	void set_pipeline_frontend(bool enabled);
+	// Discard live pipeline/interrupt-entry work after fixture state changes.
+	// This resets execution state, not architectural registers or peripherals.
+	void reset_execution_pipeline();
 	u64 pipeline_cycles() const { return m_pipeline_cycles; }
 	auto bio_in_cb() { return m_bio_in_cb.bind(); }
 	auto xf_out_cb() { return m_xf_out_cb.bind(); }

@@ -5,7 +5,6 @@ namespace c54x_test {
 inline std::vector<clocked_register_case> section_cases()
 {
 	std::vector<clocked_register_case> cases;
-	constexpr bool staged = true;
 	for (unsigned kind = 0; kind < 3; ++kind)
 	for (unsigned initial_tc = 0; initial_tc < 2; ++initial_tc)
 	{
@@ -16,7 +15,6 @@ inline std::vector<clocked_register_case> section_cases()
 		initial.initial.insert(initial.initial.end(), {{r::STATE_ST0,0xe05 | (initial_tc ? 0x1000U : 0U)}});
 		initial.data = {{0x1000,0x602}};
 		clocked_register_case c{{{0,std::move(initial)}},(kind + initial_tc) & 1 ? 9U : 3U,32};
-		c.pipeline_frontend = staged;
 		c.states.push_back({32,observation("settled-status-after-return", {{r::STATE_A,0},{r::STATE_B,0x33},
 			{STATE_GENPC,0x606},{r::STATE_SP,0x1000 + unsigned(taken)},
 			{r::STATE_ST0,0xe05 | (!initial_tc ? 0x1000U : 0U)}})});

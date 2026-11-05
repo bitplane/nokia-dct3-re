@@ -31,7 +31,7 @@ inline std::vector<clocked_register_case> section_cases()
 			{r::STATE_AR1,!branch && !ret && v.taken ? 0x121U : 0x120U},{r::STATE_AR2,!branch && !ret && v.taken ? 0x131U : 0x130U}},{{0x300,0x700}});
 		clocked_register_case c{{{0,std::move(initial)},{1,observation("pre-condition-snapshot", {{STATE_GENPC,0x600}})},
 			{2,observation("condition-running", {})},{32,std::move(final)}},1,32};
-		c.pipeline_frontend = true; c.data_events = std::vector<clocked_data_event>{};
+		c.data_events = std::vector<clocked_data_event>{};
 		if (ret && v.taken) c.data_events->push_back({false,0x300,0x700,0,false});
 		if ((branch || ret) && v.taken) c.program_events = {{false,0x700,0xf4e1,0,false}};
 		cases.push_back(std::move(c));

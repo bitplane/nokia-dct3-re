@@ -20,7 +20,6 @@ inline std::vector<clocked_register_case> section_cases()
 			initial.program.push_back({0x602,0xf495});
 		}
 		clocked_register_case c{{{0,std::move(initial)}},index & 1 ? 3U : 1U,32};
-		c.pipeline_frontend = true;
 		c.states.push_back({32,observation("mapped-TRN-read-write-and-store", {{r::STATE_TRN,value},{r::STATE_A,separated ? value : 0xabcdU},
 			{r::STATE_B,0x12345678},{r::STATE_T,0x9876},{r::STATE_ST0,0},{r::STATE_ST1,0x900},
 			{r::STATE_AR2,mode == 1 ? 0xf60U : 0xf67U},{STATE_GENPC,(mode == 2 ? 0x606U : 0x605U) + separated}},{{address,value}})});
@@ -35,7 +34,6 @@ inline std::vector<clocked_register_case> section_cases()
 		initial.initial.insert(initial.initial.end(), {{r::STATE_TRN,value},{r::STATE_SP,0x1000},{r::STATE_ST0,0x1ff},
 			{r::STATE_ST1,0x4900},{r::STATE_AR0,0xf0f},{r::STATE_AR2,0xf0f},{r::STATE_BK,16}});
 		clocked_register_case c{{{0,std::move(initial)}},index & 1 ? 3U : 1U,24};
-		c.pipeline_frontend = true;
 		c.states.push_back({24,observation("MMR-address-ignores-DP-CPL", {{r::STATE_SP,0xfff},{r::STATE_TRN,value},
 			{r::STATE_AR2,mode == 1 ? 0xfU : mode == 2 ? 0xeU : 0xf0fU},{r::STATE_AR0,mode == 3 ? 0xeU : 0xf0fU},
 			{r::STATE_ST0,0x1ff},{r::STATE_ST1,0x4900},{STATE_GENPC,0x602}},{{0xfff,value}})});

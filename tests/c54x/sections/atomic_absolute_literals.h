@@ -20,7 +20,7 @@ inline std::vector<clocked_register_case> section_cases()
 		}
 		clocked_register_case c{{{0,std::move(initial)},{1,observation("pre-absolute-literal-snapshot", {{STATE_GENPC,0x5ff}})},
 			{2,observation("literal-running", {})},{48,std::move(final)}},1,48};
-		c.pipeline_frontend = true; c.data_events = std::move(events); cases.push_back(std::move(c));
+		c.data_events = std::move(events); cases.push_back(std::move(c));
 	};
 	append("LD-small-B-retains-A",{0xe908},{{r::STATE_A,0x123456},{r::STATE_B,0xffffffffffULL}},{{r::STATE_B,8},{r::STATE_A,0x123456}});
 	append("LDM-AR4-B-unsigned",{0x4914},{{r::STATE_AR4,0x8001},{r::STATE_A,0x123456}},

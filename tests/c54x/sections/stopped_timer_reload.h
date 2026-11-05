@@ -15,7 +15,6 @@ inline std::vector<clocked_register_case> section_cases()
 		// Read back the completed RMW; simultaneous peripheral arbitration remains unqualified.
 		clocked_register_case c{{{0,std::move(initial)},{1,observation("timer-program-running",{})},{24,std::move(final)}},
 			std::array<unsigned,3>{1,3,6}[cases.size()%3],24};
-		c.pipeline_frontend=true;
 		c.data_events=std::vector<clocked_data_event>{{true,0x25,0x1234,0,false},{true,0x26,request,0,false}};
 		if (variant) c.data_events->insert(c.data_events->end(),{{false,0x26,status,0,false},
 			{true,0x26,u16(status|(variant==2 ? 0x3c0 : 0)),0,false}});

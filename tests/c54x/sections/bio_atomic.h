@@ -31,7 +31,7 @@ inline std::vector<clocked_register_case> section_cases()
 		final.expected_data = {{0x400,0x910},{0x3ff,u16(take && call ? 0x903 : 0xbeef)}};
 		clocked_register_case c{{{0,std::move(initial)},{1,observation("before-BIO-control",{{STATE_GENPC,0x10900}})},
 			{2,observation("BIO-control-running",{})},{48,std::move(final)}},1,48};
-		c.pipeline_frontend = true; c.initial_bio = level; c.bio_samples = std::vector<clocked_line_sample>{{0,level,false}};
+		c.initial_bio = level; c.bio_samples = std::vector<clocked_line_sample>{{0,level,false}};
 		c.data_events = std::vector<clocked_data_event>{};
 		if (take && call) c.data_events->push_back({true,0x3ff,0x903,0,false});
 		if (take && returning) c.data_events->push_back({false,0x400,0x910,0,false});
@@ -43,7 +43,7 @@ inline std::vector<clocked_register_case> section_cases()
 	clocked_register_case c{{{0,std::move(initial)},{1,observation("before-poll",{{STATE_GENPC,0x600}})},
 		{2,observation("poll-running",{})},{12,observation("pin-low-remains-live",{{r::STATE_A,0},{r::STATE_IDLE,0}})},
 		{14,observation("pin-raised",{})},{64,std::move(final)}},12,64};
-	c.pipeline_frontend = true; c.initial_bio = false; c.forbid_data_access = true;
+	c.initial_bio = false; c.forbid_data_access = true;
 	c.bio_samples = std::vector<clocked_line_sample>{{7,false},{12,false},{17,true}};
 	// Read at clocks 7/12/17: two low-pin loops, then the high-pin fall-through.
 	// Logical Execute identity, unlike the in-flight PC cursor, proves the loop.

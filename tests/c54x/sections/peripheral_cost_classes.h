@@ -22,7 +22,6 @@ inline std::vector<clocked_register_case> section_cases()
 			{r::STATE_A,read ? 0xff00U : 0x5678U},{r::STATE_AR2,0xff00},{r::STATE_PRD,0xff00}},{{target,0xff00}});
 		clocked_register_case c{{{0,std::move(initial)},{1,observation("before-cost-program",{{STATE_GENPC,0x600}})},
 			{2,observation("cost-program-running",{})},{48,std::move(final)}},(family+kind)&1 ? 3U : 1U,48};
-		c.pipeline_frontend = true;
 		unsigned const cost = (read ? 1U : 2U) + unsigned(kind == 1 || kind == 2);
 		c.data_events = std::vector<clocked_data_event>{};
 		for (unsigned i = 0; i != 2; ++i) {

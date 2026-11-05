@@ -31,7 +31,6 @@ inline std::vector<clocked_register_case> section_cases()
 		for (unsigned ar = 0; ar != 8; ++ar) final.expected.push_back({int(r::STATE_AR0) + int(ar),ar == v.pointer ? v.finish : 0x1100U + ar});
 		clocked_register_case c{{{0,std::move(initial)},{1,observation("before-DST", {{STATE_GENPC,0x600}})},
 			{2,observation("DST-running", {})},{16,std::move(final)}},1,16};
-		c.pipeline_frontend = true;
 		c.data_events = std::vector<clocked_data_event>{{true,v.high_address,high,0,false},{true,v.low_address,low,0,false}};
 		cases.push_back(std::move(c));
 	}

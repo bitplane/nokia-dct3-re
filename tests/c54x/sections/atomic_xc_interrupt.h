@@ -25,7 +25,6 @@ inline std::vector<clocked_register_case> section_cases()
 		clocked_register_case c{{{0,std::move(initial)},{1,observation("atomic-XC-interrupt-running",{})},
 			{32,observation("two-word-protection-and-owned-return",{{r::STATE_A,entry_a},{r::STATE_SP,loop ? 0xfffU : 0x1000U},
 				{STATE_GENPC,loop ? u32(vector+2) : 0x805U}},{{0xfff,continuation}})}},3,32};
-		c.pipeline_frontend = true;
 		c.retired_instruction = loop ? retired_instruction_check{0x804,u16(wide ? 0xf020 : 0xe801),2} :
 			retired_instruction_check{0x802,0xe809,unsigned(!wide || accepted)};
 		c.data_events = std::vector<clocked_data_event>{{true,0xfff,continuation,0,false},{false,0x61,0,0,false}};

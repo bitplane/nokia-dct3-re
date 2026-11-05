@@ -27,7 +27,7 @@ inline std::vector<clocked_register_case> section_cases()
 		final.expected_data = initial.data;
 		clocked_register_case c{{{0,std::move(initial)},{1,observation("before-control-markers",{{STATE_GENPC,0x600}})},
 			{2,observation("control-markers-running",{})},{64,std::move(final)}},3,64};
-		c.pipeline_frontend = true; c.observed_data_space = AS_IO;
+		c.observed_data_space = AS_IO;
 		// RPT count-Read holds and repeat-tail Prefetch refill belong to the staged schedule.
 		c.data_events = std::vector<clocked_data_event>{{true,0x124,0x1111,9},
 			{true,0x124,u16(taken ? 0x3333 : 0x2222),0,false,{},variant == 2 ? 15U : variant == 5 ? 10U : taken ? 8U : 6U}};

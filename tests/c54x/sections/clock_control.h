@@ -19,7 +19,6 @@ inline std::vector<clocked_register_case> section_cases()
 		write(replacement); write(replacement | 2); capture(0x503);
 		initial.program[pc].value = 0xf4e1;
 		clocked_register_case c{{{0,std::move(initial)}},index & 1 ? 12U : 1U,96};
-		c.pipeline_frontend = true;
 		c.states.push_back({96,observation("div-protected-fields", {},
 			{{0x501,u16(first | 3)},{0x502,u16(first | 3)},{0x503,u16(replacement | 3)}})});
 		cases.push_back(std::move(c));

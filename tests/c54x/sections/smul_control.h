@@ -26,7 +26,6 @@ inline std::vector<clocked_register_case> section_cases()
 			{r::STATE_B,destination_b ? seed : 0x12340000},{r::STATE_T,0x8000},{r::STATE_AR2,0x600},
 			{r::STATE_AR3,family == 0 ? 0x600U : 0x610U},{r::STATE_ST0,st0},{r::STATE_ST1,st1},{r::STATE_PMST,controls & 4 ? 2U : 0U}});
 		clocked_register_case c{{{0,std::move(initial)}},index & 1 ? 3U : 1U,24};
-		c.pipeline_frontend = true;
 		c.states.push_back({24,observation("fractional-saturating-multiply-controls", {{r::STATE_A,destination_b ? 0x12340000 : result},
 			{r::STATE_B,destination_b ? result : 0x12340000},{r::STATE_T,0x8000},{r::STATE_ST0,flags},{r::STATE_ST1,st1},
 			{r::STATE_PMST,controls & 4 ? 2U : 0U},{r::STATE_AR2,family == 0 ? 0x600U : 0x601U},

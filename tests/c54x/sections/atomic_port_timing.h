@@ -46,7 +46,6 @@ inline std::vector<clocked_register_case> section_cases()
 		}
 		clocked_register_case c{{{0,std::move(initial)},{1,observation("before-port-program",{{STATE_GENPC,0x600}})},
 			{2,observation("port-program-running",{})},{48,std::move(final)}},1,48};
-		c.pipeline_frontend = true;
 		c.observed_data_space = AS_IO;
 		c.initial_io = {{port,0xabcd},{0x123,0xabcd}};
 		c.data_events = std::vector<clocked_data_event>{{writing,port,u16(writing ? 0x1234 : 0xabcd),0,false}};

@@ -16,7 +16,7 @@ inline std::vector<clocked_register_case> section_cases()
 		auto final = observation(name,checks,memory);
 		clocked_register_case c{{{0,std::move(initial)},{1,observation("pre-far-snapshot", {{STATE_GENPC,start-1}})},
 			{2,observation("far-running", {})},{48,std::move(final)}},1,48};
-		c.pipeline_frontend = true; c.data_events = std::move(events); cases.push_back(std::move(c));
+		c.data_events = std::move(events); cases.push_back(std::move(c));
 	};
 	for (unsigned delayed = 0; delayed < 2; ++delayed) {
 		std::vector<memory_word> program{{0x20600,u16(delayed ? 0xfb83 : 0xf983)},{0x20601,0x700},

@@ -20,7 +20,6 @@ inline std::vector<clocked_register_case> section_cases()
 	// RETF is present before Prefetch; waking IDLE must not rely on code patching.
 	c.actions = {{12,{{r::STATE_IDLE,0}},false,{}, {},{{0x3ff,0xdead}}},
 		{28,{{STATE_GENPC,0x30780},{r::STATE_IDLE,0}}}};
-	c.pipeline_frontend = true;
 	c.data_events = std::vector<clocked_data_event>{{true,0x3ff,0x682,0,false},{true,0x3ff,0x782,0,false}};
 	return {std::move(c)};
 }

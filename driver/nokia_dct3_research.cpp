@@ -843,7 +843,7 @@ void nokia_dct3_state::npe3mbus(machine_config &config)
 void nse1_pipeline_fixture_state::nse1pipe(machine_config &config)
 {
 	noki5110(config);
-	subdevice<tms320c54x_device>("dsp_c54x:cpu")->set_pipeline_frontend(true);
+	subdevice<tms320c54x_device>("dsp_c54x:cpu")->reset_execution_pipeline();
 	subdevice<tms320c54x_device>("dsp_c54x:cpu")->set_standard_swwsr(true);
 }
 

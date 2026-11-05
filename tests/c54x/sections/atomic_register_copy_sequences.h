@@ -43,7 +43,7 @@ inline std::vector<clocked_register_case> section_cases()
 		} else final.expected.push_back({r::STATE_RC,0});
 		clocked_register_case c{{{0,std::move(initial)},{1,observation("pre-sequence-snapshot", {{STATE_GENPC,0x600}})},
 			{2,observation("sequence-running", {})},{64,std::move(final)}},1,64};
-		c.pipeline_frontend = true; c.data_events = std::move(events);
+		c.data_events = std::move(events);
 		if (!variant) {
 			for (unsigned prefix : {3U,4U}) {
 				auto pending = c;

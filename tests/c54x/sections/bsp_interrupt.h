@@ -28,7 +28,6 @@ inline std::vector<clocked_register_case> section_cases()
 		clocked_register_case c{{{0,std::move(initial)},{16,std::move(asleep)},
 			{17,observation("frame-edge-delivered",{})},{20,std::move(held)},
 			{25,observation("execution-hold-released",{})},{80,std::move(final)}},20,80};
-		c.pipeline_frontend = true;
 		c.initial_input_lines={{4,CLEAR_LINE},{5,CLEAR_LINE},{INPUT_LINE_HALT,CLEAR_LINE}};
 		c.actions={{16,{},false,{},{{INPUT_LINE_HALT,ASSERT_LINE}}},{24,{},false,{},{{INPUT_LINE_HALT,CLEAR_LINE}}}};
 		c.data_events=std::vector<clocked_data_event>{};

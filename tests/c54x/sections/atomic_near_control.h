@@ -27,7 +27,7 @@ inline std::vector<clocked_register_case> section_cases()
 			{r::STATE_SP,0x3000U + unsigned(v.returning && v.taken)}});
 		clocked_register_case c{{{0,std::move(initial)},{1,observation("pre-control-snapshot", {{STATE_GENPC,0x5ff}})},
 			{2,observation("control-running", {})},{32,std::move(final)}},1,32};
-		c.pipeline_frontend = true; c.data_events = std::vector<clocked_data_event>{};
+		c.data_events = std::vector<clocked_data_event>{};
 		if (v.returning && v.taken) c.data_events->push_back({false,0x3000,0x700,0,false});
 		cases.push_back(std::move(c));
 	}
@@ -39,7 +39,6 @@ inline std::vector<clocked_register_case> section_cases()
 			{{0x2fff,0x1234},{0x2ffe,0x5678},{0x62,0x5678},{0x63,0x1234}});
 		clocked_register_case c{{{0,std::move(initial)},{1,observation("pre-stack-snapshot", {{r::STATE_SP,0x3000}})},
 			{2,observation("stack-running", {})},{32,std::move(final)}},1,32};
-		c.pipeline_frontend = true;
 		// Aliasing POPM reads after the older PSHM write; other Reads precede EB.
 		c.data_events = std::vector<clocked_data_event>{{false,0x62,0x1234,6},{false,0x63,0x5678,7},
 			{true,0x2fff,0x1234,7},{true,0x2ffe,0x5678,8},{false,0x2ffe,0x5678,8},

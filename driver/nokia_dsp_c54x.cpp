@@ -23,7 +23,7 @@ nokia_dsp_c54x_device::nokia_dsp_c54x_device(const machine_config &mconfig,
 void nokia_dsp_c54x_device::device_add_mconfig(machine_config &config)
 {
 	TMS320C54X(config, m_cpu, clock());
-	m_cpu->set_pipeline_frontend(true);
+	m_cpu->reset_execution_pipeline();
 	m_cpu->set_standard_swwsr(true);
 	// ROM4 ORs its operational masks into retained IMR state and assigns its
 	// CTSI receiver to INT0. The MAD2/Lead cold-entry contract supplies bit 0;

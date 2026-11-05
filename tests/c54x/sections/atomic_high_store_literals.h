@@ -21,7 +21,7 @@ inline std::vector<clocked_register_case> section_cases()
 		// Cold staged entry has not advanced Prefetch's PC after its first clock.
 		clocked_register_case c{{{0,std::move(initial)},{1,observation("pre-store-snapshot", {{STATE_GENPC,0x600}})},
 			{2,observation("store-running", {})},{24,std::move(final)}},1,24};
-		c.pipeline_frontend = true; c.data_events = std::vector<clocked_data_event>{{true,address,word,0,false}};
+		c.data_events = std::vector<clocked_data_event>{{true,address,word,0,false}};
 		cases.push_back(std::move(c));
 	}
 	return cases;

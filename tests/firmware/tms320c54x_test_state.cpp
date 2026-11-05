@@ -16,7 +16,7 @@ void tms320c54x_test_state::machine_start()
 
 void tms320c54x_test_state::machine_reset()
 {
-	m_cpu->set_pipeline_frontend(true);
+	m_cpu->reset_execution_pipeline();
 	m_result_owner=nullptr;
 	m_context_coverage={};
 	if(profile_is("rom4-context")){m_result_owner=&tms320c54x_test_state::check_rom4_context_results;start_pipeline_mu4_prologue();return;}
@@ -66,7 +66,7 @@ void tms320c54x_test_state::machine_reset()
 	{
 		if (profile_is("fr-encoder-pipe"))
 		{
-			m_cpu->set_pipeline_frontend(true);
+			m_cpu->reset_execution_pipeline();
 			osd_printf_info("ROM4 FR encoder frontend: staged handset_audio_claim=0\n");
 		}
 		start_rom4_fr_encoder(0, 0);
@@ -77,7 +77,7 @@ void tms320c54x_test_state::machine_reset()
 	{
 		if (profile_is("fr-decoder-pipe"))
 		{
-			m_cpu->set_pipeline_frontend(true);
+			m_cpu->reset_execution_pipeline();
 			osd_printf_info("ROM4 FR decoder frontend: staged handset_audio_claim=0\n");
 		}
 		start_rom4_fr_decoder(0, true);

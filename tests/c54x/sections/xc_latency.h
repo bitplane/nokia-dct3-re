@@ -5,7 +5,6 @@ namespace c54x_test {
 inline std::vector<clocked_register_case> section_cases()
 {
 	std::vector<clocked_register_case> cases;
-	constexpr bool staged = true;
 	for (unsigned kind = 0; kind < 6; ++kind)
 	for (unsigned gap = 0; gap < 4; ++gap)
 	for (unsigned slots = 1; slots <= 2; ++slots)
@@ -32,7 +31,6 @@ inline std::vector<clocked_register_case> section_cases()
 		initial.initial.insert(initial.initial.end(), {{r::STATE_ST0,status},
 			{r::STATE_A,kind >= 2 && !(kind & 1) ? old : 0},{r::STATE_B,kind >= 2 && (kind & 1) ? old : 0}});
 		clocked_register_case c{{{0,std::move(initial)}},(kind + gap + slots + old + polarity) & 1 ? 5 + prefix : 1U,40};
-		c.pipeline_frontend = staged;
 		c.states.push_back({40,observation("one-retained-condition", {
 			{r::STATE_A,kind >= 2 && !(kind & 1) ? output : take ? 0x33U : 0U},
 			{r::STATE_B,kind >= 2 && (kind & 1) ? output : kind >= 2 && take ? 0x33U : 0U},

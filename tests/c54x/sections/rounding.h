@@ -20,7 +20,6 @@ inline std::vector<clocked_register_case> section_cases()
 		auto initial = initial_case("rounding", {u16(0xf49f | ((selectors & 2) << 8) | ((selectors & 1) << 8)),0xf4e1});
 		initial.initial.insert(initial.initial.end(), {{r::STATE_A,a},{r::STATE_B,b},{r::STATE_ST0,status},{r::STATE_ST1,ovm ? 0x200U : 0U}});
 		clocked_register_case c{{{0,std::move(initial)}},selectors & 1 ? 3U : 1U,24};
-		c.pipeline_frontend = true;
 		c.states.push_back({24,observation("rounding-boundary", {{r::STATE_A,selectors & 1 ? a : result},
 			{r::STATE_B,selectors & 1 ? result : b},{r::STATE_ST0,status},{r::STATE_ST1,ovm ? 0x200U : 0U},{STATE_GENPC,0x602}})});
 		c.data_events = std::vector<clocked_data_event>{};

@@ -22,7 +22,6 @@ inline std::vector<clocked_register_case> section_cases()
 			{r::STATE_SP,0xfff},{r::STATE_AR2,0x1234},{r::STATE_RC,0}},
 			{{0x600,0x1234},{0x601,0x1234},{0x602,0x1234},{0x603,0xdead},{0xfff,continuation}});
 		clocked_register_case c{{{0,std::move(initial)},{128,std::move(final)}},1,128};
-		c.pipeline_frontend=true;
 		c.initial_input_lines={{0,CLEAR_LINE},{INPUT_LINE_NMI,CLEAR_LINE}};
 		if (index&1) c.checkpoint_after_data_events=7;
 		if(long_count)c.program_events.push_back({false,0x10000U|u16(start+1),2,0,false});

@@ -29,7 +29,7 @@ inline std::vector<clocked_register_case> section_cases()
 		}
 		clocked_register_case c{{{0,std::move(initial)},{1,observation("pre-memory-snapshot", {{STATE_GENPC,0x5ff}})},
 			{2,observation("memory-operation-running", {})},{32,std::move(final)}},1,32};
-		c.pipeline_frontend = true; c.data_events = std::move(events); cases.push_back(std::move(c));
+		c.data_events = std::move(events); cases.push_back(std::move(c));
 	};
 	for (unsigned fractional = 0; fractional != 2; ++fractional)
 		append("ABDST-old-A-high",{0xe33a},{{r::STATE_A,0xffabcd0000ULL},{r::STATE_T,0x4444},

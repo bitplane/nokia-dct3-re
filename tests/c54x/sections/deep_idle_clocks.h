@@ -23,7 +23,6 @@ inline std::vector<clocked_register_case> section_cases()
 			{r::STATE_IFR,external ? 0x20U : enabled ? 9U : 1U}},{{0x501,u16(enabled)}});
 		clocked_register_case c{{{0,std::move(initial)},{100,std::move(asleep)},
 			{2601,observation("clock-stimulus-issued",{})},{3900,std::move(final)}},1300,3900};
-		c.pipeline_frontend = true;
 		c.initial_input_lines={{0,CLEAR_LINE},{5,CLEAR_LINE}};
 		if (!external) c.actions={{2600,{},false,{},{{0,ASSERT_LINE},{0,CLEAR_LINE}}}};
 		c.data_events=std::vector<clocked_data_event>{};

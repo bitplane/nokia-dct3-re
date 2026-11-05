@@ -18,7 +18,7 @@ public:
 	void verifier(machine_config &config)
 	{
 		TMS320C54X(config, m_cpu, 13'000'000);
-		m_cpu->set_pipeline_frontend(true);
+		m_cpu->reset_execution_pipeline();
 		m_cpu->set_standard_swwsr(true);
 		m_cpu->instruction_observer_cb().set([this](offs_t address, u16 opcode) {
 			// Prefetch may legitimately cross the end of the upload while a

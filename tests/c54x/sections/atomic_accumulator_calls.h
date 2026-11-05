@@ -22,7 +22,6 @@ inline std::vector<clocked_register_case> section_cases()
 			{r::STATE_B,delayed ? 2U : variant == 1 ? 0x700U : 3U}},{{address,value},{0x2ff,continuation}});
 		clocked_register_case c{{{0,std::move(initial)},{1,observation("pre-call-snapshot",{{STATE_GENPC,0x600}})},
 			{2,observation("call-running",{})},{48,std::move(final)}},1,48};
-		c.pipeline_frontend = true;
 		// RET's Read and the preceding ST's Execute share a clock, in that order.
 		c.data_events = std::vector<clocked_data_event>{{true,0x2ff,continuation,0,false},{false,0x2ff,continuation,0,false},{true,address,value,0,false,{},0U}};
 		c.program_events = {{false,0x700,0x76f8,0,false}}; cases.push_back(std::move(c));

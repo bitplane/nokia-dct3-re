@@ -28,7 +28,7 @@ inline std::vector<clocked_register_case> section_cases()
 		final.expected_data = initial.data;
 		clocked_register_case c{{{0,std::move(initial)},{1,observation("before-register-markers",{{STATE_GENPC,0x600}})},
 			{2,observation("register-markers-running",{})},{64,std::move(final)}},3,64};
-		c.pipeline_frontend = true; c.observed_data_space = AS_IO;
+		c.observed_data_space = AS_IO;
 		// The modeled repeat tail refills Prefetch; steady MAR retirement remains one clock.
 		c.data_events = std::vector<clocked_data_event>{{true,0x124,0x1111,0,false},{true,0x124,0x1111,0,false,{},repeat ? 22U : load ? 5U : 4U}};
 		cases.push_back(std::move(c));

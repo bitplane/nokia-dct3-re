@@ -27,7 +27,6 @@ inline std::vector<clocked_register_case> section_cases()
 			{r::STATE_AR3,v.ar3},{r::STATE_ST0,0xaa5},{r::STATE_ST1,v.sxm ? 0x100U : 0U}},{{v.source,0xff80}});
 		clocked_register_case c{{{0,std::move(initial)},{1,observation("pre-load-snapshot", {{STATE_GENPC,0x600}})},
 			{2,observation("load-running", {})},{16,std::move(final)}},1,16};
-		c.pipeline_frontend = true;
 		c.data_events = std::vector<clocked_data_event>{{false,v.source,0xff80,0,false}};
 		cases.push_back(std::move(c));
 	}

@@ -35,7 +35,6 @@ inline std::vector<clocked_register_case> section_cases()
 			{r::STATE_ST1,u64(poly ? (v & 4 ? 0x40 : 0) | (v & 8 ? 0x200 : 0) | (v & 16 ? 0x100 : 0) :
 				0x100 | (v & 1 ? 0x40 : 0) | (v & 2 ? 0x200 : 0))}});
 		clocked_register_case c{{{0,std::move(initial)}},index & 1 ? 3U : 1U,24};
-		c.pipeline_frontend = true;
 		c.states.push_back({24,observation("arithmetic-boundary-result", {{r::STATE_A,a},{r::STATE_B,b},
 			{r::STATE_ST0,flags},{r::STATE_T,poly ? 1U : 0x1234U},{r::STATE_AR2,0x600},{r::STATE_AR3,0x601},{STATE_GENPC,0x602}})});
 		c.data_events = std::vector<clocked_data_event>{{false,0x600,u16(poly ? 0xffff : 0),0,false}};

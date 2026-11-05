@@ -37,7 +37,7 @@ inline std::vector<clocked_register_case> section_cases()
 		if (v.opcode == 0xec05) final.expected.push_back({r::STATE_RC,0});
 		clocked_register_case c{{{0,std::move(initial)},{1,observation("before-memory-markers",{{STATE_GENPC,0x600}})},
 			{2,observation("memory-markers-running",{})},{64,std::move(final)}},3,64};
-		c.pipeline_frontend = true; c.observed_data_space = AS_IO;
+		c.observed_data_space = AS_IO;
 		c.data_events = std::vector<clocked_data_event>{{true,0x124,0x1234,0,false}};
 		if (port) c.data_events->push_back({true,0x124,0xabcd,0,false,{},2});
 		c.data_events->push_back({true,0x124,0x5678,0,false,{},port ? 2U : v.interval});

@@ -29,7 +29,7 @@ inline std::vector<clocked_register_case> section_cases()
 		if (variant >= 3) final.expected_data.push_back({0xd40,0xface});
 		clocked_register_case c{{{0,std::move(initial)},{1,observation("pre-literal-snapshot", {{STATE_GENPC,0x600}})},
 			{2,observation("literal-running", {})},{32,std::move(final)}},1,32};
-		c.pipeline_frontend = true; c.data_events = std::vector<clocked_data_event>{};
+		c.data_events = std::vector<clocked_data_event>{};
 		if (variant <= 2) c.data_events->push_back({false,address,before,0,false});
 		if (variant != 2) c.data_events->push_back({true,address,after,0,false});
 		if (variant >= 3) c.program_events = {{false,0xd40,0xabcd,0,false}};

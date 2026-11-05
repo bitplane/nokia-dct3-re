@@ -18,7 +18,6 @@ inline std::vector<clocked_register_case> section_cases()
 		initial.initial.insert(initial.initial.end(), {{STATE_GENPC,0x800},{r::STATE_ST1,nmi ? 0x800U : 0U},
 			{r::STATE_IMR,1},{r::STATE_IFR,3}});
 		clocked_register_case c{{{0,std::move(initial)}},checkpoint,24};
-		c.pipeline_frontend = true;
 		c.instruction_events = std::vector<memory_word>{{vector,0xf020},{u32(vector+2),0xf4e1}};
 		if (nmi) c.initial_input_lines = {{line,ASSERT_LINE},{line,CLEAR_LINE}};
 		for (unsigned tick = 1; tick <= 5; ++tick) c.states.push_back({tick,observation("entry-ownership-boundary", {
@@ -45,7 +44,6 @@ inline std::vector<clocked_register_case> section_cases()
 			{4,observation("vector-captured-before-stack-write", {{r::STATE_SP,0xfff},{r::STATE_A,0}},{{0xfff,0xbeef}})},
 			{5,observation("entry-cancelled", {{r::STATE_A,0}})},
 			{24,observation("foreground-idle-not-vector", {{STATE_GENPC,0x801},{r::STATE_A,0}})}},2,24};
-		c.pipeline_frontend = true;
 		c.initial_input_lines = {{INPUT_LINE_NMI,ASSERT_LINE},{INPUT_LINE_NMI,CLEAR_LINE}};
 		c.actions = {{4,{{reset ? int(STATE_GENPC) : int(r::STATE_PC),0x800},{r::STATE_IDLE,0}},false,{},{},{},reset}};
 		c.actions.push_back({6,{{r::STATE_IMR,0}}});

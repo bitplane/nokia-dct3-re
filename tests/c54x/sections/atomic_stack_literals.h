@@ -17,7 +17,7 @@ inline std::vector<clocked_register_case> section_cases()
 		auto final = observation(name,checks,memory); final.expected.push_back({STATE_GENPC,0x601 + unsigned(words.size())});
 		clocked_register_case c{{{0,std::move(initial)},{1,observation("pre-stack-snapshot", {{STATE_GENPC,0x5ff}})},
 			{2,observation("stack-operation-running", {})},{32,std::move(final)}},1,32};
-		c.pipeline_frontend = true; c.data_events = std::move(events); cases.push_back(std::move(c));
+		c.data_events = std::move(events); cases.push_back(std::move(c));
 	};
 	append("SSBX-INTM-and-PSHM-AL",{0xf7bb,0x4a08},{{r::STATE_A,0x12345678},{r::STATE_ST1,0}},{{0x2ff,0}},
 		{{r::STATE_A,0x12345678},{r::STATE_SP,0x2ff},{r::STATE_ST1,0x800}},{{0x2ff,0x5678}},

@@ -27,7 +27,6 @@ inline std::vector<clocked_register_case> section_cases()
 		final.expected_program = {{0x700,0x1234}};
 		clocked_register_case c{{{0,std::move(initial)},{1,observation("pre-MAC-snapshot", {{STATE_GENPC,0x5ff}})},
 			{2,observation("MAC-running", {})},{32,std::move(final)}},1,32};
-		c.pipeline_frontend = true;
 		c.program_events = {{false,0x700,0x1234,0,false}};
 		c.data_events = std::vector<clocked_data_event>{{false,source,0x55,0,false}};
 		if (move) c.data_events->push_back({true,source + 1,0x55,0,false});

@@ -32,7 +32,7 @@ inline std::vector<clocked_register_case> section_cases()
 		else if (variant >= 2) final.expected_data[5].value = 0x5678;
 		clocked_register_case c{{{0,std::move(initial)},{1,observation("before-transfer-markers",{{STATE_GENPC,0x600}})},
 			{2,observation("transfer-markers-running",{})},{48,std::move(final)}},3,48};
-		c.pipeline_frontend = true; c.observed_data_space = AS_IO;
+		c.observed_data_space = AS_IO;
 		c.data_events = mvdk ? std::vector<clocked_data_event>{{true,0x124,0x2222,0,false},{true,0x124,0x1111,0,false,{},4}} :
 			std::vector<clocked_data_event>{{true,0x124,0x1111,0,false},{true,0x124,0x1111,0,false,{},5}};
 		cases.push_back(std::move(c));

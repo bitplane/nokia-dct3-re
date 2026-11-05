@@ -611,7 +611,7 @@ private:
 			{
 				// Repeat the same pending-word/pin contract with staged execution;
 				// this does not assert the silicon's peripheral-write phase.
-				m_cpu->set_pipeline_frontend(true);
+				m_cpu->reset_execution_pipeline();
 				++m_case; m_stage = 80;
 				m_timer->adjust(attotime::from_usec(100)); return;
 			}

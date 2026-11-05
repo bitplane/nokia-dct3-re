@@ -102,7 +102,6 @@ struct clocked_register_case
 	std::vector<clocked_data_event> program_events{}; // Reads at listed addresses; any write expectation enables whole-program write observation.
 	std::vector<std::array<u32,2>> data_ranges{}; // Empty means the whole data bus.
 	std::vector<clocked_irq_expectation> irqs{};
-	bool pipeline_frontend = true;
 	std::vector<register_setting> initial_input_lines{};
 	bool extended_program = true;
 	std::optional<std::vector<bool>> xf_events{}; // Instruction/debugger publications; setup and post-load re-drive are separate.
@@ -111,7 +110,7 @@ struct clocked_register_case
 	std::optional<std::vector<clocked_data_event>> io_events{}; // Additional IO observation when data_events covers RAM/MMRs.
 	bool initial_bio = true;
 	bool initial_ready = true;
-	bool bus_uses_elapsed_clocks = false; // Atomic external transfers have no staged pipeline counter.
+	bool bus_uses_elapsed_clocks = false; // Select CPU elapsed clocks instead of pipeline clocks for bus observations.
 	std::optional<std::vector<clocked_line_sample>> bio_samples{};
 	bool observe_data_reads = true; // Write-only contracts can leave variable polling reads unconstrained.
 	std::optional<std::vector<memory_word>> instruction_events{}; // Bounded logical Execute address/opcode sequence, not fetch history.

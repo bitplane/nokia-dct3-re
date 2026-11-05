@@ -18,7 +18,6 @@ inline std::vector<clocked_register_case> section_cases()
 			{0xfffe,0xaaaa},{0xffff,0xbbbb},{0,0xcccc},{0x20000,0xdddd}};
 		clocked_register_case c{{{0,std::move(initial)},{1,observation("pre-repeat-snapshot", {{STATE_GENPC,0x107ff}})},
 			{2,observation("repeat-running", {})},{64,std::move(final)}},1,64};
-		c.pipeline_frontend = true;
 		c.data_events = std::vector<clocked_data_event>{{false,0x500,0x1234,0,false},{false,0x501,0x5678,0,false},
 			{false,0x502,0x9abc,0,false},{true,0x503,0x1234,0,false},{true,0x504,0x5678,0,false},{true,0x505,0x9abc,0,false}};
 		c.program_events = {{false,0x2fffe,0x1234,0,false},{false,0x2ffff,0x5678,0,false},{false,0x30000,0x9abc,0,false}};
@@ -35,7 +34,6 @@ inline std::vector<clocked_register_case> section_cases()
 		final.expected_program = {{7,0x1234},{0x20007,0xaaaa},{0x20600,0xf4e1}};
 		clocked_register_case c{{{0,std::move(initial)},{1,observation("pre-overlay-transfer-snapshot", {{STATE_GENPC,0x20600}})},
 			{2,observation("overlay-transfer-running", {})},{48,std::move(final)}},1,48};
-		c.pipeline_frontend = true;
 		c.data_events = std::vector<clocked_data_event>{{false,0x500,0x1234,0,false},{true,0x501,0x1234,0,false}};
 		c.program_events = {{false,7,0x1234,0,false}};
 		cases.push_back(std::move(c));
@@ -47,7 +45,6 @@ inline std::vector<clocked_register_case> section_cases()
 		clocked_register_case c{{{0,std::move(initial)},{1,observation("before-ARP", {{STATE_GENPC,0x600}})},
 			{2,observation("ARP-loaded", {})},{16,observation("only-ARP-field-changed", {{STATE_GENPC,0x603},
 				{r::STATE_ST0,0x1abc | (arp << 13)}})}},1,16};
-		c.pipeline_frontend = true;
 		c.data_events = std::vector<clocked_data_event>{};
 		cases.push_back(std::move(c));
 	}
@@ -59,7 +56,6 @@ inline std::vector<clocked_register_case> section_cases()
 		clocked_register_case c{{{0,std::move(initial)},{1,observation("before-DP", {{STATE_GENPC,0x600}})},
 			{2,observation("DP-loading", {})},{16,observation("only-nine-DP-bits-loaded", {{STATE_GENPC,0x604},
 				{r::STATE_ST0,u64(0xfe00 | (value & 0x1ff))}})}},1,16};
-		c.pipeline_frontend = true;
 		c.data_events = std::vector<clocked_data_event>{{false,0x500,value,0,false}};
 		cases.push_back(std::move(c));
 	}

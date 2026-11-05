@@ -29,7 +29,7 @@ public:
 	{
 		// Initial configured rate is replaced by the evidenced compatibility reset.
 		TMS320C54X(config, m_cpu, 13'000'000);
-		m_cpu->set_pipeline_frontend(true);
+		m_cpu->reset_execution_pipeline();
 		m_cpu->set_c5416_bus_profile(true);
 		// Sheet 4: R101 pulls CLKMD1/2/3 high. SPRS095P table 3-8,
 		// matching C5416 PGE pin/MMIO layout: 111 -> 0000, Y101 / 2.
@@ -4192,7 +4192,7 @@ private:
 			{
 				// Fail-closed coverage diagnostic from the original serial entry.
 				// No atomic fallback and no firmware-PC-conditioned switch.
-				m_cpu->set_pipeline_frontend(true);
+				m_cpu->reset_execution_pipeline();
 				logerror("mu4_staged_original: enabled=1 entry=000e41 atomic_fallback=0 acceptance=0\n");
 			}
 			m_phase = 30;
@@ -6330,7 +6330,7 @@ private:
 		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x1800);
 		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x610f);
 		m_cpu->set_state_int(STATE_GENPC, 0x1000);
-		m_cpu->set_pipeline_frontend(true);
+		m_cpu->reset_execution_pipeline();
 		m_check->adjust(attotime::from_msec(m_expected_calls > 32 ? 45000 : m_expected_calls > 8 ? 8000 : m_expected_calls > 1 ? 2000 : 250));
 		logerror("mu4_aac_abi_setup: original_upload_words=%u original_initializers=%u input_bytes=2048 output_base=%04x output_words=2048 constructor=023d27 process=023d5d isolated_abi=1 handset_boot=0 conformance=0\n",total,initializers,OUTPUT_BASE);
 	}

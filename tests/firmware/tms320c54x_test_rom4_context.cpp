@@ -35,7 +35,7 @@ void tms320c54x_test_state::start_pipeline_mu4_prologue(unsigned variant)
 	m_cpu->space(AS_DATA).write_word(0x7f, 0xe012);
 	m_cpu->space(AS_DATA).write_word(0x936, 0x4044);
 	m_cpu->set_state_int(STATE_GENPC, base + 0x3d73);
-	m_cpu->set_pipeline_frontend(true);
+	m_cpu->reset_execution_pipeline();
 	m_pipeline_replay = false; m_pipeline_expected_cycle = 1; m_pipeline_store_writes = 0;
 	m_pipeline_operand_reads = m_pipeline_extensions_reads = 0;
 	m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0xff7, 0xfff, "staged_mu4_context_save",
@@ -83,7 +83,7 @@ void tms320c54x_test_state::start_pipeline_original_worker_roundtrip(unsigned va
 		{cpu_regs::STATE_AR0, 0x5678}, {cpu_regs::STATE_AR2, 0x510}, {cpu_regs::STATE_IFR, 0}, {cpu_regs::STATE_IMR, 1},
 	});
 	m_cpu->space(AS_DATA).write_word(0x510, 0xbeef); m_cpu->space(AS_DATA).write_word(0x511, 1);
-	m_cpu->set_state_int(STATE_GENPC, 0x23d92); m_cpu->set_pipeline_frontend(true);
+	m_cpu->set_state_int(STATE_GENPC, 0x23d92); m_cpu->reset_execution_pipeline();
 	m_pipeline_replay = false; m_pipeline_expected_cycle = 1;
 	m_pipeline_operand_reads = m_pipeline_extensions_reads = m_pipeline_store_writes = m_pipeline_drained_fetches = m_vector_reads = 0;
 	m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0xffe, 0xfff, "worker_roundtrip_stack_reads",
@@ -161,7 +161,7 @@ void tms320c54x_test_state::start_pipeline_original_context_call(unsigned varian
 		data.write_word(0x514, 0xff0f); data.write_word(0x515, 0x00f0);
 		for (unsigned i = 0; i < 4; ++i) data.write_word(0x470 + i, 0x7777);
 	}
-	m_cpu->set_state_int(STATE_GENPC, base + 0x3d73); m_cpu->set_pipeline_frontend(true);
+	m_cpu->set_state_int(STATE_GENPC, base + 0x3d73); m_cpu->reset_execution_pipeline();
 	m_pipeline_replay = false; m_pipeline_expected_cycle = 1;
 	m_pipeline_store_writes = m_pipeline_operand_reads = m_pipeline_extensions_reads = 0;
 	m_pipeline_drained_fetches = m_vector_reads = 0;
@@ -232,7 +232,7 @@ void tms320c54x_test_state::start_pipeline_mu4_timer_context(unsigned variant)
 		{cpu_regs::STATE_PMST, 0x2020}, {cpu_regs::STATE_ST1, 0x4200 | (sxm ? 0x100 : 0)}, {cpu_regs::STATE_A, 0x77},
 		{cpu_regs::STATE_IMR, 8}, {cpu_regs::STATE_IFR, 0},
 	});
-	m_cpu->set_state_int(STATE_GENPC, foreground); m_cpu->set_pipeline_frontend(true);
+	m_cpu->set_state_int(STATE_GENPC, foreground); m_cpu->reset_execution_pipeline();
 	m_cpu->set_state_int(tms320c54x_device::STATE_PRD, 0xffff);
 	m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x20);
 	m_cpu->set_state_int(tms320c54x_device::STATE_TIM, 31);
@@ -369,7 +369,7 @@ void tms320c54x_test_state::start_pipeline_original_idle(unsigned variant)
 	});
 	auto &data = m_cpu->space(AS_DATA);
 	data.write_word(sp, 0x700); data.write_word(0xa531, skip ? 1 : 0);
-	m_cpu->set_state_int(STATE_GENPC, 0x23d2f); m_cpu->set_pipeline_frontend(true);
+	m_cpu->set_state_int(STATE_GENPC, 0x23d2f); m_cpu->reset_execution_pipeline();
 	if (service && !initialize)
 	{
 		m_cpu->set_state_int(tms320c54x_device::STATE_PRD, 0xffff);
@@ -421,7 +421,7 @@ void tms320c54x_test_state::start_pipeline_idle_sp_tail(unsigned variant)
 		{cpu_regs::STATE_A, 0x77}, {cpu_regs::STATE_IFR, 0}, {cpu_regs::STATE_IMR, 0},
 	});
 	m_cpu->space(AS_DATA).write_word(0xffe, 0x1000); m_cpu->space(AS_DATA).write_word(0x1000, 0x700);
-	m_cpu->set_state_int(STATE_GENPC, 0x23d3a); m_cpu->set_pipeline_frontend(true);
+	m_cpu->set_state_int(STATE_GENPC, 0x23d3a); m_cpu->reset_execution_pipeline();
 	m_pipeline_replay = false; m_pipeline_expected_cycle = 1; m_pipeline_operand_reads = m_pipeline_register_writes = m_pipeline_extensions_reads = 0;
 	m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0xffe, 0x1000, "idle_original_sp_return_sources",
 		[this](offs_t address, u16 &value, u16) {

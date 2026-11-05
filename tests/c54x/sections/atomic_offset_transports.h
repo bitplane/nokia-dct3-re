@@ -29,7 +29,7 @@ inline std::vector<clocked_register_case> section_cases()
 		final.expected_program = {{0x9000,u16(variant == 1 ? 0xbeef : variant == 2 ? 0x1234 : 0)}};
 		clocked_register_case c{{{0,std::move(initial)},{1,observation("before-transport-markers",{{STATE_GENPC,0x600}})},
 			{2,observation("transport-markers-running",{})},{64,std::move(final)}},3,64};
-		c.pipeline_frontend = true; c.observed_data_space = AS_IO; c.initial_io = {{0x123,0xabcd}};
+		c.observed_data_space = AS_IO; c.initial_io = {{0x123,0xabcd}};
 		c.data_events = std::vector<clocked_data_event>{{true,0x124,0x1111,0,false}};
 		if (variant == 0 || variant == 3) c.data_events->push_back({variant == 0,u32(variant == 0 ? 0x124 : 0x123),0xabcd,0,false,
 			{},variant == 3 ? std::optional<unsigned>(2) : std::nullopt});

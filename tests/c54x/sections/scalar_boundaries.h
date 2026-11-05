@@ -56,7 +56,6 @@ inline std::vector<clocked_register_case> section_cases()
 			{STATE_GENPC,v.extended ? 0x603U : 0x602U}});
 		if (v.status_mask) final.expected.push_back({r::STATE_ST0,v.expected_st0,v.status_mask});
 		clocked_register_case c{{{0,std::move(initial)},{32,std::move(final)}},cases.size() & 1 ? 1U : 8U,32};
-		c.pipeline_frontend = true;
 		c.data_events = std::vector<clocked_data_event>{};
 		if (memory) c.data_events->push_back({false,0xa80,1,0,false});
 		cases.push_back(std::move(c));

@@ -28,7 +28,6 @@ inline std::vector<clocked_register_case> section_cases()
 		if (v.mask) final.expected.push_back({r::STATE_ST0,v.flags,v.mask});
 		clocked_register_case c{{{0,std::move(initial)},{1,observation("before-square", {{r::STATE_A,v.a},{r::STATE_B,v.b}})},
 			{2,observation("square-running", {})},{32,std::move(final)}},1,32};
-		c.pipeline_frontend = true;
 		c.data_events = std::vector<clocked_data_event>{};
 		if (memory) c.data_events->push_back({false,0x5000,v.word,0,false});
 		cases.push_back(std::move(c));

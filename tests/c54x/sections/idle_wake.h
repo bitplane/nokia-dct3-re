@@ -22,7 +22,7 @@ inline std::vector<clocked_register_case> section_cases()
 			{r::STATE_IFR,serviced || continued ? 0U : timer ? 8U : 1U}},{{0x501,u16(continued ? 1 : 0)},{0xfff,u16(serviced ? 0x901 : 0x5a5a)}});
 		clocked_register_case c{{{0,std::move(initial)},{16,std::move(asleep)},
 			{17,observation("wake-source-pending",{})},{128,std::move(final)}},12,128};
-		c.pipeline_frontend = true; c.initial_input_lines={{0,CLEAR_LINE}};
+		c.initial_input_lines={{0,CLEAR_LINE}};
 		if (timer) c.actions={{16,{{r::STATE_PRD,9},{r::STATE_TCR,0x20}}}};
 		else c.actions={{16,{},false,{},{{0,ASSERT_LINE},{0,CLEAR_LINE}}}};
 		c.data_events=std::vector<clocked_data_event>{};

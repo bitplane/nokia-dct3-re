@@ -20,7 +20,7 @@ inline std::vector<clocked_register_case> section_cases()
 		final.expected_data = initial.data;
 		clocked_register_case c{{{0,std::move(initial)},{1,observation("before-indirect-port-markers",{{STATE_GENPC,0x600}})},
 			{2,observation("indirect-port-markers-running",{})},{48,std::move(final)}},3,48};
-		c.pipeline_frontend = true; c.observed_data_space = AS_IO;
+		c.observed_data_space = AS_IO;
 		c.data_events = std::vector<clocked_data_event>{{true,0x124,0x1111,0,false},{true,0x124,values[variant],0,false},
 			{true,0x124,0x1111,0,false,{},{},5}};
 		cases.push_back(std::move(c));

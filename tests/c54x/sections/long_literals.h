@@ -59,7 +59,6 @@ inline std::vector<clocked_register_case> section_cases()
 		if (v.mask) final.expected.push_back({r::STATE_ST0,v.flags,v.mask});
 		clocked_register_case c{{{0,std::move(initial)},{1,observation("pre-arithmetic-snapshot", {{r::STATE_A,v.a},{r::STATE_B,v.b}})},
 			{2,observation("arithmetic-running", {})},{32,std::move(final)}},1,32};
-		c.pipeline_frontend = true;
 		c.data_events = std::vector<clocked_data_event>{{false,address,v.high,0,false},{false,u32(address + 1),v.low,0,false}};
 		if (v.opcode == 0x5a93) {
 			auto poisoned = c;

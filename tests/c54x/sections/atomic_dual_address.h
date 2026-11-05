@@ -36,7 +36,6 @@ inline std::vector<clocked_register_case> section_cases()
 		for (unsigned i = 0; i < 4; ++i) final.expected.push_back({int(r::STATE_AR2) + int(i),v.final_pointers[i]});
 		clocked_register_case c{{{0,std::move(initial)},{1,observation("pre-operation-snapshot", {{r::STATE_A,v.a},{r::STATE_B,v.b}})},
 			{2,observation("operation-running", {})},{32,std::move(final)}},1,32};
-		c.pipeline_frontend = true;
 		c.data_events = std::vector<clocked_data_event>{{false,v.xaddress,v.x,0,false},
 			{v.store,v.yaddress,v.store ? v.stored : v.y,0,false}};
 		cases.push_back(std::move(c));

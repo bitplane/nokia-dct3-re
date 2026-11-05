@@ -29,7 +29,7 @@ inline std::vector<clocked_register_case> section_cases()
 		if (port_read) final.expected_data[variant ? 3 : 1].value = 0xabcd;
 		clocked_register_case c{{{0,std::move(initial)},{1,observation("before-load-markers",{{STATE_GENPC,0x600}})},
 			{2,observation("load-markers-running",{})},{48,std::move(final)}},3,48};
-		c.pipeline_frontend = true; c.observed_data_space = AS_IO; c.initial_io = {{0x123,0xabcd}};
+		c.observed_data_space = AS_IO; c.initial_io = {{0x123,0xabcd}};
 		c.data_events = port_read ? std::vector<clocked_data_event>{{true,0x124,0x1234,0,false},
 			{false,0x123,0xabcd,0,false},{false,0x123,0xabcd,0,false,{},2}} :
 			std::vector<clocked_data_event>{{true,0x124,0x1111,0,false},{true,0x124,0x1111,0,false,{},4}};

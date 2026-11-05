@@ -18,7 +18,7 @@ inline std::vector<clocked_register_case> section_cases()
 		auto final = observation("move-completes-with-owned-pointer-and-count", {{STATE_GENPC,0x601 + at},
 			{r::STATE_AR2,to_mmr ? repeat ? 0x3333U : 0x1234U : repeat ? 0x4455U : 0x1234U}});
 		if (repeat) final.expected.push_back({r::STATE_RC,0});
-		clocked_register_case c{{},1,48}; c.pipeline_frontend = true;
+		clocked_register_case c{{},1,48};
 		c.data_events = std::vector<clocked_data_event>{};
 		for (unsigned i = 0; i != (repeat ? 3U : 1U); ++i) {
 			u16 const word = to_mmr ? repeat ? 0x1111 * (i + 1) : 0x1234 : repeat ? 0x4455 : 0x1234;

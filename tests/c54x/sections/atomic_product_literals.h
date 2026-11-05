@@ -17,7 +17,7 @@ inline std::vector<clocked_register_case> section_cases()
 		for (auto const &event : events) if (event.write) final.expected_data.push_back({event.address,event.value});
 		clocked_register_case c{{{0,std::move(initial)},{1,observation("pre-product-snapshot", {{STATE_GENPC,0x5ff}})},
 			{2,observation("product-running", {})},{32,std::move(final)}},1,32};
-		c.pipeline_frontend = true; c.data_events = std::move(events); cases.push_back(std::move(c));
+		c.data_events = std::move(events); cases.push_back(std::move(c));
 	};
 	append("MPYA signed17",{0xf58c},{{r::STATE_A,0x80000000},{r::STATE_B,0},{r::STATE_T,2}},
 		{{r::STATE_A,0x80000000},{r::STATE_B,0x10000},{r::STATE_T,2}});

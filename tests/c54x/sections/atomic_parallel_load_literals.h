@@ -39,7 +39,7 @@ inline std::vector<clocked_register_case> section_cases()
 		} else events = {{false,variant == 6 ? 0x12U : 0x11U,u16(variant == 6 ? 0x9abc : 0xabcd),0,false}};
 		clocked_register_case c{{{0,std::move(initial)},{1,observation("pre-literal-snapshot", {{STATE_GENPC,0x600}})},
 			{2,observation("literal-running", {})},{24,std::move(final)}},1,24};
-		c.pipeline_frontend = true; c.data_events = std::move(events); cases.push_back(std::move(c));
+		c.data_events = std::move(events); cases.push_back(std::move(c));
 	}
 	return cases;
 }

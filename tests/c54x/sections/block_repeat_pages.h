@@ -6,7 +6,6 @@ namespace c54x_test {
 inline std::vector<clocked_register_case> section_cases()
 {
 	std::vector<clocked_register_case> cases;
-	constexpr bool staged = true;
 	for (bool delayed : {false,true}) for (bool hazard : {false,true})
 	for (unsigned count : {0U,1U,2U,7U}) for (unsigned pair=0;pair<3;++pair) {
 		u32 const caller=std::array<u32,3>{0,0x20000,0x7f0000}[pair], target=std::array<u32,3>{0x20000,0x7f0000,0}[pair];
@@ -25,8 +24,8 @@ inline std::vector<clocked_register_case> section_cases()
 			{r::STATE_AR7,0x1700+(delayed ? calls : 0)},{r::STATE_BRC,0},{r::STATE_RSA,0x602},{r::STATE_REA,0x609},
 			{r::STATE_ST0,0xa608},{r::STATE_ST1,0x900}});
 		clocked_register_case c{{{0,std::move(initial)},{240,std::move(final)}},
-			std::array<unsigned,4>{6,10,16,24}[(count+pair+unsigned(staged)+unsigned(hazard))%4],240};
-		c.pipeline_frontend=staged;c.data_events=std::vector<clocked_data_event>{};
+			std::array<unsigned,4>{6,10,16,24}[(count+pair+1U+unsigned(hazard))%4],240};
+		c.data_events=std::vector<clocked_data_event>{};
 		for(unsigned i=0;i<calls;++i) {
 			c.data_events->push_back({true,0x2fff,return_pc,0,false});c.data_events->push_back({true,0x2ffe,u16(caller>>16),0,false});
 			c.data_events->push_back({false,0x2ffe,u16(caller>>16),0,false});c.data_events->push_back({false,0x2fff,return_pc,0,false});

@@ -17,7 +17,6 @@ inline std::vector<clocked_register_case> section_cases()
 			{r::STATE_A,values[index]},{r::STATE_ST0,overflow ? 0x400U : 0U}});
 		initial.data = {{0xfff,0xbeef}};
 		clocked_register_case c{{{0,std::move(initial)}},index & 1 ? 4U : 1U,40};
-		c.pipeline_frontend = true;
 		c.states.push_back({40,observation("predicate-before-delays", {{r::STATE_A,0},{r::STATE_B,taken ? 2U : 1U},
 			{r::STATE_SP,0x1000},{STATE_GENPC,0x10605},{r::STATE_XPC,1}},{{0xfff,u16(taken ? 0x604 : 0xbeef)}})});
 		if (index >= 4) c.states.back().observation.expected.push_back({r::STATE_ST0,0,0x400});

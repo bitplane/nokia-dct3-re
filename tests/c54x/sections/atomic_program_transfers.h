@@ -27,7 +27,7 @@ inline std::vector<clocked_register_case> section_cases()
 		auto final = observation("independent-address-spaces-and-retained-A", {{STATE_GENPC,0x601 + at},
 			{r::STATE_AR2,v.absolute ? v.data : unsigned(v.data + v.count)},{r::STATE_A,v.program}});
 		if (v.count == 3) final.expected.push_back({r::STATE_RC,0});
-		clocked_register_case c{{},1,48}; c.pipeline_frontend = true;
+		clocked_register_case c{{},1,48};
 		c.data_events = std::vector<clocked_data_event>{};
 		for (unsigned i = 0; i < v.count; ++i) {
 			u16 const word = v.count == 3 ? std::array<u16,3>{0x1357,0x2468,0x369a}[i] : v.word;

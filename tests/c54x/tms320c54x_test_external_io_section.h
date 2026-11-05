@@ -28,7 +28,7 @@ inline std::vector<clocked_register_case> external_io_cases(bool extended_forms,
 		if (!write) final.expected_data.push_back({address,value});
 		unsigned const checkpoint=std::array<unsigned,3>{first-1,first+1,complete+1}[(form+selector+multiplier+unsigned(write)+unsigned(hold)+irq)%3];
 		clocked_register_case c{{{0,std::move(initial)},{complete+16,std::move(final)}},checkpoint,complete+16};
-		c.pipeline_frontend=true; c.initial_ready=!hold;
+		c.initial_ready=!hold;
 		c.initial_io={{0x125,0x1234}}; c.initial_input_lines={{0,CLEAR_LINE},{INPUT_LINE_NMI,CLEAR_LINE}};
 		if (write) {
 			clocked_register_action poison{first-1,{}};

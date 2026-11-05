@@ -19,7 +19,6 @@ inline std::vector<clocked_register_case> section_cases()
 		initial.initial.insert(initial.initial.end(), {{r::STATE_SP,0x1000},{r::STATE_ST0,0x30},
 			{r::STATE_ST1,dp ? 0x800U : 0x4800U},{r::STATE_A,0x4044},{r::STATE_B,0x1234}});
 		clocked_register_case c{{{0,std::move(initial)}},index & 1 ? 3U : 1U,32};
-		c.pipeline_frontend = true;
 		c.states.push_back({32,observation("category-I-latency-category-II-forwarding", {{r::STATE_SP,final_sp},
 			{r::STATE_A,0x4044},{r::STATE_B,producer == 0 ? 0x5566U : 0x1234U},{STATE_GENPC,0x601 + cursor}},{{address,0x4044}})});
 		c.data_events = std::vector<clocked_data_event>{};

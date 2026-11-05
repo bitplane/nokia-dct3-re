@@ -239,7 +239,7 @@ void tms320c54x_test_state::enable_rom4_codec_pipeline(char const *kind)
 	std::string_view const bios(machine().options().bios());
 	if(bios.size()>5 && bios.substr(bios.size()-5)=="-pipe")
 	{
-		m_cpu->set_pipeline_frontend(true);
+		m_cpu->reset_execution_pipeline();
 		osd_printf_info("ROM4 %s frontend: staged handset_audio_claim=0\n",kind);
 	}
 }
@@ -924,7 +924,7 @@ bool tms320c54x_test_state::check_rom4_fr_decoder_results()
 		{
 			// The existing delayed-repeat preflight is atomic; the acquired
 			// decoder reset and every frame below use the staged frontend.
-			m_cpu->set_pipeline_frontend(true);
+			m_cpu->reset_execution_pipeline();
 			osd_printf_info("ROM4 EFR decoder frontend: staged handset_audio_claim=0\n");
 		}
 		start_rom4_efr_decoder(0, true); return true;

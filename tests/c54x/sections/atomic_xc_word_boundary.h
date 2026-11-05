@@ -19,7 +19,6 @@ inline std::vector<clocked_register_case> section_cases()
 		if (irq) final.expected_data.back().value = 0x60a;
 		clocked_register_case c{{{0,std::move(initial)},{1,observation("before-XC-markers",{{STATE_GENPC,0x600}})},
 			{2,observation("XC-markers-running",{})},{96,std::move(final)}},3,96};
-		c.pipeline_frontend = true;
 		if (irq) {
 			c.data_events = std::vector<clocked_data_event>{{false,0x100,0x1111,0,false},{false,0x120,1,0,false,2},
 				{false,0x100,0x1111,0,false},{true,0x2ff,0x60a,0,false},{false,0x121,0,0,false},{false,0x2ff,0x60a,0,false}};

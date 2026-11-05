@@ -21,7 +21,6 @@ inline std::vector<clocked_register_case> section_cases()
 		}
 		initial.initial.insert(initial.initial.end(), {{r::STATE_BRC,3},{r::STATE_AR1,0},{r::STATE_ST1,0}});
 		clocked_register_case c{{{0,std::move(initial)}},kind & 1 ? 6U : 1U,64};
-		c.pipeline_frontend = true;
 		c.states.push_back({64,observation("architectural-braf-control", {{r::STATE_AR1,kind == 3 ? 4U : 1U},
 			{r::STATE_BRC,kind == 3 ? 0U : 3U},{r::STATE_SP,kind == 2 ? 0x1001U : 0x1000U},
 			{r::STATE_ST1,0,0x8000},{STATE_GENPC,kind == 3 ? 0x60bU : 0x60dU}})});
@@ -39,7 +38,6 @@ inline std::vector<clocked_register_case> section_cases()
 		initial.program[body - 0x600 + 1].value = 0xf4e1;
 		initial.initial.insert(initial.initial.end(), {{r::STATE_BRC,3},{r::STATE_AR1,0},{r::STATE_ST1,0}});
 		clocked_register_case c{{{0,std::move(initial)}},extended ? 6U : 1U,96};
-		c.pipeline_frontend = true;
 		c.states.push_back({96,observation("nested-loop-counts", {{r::STATE_AR1,4 * (count + 1)},
 			{r::STATE_BRC,0},{r::STATE_ST1,0,0x8000}})});
 		c.data_events = std::vector<clocked_data_event>{};

@@ -25,7 +25,7 @@ inline std::vector<clocked_register_case> section_cases()
 		}
 		clocked_register_case c{{{0,std::move(initial)},{1,observation("pre-transfer-snapshot", {{STATE_GENPC,0x5ff}})},
 			{2,observation("transfer-running", {})},{48,std::move(final)}},1,48};
-		c.pipeline_frontend = true; c.data_events = std::move(events); cases.push_back(std::move(c));
+		c.data_events = std::move(events); cases.push_back(std::move(c));
 	};
 	append("STM-BRC-literal",{0x771a,0x42},{},{{r::STATE_BRC,0x42}},{{true,0x1a,0x42,0,false}});
 	append("ST-literal-absolute",{0x76f8,0xd50,0x5678},{},{},{{true,0xd50,0x5678,0,false}});

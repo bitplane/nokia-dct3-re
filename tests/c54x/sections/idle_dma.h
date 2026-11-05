@@ -24,7 +24,7 @@ inline std::vector<clocked_register_case> section_cases()
 		for (unsigned word=0;word<4;++word) final.data.push_back({0x530+word,u16(0x1111*(word+1))});
 		clocked_register_case c{{{0,std::move(initial)},{16,std::move(asleep)},
 			{17,observation("DMA-enabled",{})},{160,std::move(final)}},index>=6 ? 24U : 18U,160};
-		c.pipeline_frontend = true; c.initial_input_lines={{6,CLEAR_LINE}};
+		c.initial_input_lines={{6,CLEAR_LINE}};
 		c.data_events=std::vector<clocked_data_event>{};
 		for (unsigned word=0;word<4;++word) {
 			c.data_events->push_back({false,0x520+word,u16(0x1111*(word+1)),0,false});

@@ -28,7 +28,7 @@ inline std::vector<clocked_register_case> section_cases()
 		for (auto &word : final.expected_data) if (word.address == destinations[variant]) word.value = variant == 4 ? 0x5678 : 0xbeef;
 		clocked_register_case c{{{0,std::move(initial)},{1,observation("before-low-store-markers",{{STATE_GENPC,0x600}})},
 			{2,observation("low-store-markers-running",{})},{48,std::move(final)}},3,48};
-		c.pipeline_frontend = true; c.observed_data_space = AS_IO;
+		c.observed_data_space = AS_IO;
 		c.data_events = std::vector<clocked_data_event>{{true,0x124,0x1111,0,false},{true,0x124,0x1111,0,false,{},variant ? 4U : 5U}};
 		cases.push_back(std::move(c));
 	}

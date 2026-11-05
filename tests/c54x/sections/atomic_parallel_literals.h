@@ -17,7 +17,6 @@ inline std::vector<clocked_register_case> section_cases()
 		if (source != destination) final.expected_data.push_back({source,word});
 		clocked_register_case c{{{0,std::move(initial)},{1,observation("pre-parallel-snapshot", {{STATE_GENPC,0x5ff}})},
 			{2,observation("parallel-running", {})},{32,std::move(final)}},1,32};
-		c.pipeline_frontend = true;
 		c.data_events = std::vector<clocked_data_event>{{false,source,word,0,false},{true,destination,stored,0,false}};
 		cases.push_back(std::move(c));
 	};

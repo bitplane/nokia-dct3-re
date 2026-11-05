@@ -23,7 +23,6 @@ inline std::vector<clocked_register_case> section_cases()
 			{r::STATE_ST0,(x >= y ? 0x800U : 0U) | (overflow ? 0x400U : 0U)},{r::STATE_ST1,st1}},{{0x2000,x},{0x2100,y}});
 		clocked_register_case c{{{0,std::move(initial)},{1,observation("snapshot-before-SUB", {{r::STATE_A,0x123456}})},
 			{2,observation("SUB-running", {})},{32,std::move(final)}},1,32};
-		c.pipeline_frontend = true;
 		c.data_events = std::vector<clocked_data_event>{{false,0x2000,x,0,false},{false,0x2100,y,0,false}};
 		cases.push_back(std::move(c));
 	}
@@ -44,7 +43,6 @@ inline std::vector<clocked_register_case> section_cases()
 			{{0x2000,x},{0x2100,stored}});
 		clocked_register_case c{{{0,std::move(initial)},{1,observation("snapshot-before-ST-SUB", {{r::STATE_A,a},{r::STATE_B,b}})},
 			{2,observation("ST-SUB-running", {})},{32,std::move(final)}},1,32};
-		c.pipeline_frontend = true;
 		c.data_events = std::vector<clocked_data_event>{{false,0x2000,x,0,false},{true,0x2100,stored,0,false}};
 		cases.push_back(std::move(c));
 	}

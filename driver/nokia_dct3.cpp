@@ -2406,7 +2406,7 @@ void nokia_dct3_state::noki5110(machine_config &config)
 	// NSE-1 System Module 03/98, p. 3-33: the DSP multiplies the 13 MHz
 	// system reference to 52 MHz; native co-simulation independently agrees.
 	NOKIA_DSP_C54X(config, m_dsp_c54x, 52'000'000);
-	subdevice<tms320c54x_device>("dsp_c54x:cpu")->set_pipeline_frontend(true);
+	subdevice<tms320c54x_device>("dsp_c54x:cpu")->reset_execution_pipeline();
 	// ROM4 initializes SWWSR with STM 7728; the staged frontend uses its
 	// standard wait-register contract rather than the legacy timing profile.
 	subdevice<tms320c54x_device>("dsp_c54x:cpu")->set_standard_swwsr(true);

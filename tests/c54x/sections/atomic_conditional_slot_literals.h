@@ -25,7 +25,7 @@ inline std::vector<clocked_register_case> section_cases()
 			{r::STATE_AR1,kind && taken ? 0x121U : 0x120U},{r::STATE_AR2,kind && taken ? 0x131U : 0x130U}});
 		clocked_register_case c{{{0,std::move(initial)},{1,observation("pre-condition-snapshot", {{STATE_GENPC,0x600}})},
 			{2,observation("condition-running", {})},{32,std::move(final)}},1,32};
-		c.pipeline_frontend = true; c.data_events = std::vector<clocked_data_event>{};
+		c.data_events = std::vector<clocked_data_event>{};
 		if (kind == 0 && taken) c.program_events = {{false,0x700,0xf4e1,0,false}};
 		cases.push_back(std::move(c));
 	}
@@ -45,7 +45,6 @@ inline std::vector<clocked_register_case> section_cases()
 		if (!pmst) final.expected_data = {{0xf22,0x8000},{0xf30,0x5aa5},{0xf31,0xabcd}};
 		clocked_register_case c{{{0,std::move(initial)},{1,observation("pre-operation-snapshot", {{STATE_GENPC,0x600}})},
 			{2,observation("operation-running", {})},{32,std::move(final)}},1,32};
-		c.pipeline_frontend = true;
 		c.data_events = pmst ? std::vector<clocked_data_event>{{true,0x1d,0x4567,0,false}} :
 			std::vector<clocked_data_event>{{false,0xf22,0x8000,0,false},{true,0xf30,0x5aa5,0,false},{true,0xf31,0xabcd,0,false}};
 		cases.push_back(std::move(c));

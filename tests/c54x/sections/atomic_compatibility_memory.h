@@ -37,7 +37,6 @@ inline std::vector<clocked_register_case> section_cases()
 		final.expected_data = {{0x120,output[variant]},{0x130,0x7777}};
 		clocked_register_case c{{{0,std::move(initial)},{1,observation("before-memory-program",{{STATE_GENPC,0x600}})},
 			{2,observation("memory-program-running",{})},{48,std::move(final)}},marked ? 3U : 1U,48};
-		c.pipeline_frontend = true;
 		if (marked) {
 			c.observed_data_space = AS_IO;
 			c.data_events = std::vector<clocked_data_event>{{true,0x124,0x1234,0,false},{true,0x124,0x5678,0,false,{},variant == 8 ? 5U : 4U}};
