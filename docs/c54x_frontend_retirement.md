@@ -42,6 +42,9 @@ encoder and one decoder. Old benchmark BIOS names are not live interfaces.
 
 Read-only log checkers distinguish marked versus legacy-unmarked captures using
 `require_frontend_marker`; this selects an input format, never emulation.
+PC-context parsers similarly expose `legacy_capture` or `--capture-format`
+for archived instruction-boundary observations; current runners use stage-owned
+capture contexts.
 Current codec runs require the stage-owned execution marker and retain complete
 frame, reference, replay, exit-status and validity checks. An unmarked old log
 alone is not proof of an atomic engine or renewed acceptance.
@@ -79,10 +82,15 @@ EFR codecs, serial/pin audio and replay, four uploaded-program verifier families
 MU4 provisioning/retained-storage/bootstrap/replay/reset, and backend BSP/slot
 requests. The CPU was 978 net lines smaller than the pre-removal checkpoint.
 
-Stage-5 normalization is implemented; complete renamed-catalogue validation is
-in progress. Canonical codec/RF, 5110 menu/save-state and backend integration
-checks pass. Final acceptance must identify the current manifest, not reuse
-the old-name checkpoint as a new full-suite result.
+All five retirement stages are complete. The normalized catalogue independently
+passes all 520 sections and 1,461,937 cases and restores (3,860.357 seconds).
+Its manifest SHA-256 is
+`20173d1de10d112c5a1f78e9802a7901fe4e5a191a140128315042af3f553e81`.
+Renewed acceptance also passes canonical ROM4 cold/context, FR/EFR and RF
+algorithms; 5110 menu, late input, power and save-state; clocked serial audio,
+backend BSP/requests; and MU4 original bootstrap with exact 1,339-item replay.
+The host checks pass 354 C54x, 81 runner and 34 patch/keypad tests. These results
+validate the normalized interfaces without claiming broader physical coverage.
 
 ## Limits
 

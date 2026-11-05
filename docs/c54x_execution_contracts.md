@@ -6115,7 +6115,7 @@ electrical behavior or fitted-silicon timing of reserved register-map gaps.
 The native `a5e8` chain loads data word `00f1`, adds word `00f2`, and
 publishes AR3 through STLM `8813` at `a5ec`. Passive existing-access taps
 show boot clearing both fields, then firmware storing `00f2=3` while
-`00f1` remains zero. Both the staged and ordinary atomic profiles take this
+`00f1` remains zero. The bounded native controls take this
 initial path and make six early reads of board word `0003`, returning zero
 under the existing board model. The atomic run later publishes `00f1=b736`
 and `b71a`. Thus the zero base is not a staged-only AR3 derivation error;

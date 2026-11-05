@@ -29,19 +29,19 @@ a final integration checkpoint, not a prerequisite for each edit.
 The catalogue checks registration and counts, not instruction correctness.
 Executable sections must establish their own stimulus, bus/state expectations,
 replay and meaningful rejection controls. See
-[`c54x_section_trial.md`](../docs/c54x_section_trial.md) for the canonical
-disposition table, deliberate coverage reductions and unresolved integration work.
+[`c54x_test_suite.md`](../docs/c54x_test_suite.md) for the canonical
+coverage boundaries and scoped execution commands.
 
 ## Firmware and handset acceptance
 
 `tools/run_c54x_core.py` now runs only the retained `rom4-context` and
-`cold-pipeline` firmware integrations. The historical generic BIOS profiles,
+`cold` firmware integrations. The historical generic BIOS profiles,
 default phase chain, review manifests and frozen transcript inventories are
 retired. Their old command lines are not current acceptance interfaces.
 
 `make check-c54x-rom4-context` selects the copied context integration.
 Acquired-ROM codec fixtures retain separate runners and input hashes.
-ROM4 `cold`/`cold-pipeline` omit the MCU loader deliberately: a cold-frontier
+ROM4 `cold` omits the MCU loader deliberately: a cold-frontier
 result is not a statement that normal handset boot stops there.
 Verifier-sensitivity machines are research instruments, not handset verdicts.
 
@@ -211,7 +211,7 @@ unavailable. Build only the C54x translation unit with `CXXFLAGS=-g` and
 ```sh
 DCT3_PROFILE_JSON="$PWD/tmp/c54x-speed/profile.json" \
 gdb -batch -x tools/profile_c54x_gdb.py --args "$PWD/mame/mame" tms54rom4 \
-  -bios efr-encoder-pipe -rompath "$PWD/mame/roms" \
+  -bios efr-encoder -rompath "$PWD/mame/roms" \
   -video none -sound none -nothrottle -noreadconfig \
   -joystickprovider none -midiprovider none -seconds_to_run 10
 ```
