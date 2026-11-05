@@ -3,7 +3,7 @@
 #include "c54x_section_common.h"
 namespace c54x_test {
 namespace marker_tables {
-inline std::vector<clocked_register_case> port_marked_memory_cases()
+inline void append_port_marked_memory(std::vector<clocked_register_case> &cases)
 {
 	struct row { u16 opcode,extension,operand,st0,st1; u64 a,b,out_a,out_b; u16 flags,mask; unsigned interval; };
 	constexpr row rows[]{
@@ -19,7 +19,6 @@ inline std::vector<clocked_register_case> port_marked_memory_cases()
 		{0xec05,0x0082,1,0,0,0,5,6,5,0,0,13},
 		{0x7593,0x124,0xabcd,0,0,0,5,0,5,0,0,4}
 	};
-	std::vector<clocked_register_case> cases;
 	for (auto const &v : rows) {
 		bool const store = v.opcode == 0x8094;
 		bool const port = v.opcode == 0x7593;
@@ -46,13 +45,11 @@ inline std::vector<clocked_register_case> port_marked_memory_cases()
 		}
 		cases.push_back(std::move(c));
 	}
-	return cases;
 }
 
-inline std::vector<clocked_register_case> port_marked_transfers_cases()
+inline void append_port_marked_transfers(std::vector<clocked_register_case> &cases)
 {
 	constexpr u16 opcodes[]{0x7213,0x720b,0x708a,0x7083,0x7092,0x7090,0x7088,0x7194,0x7184};
-	std::vector<clocked_register_case> cases;
 	for (unsigned variant = 0; variant != std::size(opcodes); ++variant) {
 		bool const mvdk = variant >= 7;
 		std::vector<u16> words = mvdk ? std::vector<u16>{0x75d6,0x124} : std::vector<u16>{0x75f8,0x100,0x124};
@@ -81,12 +78,10 @@ inline std::vector<clocked_register_case> port_marked_transfers_cases()
 			std::vector<clocked_data_event>{{true,0x124,0x1111,0,false},{true,0x124,0x1111,0,false,{},5}};
 		cases.push_back(std::move(c));
 	}
-	return cases;
 }
 
-inline std::vector<clocked_register_case> port_loads_cases()
+inline void append_port_loads(std::vector<clocked_register_case> &cases)
 {
-	std::vector<clocked_register_case> cases;
 	for (unsigned variant = 0; variant != 6; ++variant) {
 		bool const port_read = variant < 2;
 		bool const circular = variant >= 4;
@@ -114,14 +109,12 @@ inline std::vector<clocked_register_case> port_loads_cases()
 			std::vector<clocked_data_event>{{true,0x124,0x1111,0,false},{true,0x124,0x1111,0,false,{},4}};
 		cases.push_back(std::move(c));
 	}
-	return cases;
 }
 
-inline std::vector<clocked_register_case> port_low_store_cases()
+inline void append_port_low_store(std::vector<clocked_register_case> &cases)
 {
 	constexpr u16 opcodes[]{0x81f8,0x8192,0x8190,0x8191,0x8090,0x8194};
 	constexpr u16 destinations[]{0x120,0x122,0x124,0x126,0x124,0x128};
-	std::vector<clocked_register_case> cases;
 	for (unsigned variant = 0; variant != std::size(opcodes); ++variant) {
 		std::vector<u16> words{0x75f8,0x100,0x124,opcodes[variant]};
 		if (!variant) words.push_back(0x120);
@@ -144,14 +137,12 @@ inline std::vector<clocked_register_case> port_low_store_cases()
 		c.data_events = std::vector<clocked_data_event>{{true,0x124,0x1111,0,false},{true,0x124,0x1111,0,false,{},variant ? 4U : 5U}};
 		cases.push_back(std::move(c));
 	}
-	return cases;
 }
 
-inline std::vector<clocked_register_case> port_register_examples_cases()
+inline void append_port_register_examples(std::vector<clocked_register_case> &cases)
 {
 	constexpr u16 opcodes[]{0x8814,0x8813,0x8811,0x8912};
 	constexpr unsigned destinations[]{4,3,1,2};
-	std::vector<clocked_register_case> cases;
 	for (unsigned variant = 0; variant != 6; ++variant) {
 		bool const repeat = variant == 4, load = variant == 5;
 		std::vector<u16> words{0x75f8,0x100,0x124};
@@ -175,16 +166,17 @@ inline std::vector<clocked_register_case> port_register_examples_cases()
 		c.data_events = std::vector<clocked_data_event>{{true,0x124,0x1111,0,false},{true,0x124,0x1111,0,false,{},repeat ? 22U : load ? 5U : 4U}};
 		cases.push_back(std::move(c));
 	}
-	return cases;
 }
 }
 inline std::vector<clocked_register_case> section_cases()
 {
 	std::vector<clocked_register_case> cases;
-	for (auto build : {marker_tables::port_marked_memory_cases,marker_tables::port_marked_transfers_cases,marker_tables::port_loads_cases,marker_tables::port_low_store_cases,marker_tables::port_register_examples_cases}) {
-		auto rows = build();
-		cases.insert(cases.end(),std::make_move_iterator(rows.begin()),std::make_move_iterator(rows.end()));
-	}
+	for (auto append : {
+		marker_tables::append_port_marked_memory,
+		marker_tables::append_port_marked_transfers,
+		marker_tables::append_port_loads,
+		marker_tables::append_port_low_store,
+		marker_tables::append_port_register_examples}) append(cases);
 	return cases;
 }
 }

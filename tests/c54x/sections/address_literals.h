@@ -3,9 +3,8 @@
 #include "c54x_section_common.h"
 namespace c54x_test {
 namespace literal_tables {
-inline std::vector<clocked_register_case> address_literals_cases()
+inline void append_address_literals(std::vector<clocked_register_case> &cases)
 {
-	std::vector<clocked_register_case> cases;
 	auto append = [&](char const *name, std::initializer_list<u16> words,
 		std::initializer_list<register_setting> setup, std::initializer_list<register_check> checks,
 		std::vector<clocked_data_event> events = {}) {
@@ -28,12 +27,10 @@ inline std::vector<clocked_register_case> address_literals_cases()
 	append("DLD-sign-extends-B-stationary",{0x5781},{{r::STATE_AR1,0xe00},{r::STATE_A,0x1234},{r::STATE_ST1,0x100}},
 		{{r::STATE_B,0xff80012345ULL},{r::STATE_A,0x1234},{r::STATE_AR1,0xe00}},
 		{{false,0xe00,0x8001,0,false},{false,0xe01,0x2345,0,false}});
-	return cases;
 }
 
-inline std::vector<clocked_register_case> stack_literals_cases()
+inline void append_stack_literals(std::vector<clocked_register_case> &cases)
 {
-	std::vector<clocked_register_case> cases;
 	auto append = [&](char const *name, std::initializer_list<u16> words,
 		std::initializer_list<register_setting> setup, std::initializer_list<memory_word> data,
 		std::initializer_list<register_check> checks, std::initializer_list<memory_word> memory,
@@ -76,12 +73,10 @@ inline std::vector<clocked_register_case> stack_literals_cases()
 		{{r::STATE_B,0x7f1234abcd},{r::STATE_A,0x1234567654},{r::STATE_SP,0x300}},{},
 		{{false,0x2fd,0x7f,6},{false,0x2fe,0x1234,7},{true,13,0x7f,7},
 		{false,0x2ff,0xabcd,8},{true,12,0x1234,8},{true,11,0xabcd,9}});
-	return cases;
 }
 
-inline std::vector<clocked_register_case> move_modify_literals_cases()
+inline void append_move_modify_literals(std::vector<clocked_register_case> &cases)
 {
-	std::vector<clocked_register_case> cases;
 	for (unsigned variant = 0; variant != 9; ++variant) {
 		std::vector<u16> words{0xf495};
 		switch (variant) {
@@ -131,12 +126,10 @@ inline std::vector<clocked_register_case> move_modify_literals_cases()
 		auto c = literal_sequence(std::move(initial), observation("pre-operation-snapshot", {{STATE_GENPC,0x600}}), std::move(final), 128, 1);
 		c.data_events = std::move(events); cases.push_back(std::move(c));
 	}
-	return cases;
 }
 
-inline std::vector<clocked_register_case> mmr_transfer_literals_cases()
+inline void append_mmr_transfer_literals(std::vector<clocked_register_case> &cases)
 {
-	std::vector<clocked_register_case> cases;
 	for (unsigned variant = 0; variant != 4; ++variant) {
 		std::vector<u16> const words = variant == 0 ? std::vector<u16>{0x45f8,0xf24} :
 			variant == 1 ? std::vector<u16>{0x4816,0x4913} : variant == 2 ?
@@ -171,12 +164,10 @@ inline std::vector<clocked_register_case> mmr_transfer_literals_cases()
 		auto c = literal_sequence(std::move(initial), observation("pre-transfer-snapshot", {{STATE_GENPC,0x600}}), std::move(final), 48, 1);
 		c.data_events = std::move(events); cases.push_back(std::move(c));
 	}
-	return cases;
 }
 
-inline std::vector<clocked_register_case> transfer_literals_cases()
+inline void append_transfer_literals(std::vector<clocked_register_case> &cases)
 {
-	std::vector<clocked_register_case> cases;
 	auto append = [&](char const *name,std::initializer_list<u16> words,std::initializer_list<register_setting> setup,
 		std::initializer_list<register_check> checks,std::vector<clocked_data_event> events) {
 		auto initial = initial_case(name,{*words.begin()}); unsigned at = 0;
@@ -251,16 +242,17 @@ inline std::vector<clocked_register_case> transfer_literals_cases()
 	append("POPM-ST1",{0x8a07},{{r::STATE_SP,0x2ff}},{{r::STATE_ST1,0x8123},{r::STATE_SP,0x300}},
 		{{false,0x2ff,0x8123,0,false},{true,7,0x8123,0,false}});
 	append("LDM-ST1-B-unsigned",{0x4907},{{r::STATE_ST1,0x8123}},{{r::STATE_B,0x8123}},{{false,7,0x8123,0,false}});
-	return cases;
 }
 }
 inline std::vector<clocked_register_case> section_cases()
 {
 	std::vector<clocked_register_case> cases;
-	for (auto build : {literal_tables::address_literals_cases,literal_tables::stack_literals_cases,literal_tables::move_modify_literals_cases,literal_tables::mmr_transfer_literals_cases,literal_tables::transfer_literals_cases}) {
-		auto rows = build();
-		cases.insert(cases.end(),std::make_move_iterator(rows.begin()),std::make_move_iterator(rows.end()));
-	}
+	for (auto append : {
+		literal_tables::append_address_literals,
+		literal_tables::append_stack_literals,
+		literal_tables::append_move_modify_literals,
+		literal_tables::append_mmr_transfer_literals,
+		literal_tables::append_transfer_literals}) append(cases);
 	return cases;
 }
 }

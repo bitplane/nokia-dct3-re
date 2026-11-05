@@ -3,7 +3,7 @@
 #include "c54x_section_common.h"
 namespace c54x_test {
 namespace literal_tables {
-inline std::vector<clocked_register_case> logic_pointer_literals_cases()
+inline void append_logic_pointer_literals(std::vector<clocked_register_case> &cases)
 {
 	struct row {
 		std::vector<u16> words;
@@ -30,7 +30,6 @@ inline std::vector<clocked_register_case> logic_pointer_literals_cases()
 		{{0x6883,0xff0},{{r::STATE_AR3,0xf33}},{{r::STATE_AR3,0xf33},{r::STATE_ST0,0x800}},{{0xf33,0xff0f}},{{0xf33,0xf00}},{{false,0xf33,0xff0f,0,false},{true,0xf33,0xf00,0,false}}},
 		{{0x6983,0xf0},{{r::STATE_AR3,0xf33}},{{r::STATE_AR3,0xf33},{r::STATE_ST0,0x800}},{{0xf33,0xf00}},{{0xf33,0xff0}},{{false,0xf33,0xf00,0,false},{true,0xf33,0xff0,0,false}}}
 	};
-	std::vector<clocked_register_case> cases;
 	for (auto const &v : rows) {
 		auto initial = initial_case("logic-and-circular-pointer-literals", {0xf495}); initial.program.clear();
 		initial.program.push_back({0x600,0xf495});
@@ -51,12 +50,10 @@ inline std::vector<clocked_register_case> logic_pointer_literals_cases()
 		auto c = literal_sequence(std::move(initial), observation("pre-XC-snapshot", {{STATE_GENPC,0x600}}), std::move(final), 24, 1);
 		c.data_events = std::vector<clocked_data_event>{}; cases.push_back(std::move(c));
 	}
-	return cases;
 }
 
-inline std::vector<clocked_register_case> logic_program_literals_cases()
+inline void append_logic_program_literals(std::vector<clocked_register_case> &cases)
 {
-	std::vector<clocked_register_case> cases;
 	for (unsigned variant = 0; variant != 5; ++variant) {
 		u16 const opcode = std::array<u16,5>{0x6885,0x6985,0x6fd2,0x7e8b,0x7e92}[variant];
 		auto initial = initial_case("AR5-logic-shifted-LD-and-READA-literals", {0xf495,opcode});
@@ -86,12 +83,10 @@ inline std::vector<clocked_register_case> logic_program_literals_cases()
 		if (variant >= 3) c.program_events = {{false,0xd40,0xabcd,0,false}};
 		cases.push_back(std::move(c));
 	}
-	return cases;
 }
 
-inline std::vector<clocked_register_case> accumulator_add_literals_cases()
+inline void append_accumulator_add_literals(std::vector<clocked_register_case> &cases)
 {
-	std::vector<clocked_register_case> cases;
 	for (unsigned variant = 0; variant != 7; ++variant) {
 		bool const cross = variant >= 1 && variant <= 4, b = cross && variant % 2;
 		bool const ovm = cross && variant >= 3;
@@ -112,10 +107,9 @@ inline std::vector<clocked_register_case> accumulator_add_literals_cases()
 		auto c = literal_sequence(std::move(initial), observation("pre-add-snapshot", {{STATE_GENPC,0x600}}), std::move(final), 24, 1);
 		c.data_events = std::vector<clocked_data_event>{}; cases.push_back(std::move(c));
 	}
-	return cases;
 }
 
-inline std::vector<clocked_register_case> shift_peripheral_literals_cases()
+inline void append_shift_peripheral_literals(std::vector<clocked_register_case> &cases)
 {
 	struct row { u16 opcode,extension,st0,st1,operand; u64 a,b,out_a,out_b; u16 flags,mask; unsigned interval; };
 	constexpr row rows[]{
@@ -129,7 +123,6 @@ inline std::vector<clocked_register_case> shift_peripheral_literals_cases()
 		{0x6184,0xf0,0x800,0x100,0xa0,0,0,0,0,0x1800,0x1800,5},
 		{0x6184,0xf0,0x800,0x100,0xa00,0,0,0,0,0x800,0x1800,5}
 	};
-	std::vector<clocked_register_case> cases;
 	for (auto const &v : rows) {
 		std::vector<u16> words{0x75f8,0x100,0x124,v.opcode};
 		if (v.extension) words.push_back(v.extension);
@@ -158,16 +151,16 @@ inline std::vector<clocked_register_case> shift_peripheral_literals_cases()
 	c.observed_data_space = AS_IO;
 	c.data_events = std::vector<clocked_data_event>{{true,0x124,0x1111,0,false},{true,0x124,0x3333,0,false,{},9}};
 	cases.push_back(std::move(c));
-	return cases;
 }
 }
 inline std::vector<clocked_register_case> section_cases()
 {
 	std::vector<clocked_register_case> cases;
-	for (auto build : {literal_tables::logic_pointer_literals_cases,literal_tables::logic_program_literals_cases,literal_tables::accumulator_add_literals_cases,literal_tables::shift_peripheral_literals_cases}) {
-		auto rows = build();
-		cases.insert(cases.end(),std::make_move_iterator(rows.begin()),std::make_move_iterator(rows.end()));
-	}
+	for (auto append : {
+		literal_tables::append_logic_pointer_literals,
+		literal_tables::append_logic_program_literals,
+		literal_tables::append_accumulator_add_literals,
+		literal_tables::append_shift_peripheral_literals}) append(cases);
 	return cases;
 }
 }

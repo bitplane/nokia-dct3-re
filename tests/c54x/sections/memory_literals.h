@@ -3,9 +3,8 @@
 #include "c54x_section_common.h"
 namespace c54x_test {
 namespace literal_tables {
-inline std::vector<clocked_register_case> memory_literals_cases()
+inline void append_memory_literals(std::vector<clocked_register_case> &cases)
 {
-	std::vector<clocked_register_case> cases;
 	auto append = [&](char const *name, std::initializer_list<u16> words,
 		std::initializer_list<register_setting> setup, std::initializer_list<register_check> checks,
 		std::vector<clocked_data_event> events = {}, std::initializer_list<memory_word> decoys = {}) {
@@ -95,10 +94,9 @@ inline std::vector<clocked_register_case> memory_literals_cases()
 		{{r::STATE_A,0xffffffffffULL},{r::STATE_ST0,0,0x800}},{{false,0x405,6,0,false}});
 	append("ADDM-negative-saturation",{0x6b94,0xfff8},{{r::STATE_AR4,0x100},{r::STATE_ST1,0x300}},
 		{{r::STATE_AR4,0x101},{r::STATE_ST0,0x400,0x400}},{{false,0x100,0x8007,0,false},{true,0x100,0x8000,0,false}});
-	return cases;
 }
 
-inline std::vector<clocked_register_case> memory_alu_literals_cases()
+inline void append_memory_alu_literals(std::vector<clocked_register_case> &cases)
 {
 	struct row { u16 opcode,address,operand,st1; u64 a,b,out_a,out_b; u16 flags; bool increment; };
 	constexpr row rows[]{
@@ -112,7 +110,6 @@ inline std::vector<clocked_register_case> memory_alu_literals_cases()
 		{0x1b84,0xf24,0xf0,0x100,0x7fff,0xff0000000fULL,0x7fff,0xff000000ffULL,0x800,false},
 		{0x1bf8,0xf24,0xf0,0x100,0x7fff,0xff0000000fULL,0x7fff,0xff000000ffULL,0x800,false}
 	};
-	std::vector<clocked_register_case> cases;
 	for (auto const &v : rows) {
 		bool const extended = v.opcode == 0x1bf8;
 		auto initial = initial_case("memory-SUB-ADD-OR-SXM-and-pointer-literals", {0xf495,v.opcode});
@@ -130,12 +127,10 @@ inline std::vector<clocked_register_case> memory_alu_literals_cases()
 		c.data_events = std::vector<clocked_data_event>{{false,v.address,v.operand,0,false}};
 		cases.push_back(std::move(c));
 	}
-	return cases;
 }
 
-inline std::vector<clocked_register_case> memory_address_literals_cases()
+inline void append_memory_address_literals(std::vector<clocked_register_case> &cases)
 {
-	std::vector<clocked_register_case> cases;
 	auto add = [&](char const *name, std::vector<u16> words, std::vector<register_setting> registers,
 		std::vector<register_check> expected, std::vector<memory_word> data,
 		std::vector<memory_word> results, std::vector<clocked_data_event> events) {
@@ -209,12 +204,10 @@ inline std::vector<clocked_register_case> memory_address_literals_cases()
 		{{false,0x11,0x1a23,0,false},{true,0x12,0x1a23,0,false}});
 	add("MVMM-AR1-to-AR3-preserves-source",{0xe713},{{r::STATE_AR1,0x1a23}},{{r::STATE_AR3,0x1a23},{r::STATE_AR1,0x1a23}},{},{},
 		{{false,0x11,0x1a23,0,false},{true,0x13,0x1a23,0,false}});
-	return cases;
 }
 
-inline std::vector<clocked_register_case> memory_route_literals_cases()
+inline void append_memory_route_literals(std::vector<clocked_register_case> &cases)
 {
-	std::vector<clocked_register_case> cases;
 	auto add = [&](char const *id, std::vector<u16> words, std::vector<register_setting> initial_regs,
 		std::vector<register_check> expected, std::vector<memory_word> data = {},
 		unsigned interval = 5, std::vector<memory_word> expected_data = {}) {
@@ -289,12 +282,10 @@ inline std::vector<clocked_register_case> memory_route_literals_cases()
 		add("and-immediate-b-to-a-retains-b", {0xf230, 0x0ff0}, {{r::STATE_A, 0x123456}, {r::STATE_B, 0xffabcdf123ULL}},
 			{{r::STATE_A, 0x0120}, {r::STATE_B, 0xffabcdf123ULL}});
 
-	return cases;
 }
 
-inline std::vector<clocked_register_case> absolute_literals_cases()
+inline void append_absolute_literals(std::vector<clocked_register_case> &cases)
 {
-	std::vector<clocked_register_case> cases;
 	auto append = [&](char const *name,std::initializer_list<u16> words,std::initializer_list<register_setting> setup,
 		std::initializer_list<register_check> checks,std::vector<clocked_data_event> events = {}) {
 		auto initial = initial_case(name,{*words.begin()}); unsigned at = 0;
@@ -363,12 +354,10 @@ inline std::vector<clocked_register_case> absolute_literals_cases()
 		{{r::STATE_A,0x8001},{r::STATE_AR2,0x15}},{{false,0x15,0x8001,0,false}});
 	append("STLM-indirect-MMR-postincrement",{0x8892},{{r::STATE_A,0x3456},{r::STATE_AR2,0xff17},{r::STATE_AR7,0}},
 		{{r::STATE_AR7,0x3456},{r::STATE_AR2,0x18}},{{true,0x17,0x3456,0,false}});
-	return cases;
 }
 
-inline std::vector<clocked_register_case> long_offset_literals_cases()
+inline void append_long_offset_literals(std::vector<clocked_register_case> &cases)
 {
-	std::vector<clocked_register_case> cases;
 	auto add = [&](char const *id, std::vector<u16> words, std::vector<register_setting> initial_regs,
 		std::vector<register_check> expected, std::vector<memory_word> data = {},
 		unsigned interval = 5, std::vector<memory_word> expected_data = {}) {
@@ -418,16 +407,18 @@ inline std::vector<clocked_register_case> long_offset_literals_cases()
 		add("load-high-b-long-preupdate", {0x45ea, 5}, {{r::STATE_AR2, 0x0f00}},
 			{{r::STATE_B, 0x12340000}, {r::STATE_AR2, 0x0f05}}, {{0x0f05, 0x1234}});
 
-	return cases;
 }
 }
 inline std::vector<clocked_register_case> section_cases()
 {
 	std::vector<clocked_register_case> cases;
-	for (auto build : {literal_tables::memory_literals_cases,literal_tables::memory_alu_literals_cases,literal_tables::memory_address_literals_cases,literal_tables::memory_route_literals_cases,literal_tables::absolute_literals_cases,literal_tables::long_offset_literals_cases}) {
-		auto rows = build();
-		cases.insert(cases.end(),std::make_move_iterator(rows.begin()),std::make_move_iterator(rows.end()));
-	}
+	for (auto append : {
+		literal_tables::append_memory_literals,
+		literal_tables::append_memory_alu_literals,
+		literal_tables::append_memory_address_literals,
+		literal_tables::append_memory_route_literals,
+		literal_tables::append_absolute_literals,
+		literal_tables::append_long_offset_literals}) append(cases);
 	return cases;
 }
 }

@@ -3,9 +3,8 @@
 #include "c54x_section_common.h"
 namespace c54x_test {
 namespace literal_tables {
-inline std::vector<clocked_register_case> conditional_control_examples_cases()
+inline void append_conditional_control_examples(std::vector<clocked_register_case> &cases)
 {
-	std::vector<clocked_register_case> cases;
 	for (unsigned family = 0; family < 6; ++family) for (unsigned taken = 0; taken < 2; ++taken) {
 		bool const returning = family == 0, call = family == 2 || family == 3, delayed = family == 1 || family >= 4;
 		u16 const opcode = std::array<u16,6>{0xfc4b,0xfa45,0xf947,0xf930,0x6e8f,0x6e82}[family];
@@ -34,12 +33,10 @@ inline std::vector<clocked_register_case> conditional_control_examples_cases()
 		if (taken && call) c.data_events->push_back({true,0x2fff,0x602,0,false});
 		cases.push_back(std::move(c));
 	}
-	return cases;
 }
 
-inline std::vector<clocked_register_case> conditional_slot_literals_cases()
+inline void append_conditional_slot_literals(std::vector<clocked_register_case> &cases)
 {
-	std::vector<clocked_register_case> cases;
 	for (unsigned kind = 0; kind != 4; ++kind)
 	for (bool taken : {false,true}) {
 		u16 const opcode = std::array<u16,4>{0xf843,0xff30,0xff45,0xff4e}[kind];
@@ -82,10 +79,9 @@ inline std::vector<clocked_register_case> conditional_slot_literals_cases()
 			std::vector<clocked_data_event>{{false,0xf22,0x8000,0,false},{true,0xf30,0x5aa5,0,false},{true,0xf31,0xabcd,0,false}};
 		cases.push_back(std::move(c));
 	}
-	return cases;
 }
 
-inline std::vector<clocked_register_case> fast_return_examples_cases()
+inline void append_fast_return_examples(std::vector<clocked_register_case> &cases)
 {
 	auto initial = initial_case("CALL-publishes-restorable-RTN", {0xf495});
 	initial.program = {{0x2067f,0xf495},{0x20680,0xf074},{0x20681,0x700},{0x20682,0xf4e1},
@@ -104,16 +100,16 @@ inline std::vector<clocked_register_case> fast_return_examples_cases()
 	c.actions = {{12,{{r::STATE_IDLE,0}},false,{}, {},{{0x3ff,0xdead}}},
 		{28,{{STATE_GENPC,0x30780},{r::STATE_IDLE,0}}}};
 	c.data_events = std::vector<clocked_data_event>{{true,0x3ff,0x682,0,false},{true,0x3ff,0x782,0,false}};
-	return {std::move(c)};
+	cases.push_back(std::move(c));
 }
 }
 inline std::vector<clocked_register_case> section_cases()
 {
 	std::vector<clocked_register_case> cases;
-	for (auto build : {literal_tables::conditional_control_examples_cases,literal_tables::conditional_slot_literals_cases,literal_tables::fast_return_examples_cases}) {
-		auto rows = build();
-		cases.insert(cases.end(),std::make_move_iterator(rows.begin()),std::make_move_iterator(rows.end()));
-	}
+	for (auto append : {
+		literal_tables::append_conditional_control_examples,
+		literal_tables::append_conditional_slot_literals,
+		literal_tables::append_fast_return_examples}) append(cases);
 	return cases;
 }
 }

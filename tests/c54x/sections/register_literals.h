@@ -3,7 +3,7 @@
 #include "c54x_section_common.h"
 namespace c54x_test {
 namespace literal_tables {
-inline std::vector<clocked_register_case> register_logic_examples_cases()
+inline void append_register_logic_examples(std::vector<clocked_register_case> &cases)
 {
 	struct row { u16 opcode,literal; bool extended; u64 a,b,out_a,out_b; u16 st0,flags,mask; };
 	constexpr row rows[]{
@@ -28,7 +28,6 @@ inline std::vector<clocked_register_case> register_logic_examples_cases()
 		{0xf468,0,false,0x800000,0,0x80000000,0,0,0x400,0x400},
 		{0xf2a0,0,false,0xf0,0xff0000000fULL,0xff000000ffULL,0xff0000000fULL,0x800,0x800,0xffff}
 	};
-	std::vector<clocked_register_case> cases;
 	for (auto const &v : rows) {
 		auto initial = initial_case("register-logic-boundary", {v.opcode,v.extended ? v.literal : u16(0xf4e1),0xf4e1});
 		initial.program.push_back({0x5ff,0xf495});
@@ -40,10 +39,9 @@ inline std::vector<clocked_register_case> register_logic_examples_cases()
 		c.forbid_data_access = true;
 		cases.push_back(std::move(c));
 	}
-	return cases;
 }
 
-inline std::vector<clocked_register_case> register_shift_cases()
+inline void append_register_shift(std::vector<clocked_register_case> &cases)
 {
 	struct entry { char const *id; u16 opcode; u64 a_before,b_before,a_after,b_after; u16 st0_before,st0_after,st1 = 0x100; };
 	constexpr entry references[]{
@@ -84,7 +82,6 @@ inline std::vector<clocked_register_case> register_shift_cases()
 		{ "roltc-a-uses-tc-clears-guards", 0xf492, 0x81c0005555ULL, 0x12345, 0x8000aaab, 0x12345, 0x15a5, 0x1da5, 0x0b00 },
 		{ "roltc-b-ignores-old-carry", 0xf592, 0x12345, 0xff12345678ULL, 0x12345, 0x2468acf0, 0x0da5, 0x05a5, 0x0b00 }
 	};
-	std::vector<clocked_register_case> cases;
 	for (auto const &v : references) {
 		auto initial = initial_case(v.id,{v.opcode,0xf4e1});
 		initial.program.push_back({0x5ff,0xf495});
@@ -96,10 +93,9 @@ inline std::vector<clocked_register_case> register_shift_cases()
 		c.forbid_data_access = true;
 		cases.push_back(std::move(c));
 	}
-	return cases;
 }
 
-inline std::vector<clocked_register_case> shift_literals_cases()
+inline void append_shift_literals(std::vector<clocked_register_case> &cases)
 {
 	struct row { u16 opcode; u64 a,b; u16 t,st0,st1,word; u64 out_a,out_b; u16 out_t,flags,mask; };
 	constexpr row rows[]{
@@ -129,7 +125,6 @@ inline std::vector<clocked_register_case> shift_literals_cases()
 		{0xf483,0xf812345678ULL,0,0,0x800,0,0,0xff80000000ULL,0,0,0xc00,0xc00},
 		{0xf583,0,0x123456,0,0xa00,0,0,0,0x123456,0,0x800,0xa00}
 	};
-	std::vector<clocked_register_case> cases;
 	for (auto const &v : rows) {
 		bool const memory = v.opcode < 0xf000, xmem = (v.opcode & 0xf000) == 0x9000;
 		u16 const address = xmem ? 0x300 : 0x200;
@@ -145,16 +140,15 @@ inline std::vector<clocked_register_case> shift_literals_cases()
 		if (memory) c.data_events->push_back({false,address,v.word,0,false});
 		cases.push_back(std::move(c));
 	}
-	return cases;
 }
 }
 inline std::vector<clocked_register_case> section_cases()
 {
 	std::vector<clocked_register_case> cases;
-	for (auto build : {literal_tables::register_logic_examples_cases,literal_tables::register_shift_cases,literal_tables::shift_literals_cases}) {
-		auto rows = build();
-		cases.insert(cases.end(),std::make_move_iterator(rows.begin()),std::make_move_iterator(rows.end()));
-	}
+	for (auto append : {
+		literal_tables::append_register_logic_examples,
+		literal_tables::append_register_shift,
+		literal_tables::append_shift_literals}) append(cases);
 	return cases;
 }
 }

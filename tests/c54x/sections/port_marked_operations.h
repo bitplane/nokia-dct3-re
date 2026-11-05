@@ -3,9 +3,8 @@
 #include "c54x_section_common.h"
 namespace c54x_test {
 namespace marker_tables {
-inline std::vector<clocked_register_case> port_marked_operations_cases()
+inline void append_port_marked_operations(std::vector<clocked_register_case> &cases)
 {
-	std::vector<clocked_register_case> cases;
 	for (unsigned variant = 0; variant != 13; ++variant) {
 		bool const branch = variant < 6 || variant >= 11;
 		bool const taken = branch && (variant == 11 || (variant < 6 && !(variant & 1)));
@@ -70,12 +69,10 @@ inline std::vector<clocked_register_case> port_marked_operations_cases()
 		c.data_events = std::vector<clocked_data_event>{{true,0x124,0x1234,0,false},{true,0x124,0x5678,0,false,{},taken ? 7U : 5U}};
 		cases.push_back(std::move(c));
 	}
-	return cases;
 }
 
-inline std::vector<clocked_register_case> port_marked_counter_cases()
+inline void append_port_marked_counter(std::vector<clocked_register_case> &cases)
 {
-	std::vector<clocked_register_case> cases;
 	for (unsigned variant = 0; variant != 8; ++variant) {
 		bool const delayed = variant == 2;
 		bool const compat = variant < 5;
@@ -103,12 +100,10 @@ inline std::vector<clocked_register_case> port_marked_counter_cases()
 			{true,0x124,u16(taken ? 0x3333 : 0x2222),0,false,{},store ? 4U : variant >= 5 ? taken ? 8U : 6U : taken ? 7U : 5U}};
 		cases.push_back(std::move(c));
 	}
-	return cases;
 }
 
-inline std::vector<clocked_register_case> port_control_examples_cases()
+inline void append_port_control_examples(std::vector<clocked_register_case> &cases)
 {
-	std::vector<clocked_register_case> cases;
 	for (unsigned variant = 0; variant != 6; ++variant) {
 		bool const returning = variant < 2, branch = variant == 3 || variant == 4;
 		bool const taken = variant == 0 || variant == 3;
@@ -134,12 +129,10 @@ inline std::vector<clocked_register_case> port_control_examples_cases()
 			{true,0x124,u16(taken ? 0x3333 : 0x2222),0,false,{},variant == 2 ? 15U : variant == 5 ? 10U : taken ? 8U : 6U}};
 		cases.push_back(std::move(c));
 	}
-	return cases;
 }
 
-inline std::vector<clocked_register_case> port_delayed_branch_cases()
+inline void append_port_delayed_branch(std::vector<clocked_register_case> &cases)
 {
-	std::vector<clocked_register_case> cases;
 	for (unsigned condition = 0; condition != 3; ++condition)
 		for (bool taken : {false,true}) {
 			u16 const opcode = condition == 0 ? 0xfa20 : condition == 1 ? 0xfa4d : 0xfa30;
@@ -158,16 +151,16 @@ inline std::vector<clocked_register_case> port_delayed_branch_cases()
 				{true,0x124,u16(taken ? 0x3333 : 0x2222),0,false,{},9}};
 			cases.push_back(std::move(c));
 		}
-	return cases;
 }
 }
 inline std::vector<clocked_register_case> section_cases()
 {
 	std::vector<clocked_register_case> cases;
-	for (auto build : {marker_tables::port_marked_operations_cases,marker_tables::port_marked_counter_cases,marker_tables::port_control_examples_cases,marker_tables::port_delayed_branch_cases}) {
-		auto rows = build();
-		cases.insert(cases.end(),std::make_move_iterator(rows.begin()),std::make_move_iterator(rows.end()));
-	}
+	for (auto append : {
+		marker_tables::append_port_marked_operations,
+		marker_tables::append_port_marked_counter,
+		marker_tables::append_port_control_examples,
+		marker_tables::append_port_delayed_branch}) append(cases);
 	return cases;
 }
 }

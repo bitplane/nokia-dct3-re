@@ -3,7 +3,6 @@
 #ifndef C54X_SECTION_COMMON_H
 #define C54X_SECTION_COMMON_H
 #include "tms320c54x_test_case.h"
-#include <iterator>
 namespace c54x_test {
 using r = tms320c54x_device;
 inline instruction_case initial_case(char const *name, std::initializer_list<u16> words)

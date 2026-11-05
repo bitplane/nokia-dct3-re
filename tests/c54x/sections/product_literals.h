@@ -3,9 +3,8 @@
 #include "c54x_section_common.h"
 namespace c54x_test {
 namespace literal_tables {
-inline std::vector<clocked_register_case> product_literals_cases()
+inline void append_product_literals(std::vector<clocked_register_case> &cases)
 {
-	std::vector<clocked_register_case> cases;
 	auto append = [&](char const *name,std::initializer_list<u16> words,std::initializer_list<register_setting> setup,
 			std::initializer_list<register_check> checks,std::vector<clocked_data_event> events = {}) {
 		auto initial = initial_case(name,{*words.begin()}); unsigned at = 0;
@@ -58,10 +57,9 @@ inline std::vector<clocked_register_case> product_literals_cases()
 	}
 	append("MPYU fractional saturation",{0x2483},{{r::STATE_A,0},{r::STATE_T,0xffff},{r::STATE_ST1,0x240}},
 		{{r::STATE_A,0x7fffffff},{r::STATE_T,0xffff},{r::STATE_AR3,0x200},{r::STATE_ST0,0x400,0x400}},{{false,0x200,0xffff,0,false}});
-	return cases;
 }
 
-inline std::vector<clocked_register_case> immediate_product_literals_cases()
+inline void append_immediate_product_literals(std::vector<clocked_register_case> &cases)
 {
 	struct row { u16 opcode,literal,st0,st1,t; u64 a,b,out_a,out_b; u16 out_t,flags,mask; };
 	constexpr row rows[]{
@@ -77,7 +75,6 @@ inline std::vector<clocked_register_case> immediate_product_literals_cases()
 		{0xf166,0xfffe,0xa00,0,0x2000,0x1234,0,0x1234,0xffffffc000ULL,0x2000,0,0},
 		{0x62f8,5,0xa00,0,0,0,0xffffffc000ULL,15,0xffffffc000ULL,3,0,0}
 	};
-	std::vector<clocked_register_case> cases;
 	for (auto const &v : rows) {
 		bool const absolute = v.opcode == 0x62f8, memory = v.opcode != 0xf166;
 		auto initial = initial_case("immediate-MPY-MAC-destination-and-overflow-literals",{0xf495,v.opcode});
@@ -94,12 +91,10 @@ inline std::vector<clocked_register_case> immediate_product_literals_cases()
 		if (memory) c.data_events->push_back({false,0x200,3,0,false});
 		cases.push_back(std::move(c));
 	}
-	return cases;
 }
 
-inline std::vector<clocked_register_case> mac_literals_cases()
+inline void append_mac_literals(std::vector<clocked_register_case> &cases)
 {
-	std::vector<clocked_register_case> cases;
 	auto append = [&](u16 opcode,u64 a,u64 b,u16 t,u16 st0,u16 st1,u16 x,u16 y,u64 out_a,u64 out_b,
 			u16 out_t,u16 flags,u16 mask,u16 stored,bool alias) {
 		bool const parallel = (opcode & 0xf000) == 0xd000;
@@ -135,12 +130,11 @@ inline std::vector<clocked_register_case> mac_literals_cases()
 	append(0xd93a,0x18000,0x28000,2,0,0x140,3,0,0x18000,0x27ff4,2,0,0x600,1,false);
 	append(0xb83a,0x7fffffff,0,0,0,0x300,0xffff,2,0x7fffffff,0,0xffff,0x400,0x600,2,false);
 	append(0xd93a,0x18000,0x7fffffff,2,0,0x300,0xffff,0,0x18000,0x7fffffff,2,0x200,0x600,1,false);
-	return cases;
 }
 
-inline std::vector<clocked_register_case> coefficient_fir_literals_cases()
+inline void append_coefficient_fir_literals(std::vector<clocked_register_case> &cases)
 {
-	std::vector<clocked_register_case> cases;
+	auto const first = cases.size();
 	for (unsigned variant = 0; variant != 5; ++variant) {
 		bool const repeated = variant == 2 || variant == 4, fir = variant >= 3;
 		u16 const opcode = variant == 0 ? 0x788b : variant == 1 ? 0x7a8b : variant == 2 ? 0x7893 : 0xe03a;
@@ -175,7 +169,7 @@ inline std::vector<clocked_register_case> coefficient_fir_literals_cases()
 		auto c = literal_sequence(std::move(initial), observation("pre-coefficient-operation-snapshot",{{STATE_GENPC,0x600}}), std::move(final), 64, 1);
 		c.data_events = std::move(reads); c.program_events = std::move(coefficients); cases.push_back(std::move(c));
 	}
-	auto stream = cases[2];
+	auto stream = cases.at(first+2);
 	stream.states.front().observation.id = "MACP-retains-held-coefficient-stream";
 	stream.states.front().observation.program.push_back({0x800,0xdead});
 	stream.checkpoint = 8;
@@ -184,7 +178,7 @@ inline std::vector<clocked_register_case> coefficient_fir_literals_cases()
 	stream.data_events = std::vector<clocked_data_event>{{false,0xf90,1,8},{false,0xf91,2,10},{false,0xf92,3,11}};
 	stream.program_events = {{false,0x700,4,9},{false,0x701,5,10},{false,0x702,6,11}};
 	cases.push_back(std::move(stream));
-	auto successor = cases[1];
+	auto successor = cases.at(first+1);
 	successor.states.front().observation.id = "MACD-retains-result-before-successor-write";
 	successor.checkpoint = 8;
 	successor.actions = {{8,{{r::STATE_T,0x7777}},false,{{0x700,0xdead}},{},{{0xf90,0xdead}}}};
@@ -195,12 +189,10 @@ inline std::vector<clocked_register_case> coefficient_fir_literals_cases()
 	successor.data_events = std::vector<clocked_data_event>{{false,0xf90,0x55,7},{true,0xf91,0x55,9}};
 	successor.program_events = {{false,0x700,0x1234,8}};
 	cases.push_back(std::move(successor));
-	return cases;
 }
 
-inline std::vector<clocked_register_case> multiply_move_literals_cases()
+inline void append_multiply_move_literals(std::vector<clocked_register_case> &cases)
 {
-	std::vector<clocked_register_case> cases;
 	for (unsigned variant = 0; variant != 7; ++variant) {
 		std::vector<u16> words{0xf495};
 		if (variant == 0) words.push_back(0x3182);
@@ -250,10 +242,9 @@ inline std::vector<clocked_register_case> multiply_move_literals_cases()
 		auto c = literal_sequence(std::move(initial), observation("pre-sequence-snapshot", {{STATE_GENPC,0x600}}), std::move(final), 32, 1);
 		c.data_events = std::move(events); cases.push_back(std::move(c));
 	}
-	return cases;
 }
 
-inline std::vector<clocked_register_case> dual_arithmetic_literals_cases()
+inline void append_dual_arithmetic_literals(std::vector<clocked_register_case> &cases)
 {
 	struct row { u16 opcode,x,y,t,st1,ar4,ar5,out4,out5,out_t; u64 a,b,out_a,out_b; };
 	constexpr row rows[]{
@@ -261,7 +252,6 @@ inline std::vector<clocked_register_case> dual_arithmetic_literals_cases()
 		{0xa6ab,0x8765,0x1234,8,0x100,0xf90,0xf91,0xf91,0xf92,0x8765,0x1000,0x2222,0x9a0aa84,0x2222},
 		{0xa7ab,0x8765,0xfffe,0,0x140,0xf90,0xf91,0xf91,0xf92,0x8765,0x1234,0,0x1234,0xfffffde26cULL}
 	};
-	std::vector<clocked_register_case> cases;
 	for (auto const &v : rows) {
 		auto initial = initial_case("LMS-and-MACSU-fixed-dual-memory-examples",{0xf495,v.opcode,0xf4e1});
 		initial.initial.insert(initial.initial.end(),{{r::STATE_A,v.a},{r::STATE_B,v.b},{r::STATE_T,v.t},
@@ -274,12 +264,10 @@ inline std::vector<clocked_register_case> dual_arithmetic_literals_cases()
 		c.data_events = std::vector<clocked_data_event>{{false,0xf90,v.x,0,false},{false,0xf91,v.y,0,false}};
 		cases.push_back(std::move(c));
 	}
-	return cases;
 }
 
-inline std::vector<clocked_register_case> dual_add_sub_literals_cases()
+inline void append_dual_add_sub_literals(std::vector<clocked_register_case> &cases)
 {
-	std::vector<clocked_register_case> cases;
 	for (unsigned variant = 0; variant != 8; ++variant) {
 		bool const memory = variant >= 6, special = variant == 4 || variant == 5, b = variant < 4 && variant % 2;
 		u16 const opcode = variant < 4 ? 0xa03a + variant * 0x100 : variant == 4 ? 0xa249 : variant == 5 ? 0xa201 : variant == 6 ? 0x6b84 : 0x6b8c;
@@ -306,16 +294,19 @@ inline std::vector<clocked_register_case> dual_add_sub_literals_cases()
 			std::vector<clocked_data_event>{{false,0xf90,0x55,0,false},{false,0xf91,0xaa,0,false}};
 		cases.push_back(std::move(c));
 	}
-	return cases;
 }
 }
 inline std::vector<clocked_register_case> section_cases()
 {
 	std::vector<clocked_register_case> cases;
-	for (auto build : {literal_tables::product_literals_cases,literal_tables::immediate_product_literals_cases,literal_tables::mac_literals_cases,literal_tables::coefficient_fir_literals_cases,literal_tables::multiply_move_literals_cases,literal_tables::dual_arithmetic_literals_cases,literal_tables::dual_add_sub_literals_cases}) {
-		auto rows = build();
-		cases.insert(cases.end(),std::make_move_iterator(rows.begin()),std::make_move_iterator(rows.end()));
-	}
+	for (auto append : {
+		literal_tables::append_product_literals,
+		literal_tables::append_immediate_product_literals,
+		literal_tables::append_mac_literals,
+		literal_tables::append_coefficient_fir_literals,
+		literal_tables::append_multiply_move_literals,
+		literal_tables::append_dual_arithmetic_literals,
+		literal_tables::append_dual_add_sub_literals}) append(cases);
 	return cases;
 }
 }

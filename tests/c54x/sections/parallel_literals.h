@@ -3,9 +3,8 @@
 #include "c54x_section_common.h"
 namespace c54x_test {
 namespace literal_tables {
-inline std::vector<clocked_register_case> parallel_literals_cases()
+inline void append_parallel_literals(std::vector<clocked_register_case> &cases)
 {
-	std::vector<clocked_register_case> cases;
 	auto append = [&](char const *name,u16 opcode,u16 source,u16 word,u16 destination,u16 stored,
 			std::initializer_list<register_setting> setup,std::initializer_list<register_check> checks) {
 		auto initial = initial_case(name,{opcode,0xf4e1});
@@ -48,12 +47,10 @@ inline std::vector<clocked_register_case> parallel_literals_cases()
 	append("ST-SUB-saturates",0xc531,0x300,0x8000,0x200,1,
 		{{r::STATE_A,0x10000},{r::STATE_B,0},{r::STATE_ST0,0},{r::STATE_ST1,0x300},{r::STATE_AR3,0x200},{r::STATE_AR5,0x300}},
 		{{r::STATE_B,0xff80000000ULL},{r::STATE_ST0,0xa00,0xe00}});
-	return cases;
 }
 
-inline std::vector<clocked_register_case> parallel_load_literals_cases()
+inline void append_parallel_load_literals(std::vector<clocked_register_case> &cases)
 {
-	std::vector<clocked_register_case> cases;
 	for (unsigned variant = 0; variant != 8; ++variant) {
 		bool const parallel = variant == 1 || variant == 2;
 		u16 const opcode = std::array<u16,8>{0x4f82,0xd6e1,0xd6e1,0x1093,0x1084,0x1094,0x4912,0x4911}[variant];
@@ -89,10 +86,9 @@ inline std::vector<clocked_register_case> parallel_load_literals_cases()
 		auto c = literal_sequence(std::move(initial), observation("pre-literal-snapshot", {{STATE_GENPC,0x600}}), std::move(final), 24, 1);
 		c.data_events = std::move(events); cases.push_back(std::move(c));
 	}
-	return cases;
 }
 
-inline std::vector<clocked_register_case> alu_store_literals_cases()
+inline void append_alu_store_literals(std::vector<clocked_register_case> &cases)
 {
 	struct row { u16 opcode,st0,st1,pmst,address,memory; unsigned ar; u16 next; u64 a,b,result_a,result_b; u16 result_st0; bool write; };
 	constexpr row rows[]{
@@ -105,7 +101,6 @@ inline std::vector<clocked_register_case> alu_store_literals_cases()
 		{0x81d3,0x800,0x200,0,0xffb,0xabcd,3,0xff8,0x11223344,0xabcd,0x11223344,0xabcd,0x800,true},
 		{0x8282,0x800,0x100,1,0xf90,0x7fff,2,0xf90,0x7ffff0000ULL,0xabcd,0x7ffff0000ULL,0xabcd,0x800,true}
 	};
-	std::vector<clocked_register_case> cases;
 	for (auto const &v : rows) {
 		auto initial = initial_case("literal-LD-ADD-OR-XOR-SUB-STL-STH", {0xf495,v.opcode,0xf4e1});
 		initial.initial.insert(initial.initial.end(), {{r::STATE_A,v.a},{r::STATE_B,v.b},{r::STATE_ST0,v.st0},
@@ -122,12 +117,10 @@ inline std::vector<clocked_register_case> alu_store_literals_cases()
 		if (v.address) c.data_events->push_back({v.write,v.address,v.memory,0,false});
 		cases.push_back(std::move(c));
 	}
-	return cases;
 }
 
-inline std::vector<clocked_register_case> high_store_literals_cases()
+inline void append_high_store_literals(std::vector<clocked_register_case> &cases)
 {
-	std::vector<clocked_register_case> cases;
 	for (unsigned variant = 0; variant != 5; ++variant) {
 		bool const b = variant % 2 && variant != 4, ar2 = variant >= 2, circular = variant != 4;
 		u16 const opcode = (b ? 0x8300 : 0x8200) | (circular ? 0xd0 : 0x90) | (ar2 ? 2 : 3);
@@ -146,16 +139,16 @@ inline std::vector<clocked_register_case> high_store_literals_cases()
 		c.data_events = std::vector<clocked_data_event>{{true,address,word,0,false}};
 		cases.push_back(std::move(c));
 	}
-	return cases;
 }
 }
 inline std::vector<clocked_register_case> section_cases()
 {
 	std::vector<clocked_register_case> cases;
-	for (auto build : {literal_tables::parallel_literals_cases,literal_tables::parallel_load_literals_cases,literal_tables::alu_store_literals_cases,literal_tables::high_store_literals_cases}) {
-		auto rows = build();
-		cases.insert(cases.end(),std::make_move_iterator(rows.begin()),std::make_move_iterator(rows.end()));
-	}
+	for (auto append : {
+		literal_tables::append_parallel_literals,
+		literal_tables::append_parallel_load_literals,
+		literal_tables::append_alu_store_literals,
+		literal_tables::append_high_store_literals}) append(cases);
 	return cases;
 }
 }

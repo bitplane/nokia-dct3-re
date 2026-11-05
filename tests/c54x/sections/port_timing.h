@@ -3,9 +3,8 @@
 #include "c54x_section_common.h"
 namespace c54x_test {
 namespace marker_tables {
-inline std::vector<clocked_register_case> port_timing_cases()
+inline void append_port_timing(std::vector<clocked_register_case> &cases)
 {
-	std::vector<clocked_register_case> cases;
 	for (unsigned variant = 0; variant != 15; ++variant) {
 		bool const writing = variant == 2 || variant >= 6;
 		bool const single = variant == 1;
@@ -57,14 +56,12 @@ inline std::vector<clocked_register_case> port_timing_cases()
 		if (!single) c.checkpoint = 3; // Port progress and the elapsed-clock origin survive restore.
 		cases.push_back(std::move(c));
 	}
-	return cases;
 }
 
-inline std::vector<clocked_register_case> port_indirect_output_cases()
+inline void append_port_indirect_output(std::vector<clocked_register_case> &cases)
 {
 	constexpr u16 opcodes[]{0x7582,0x7583,0x7595,0x7592,0x758a};
 	constexpr u16 values[]{0xface,0xbeef,0xcafe,0xface,0xface};
-	std::vector<clocked_register_case> cases;
 	for (unsigned variant = 0; variant != std::size(opcodes); ++variant) {
 		auto initial = initial_case("indirect-port-source-and-modification",{0xf495,0x75f8,0x100,0x124,
 			opcodes[variant],0x124,0x75f8,0x100,0x124,0xf4e1});
@@ -81,16 +78,14 @@ inline std::vector<clocked_register_case> port_indirect_output_cases()
 			{true,0x124,0x1111,0,false,{},{},5}};
 		cases.push_back(std::move(c));
 	}
-	return cases;
 }
 }
 inline std::vector<clocked_register_case> section_cases()
 {
 	std::vector<clocked_register_case> cases;
-	for (auto build : {marker_tables::port_timing_cases,marker_tables::port_indirect_output_cases}) {
-		auto rows = build();
-		cases.insert(cases.end(),std::make_move_iterator(rows.begin()),std::make_move_iterator(rows.end()));
-	}
+	for (auto append : {
+		marker_tables::append_port_timing,
+		marker_tables::append_port_indirect_output}) append(cases);
 	return cases;
 }
 }
