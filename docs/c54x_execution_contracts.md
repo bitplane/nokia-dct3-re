@@ -2333,7 +2333,7 @@ Pipelined FIRS and short MACP repeats retain the decoded opcode, advance PAR
 once per iteration, and use PB for coefficients instead of refetching opcode
 extensions. The first request owns an extra program-bus hold; later iterations
 read one coefficient per clock. The stream-start flag and held physical request
-are saved/reset. Two extra `coefficient_fir_literals` cases snapshot
+are saved/reset. Two coefficient-FIR cases in `product_literals` snapshot
 the held first MACP request and MACD before its successor write, poisoning
 already-read RAM/literals/coefficients/T as appropriate. Exact reads, writes,
 products, final input poison and replay are checked. Repeated MACD, extended
@@ -5324,12 +5324,12 @@ Long-offset PORTW/PORTR and MVDP/MVPD retain offset in the first extension
 and explicit port/program address in the second. GNU tic54x assembler output
 independently establishes the qualified encoding; SPRU131G's generic
 last-word-offset note conflicts and is not hardware confirmation. Execution,
-disassembly, and both frontend fixtures use the same corrected words. Existing
+disassembly, and execution fixtures use the same corrected words. Existing
 832 program-transfer and 41 MVDP cases retain their pointer/mapping poison,
 bus values, exact stage checkpoints and restores after re-encoding.
 
 `operand_order` retains all 46 independent data/I/O/program sequences
-and extension-before-operand checks. `memory_route_literals` retains
+and extension-before-operand checks. The route table in `memory_literals` retains
 26 result/marker cases, including long preupdated READA. The six transport
 cases retain pointers, flags, unrelated accumulators and actual transfers;
 PORTR's input Read is two clocks after the preceding PORTW Write and four

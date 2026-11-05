@@ -53,6 +53,13 @@ about an hour; cached focused builds usually take seconds.
 
 ## Fixture contracts
 
+Small independent literal tables are grouped into `register_literals`,
+`product_literals`, `parallel_literals`, `memory_literals`, `address_literals`,
+`logic_literals` and `control_literals`. Each table keeps its own inputs,
+expected values, checkpoint selection and bus events; `literal_sequence` only
+constructs the shared before/running/final snapshot cadence. Family grouping
+does not replace these literals with expectations computed by the CPU model.
+
 - Expectations belong to the case, not opcode-specific branches in the runner.
   Keep independent arithmetic, flags, addresses, guards and rejection limits.
 - Observe ordered data/program/I/O events, widths and source identity where

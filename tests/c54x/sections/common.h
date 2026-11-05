@@ -3,6 +3,7 @@
 #ifndef C54X_SECTION_COMMON_H
 #define C54X_SECTION_COMMON_H
 #include "tms320c54x_test_case.h"
+#include <iterator>
 namespace c54x_test {
 using r = tms320c54x_device;
 inline instruction_case initial_case(char const *name, std::initializer_list<u16> words)
@@ -24,6 +25,13 @@ inline instruction_case observation(char const *name, std::initializer_list<regi
 	instruction_case c{name,0,{}, {}, {}, expected,0,0};
 	c.expected.push_back({r::STATE_ILLEGAL,0}); c.expected_data = memory;
 	return c;
+}
+// Literal tables share snapshot cadence, not arithmetic or bus expectations.
+inline clocked_register_case literal_sequence(instruction_case initial, instruction_case before,
+	instruction_case final, unsigned finish = 32, unsigned checkpoint = 1)
+{
+	return {{{0,std::move(initial)},{1,std::move(before)},
+		{2,observation("literal-running",{})},{finish,std::move(final)}},checkpoint,finish};
 }
 }
 #endif // C54X_SECTION_COMMON_H
