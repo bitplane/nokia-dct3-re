@@ -8,10 +8,65 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from tools.run_c54x_section import load_sections, main, run_suite
+from tools.run_c54x_section import batch_compatible, batch_header, load_sections, main, plan_batches, run_section, run_suite
 
 
 class SectionCatalogTests(unittest.TestCase):
+    def test_batches_preserve_inventory_and_isolate_special_configuration(self):
+        sections = load_sections()
+        selected = list(sections)
+        batches = plan_batches(selected, sections, 8)
+        flattened = [name for batch in batches for name in batch]
+        self.assertCountEqual(flattened, selected)
+        self.assertEqual(len(flattened), len(set(flattened)))
+        self.assertLess(len(batches), len(selected))
+        for batch in batches:
+            self.assertLessEqual(len(batch), 8)
+            if len(batch) > 1:
+                self.assertTrue(all(batch_compatible(sections[name]) for name in batch))
+        for name in ('c5416_io_extended', 'bio_conditions', 'mcbsp_control', 'mu4_name_copy'):
+            self.assertIn([name], batches)
+        self.assertEqual(plan_batches(['immediate_store', 'basic_memory'], sections, 1),
+                         [['immediate_store'], ['basic_memory']])
+
+    def test_batch_eligibility_fails_closed(self):
+        with tempfile.TemporaryDirectory() as directory:
+            source = Path(directory) / 'x.h'
+            base = '#include "c54x_section_common.h"\nnamespace c54x_test { inline auto section_cases() { return 0; } }'
+            for extra, cases, scope, expected in [('', 2, 'cpu', True),
+                    ('\n#define C54X_SECTION_INSTRUCTION_EVENTS', 2, 'cpu', False),
+                    ('\n#include "other.h"', 2, 'cpu', False),
+                    ('\ninline auto helper() { return 0; }', 2, 'cpu', False),
+                    ('', 65, 'cpu', False), ('', 2, 'firmware', False)]:
+                source.write_text(base + extra)
+                self.assertEqual(batch_compatible(dict(source=source, cases=cases, scope=scope)), expected)
+
+    def test_batch_selection_is_explicit_and_unknown_names_are_rejected(self):
+        text = batch_header(['one', 'two'])
+        self.assertIn('section_cases_one()', text)
+        self.assertIn('section_cases_two()', text)
+        self.assertIn('Missing C54x batch section', text)
+        self.assertIn('Unknown C54x batch section', text)
+        self.assertEqual(text.count('#undef section_cases'), 2)
+
+    def test_individual_execution_requires_own_counts_and_completion(self):
+        good = 'C54x section: PASS cases=2 restores=2\nC54x section complete\n'
+        for code, text, passes in [(3, good, True), (0, good, False),
+                (3, good.replace('cases=2', 'cases=3'), False),
+                (3, good.replace('restores=2', 'restores=1'), False),
+                (3, good.replace('C54x section complete', ''), False)]:
+            with self.subTest(code=code, text=text), tempfile.TemporaryDirectory() as directory, \
+                    patch('tools.run_c54x_section.subprocess.run',
+                          return_value=subprocess.CompletedProcess([], code, text, '')) as run, \
+                    contextlib.redirect_stdout(io.StringIO()):
+                if passes:
+                    run_section(['emulator'], Path(directory), 'one', 2, 1.5)
+                else:
+                    with self.assertRaises(SystemExit):
+                        run_section(['emulator'], Path(directory), 'one', 2, 1.5)
+                self.assertEqual(run.call_args.kwargs['env']['C54X_TEST_SECTION'], 'one')
+                self.assertEqual(json.loads((Path(directory) / 'timing.json').read_text())['exit_code'], code)
+
     def test_suite_reports_only_successful_children(self):
         for fail in (False, True):
             with self.subTest(fail=fail), tempfile.TemporaryDirectory() as directory:

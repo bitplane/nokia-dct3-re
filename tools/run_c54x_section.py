@@ -4,8 +4,11 @@ Overlays the isolated c54xisa target, not the legacy suite or handset build.
 Each invocation records build/run wall times. Section names are explicit.
 """
 import argparse
+import hashlib
 import json
+import os
 from pathlib import Path
+import re
 import shutil
 import subprocess
 import sys
@@ -46,20 +49,67 @@ def copy_changed(source, target):
         shutil.copyfile(source, target)
 
 
-def run_suite(selected, sections, jobs, scope, root=ROOT):
+def batch_compatible(section):
+    """Only standalone base-machine sections can share a translation unit."""
+    if section.get('scope') != 'cpu' or section['cases'] > 64:
+        return False
+    source = section['source'].read_text()
+    directives = re.findall(r'^\s*#(.*)$', source, re.M)
+    return (directives == ['include "c54x_section_common.h"']
+            and source.count('inline ') == 1
+            and source.count('section_cases()') == 1)
+
+
+def plan_batches(selected, sections, size):
+    if not 1 <= size <= 8:
+        raise ValueError('batch size must be between 1 and 8')
+    batches, pending = [], []
+    for name in selected:
+        if size > 1 and batch_compatible(sections[name]):
+            pending.append(name)
+            if len(pending) == size:
+                batches.append(pending)
+                pending = []
+        else:
+            batches.append([name])
+    if pending:
+        batches.append(pending)
+    order = {name: i for i, name in enumerate(selected)}
+    return sorted(batches, key=lambda batch: order[batch[0]])
+
+
+def batch_header(names):
+    lines = ['#include <cstdlib>', '#include <stdexcept>', '#include <string_view>']
+    for i, name in enumerate(names):
+        lines += [f'#define section_cases section_cases_{name}',
+                  f'#include "c54x_batch_{i}.h"', '#undef section_cases']
+    lines += ['namespace c54x_test {',
+              'inline std::vector<clocked_register_case> section_cases() {',
+              'auto const *name = std::getenv("C54X_TEST_SECTION");',
+              'if (!name) throw std::invalid_argument("Missing C54x batch section");']
+    for name in names:
+        lines.append(f'if (std::string_view(name) == "{name}") return section_cases_{name}();')
+    lines += ['throw std::invalid_argument("Unknown C54x batch section");', '}', '}']
+    return '\n'.join(lines) + '\n'
+
+
+def run_suite(selected, sections, jobs, scope, root=ROOT, batch_size=8):
     output = root / 'tmp/c54x-section-trial' / (scope + '-summary.json')
     output.parent.mkdir(parents=True, exist_ok=True)
     started = time.monotonic()
     report = dict(scope=scope, selected=len(selected), completed=[], complete=False, passed_cases=0)
     try:
-        for name in selected:
+        for batch in plan_batches(selected, sections, batch_size):
             current = time.monotonic()
-            report['active_section'] = name
+            report['active_section'] = ','.join(batch)
             output.write_text(json.dumps(report, indent=2) + '\n')
-            subprocess.run([sys.executable, __file__, name, '--jobs', str(jobs)], check=True)
-            report['completed'].append(dict(section=name, cases=sections[name]['cases'],
-                                            wall_seconds=round(time.monotonic()-current, 3)))
-            report['passed_cases'] += sections[name]['cases']
+            arguments = batch if len(batch) == 1 else ['--batch', *batch]
+            subprocess.run([sys.executable, __file__, *arguments, '--jobs', str(jobs)], check=True)
+            elapsed = time.monotonic() - current
+            for name in batch:
+                report['completed'].append(dict(section=name, cases=sections[name]['cases'],
+                    wall_seconds=round(elapsed / len(batch), 3), build_group=batch))
+                report['passed_cases'] += sections[name]['cases']
         report.pop('active_section', None)
         report['complete'] = True
     finally:
@@ -74,31 +124,39 @@ def main():
     sections = load_sections()
     counts = {name: item['cases'] for name, item in sections.items()}
     parser.add_argument('section', nargs='?', choices=[*counts, 'all'])
+    parser.add_argument('--batch', nargs='+', choices=list(counts), help='build up to eight compatible sections once; execute each separately')
+    parser.add_argument('--batch-size', type=int, choices=range(1, 9), default=8, help='maximum small-section batch for all (1 disables batching)')
     parser.add_argument('--list', action='store_true', help='list sections and expected counts without building')
     parser.add_argument('--scope', choices=('cpu', 'firmware', 'all'), default='cpu', help='scope for --list or all; private/copied firmware is opt-in')
     parser.add_argument('--jobs', type=int, default=8)
     parser.add_argument('--build-only', action='store_true', help='prepare and compile the selected section without executing it')
     parser.add_argument('--negative-control', action='store_true', help='require failure of an intentionally wrong expectation')
     args = parser.parse_args()
+    if args.batch and (args.section or args.build_only or args.negative_control or len(args.batch) > 8
+                       or len(set(args.batch)) != len(args.batch)
+                       or not all(batch_compatible(sections[name]) for name in args.batch)):
+        parser.error('batch requires up to eight distinct compatible sections and no other execution mode')
     if args.build_only and args.negative_control:
         parser.error('--negative-control must execute the section')
     selected = [name for name, item in sections.items() if args.scope == 'all' or item['scope'] == args.scope]
     if args.list:
         print(json.dumps({name: dict(cases=counts[name], source=str(sections[name]['source'].relative_to(ROOT)), scope=sections[name]['scope']) for name in selected}, indent=2))
         return
-    if args.section is None:
+    if args.section is None and not args.batch:
         parser.error('select a section, all, or --list')
     if args.section == 'all':
         if args.build_only:
             parser.error('--build-only requires one section')
         if args.negative_control:
             parser.error('select one section for the negative control')
-        run_suite(selected, sections, args.jobs, args.scope)
+        run_suite(selected, sections, args.jobs, args.scope, batch_size=args.batch_size)
         return
-    selected_source = sections[args.section]['source']
+    names = args.batch or [args.section]
+    group = 'batch-' + hashlib.sha256(','.join(names).encode()).hexdigest()[:12] if args.batch else args.section
+    selected_source = sections[names[0]]['source']
     sections = ROOT / 'tests/c54x/sections'
     overlay = ROOT / 'mame/src/mame/nokia'
-    output = ROOT / 'tmp/c54x-section-trial' / (args.section + ('-negative' if args.negative_control else ''))
+    output = ROOT / 'tmp/c54x-section-trial' / (group + ('-negative' if args.negative_control else ''))
     output.mkdir(parents=True, exist_ok=True)
     for source in (ROOT / 'tests/c54x').glob('*.h'):
         copy_changed(source, overlay / source.name)
@@ -111,7 +169,12 @@ def main():
     if args.section in ('idle_dma', 'clock_rates'):
         for name in ('tms320c54x_dma.h', 'tms320c54x_dma.cpp'):
             copy_changed(ROOT / 'driver' / name, overlay / name)
-    copy_changed(selected_source, overlay / 'c54x_section_selected.h')
+    if args.batch:
+        for i, name in enumerate(names):
+            copy_changed(ROOT / 'tests/c54x/sections' / (name + '.h'), overlay / f'c54x_batch_{i}.h')
+        (overlay / 'c54x_section_selected.h').write_text(batch_header(names))
+    else:
+        copy_changed(selected_source, overlay / 'c54x_section_selected.h')
     if args.negative_control:
         selected = overlay / 'c54x_section_selected.h'
         text = selected.read_text()
@@ -133,6 +196,9 @@ def main():
         print('\n'.join((output / 'build.log').read_text().splitlines()[-30:]), file=sys.stderr)
         raise SystemExit('section build failed')
     built = time.monotonic()
+    if args.batch:
+        (output / 'timing.json').write_text(json.dumps(dict(sections=names,
+            build_seconds=round(built-start, 3)), indent=2) + '\n')
     if args.build_only:
         result = dict(section=args.section, build_seconds=round(built-start,3), executed=False)
         (output / 'timing.json').write_text(json.dumps(result, indent=2) + '\n')
@@ -141,19 +207,31 @@ def main():
     command = [str(ROOT / 'mame/c54xisa'), 'tms54isa', '-video', 'none', '-sound', 'none',
                '-joystickprovider', 'none', '-midiprovider', 'none', '-nothrottle',
                '-noreadconfig', '-seconds_to_run', '1']
-    run = subprocess.run(command, cwd=output, capture_output=True, text=True, timeout=30)
+    for name in names:
+        run_section(command, output, name, counts[name], built-start, args.negative_control,
+                    group if args.batch else None)
+
+
+def run_section(command, output, name, count, build_seconds, negative=False, group=None):
+    if group:
+        output = ROOT / 'tmp/c54x-section-trial' / name
+        output.mkdir(parents=True, exist_ok=True)
+    started = time.monotonic()
+    env = os.environ.copy()
+    env['C54X_TEST_SECTION'] = name
+    run = subprocess.run(command, cwd=output, env=env, capture_output=True, text=True, timeout=30)
     text = run.stdout + run.stderr
     (output / 'console.log').write_text(text)
-    result = dict(section=args.section, build_seconds=round(built-start,3),
-                  run_seconds=round(time.monotonic()-built,3), exit_code=run.returncode)
+    result = dict(section=name, build_seconds=None if group else round(build_seconds,3), build_group=group,
+                  run_seconds=round(time.monotonic()-started,3), exit_code=run.returncode)
     (output / 'timing.json').write_text(json.dumps(result, indent=2) + '\n')
     print(text, end='')
     print(json.dumps(result))
-    if args.negative_control:
+    if negative:
         if run.returncode != 3 or 'expected=1' not in text or 'C54x section: PASS' in text:
             raise SystemExit('negative control did not detect the wrong expectation')
         print('C54x negative control: PASS (wrong expectation rejected)')
-    elif run.returncode != 3 or f'C54x section: PASS cases={counts[args.section]} restores={counts[args.section]}' not in text or 'C54x section complete' not in text:
+    elif run.returncode != 3 or f'C54x section: PASS cases={count} restores={count}' not in text or 'C54x section complete' not in text:
         raise SystemExit('section failed')
 
 

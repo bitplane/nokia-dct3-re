@@ -31,6 +31,16 @@ Overlay changed CPU sources before testing. Sections share one object tree:
 build sequentially, including relative to the main MAME and benchmark builds.
 Do not retain an emulator binary per section.
 
+Complete runs batch up to eight small, self-contained base-machine sections per
+build. Each section still runs in a fresh emulator process and must pass its own
+case count, restore count and completion marker. Device-specific, observer-hook,
+copied-firmware and large sections retain isolated builds. `--batch-size 1`
+disables batching; `--batch NAME ...` runs an explicit compatible group.
+`C54X_TEST_SECTION` is generated-fixture dispatch only, not a CPU execution mode.
+Batch build times are recorded once under the batch directory; each section's
+timing links to that build group. Suite per-section wall times amortize shared
+build overhead and must not be interpreted as instruction throughput.
+
 Each section's logs and build/run times are under ignored
 `tmp/c54x-section-trial/SECTION/`. Complete runs write
 `tmp/c54x-section-trial/SCOPE-summary.json`, including completed sections,
