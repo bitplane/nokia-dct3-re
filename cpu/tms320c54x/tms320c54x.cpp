@@ -2403,6 +2403,30 @@ void tms320c54x_device::pipeline_step()
 	// Resolve an older store's implicit DAGEN update before a younger
 	// memory Access consumes the same AR. The data write remains in Execute.
 	// This is address ordering, not forwarding an explicit MMR store.
+	if (m_pipeline_valid[4] && staged_read_a(m_pipeline_word[4]))
+	{
+		// READA also writes EAB in Read. Resolve its destination before a
+		// younger Access updates the same AR; retain the existing PAR hold.
+		u8 const mode = m_pipeline_word[4];
+		bool const extended = mode >= 0xe0;
+		bool const preincrement = !extended && BIT(mode, 7) && (mode & 0x78) == 0x18;
+		if (preincrement) indirect_modify(mode, false, 4);
+		m_pipeline_operand_address[4] = mode == 0xf8 ? m_pipeline_immediate[4] : extended ?
+			long_offset_address(mode, indirect_ar(mode, 4), s16(m_pipeline_immediate[4]), 4) : basic_address(4, mode);
+		u16 const destination = m_pipeline_operand_address[4];
+		bool const repeat_body = m_pipeline_repeat_active && m_pipeline_repeat_body_latched && m_pipeline_address[4] == m_pipeline_repeat_address;
+		bool const bd_delay = m_pipeline_control_words && m_pipeline_control_word == 0xf273 &&
+			(m_pipeline_address[4] == m_pipeline_control_address+2 || m_pipeline_address[4] == m_pipeline_control_address+3);
+		bool const accumulator_word = destination >= 0x08 && destination <= 0x0d;
+		bool const brc_word = destination == 0x1a && !m_pipeline_block_active;
+		if (destination < 0x60 && (repeat_body || bd_delay || (!accumulator_word && !brc_word && (destination < 0x10 || destination > 0x17))))
+		{
+			logerror("%s: staged READA control/peripheral destination is unsupported instruction=%06x word=%04x destination=%04x repeat=%u\n",
+				machine().describe_context(), unsigned(m_pipeline_address[4]), m_pipeline_word[4], destination, unsigned(repeat_body)); m_illegal = true; return;
+		}
+		if (!extended && BIT(mode, 7) && !preincrement) indirect_modify(mode, false, 4);
+		m_pipeline_read_a_wait = 4;
+	}
 	if (m_pipeline_valid[4] && staged_xmem_store(m_pipeline_word[4]))
 	{
 		// SPRU131G 7.1: a store presents EAB in Read and drives EB in Execute.
@@ -3280,28 +3304,6 @@ void tms320c54x_device::pipeline_step()
 	{
 		m_pipeline_operand[4] = pipeline_read_data(m_pipeline_operand_address[4]);
 		m_pipeline_write_a_wait = 4;
-	}
-	if (m_pipeline_valid[4] && staged_read_a(m_pipeline_word[4]))
-	{
-		u8 const mode = m_pipeline_word[4];
-		bool const extended = mode >= 0xe0;
-		bool const preincrement = !extended && BIT(mode, 7) && (mode & 0x78) == 0x18;
-		if (preincrement) indirect_modify(mode, false, 4);
-		m_pipeline_operand_address[4] = mode == 0xf8 ? m_pipeline_immediate[4] : extended ?
-			long_offset_address(mode, indirect_ar(mode, 4), s16(m_pipeline_immediate[4]), 4) : basic_address(4, mode);
-		u16 const destination = m_pipeline_operand_address[4];
-		bool const repeat_body = m_pipeline_repeat_active && m_pipeline_repeat_body_latched && m_pipeline_address[4] == m_pipeline_repeat_address;
-		bool const bd_delay = m_pipeline_control_words && m_pipeline_control_word == 0xf273 &&
-			(m_pipeline_address[4] == m_pipeline_control_address+2 || m_pipeline_address[4] == m_pipeline_control_address+3);
-		bool const accumulator_word = destination >= 0x08 && destination <= 0x0d;
-		bool const brc_word = destination == 0x1a && !m_pipeline_block_active;
-		if (destination < 0x60 && (repeat_body || bd_delay || (!accumulator_word && !brc_word && (destination < 0x10 || destination > 0x17))))
-		{
-			logerror("%s: staged READA control/peripheral destination is unsupported instruction=%06x word=%04x destination=%04x repeat=%u\n",
-				machine().describe_context(), unsigned(m_pipeline_address[4]), m_pipeline_word[4], destination, unsigned(repeat_body)); m_illegal = true; return;
-		}
-		if (!extended && BIT(mode, 7) && !preincrement) indirect_modify(mode, false, 4);
-		m_pipeline_read_a_wait = 4;
 	}
 	if (m_pipeline_valid[4] && staged_program_move(m_pipeline_word[4]))
 	{

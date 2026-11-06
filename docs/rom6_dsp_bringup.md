@@ -18,14 +18,22 @@ Its initial IMR is zero, not the backend's ROM4-specific bit-0 seed. The
 assumptions, not measured ROM6 hardware parameters.
 
 A fresh three-second run enters reset `ff80` and the upload loader `0f00`
-twice, then reaches resident initialization `2c75` organically. The native
-backend publishes one completion strobe; complete upload equivalence and MCU
-self-test success are not yet qualified. The next CPU exclusion is MVDD at
-uploaded address `0b48`: opcode `e51a`, source `0061`, destination SP (`0018`).
-The preceding absolute CMPM at `0b38` reads BRC against `ffff`; its admission
-is covered by eight independent literal/retention/save-restore cases derived
-from TI SPRU172C 4-33, not a ROM-specific compare result. Direct/indirect BRC
-CMPM and other control-register admissions remain excluded.
+twice, then reaches resident initialization `2c75` organically. The MCU
+consumes verifier result `0000/0006` and self-test command `0d` with zero
+faults, without the DSP HLE backend. At the terminal sample the native CPU
+has `ILLEGAL=0`, is in IDLE at `3999`, and has generated 527 completion
+strobes. Complete upload equivalence, sustained UI and storage acceptance
+remain unqualified.
+
+The absolute CMPM at uploaded address `0b38` reads BRC against `ffff`; its
+admission is covered by eight independent literal/retention/save-restore cases
+derived from TI SPRU172C 4-33, not a ROM-specific compare result. A table-copy
+ordering defect was independently reproduced and corrected: READA's older
+Read-stage destination update must precede a younger Access-stage use of the
+same AR. Otherwise initialization loses its table position and attempts mapped
+register copies. The initializer now terminates organically; additional mapped
+destinations were not admitted to mask that error. CPU contracts live in
+[C54x execution contracts](c54x_execution_contracts.md#harness-contract).
 
 Reproduce the input preparation with:
 

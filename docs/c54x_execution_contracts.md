@@ -94,6 +94,15 @@ neighbouring destination, repeated and different-form exclusions. Status and
 accumulators remain unchanged (SPRU172C 4-107). The asserted bus clocks are
 the model's phase contract, not independent silicon timing measurements.
 
+READA resolves its Read-stage destination DAGEN update before a younger
+Access-stage instruction consumes that AR (SPRU131G 7.1). Its retained PAR
+sample, program-bus hold and Execute publication are unchanged.
+`program_table_copy` uses four independent pair-table loops (one, two, four
+and eight pairs) to check READA/ADD/MVDD composition, final table position,
+scratch-pointer balance, copied words and restoration. This catches a loop
+that passes standalone instruction tests but reads the scratch word on the
+wrong side of an older postdecrement.
+
 Short RAM AND/OR/XOR operands can issue through the staged single-instruction
 repeat slots. Each iteration owns one operand read and one pointer update;
 Execute reduces the retained zero-extended word into the selected accumulator
