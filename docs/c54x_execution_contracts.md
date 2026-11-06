@@ -1066,16 +1066,14 @@ restore counts are mandatory; the full pattern/checkpoint product is retired.
 LTD and DELAY read `Smem` and copy to `Smem+1`; LTD also loads T
 ([SPRU172C](https://www.ti.com/lit/ug/spru172c/spru172c.pdf), pages4-81/4-41).
 The implicit successor write does not make the encoded source a write operand.
-Their atomic handlers reject short `98..9f` before address modification or
-operand access. The unchanged core fails the matrix's first atomic case at
-the no-data-transaction assertion. An older default fixture had incorrectly
-treated `4d9b` as a valid preincrement read; its positive control now uses
+Source admission rejects short `98..9f` before address modification or
+operand access. `4d9b` is not a validated preincrement read; its positive control uses
 legal long MOD=13, `4deb 0001`, preserving the distinct two-cycle contract.
 This is fail-closed source admission, not a silicon-trap claim. Positive staged
 LTD/long-DELAY qualification is separately described under
 [successor memory copy](#staged-successor-memory-copy). MACP/MACD have the same explicit source
 guard; MVDK, MVDP, MVMD, PORTW and WRITA are covered by the central
-`execute_one` admission check. Destination-side transfers are distinct,
+Decode admission/addressing checks. Destination-side transfers are distinct,
 as described below; the implicit write alone is not evidence of a missing
 guard. Unenumerated instruction families still require their own audit.
 

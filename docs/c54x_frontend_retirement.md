@@ -4,7 +4,7 @@
 
 There is one stage-owned execution engine. Atomic scheduling, pending-I/O
 continuations, XC history, delayed/repeat scheduling and their saved state are
-removed. `execute_one` retains shared instruction effects, not a second
+removed. `execute_register_effects` retains register-only instruction effects, not a second
 scheduler or instruction-level clock accounting. Unsupported instruction forms
 stop without an alternate engine.
 
@@ -31,11 +31,29 @@ See [the test suite](c54x_test_suite.md) for execution and coverage policy and
   through MAME's disassembler build list.
 - Separate BSP, DMA and McBSP components retain their peripheral contracts.
 
-`execute_one` is a residual effects dispatcher, not an alternate engine.
-Some retained bus-capable branches still require per-family reachability
-proofs; removing the proven redundant XOR/LD-immediate/SQUR tails does not
-establish that every remaining branch is necessary. Admission/arbitration is
-still the largest scheduling block and remains a bounded partial model.
+`execute_register_effects` owns no guest bus transactions or instruction timing.
+An exhaustive opcode-only census gives the same 2,087-word caller superset in
+base and extended modes: 12 mode-snapshotted words, 2,075 ordinary words and
+128 accelerated-repeat words (the repeat set overlaps the ordinary set).
+The reviewed ranges live in `fixtures/c54x_dispatch_routes.json`.
+Admission/arbitration remains the largest scheduling block and a bounded
+partial model; this census does not expand instruction or silicon coverage.
+
+The manual instrument is:
+
+```sh
+python3 tools/c54x_dispatch_audit.py --check fixtures/c54x_dispatch_routes.json \
+  --output tmp/c54x-dispatch.json
+```
+
+It requires libclang for raw C++ tokenization and `g++` with the local MAME
+headers to evaluate guards. Aliases and bus-admission expressions come from
+the actual sources. Unknown local/state `if` conditions fork both ways; unknown
+live switch selectors and unsupported control syntax stop the audit. The proof
+covers ordinary admitted execution, not arbitrary debugger state edits or
+corrupted snapshots. The nine retained
+local/state-dependent arithmetic conditions are conservative, not removal
+proofs. No admitted caller word reaches the final unimplemented-opcode path.
 
 Opcode diagnostics allocate and collect only with MAME `-verbose`. Counts and
 full extended PCs are observations, not saved architectural state. Fetched
@@ -103,14 +121,19 @@ alone is not proof of an atomic engine or renewed acceptance.
 ## Acceptance
 
 All five retirement stages are complete. The consolidated catalogue independently
-passes all 487 sections and 1,461,937 cases and restores (2,929.482 seconds).
+passes all 487 sections and 1,461,937 cases and restores (2,905.815 seconds).
 Its manifest SHA-256 is
 `031bff8c6519d5e07acf10d428c31483c3ea6b234496a98bc527d156b2e07dd6`.
 Fixture consolidation removes no cases, expected results or restore execution.
 Fresh integration checks pass 358 linked ROM4 context cases, cold execution,
 FR/EFR codecs, RF bitmap, clocked serial/replay, backend BSP/requests,
 MU4 original bootstrap with exact 1,339-item replay, and 5110 menu/save-state.
-The host checks pass 359 C54x, 81 runner and 59 device-split/patch/keypad tests.
+The host checks pass 366 C54x, 81 runner and 59 device-split/patch/keypad tests.
+The residual-effects census preserves all three caller sets while removing
+105 proven-shadowed conditions/arms and nine unused private helpers. CPU
+component sources shrink from 8,177 to 6,963 lines; the register-effects
+dispatcher shrinks from 1,357 to 226 lines. No saved fields, catalogue cases,
+pipeline ordering or admission/arbitration rules change.
 Every catalogue completion also passes
 exact case/restore line validation, including rejection of count suffixes.
 

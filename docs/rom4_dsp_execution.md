@@ -746,8 +746,8 @@ ISA coverage or a physical pipeline implementation.
 
 ## Native timing continuation
 
-Native configurations still recognize interrupts before an instruction-atomic
-`execute_one()`. Hardware interrupt entry retains the accepted vector,
+The stage-owned engine recognizes interrupts at qualified pipeline boundaries.
+Hardware interrupt entry retains the accepted vector,
 source, then captures the continuation at INTR Decode before stepping SP
 decrement, vector fetch/IACK and stack write on separate CPU cycles. All
 entry continuation state is saved.
@@ -3883,7 +3883,7 @@ Exact `6d95` checks one AR5 increment, unchanged AR6/memory and one cycle.
 Exact `7e92` distinguishes A-addressed program memory from different data
 memory at the same address, checks AR2 post-increment, unchanged A/AR3 and
 five-cycle execution.
-The tap is in `execute_run` immediately before `execute_one`, not in the
+The current tap is in `pipeline_execute` at logical Execute entry, not in the
 extension-word fetch helper: these are instructions dispatched by the current
 emulated core, not raw program-memory reads or independent silicon evidence.
 `first_pc` is only the first observed site; each count aggregates all sites.

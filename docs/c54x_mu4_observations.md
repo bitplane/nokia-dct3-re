@@ -431,13 +431,12 @@ conformance is full bus or boot acceptance.
 Both isolated bus gates, full legacy CPU conformance, native 5110
 save-state restoration and the unchanged original memory audit pass.
 
-The atomic integration must defer retirement as well as the I/O callback.
-`execute_run` currently applies repeat redirects, delayed-word accounting,
-XC protection and INTM-guard consumption immediately after `execute_one`.
-A retained PORTR/PORTW must therefore own the instruction PC, original
-delay/XC eligibility, repeat-armed state and consumed word count until
-completion. Resume a pending transaction before `service_interrupt` or
-another fetch; retire exactly once after its single bus side effect.
+Retained PORTR/PORTW transactions own their instruction address, captured
+operands, delay/XC eligibility and repeat state while waits are pending.
+The pipeline resumes the retained transaction without refetching its operands;
+qualified interrupt acceptance must not duplicate or bypass its bus side effect.
+Repeat redirects and control protection belong to the stage-owned pipeline,
+not an instruction-at-a-time integration path.
 Preserve the existing extension order: long-offset forms fetch the port
 before the address extension, while short/absolute forms prepare the
 address before fetching the port. PORTW also retains its sampled source;
