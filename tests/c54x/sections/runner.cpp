@@ -130,7 +130,7 @@ protected:
 		c54x_test::check_disassembly(m_cpu->get_disassembler(),
 			[](bool valid,char const *contract){if(!valid)throw emu_fatalerror("%s",contract);},
 			[&groups](char const *,char const *format,auto... values){++groups;osd_printf_info(format,values...);});
-		if(groups!=44)throw emu_fatalerror("Incomplete disassembly family catalogue");
+		if(groups!=45)throw emu_fatalerror("Incomplete disassembly family catalogue");
 #endif
 		m_timer = timer_alloc(FUNC(section_state::tick), this);
 #ifdef C54X_SECTION_MMR_BUS

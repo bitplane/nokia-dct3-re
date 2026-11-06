@@ -110,6 +110,19 @@ void check_disassembly(util::disasm_interface &decoder, Expect expect, Report re
 		"control disassembly preserves mnemonic, operand, word length, page and bounded stepping flags");
 	report("disasm-control", "TMS320C54x control disassembler: PASS vectors=%u pages=2\n",
 		unsigned(std::size(vectors)));
+	// SPRU172C 4-34: four CC fields and three ARx bits; no extension word.
+	for (u32 pc : {0x010100, 0x01ffff})
+		for (unsigned condition = 0; condition < 4; ++condition)
+			for (unsigned ar = 0; ar < 8; ++ar)
+			{
+				constexpr u16 bases[] = {0xf4a8, 0xf5a8, 0xf6a8, 0xf7a8};
+				words const buffer(pc, bases[condition] | ar, 0xdead);
+				std::ostringstream text;
+				expect(decoder.disassemble(text, pc, buffer, buffer) == (1 | dasm::SUPPORTED) &&
+					text.str() == util::string_format("CMPR    %u, AR%u", condition, ar) && buffer.seen() == 1,
+					"CMPR disassembly preserves numeric condition, ARx and one-word access without branch flags");
+			}
+	report("disasm-cmpr", "TMS320C54x CMPR disassembler: PASS forms=32 pages=2 bounded_extensions=1 pipeline_claim=0\n");
 	for (u32 pc : {0x010100, 0x01ffff})
 		for (u16 family : {0x6800, 0x6900, 0x6a00, 0x6b00, 0x7600, 0x7700})
 			for (unsigned mode = 0; mode < 256; ++mode)
@@ -799,10 +812,10 @@ void check_disassembly(util::disasm_interface &decoder, Expect expect, Report re
 		{0x32e2, 2 | dasm::SUPPORTED, "LD      *AR2($2345), ASM"},
 		{0x46f8, 2 | dasm::SUPPORTED, "LD      *($2345), DP"},
 		{0x4612, 1 | dasm::SUPPORTED, "LD      $12, DP"},
-		{0xf4a8, 1, ".word   $F4A8"},
+		{0xf4a8, 1 | dasm::SUPPORTED, "CMPR    0, AR0"},
 	};
 	check_syntax(special_load_forms, {0x01ffff}, false,
-		"Special-register load syntax names destinations and rejects undocumented ARP aliases");
+		"Special-register load syntax names destinations and distinguishes CMPR from ARP loads");
 	report("disasm-special-load", "TMS320C54x special load disassembler: PASS memory_forms=768 arp=8 pages=2 bounded_extensions=1 pipeline_claim=0\n");
 	for (u32 pc : {0x010100, 0x01ffff})
 		for (u16 family : {0xf080, 0xf0a0})

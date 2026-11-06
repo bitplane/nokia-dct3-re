@@ -13,6 +13,12 @@ offs_t tms320c54x_disassembler::disassemble(std::ostream &stream, offs_t pc,
 	auto const target = [&]() { return (pc & 0x7f0000) | next_word(); };
 	u8 const mode = op;
 	u16 const family = op & 0xff00;
+	// SPRU172C 4-34: CC occupies bits 9..8 and ARx occupies bits 2..0.
+	if ((op & 0xfcf8) == 0xf4a8)
+	{
+		util::stream_format(stream, "CMPR    %u, AR%u", (op >> 8) & 3, op & 7);
+		return 1 | SUPPORTED;
+	}
 	auto const predicate_name = [](u8 predicate) -> char const * {
 		switch (predicate)
 		{

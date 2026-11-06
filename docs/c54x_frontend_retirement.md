@@ -91,6 +91,39 @@ presence is not executable coverage or proof that they are unreachable.
 Operand capture and forwarding remain interleaved in the coordinator because
 moving them into textbook stage order would change what adjacent instructions see.
 
+## Rejection scope
+
+`tools/c54x_rejection_audit.py --output tmp/c54x-rejections.json` inventories
+all 126 explicit `m_illegal = true` sites, retaining source guards and diagnostics.
+It uses the raw-token reader above. Diagnostic-wording categories are 3 bus
+arbitration, 29 control-composition, 7 encoding, 86 other (mostly operand-domain
+or publication restrictions), and 1 unlogged retained-RETD-word invariant.
+These are source-site counts, not unsupported instruction counts or reachability
+proofs; a first opcode word alone cannot establish operands or control context.
+
+The seven renewed ROM4 control/clock/wire/pin/replay captures contain 626--643
+distinct opcode words, with matching decoded lengths and no rejection diagnostic.
+A separate original MU4 bootstrap/replay capture has 862 distinct words and ends
+at `02:98ea`, IDLE set and ILLEGAL clear. This bounds the observed workloads,
+not all firmware paths. An absent error message alone is insufficient because
+the retained-word invariant has no diagnostic.
+
+The MU4 capture identifies a debugger gap rather than an execution exclusion:
+ten executed CMPR encodings previously lacked disassembly. CMPR now decodes
+all 32 CC/ARx combinations under [SPRU172C, page 4-34](https://www.ti.com/lit/ug/spru172c/spru172c.pdf).
+The unchanged 862-word observed set has 856 correctly decoded words, versus 846
+before this debugger-only correction; native 1,339-item replay still passes.
+The isolated disassembly gate checks syntax, one-word reads and absence of
+branch flags on two program pages; execution ownership remains with the existing
+register-compare tests. Six other observed words (`9411`, `9421`, `9634`, `9690`,
+`fd00`, `ff00`) remain debugger gaps, not observed CPU halts. Extension-controlled
+`6f` words require their fetched-tuple decode results, not the incomplete first
+word's result.
+
+Do not widen an execution rejection using these opcode counts as justification.
+No reached instruction exclusion was found in these workloads; a new admission
+needs a blocked execution/context or an independently qualified composition.
+
 ## Compositions and interfaces
 
 Ordinary `noki5110` selects the native DSP backend and standard SWWSR decoding.
@@ -155,7 +188,7 @@ alone is not proof of an atomic engine or renewed acceptance.
 
 ## Acceptance
 
-All five retirement stages are complete. The consolidated catalogue independently
+All five retirement stages are complete. The execution-core checkpoint `9f979059`
 passes all 487 sections and 1,461,943 cases and restores (3,055.702 seconds).
 Its manifest SHA-256 is
 `258cae1abf722739cff3e3e443e33f8592cb98fecf8c5e3b881c601fffd39bd0`.
@@ -165,7 +198,10 @@ three replay boundaries; disabling the retained-read deferral fails this gate.
 Fresh integration checks pass 358 linked ROM4 context cases, cold execution,
 FR/EFR codecs, RF bitmap, clocked serial/replay, backend BSP/requests,
 MU4 original bootstrap with exact 1,339-item replay, and 5110 menu/save-state.
-The host checks pass 367 C54x tests and 66 layout, native-runner,
+The debugger-only CMPR addition separately passes the full 45-family disassembler
+gate, 140 register-compare and 3,456 delayed-compare cases with replay; execution
+sources, admission and saved state are unchanged from that catalogue checkpoint.
+The host checks pass 371 C54x tests and 66 layout, native-runner,
 device-split/patch/keypad tests. Focused builds refresh changed CPU sources
 automatically rather than relying on a separate overlay invocation.
 The residual-effects census preserves all three caller sets. Its register-only
