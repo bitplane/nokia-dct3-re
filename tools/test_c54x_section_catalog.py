@@ -8,10 +8,30 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from tools.run_c54x_section import batch_compatible, batch_header, load_sections, main, plan_batches, run_section, run_suite
+from tools.run_c54x_section import batch_compatible, batch_header, load_sections, main, plan_batches, refresh_cpu_overlay, run_section, run_suite
 
 
 class SectionCatalogTests(unittest.TestCase):
+    def test_focused_build_refreshes_changed_cpu_sources_without_touching_cached_ones(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / 'cpu/tms320c54x'
+            target = root / 'mame/src/devices/cpu/tms320c54x'
+            source.mkdir(parents=True)
+            target.mkdir(parents=True)
+            for name in ('tms320c54x.cpp', 'tms320c54x.h', 'tms320c54x_decode.h',
+                         'tms320c54x_dasm.cpp', 'tms320c54x_dasm.h'):
+                (source / name).write_text(name)
+            (source / 'README.md').write_text('not a build input')
+            refresh_cpu_overlay(root)
+            self.assertEqual({p.name for p in target.iterdir()},
+                             {p.name for p in source.iterdir() if p.suffix != '.md'})
+            cached = (target / 'tms320c54x.h').stat().st_mtime_ns
+            (source / 'tms320c54x.cpp').write_text('changed CPU implementation')
+            refresh_cpu_overlay(root)
+            self.assertEqual((target / 'tms320c54x.cpp').read_text(), 'changed CPU implementation')
+            self.assertEqual((target / 'tms320c54x.h').stat().st_mtime_ns, cached)
+
     def test_batches_preserve_inventory_and_isolate_special_configuration(self):
         sections = load_sections()
         selected = list(sections)

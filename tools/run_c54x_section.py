@@ -49,6 +49,13 @@ def copy_changed(source, target):
         shutil.copyfile(source, target)
 
 
+def refresh_cpu_overlay(root=ROOT):
+    target = root / 'mame/src/devices/cpu/tms320c54x'
+    for source in sorted((root / 'cpu/tms320c54x').iterdir()):
+        if source.suffix in ('.cpp', '.h'):
+            copy_changed(source, target / source.name)
+
+
 def batch_compatible(section):
     """Only standalone base-machine sections can share a translation unit."""
     if section.get('scope') != 'cpu' or section['cases'] > 64:
@@ -158,6 +165,7 @@ def main():
     overlay = ROOT / 'mame/src/mame/nokia'
     output = ROOT / 'tmp/c54x-section-trial' / (group + ('-negative' if args.negative_control else ''))
     output.mkdir(parents=True, exist_ok=True)
+    refresh_cpu_overlay()
     for source in (ROOT / 'tests/c54x').glob('*.h'):
         copy_changed(source, overlay / source.name)
     copy_changed(sections / 'runner.cpp', overlay / 'tms320c54x_test_isa.cpp')
