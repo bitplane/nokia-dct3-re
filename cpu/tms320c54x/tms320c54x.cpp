@@ -1489,6 +1489,54 @@ tms320c54x_device::pipeline_cycle_result tms320c54x_device::pipeline_service_pen
 	return pipeline_cycle_result::proceed;
 }
 
+tms320c54x_device::pipeline_arbitration_result tms320c54x_device::pipeline_arbitrate_peripheral()
+{
+	bool const read_peripheral = m_pipeline_valid[3] &&
+		((m_pipeline_operand_address[3] >= 0x20 && m_pipeline_operand_address[3] <= 0x5f &&
+		(staged_memory_load(m_pipeline_word[3]) || staged_shifted_memory_load(m_pipeline_word[3], m_pipeline_immediate[3]) || staged_bitfield(m_pipeline_word[3]) || staged_port_write(m_pipeline_word[3]) || staged_memory_logic(m_pipeline_word[3]) || staged_rmw(m_pipeline_word[3]) || staged_mmr_load(m_pipeline_word[3]) || staged_memory_dp(m_pipeline_word[3]))) ||
+		(m_pipeline_immediate[3] >= 0x20 && m_pipeline_immediate[3] <= 0x5f &&
+		(staged_mvdd(m_pipeline_word[3]) || staged_parallel_load(m_pipeline_word[3]))));
+	bool const write_peripheral = m_pipeline_valid[4] &&
+		((m_pipeline_operand_address[4] >= 0x20 && m_pipeline_operand_address[4] <= 0x5f &&
+		(staged_port_read(m_pipeline_word[4]) || staged_ram_stm(m_pipeline_word[4]) || staged_store(m_pipeline_word[4]) || staged_accumulator_mmr_store(m_pipeline_word[4]) || staged_rmw(m_pipeline_word[4]) || staged_data_copy(m_pipeline_word[4]) || staged_mvdd(m_pipeline_word[4]) || (m_pipeline_word[4] & 0xff00) == 0x7600)) || staged_bus_control(m_pipeline_word[4]) || (staged_timer_control(m_pipeline_word[4]) || staged_serial_control(m_pipeline_word[4]) || staged_clock_control(m_pipeline_word[4])));
+	bool const move_peripheral = m_pipeline_valid[3] && staged_clock_destination_move(m_pipeline_word[3], m_pipeline_immediate[3]);
+	// Class 19A/B owns its retained write one stage earlier than STM. Pay
+	// the peripheral clock before advancing Access to that write stage.
+	if (move_peripheral && (read_peripheral || write_peripheral))
+	{
+		logerror("%s: simultaneous staged CLKMD move/peripheral arbitration is unsupported\n", machine().describe_context());
+		m_illegal = true; return {pipeline_cycle_result::rejected, false};
+	}
+	// The boot echo loop can read the previous BDRR while BDXR accepts
+	// another retry. These independent serial endpoints retain one access
+	// wait apiece; neither access synthesizes a serial-ready edge. Other
+	// peripheral conflicts still require their own ordering qualification.
+	bool const serial_retry_pair = read_peripheral && write_peripheral &&
+		m_pipeline_word[4] == 0x7721 && (m_pipeline_word[3] & 0xfeff) == 0x4820;
+	bool const clock_read_after_write = read_peripheral && write_peripheral &&
+		m_pipeline_word[4] == 0x7758 && (m_pipeline_word[3] & 0xfeff) == 0x4858;
+	if (read_peripheral && write_peripheral && !serial_retry_pair && !clock_read_after_write)
+	{
+		logerror("%s: simultaneous staged peripheral read/write arbitration is unsupported read_pc=%06x read_op=%04x read_address=%04x write_pc=%06x write_op=%04x write_address=%04x read_wait_paid=%u write_wait_paid=%u\n",
+			machine().describe_context(), unsigned(m_pipeline_address[3]), m_pipeline_word[3], m_pipeline_operand_address[3],
+			unsigned(m_pipeline_address[4]), m_pipeline_word[4],
+			staged_serial_control(m_pipeline_word[4]) ? u8(m_pipeline_word[4]) : m_pipeline_operand_address[4],
+			unsigned(m_pipeline_peripheral_wait_paid[3]), unsigned(m_pipeline_peripheral_wait_paid[4]));
+		m_illegal = true;
+		return {pipeline_cycle_result::rejected, false};
+	}
+	unsigned const access_stage = (serial_retry_pair || clock_read_after_write) && !m_pipeline_peripheral_wait_paid[4] ? 4 : read_peripheral || move_peripheral ? 3 : 4;
+	if ((read_peripheral || write_peripheral || move_peripheral) && !m_pipeline_peripheral_wait_paid[access_stage])
+	{
+		// SPRU172C establishes one extra peripheral-access clock. Holding
+		// pipeline advancement at the bus access is this prototype's declared
+		// latency model, not independently recovered silicon stage placement.
+		m_pipeline_peripheral_wait_paid[access_stage] = true;
+		return {pipeline_cycle_result::consumed, false};
+	}
+	return {pipeline_cycle_result::proceed, clock_read_after_write};
+}
+
 void tms320c54x_device::pipeline_step()
 {
 	++m_pipeline_cycles;
@@ -1585,49 +1633,8 @@ void tms320c54x_device::pipeline_step()
 		return;
 	}
 	if (pipeline_service_pending_transfer() != pipeline_cycle_result::proceed) return;
-	bool const read_peripheral = m_pipeline_valid[3] &&
-		((m_pipeline_operand_address[3] >= 0x20 && m_pipeline_operand_address[3] <= 0x5f &&
-		(staged_memory_load(m_pipeline_word[3]) || staged_shifted_memory_load(m_pipeline_word[3], m_pipeline_immediate[3]) || staged_bitfield(m_pipeline_word[3]) || staged_port_write(m_pipeline_word[3]) || staged_memory_logic(m_pipeline_word[3]) || staged_rmw(m_pipeline_word[3]) || staged_mmr_load(m_pipeline_word[3]) || staged_memory_dp(m_pipeline_word[3]))) ||
-		(m_pipeline_immediate[3] >= 0x20 && m_pipeline_immediate[3] <= 0x5f &&
-		(staged_mvdd(m_pipeline_word[3]) || staged_parallel_load(m_pipeline_word[3]))));
-	bool const write_peripheral = m_pipeline_valid[4] &&
-		((m_pipeline_operand_address[4] >= 0x20 && m_pipeline_operand_address[4] <= 0x5f &&
-		(staged_port_read(m_pipeline_word[4]) || staged_ram_stm(m_pipeline_word[4]) || staged_store(m_pipeline_word[4]) || staged_accumulator_mmr_store(m_pipeline_word[4]) || staged_rmw(m_pipeline_word[4]) || staged_data_copy(m_pipeline_word[4]) || staged_mvdd(m_pipeline_word[4]) || (m_pipeline_word[4] & 0xff00) == 0x7600)) || staged_bus_control(m_pipeline_word[4]) || (staged_timer_control(m_pipeline_word[4]) || staged_serial_control(m_pipeline_word[4]) || staged_clock_control(m_pipeline_word[4])));
-	bool const move_peripheral = m_pipeline_valid[3] && staged_clock_destination_move(m_pipeline_word[3], m_pipeline_immediate[3]);
-	// Class 19A/B owns its retained write one stage earlier than STM. Pay
-	// the peripheral clock before advancing Access to that write stage.
-	if (move_peripheral && (read_peripheral || write_peripheral))
-	{
-		logerror("%s: simultaneous staged CLKMD move/peripheral arbitration is unsupported\n", machine().describe_context());
-		m_illegal = true; return;
-	}
-	// The boot echo loop can read the previous BDRR while BDXR accepts
-	// another retry. These independent serial endpoints retain one access
-	// wait apiece; neither access synthesizes a serial-ready edge. Other
-	// peripheral conflicts still require their own ordering qualification.
-	bool const serial_retry_pair = read_peripheral && write_peripheral &&
-		m_pipeline_word[4] == 0x7721 && (m_pipeline_word[3] & 0xfeff) == 0x4820;
-	bool const clock_read_after_write = read_peripheral && write_peripheral &&
-		m_pipeline_word[4] == 0x7758 && (m_pipeline_word[3] & 0xfeff) == 0x4858;
-	if (read_peripheral && write_peripheral && !serial_retry_pair && !clock_read_after_write)
-	{
-		logerror("%s: simultaneous staged peripheral read/write arbitration is unsupported read_pc=%06x read_op=%04x read_address=%04x write_pc=%06x write_op=%04x write_address=%04x read_wait_paid=%u write_wait_paid=%u\n",
-			machine().describe_context(), unsigned(m_pipeline_address[3]), m_pipeline_word[3], m_pipeline_operand_address[3],
-			unsigned(m_pipeline_address[4]), m_pipeline_word[4],
-			staged_serial_control(m_pipeline_word[4]) ? u8(m_pipeline_word[4]) : m_pipeline_operand_address[4],
-			unsigned(m_pipeline_peripheral_wait_paid[3]), unsigned(m_pipeline_peripheral_wait_paid[4]));
-		m_illegal = true;
-		return;
-	}
-	unsigned const access_stage = (serial_retry_pair || clock_read_after_write) && !m_pipeline_peripheral_wait_paid[4] ? 4 : read_peripheral || move_peripheral ? 3 : 4;
-	if ((read_peripheral || write_peripheral || move_peripheral) && !m_pipeline_peripheral_wait_paid[access_stage])
-	{
-		// SPRU172C establishes one extra peripheral-access clock. Holding
-		// pipeline advancement at the bus access is this prototype's declared
-		// latency model, not independently recovered silicon stage placement.
-		m_pipeline_peripheral_wait_paid[access_stage] = true;
-		return;
-	}
+	auto const peripheral = pipeline_arbitrate_peripheral();
+	if (peripheral.cycle != pipeline_cycle_result::proceed) return;
 	u8 const entry_stage = m_interrupt_entry_stage;
 	bool prefetch_bubble = false;
 	bool late_popm_read = false;
@@ -3087,7 +3094,7 @@ void tms320c54x_device::pipeline_step()
 	bool const late_mapped_t_read = read_memory_operand && smem_t_product_read && m_pipeline_operand_address[4] == 0x0e;
 	if (read_memory_operand && !late_mapped_accumulator_read && !late_mapped_t_read && !retained_ar_operand_read)
 	{
-		if (clock_read_after_write) m_pipeline_peripheral_read_pending = true;
+		if (peripheral.defer_clock_read) m_pipeline_peripheral_read_pending = true;
 		else m_pipeline_operand[4] = pipeline_read_data(m_pipeline_operand_address[4]);
 		if (staged_memory_immediate_multiply(m_pipeline_word[4])) m_t = m_pipeline_operand[4];
 	}

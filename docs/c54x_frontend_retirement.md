@@ -22,7 +22,10 @@ See [the test suite](c54x_test_suite.md) for execution and coverage policy and
 ## Source ownership
 
 - `tms320c54x.cpp/.h`: CPU state, memory/register interfaces, clock/interrupt
-  behavior and pipeline scheduling. `pipeline_execute`,
+  behavior and pipeline scheduling. The bus-wait, pending-transfer and peripheral
+  arbitration helpers run before slot advancement, separated by the retained
+  repeat path. Their results are transient cycle decisions, not saved state.
+  `pipeline_execute`,
   `pipeline_publish_read_results` and `pipeline_prefetch` run at their original
   points within `pipeline_step`; they are not independently reordered stages.
 - `tms320c54x_decode.h`: opcode predicates and shared cached classification/

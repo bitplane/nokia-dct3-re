@@ -26,8 +26,9 @@ python3 tools/run_c54x_section.py all --scope all --jobs 8
 or `--scope all`. `make build-c54x-isa C54X_SECTION=NAME` builds one section
 without executing it. It defaults to `instruction_examples`.
 
-The runner replaces the isolated `c54xisa` fixture, not the CPU implementation.
-Overlay changed CPU sources before testing. Sections share one object tree:
+The runner refreshes changed C54x CPU sources and replaces the isolated
+`c54xisa` fixture before building; unchanged files retain their cached objects.
+Sections share one object tree:
 build sequentially, including relative to the main MAME and benchmark builds.
 Do not retain an emulator binary per section.
 

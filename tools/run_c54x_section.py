@@ -1,6 +1,6 @@
 """Build only the selected replacement section against the cached C54x core.
 
-Overlays the isolated c54xisa target, not the legacy suite or handset build.
+Refreshes CPU sources and the isolated c54xisa fixture, not handset fixtures.
 Each invocation records build/run wall times. Section names are explicit.
 """
 import argparse

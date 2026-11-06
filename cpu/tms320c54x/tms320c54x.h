@@ -167,6 +167,13 @@ private:
 	enum class pipeline_cycle_result { proceed, consumed, rejected };
 	pipeline_cycle_result pipeline_service_bus_wait();
 	pipeline_cycle_result pipeline_service_pending_transfer();
+	struct pipeline_arbitration_result
+	{
+		pipeline_cycle_result cycle;
+		// Captured before slot advancement; consumed by this clock's Read path.
+		bool defer_clock_read;
+	};
+	pipeline_arbitration_result pipeline_arbitrate_peripheral();
 	void pipeline_step();
 	bool pipeline_execute();
 	void pipeline_publish_read_results(bool smem_t_product_read);
