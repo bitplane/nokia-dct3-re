@@ -104,6 +104,10 @@ running it alone is not UI/storage acceptance. The canonical runner is
 This qualification does not promote the normal `noki8210` machine or establish
 authentic factory-default storage, native network registration or speech.
 
+The next radio-facing boundary is mapped in [the ROM6 I/O census](rom6_rf_interface.md):
+the native DSP issues serial words and reads samples, but the backend has no
+attached RF tuning/receive model. This does not reopen the completed boot gate.
+
 The first target is **8210 NSM-3 v5.31**, which shares the reported capture
 product and already has an own-upload native fixture. 6210 NPE-3 is the second
 portability target; 3350 NHM-9 supplies a distinct missing-code call at `861f`.
