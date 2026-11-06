@@ -1125,6 +1125,10 @@ audit-dsp-rom4:
 		roms/research/nse1-rom4/working/dsp_full.bin \
 		roms/research/nse1-rom4/working/dsp_drom.txt
 
+.PHONY: audit-dsp-rom6
+audit-dsp-rom6:
+	$(PYTHON) tools/dsp_rom6_candidate_check.py roms/research/nsm3-rom6
+
 check-dsp-rom4-cosim:
 	$(PYTHON) tools/dsp_rom4_cosim_check.py $(LOG)
 

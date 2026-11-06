@@ -371,6 +371,12 @@ has this fitted mask. Existing `NO_DUMP` declarations and HLE/native acceptance
 remain unchanged. [ROM6 bring-up](../docs/rom6_dsp_bringup.md) owns the plan and
 the evidence requirements for using this input.
 
+`make audit-dsp-rom6` checks pinned acquisition hashes, strict capture rows,
+coverage, agreeing overlaps, excluded RAM and byte-exact reconstruction.
+`tools/dsp_rom6_candidate_check.py ROOT --prepare DIR` additionally emits
+derived research regions and their receipt only after validation; the data
+region's zero initialization outside its captured alias is not reset evidence.
+
 ## Portability ROMs
 
 Additional firmware is used only as local validation material. Put each complete MAME set in its

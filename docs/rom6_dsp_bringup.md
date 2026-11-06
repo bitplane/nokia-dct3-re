@@ -45,8 +45,11 @@ TI-derived contracts; external interpreter fixes and rate ratios are leads only.
 1. **Input gate.** Add a strict private-input auditor: hashes, sizes, accepted
    row statuses, exact coverage, agreeing overlaps, word/byte order and exact
    reconstruction. Distinguish program, data alias and padding. Reject missing
-   or contradictory words; retain acquisition originals. Collection and manual
-   reconstruction are complete; the reusable gate is still to be implemented.
+   or contradictory words; retain acquisition originals. `make audit-dsp-rom6`
+   now implements this gate. `dsp_rom6_candidate_check.py --prepare DIR` writes
+   the verified program and a separately labelled data-alias region with zero
+   initialization elsewhere, not a captured cold-RAM state. Neither is selected
+   by an ordinary handset configuration.
 2. **8210 native composition.** Use the existing C54x/backend seam in an explicit
    research machine, not a second interpreter or a replacement for `nsm3hle`.
    Bind the candidate program view, evidence-backed data aliases, overlay extent,
