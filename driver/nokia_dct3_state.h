@@ -146,6 +146,7 @@ public:
 	void nsb6hle(machine_config &config);
 	void noki8210(machine_config &config);
 	void nsm3stage(machine_config &config);
+	void nsm3r6(machine_config &config);
 	void nsm3hle(machine_config &config);
 
 	DECLARE_INPUT_CHANGED_MEMBER(key_irq);

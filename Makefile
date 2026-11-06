@@ -36,6 +36,7 @@ MAME_PATCHES := patches/mame-nokia-dct3-driver-name.patch \
 	patches/mame-nsm2-staged.patch \
 	patches/mame-nsb6-staged.patch \
 	patches/mame-nsm3-staged.patch \
+	patches/mame-nsm3-native-rom6.patch \
 	patches/mame-npe3-staged.patch \
 	patches/mame-libgsm-build.patch \
 	patches/mame-nse1-external-pcm-fixture.patch \

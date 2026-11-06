@@ -484,6 +484,24 @@ void nokia_dct3_state::nsm3stage(machine_config &config)
 	staged.set_observe_after_missing_code(true);
 }
 
+void nokia_dct3_state::nsm3r6(machine_config &config)
+{
+	noki8210(config);
+	// Acquired 8210 ROM6 program and separate data view, not a fitted-mask
+	// promotion. Keep the ordinary product's own uploads and storage inputs.
+	config.device_remove("dsp_hle");
+	NOKIA_DSP_C54X(config, m_dsp_c54x, 52'000'000);
+	configure_native_dsp_attachments(*m_dsp_c54x);
+	m_dsp_c54x->set_overlay_end(0x2000);
+	// Own uploaded code uses FB at 07e6. Enable the existing extended-control
+	// grammar; only the acquired page-zero address map is supplied here.
+	subdevice<tms320c54x_device>("dsp_c54x:cpu")->set_extended_program(true);
+	// Do not inherit ROM4's power-on INT0 enable. Zero is the generic CPU
+	// reset-mask policy; fitted MAD2 reset state and DSP clock remain unmeasured.
+	subdevice<tms320c54x_device>("dsp_c54x:cpu")->set_power_on_imr(0);
+	m_dsp_c54x->tone_update_cb().set(FUNC(nokia_dct3_state::dsp_tone_update_w));
+}
+
 void nokia_dct3_state::nsm3hle(machine_config &config)
 {
 	nsm3stage(config);
