@@ -43,6 +43,12 @@ void nokia_dsp_c54x_device::device_start()
 	m_slot_timer = timer_alloc(FUNC(nokia_dsp_c54x_device::slot_timer_expired), this);
 	m_transfer_timer = timer_alloc(FUNC(nokia_dsp_c54x_device::transfer_timer_expired), this);
 	m_frame_timer = timer_alloc(FUNC(nokia_dsp_c54x_device::frame_timer_expired), this);
+	m_port36_timer = timer_alloc(FUNC(nokia_dsp_c54x_device::port36_complete), this);
+	save_item(NAME(m_port36.control));
+	save_item(NAME(m_port36.pending));
+	save_item(NAME(m_port36.busy));
+	save_item(NAME(m_port36.done));
+	save_item(NAME(m_port36.strobe));
 	save_item(NAME(m_program));
 	save_item(NAME(m_data));
 	save_item(NAME(m_io));
@@ -99,6 +105,8 @@ void nokia_dsp_c54x_device::device_reset()
 {
 	std::fill(m_io.begin(), m_io.end(), 0);
 	m_bsp.reset();
+	m_port36.reset();
+	m_port36_timer->adjust(attotime::never);
 	m_host_command_line = false;
 	m_reset_released = false;
 	m_host_command_vector = 0;
@@ -277,11 +285,19 @@ void nokia_dsp_c54x_device::reset_line_w(int released)
 	else
 	{
 		m_bsp.reset();
+		m_port36.reset();
+		m_port36_timer->adjust(attotime::never);
 		m_cobba->codec_serial_receive_ack();
 		m_frame_timer->adjust(attotime::never);
 		m_slot_timer->adjust(attotime::never);
 		m_transfer_timer->adjust(attotime::never);
 	}
+}
+
+TIMER_CALLBACK_MEMBER(nokia_dsp_c54x_device::port36_complete)
+{
+	if (m_reset_released && m_port36_handshake)
+		m_port36.complete();
 }
 
 bool nokia_dsp_c54x_device::overlay_address(u16 address) const
@@ -500,6 +516,8 @@ void nokia_dsp_c54x_device::update_host_command_line()
 
 u16 nokia_dsp_c54x_device::io_r(offs_t offset)
 {
+	if (m_port36_handshake && (offset & 0xff) == 0x36)
+		return m_port36.read();
 	switch (offset & 0xff)
 	{
 	case 0x01:
@@ -545,7 +563,16 @@ void nokia_dsp_c54x_device::io_w(offs_t offset, u16 data)
 		machine().logerror("rom4_port_write: port=%02x data=%04x pc=%04x t=%.6f\n",
 				port, data, u16(m_cpu->state_int(tms320c54x_device::STATE_PC)),
 				machine().time().as_double());
+	if (m_port36_handshake && port == 0x36)
+	{
+		if (m_port36.write(data)) m_port36_timer->adjust(attotime::never);
+		return; // Selected control state owns this word, not the opaque bank.
+	}
 	m_io[port] = data;
+	if (m_port36_handshake && port == 0 && m_port36.strobe_w(BIT(data, 4)))
+		// Deferred completion, not a read-triggered answer. One backend clock
+		// is an unmeasured latency policy, not an identified peripheral rate.
+		m_port36_timer->adjust(attotime::from_ticks(1, clock()));
 	if (port == 0x02)
 	{
 		// Acceptance clears the independent slot latch, not parameter data.

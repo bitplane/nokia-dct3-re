@@ -9,6 +9,7 @@
 #include "nokia_ccont.h"
 #include "nokia_dsp_backend.h"
 #include "nokia_dspif.h"
+#include "nokia_dsp_control_state.h"
 #include "tms320c54x_bsp_state.h"
 
 #include <array>
@@ -19,6 +20,7 @@ public:
 	nokia_dsp_c54x_device(const machine_config &mconfig, const char *tag,
 			device_t *owner, u32 clock = 0);
 	void set_overlay_end(u16 end) { m_overlay_end = end; }
+	void set_port36_handshake(bool enabled) { m_port36_handshake = enabled; }
 	// An attached clock owns every codec transfer, including boot loopback;
 	// do not also complete a word synchronously from the BDXR write.
 	void set_external_codec_clock(bool enabled) { m_external_codec_clock = enabled; }
@@ -68,6 +70,7 @@ private:
 	TIMER_CALLBACK_MEMBER(slot_timer_expired);
 	TIMER_CALLBACK_MEMBER(transfer_timer_expired);
 	TIMER_CALLBACK_MEMBER(frame_timer_expired);
+	TIMER_CALLBACK_MEMBER(port36_complete);
 	void arm_slot_timer(u16 quarter_symbols);
 	void arm_transfer_timer(u16 quarter_symbols);
 	void arm_compare_timer(emu_timer *timer, u16 quarter_symbols, u16 &delay);
@@ -98,6 +101,9 @@ private:
 	std::array<u16, 0x10000> m_data{};
 	std::array<u16, 0x100> m_io{};
 	tms320c54x_bsp_state m_bsp;
+	nokia_dsp_control_state m_port36;
+	bool m_port36_handshake = false;
+	emu_timer *m_port36_timer = nullptr;
 	bool m_host_command_line = false;
 	bool m_reset_released = false;
 	u16 m_overlay_end = 0x2800;

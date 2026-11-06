@@ -487,17 +487,29 @@ void nokia_dct3_state::nsm3stage(machine_config &config)
 void nokia_dct3_state::nsm3r6(machine_config &config)
 {
 	noki8210(config);
+	// Reuse the recovered NSM-3 board contracts, not the runtime HLE peers.
+	// ADC_5210 is the declared BLB-2 nominal-input model, not measured units.
+	nokia_product_config native = m_product;
+	native.ccont_board = ADC_5210;
+	native.keypad_wiring.row_pin_shift = 1; // Own scanner 305998/table 33ee78.
+	native.simi_controller = true;
+	native.synthetic_sim_card = true;
+	apply_product_config(native);
 	// Acquired 8210 ROM6 program and separate data view, not a fitted-mask
 	// promotion. Keep the ordinary product's own uploads and storage inputs.
 	config.device_remove("dsp_hle");
-	NOKIA_DSP_C54X(config, m_dsp_c54x, 52'000'000);
+	// NSM-3 System Module issue 1, 12/1999, p.25 specifies 13 MHz x 3.5.
+	NOKIA_DSP_C54X(config, m_dsp_c54x, 45'500'000);
 	configure_native_dsp_attachments(*m_dsp_c54x);
 	m_dsp_c54x->set_overlay_end(0x2000);
+	// Partial request/strobe/DONE/ack contract recovered from resident I/O.
+	// This supplies no RF/sample data or MCU/DSP service verdict.
+	m_dsp_c54x->set_port36_handshake(true);
 	// Own uploaded code uses FB at 07e6. Enable the existing extended-control
 	// grammar; only the acquired page-zero address map is supplied here.
 	subdevice<tms320c54x_device>("dsp_c54x:cpu")->set_extended_program(true);
 	// Do not inherit ROM4's power-on INT0 enable. Zero is the generic CPU
-	// reset-mask policy; fitted MAD2 reset state and DSP clock remain unmeasured.
+	// reset-mask policy; fitted MAD2 reset state remains unmeasured.
 	subdevice<tms320c54x_device>("dsp_c54x:cpu")->set_power_on_imr(0);
 	m_dsp_c54x->tone_update_cb().set(FUNC(nokia_dct3_state::dsp_tone_update_w));
 }
