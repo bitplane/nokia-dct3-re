@@ -26,19 +26,19 @@ This is a manual research instrument, not an RF acceptance gate. Retire its
 broad overlay/port capture when focused serial-device and receiver tests cover
 the recovered boundary; keep only the normalized contract and useful controls.
 
-Two fresh processes produce byte-identical **342,473-write** streams. There
+The qualified current run has a complete **342,473-write** stream. There
 are 13 observed read addresses and 38 write addresses, not an exhaustive map
 of all reachable firmware paths or physical MAD2 registers.
 
 | Observed operation | Count | Boundary |
 | --- | ---: | --- |
-| P27 sample reads | 1,245,280 | Every value is zero; first 0.535343582s, last 60.014754923s. COBBA's unattached callback supplies deterministic silence, not measured receiver noise. |
+| P27 sample reads | 1,245,280 | Every value is zero; first 0.535343582s, last 60.014753494s. COBBA's unattached callback supplies deterministic silence, not measured receiver noise. |
 | P31 / P32 writes | 30,354 each | Backend retains words but does not decode an RF chip or apply tuning. |
 | P04 writes | 35,855 | Existing comparator raises transfer pending; no serial payload is delivered to a modeled RF device. |
 | P30 writes | 30,789 | Raw values 0000/00bb/0100/0103; their physical meanings are not established here. |
 | P0e frame-length writes | 11 | Values 0546/1387; inherited quarter-symbol/frame notification policy still needs ROM6-specific validation. |
 
-The report has 546 distinct *issued* P30/P31/P32/P04 tuples. Only 30,348 P04
+The report has 545 distinct *issued* P30/P31/P32/P04 tuples. Only 30,348 P04
 writes follow fresh writes to all three payload registers; the others lack a
 complete fresh payload and their meanings are not established by this capture.
 Do not treat every P04 write as a new RF
@@ -73,6 +73,52 @@ build words in RAM for later serializers, including the observed `1a8c..1a98`
 P30/P31/P32/P04 path. A pair can therefore be halves of one computed word,
 not two independently addressed RF registers.
 
+## Scheduling ownership
+
+The descriptor list belongs to firmware RAM, not a recovered hardware FIFO:
+
+- `296a..2973` acknowledges request `1000` through P01 before testing firmware
+  state. `2993..2995` reloads descriptor/payload cursors from `265e/2660`.
+- `2a8d..2a99` publishes one P30/P31/P32/P04 group. `2a9d` advances the
+  descriptor cursor; `2ac6..2ac8` retain both cursors for the next interrupt.
+- `2a63..2a6f` cancels the modeled compare using target `3a98` and updates mirror
+  `058e`. The target exceeds both observed counter periods (5000/1351).
+- The alternate branch `2ae7..2af4` writes P30, then P04, then P31/P32. It
+  is static evidence against assuming one universal write-P04 snapshot rule;
+  this branch is not among the run's eight observed P32 contexts.
+
+The current backend has one replaceable compare target and a pending bit,
+not a packet queue. Reprogramming replaces its deadline; writing an out-of-range
+target stops future matches without acknowledging an already-pending request.
+P01/P02 bit `1000` acknowledges that independent pending bit; reset cancels it.
+These are the existing modeled contract, not a complete SCU specification.
+
+`tools/rom6_timed_output_check.py` correlates every write with the first 256
+logged compare callbacks (24,914 total model expiries). All 256 use the latest
+in-range target and read the counter at exactly that target. There are 75 target
+reprograms before observed callbacks. Payload values at arm and edge agree in
+all 256 cases, so **these observations cannot distinguish write-time latching
+from live-register sampling**. All 255 consecutive observed-edge intervals have
+a firmware `1000` acknowledgment. No one-ACK-per-packet hardware FIFO follows
+from this; pending bits can coalesce when service is delayed.
+
+## Counter-phase contract
+
+The backend's declared 13 MHz/12 counter retains one reference epoch through
+wraps. Frame, slot and transfer compares are scheduled at absolute reference
+ticks, rounded upward to the first representable attosecond. They are not
+relative delays from a fractional-phase register write. A compare cannot fire
+while its own counter still reads one tick short. The older relative/floor
+calculation violated this in 20 of 256 captured callbacks; the strict checker
+rejects that evidence rather than allowing a one-tick tolerance.
+
+Independent literal C++ tests cover fractional writes, equality/next-wrap
+policy, nonzero base, short reload, long elapsed time and rational rounding.
+Existing registers, pending bits and reference epoch remain saved/reset by
+the backend; no new firmware state or forced counter publication is added.
+The 13 MHz/12 physical rate, equality-at-write policy and RF serial latch phase
+remain separately unmeasured for ROM6.
+
 ## Cross-reference limits
 
 Dan's snapshot `dd356ff7c5fc62529ab5843ce737593ebff51f73`, especially
@@ -92,11 +138,11 @@ edge. Source/hash: [hardware atlas](hardware_atlas.md#cobba-part-identity-does-n
 
 ## Next implementation boundary
 
-First recover the queued-output contract: when P04 snapshots P30/P31/P32,
-which deadline retires it, how replacement/cancellation/reset work, and whether
-completion is independent of sample readiness. Implement a tested, saved
-device-boundary queue only once those semantics are supported. Keep raw words
-intact and unknown modes explicit; do not infer delivery from issued tuples.
-Then decode the HAGAR serial fields against own firmware producers and the
-documented frequency plan, followed by a clocked sample source with provenance.
+Do not add a second descriptor queue. The next useful software target is
+decoding the observed HAGAR serial-word producers against the documented
+frequency plan, with unknown modes left explicit. Before attaching that decoder
+to a timed output, independently resolve its trigger/latch edge (P32, P04 or
+compare), replacement and serial-completion meaning. The present stable-payload
+prefix does not choose between those models. A clocked sample source with
+provenance follows the programming contract; no carrier fallback is permitted.
 Native FCCH/SCH/BCCH, camp and registration come after those boundaries.

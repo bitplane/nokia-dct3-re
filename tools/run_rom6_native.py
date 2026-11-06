@@ -86,6 +86,9 @@ def main():
                     with (phase/'rom6_radio_writes.tsv').open('rb') as stream:
                         report=census(text,stream)
                     report['own_upload_writer']=check_output_overlay(mcu,(phase/'rom6_radio_first_output.be16').read_bytes())
+                    from tools.rom6_timed_output_check import check as check_timed_output
+                    with (phase/'rom6_radio_writes.tsv').open('rb') as stream:
+                        report['compare_prefix']=check_timed_output(text,stream)
                     (run/'radio-census.json').write_text(json.dumps(report,indent=2)+'\n')
             elif scenario=='state':
                 with Image.open(phase/'snap/nsm3r6_state_reference.png') as reference, Image.open(phase/'snap/nsm3r6_state_restored.png') as restored:

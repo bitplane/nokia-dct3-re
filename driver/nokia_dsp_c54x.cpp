@@ -3,6 +3,7 @@
 
 #include "emu.h"
 #include "nokia_dsp_c54x.h"
+#include "nokia_dsp_compare_clock.h"
 
 DEFINE_DEVICE_TYPE(NOKIA_DSP_C54X, nokia_dsp_c54x_device, "nokia_dsp_c54x",
 		"Nokia DCT3 C54x DSP backend")
@@ -171,18 +172,16 @@ void nokia_dsp_c54x_device::arm_frame_timer()
 	// ROM4 CTSI counts quarter-symbols from the 13 MHz reference divided by
 	// 12. Hardware starts with a 5000-quarter-symbol GSM frame; a later port
 	// 0x0e write replaces the default reload value.
-	const u32 quarter_symbols = frame_period() - frame_counter();
-	m_frame_timer->adjust(attotime::from_ticks(u64(quarter_symbols) * 12, 13'000'000));
+	u16 unused_delay;
+	arm_compare_timer(m_frame_timer, 0, unused_delay);
 }
 
 TIMER_CALLBACK_MEMBER(nokia_dsp_c54x_device::frame_timer_expired)
 {
 	if (!m_reset_released)
 		return;
-	// The scheduled edge is the counter wrap; pin it exactly despite
-	// attotime's integer rounding of the fractional 13 MHz/12 period.
-	m_frame_counter_base = 0;
-	m_frame_counter_epoch = machine().time();
+	// Keep the original reference epoch: re-anchoring every wrap accumulates
+	// rounding and can put an already-armed compare before its counter tick.
 
 	++m_frame_timer_expiries;
 	const bool enabled = m_ccont->dsp_frame_clock_enabled();
@@ -222,18 +221,22 @@ void nokia_dsp_c54x_device::arm_compare_timer(emu_timer *timer, u16 quarter_symb
 		timer->adjust(attotime::never);
 		return;
 	}
-	const u32 period = frame_period();
-	const u32 delta = (quarter_symbols + period - frame_counter()) % period;
 	// Equality on a newly written compare is scheduled at the next wrap;
 	// sub-quarter-symbol write/match ordering remains unvalidated.
-	delay = delta ? delta : period;
-	timer->adjust(attotime::from_ticks(u64(delay) * 12, 13'000'000));
+	using namespace nokia_dsp_compare_clock;
+	auto const edge = nokia_dsp_compare_clock::next((machine().time() - m_frame_counter_epoch).as_ticks(reference_hz),
+		m_frame_counter_base, frame_period(), quarter_symbols);
+	delay = edge.quarters;
+	attotime const absolute(edge.reference_ticks / reference_hz,
+		fractional_attoseconds(edge.reference_ticks));
+	timer->adjust(m_frame_counter_epoch + absolute - machine().time());
 }
 
 TIMER_CALLBACK_MEMBER(nokia_dsp_c54x_device::transfer_timer_expired)
 {
 	if (!m_reset_released) return;
-	m_transfer_timer->adjust(attotime::from_ticks(u64(frame_period()) * 12, 13'000'000));
+	u16 unused_delay;
+	arm_compare_timer(m_transfer_timer, m_io[4], unused_delay);
 	++m_transfer_timer_expiries;
 	if (m_transfer_timer_expiries <= 256)
 		machine().logerror("rom4_transfer_timer: expiry=%llu target=%04x counter=%04x delay=%u t=%.9f\n",
@@ -246,7 +249,8 @@ TIMER_CALLBACK_MEMBER(nokia_dsp_c54x_device::slot_timer_expired)
 {
 	if (!m_reset_released)
 		return;
-	m_slot_timer->adjust(attotime::from_ticks(u64(frame_period()) * 12, 13'000'000));
+	u16 unused_delay;
+	arm_compare_timer(m_slot_timer, m_io[0x0f], unused_delay);
 	++m_slot_timer_expiries;
 	if (m_slot_timer_expiries <= 16)
 		machine().logerror("rom4_slot_timer: expiry=%llu delay=%u pc=%04x ifr=%04x imr=%04x t=%.6f\n",

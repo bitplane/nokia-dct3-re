@@ -1244,6 +1244,12 @@
       "evidence": ["docs/5510_bringup.md", "cpu/tms320c54x/tms320c54x.cpp", "tests/c54x/tms320c54x_test.cpp", "tools/run_c54x_core.py", "tools/test_run_c54x_core.py"]
     },
     {
+      "id": "nsm3_p04_requires_hardware_descriptor_fifo", "status": "unsupported",
+      "hypothesis": "Native ROM6 progression requires a new hardware descriptor FIFO that snapshots the complete P30/P31/P32 queue when P04 is written",
+      "conclusion": "Resident296a..2ac8 acknowledges1000 and advances firmware descriptor/payload cursors retained in RAM265e/2660. P04 is the current compare target, with3a98 used to disable matches. The alternate2ae7..2af4 branch writes P04 before P31/P32, so a universal write-P04 payload snapshot is not established. In the actual8210 prefix all256 arm/edge payloads are equal, which cannot resolve latch timing. Keep the existing replaceable comparator/pending bit and recover the serial trigger separately; adding a second descriptor queue or choosing a physical latch edge from these stable tuples would introduce an unsupported mechanism.",
+      "evidence": ["docs/rom6_rf_interface.md", "tools/rom6_timed_output_check.py", "tools/test_rom6_timed_output_check.py", "driver/nokia_dsp_c54x.cpp"]
+    },
+    {
       "id": "mu4_state5_reload_requires_nonzero_worker_result", "status": "disproven",
       "hypothesis": "Repeated resident entry at lifecycle 5 requires a nonzero worker result published to 3742, indicating a failed decoder or missing external completion",
       "conclusion": "AA99 029575 uses 7212 3742, MVDM data-to-AR2, so 3742 is an input control rather than a result publication. The pinned 46-word cleanup and two-word AA55 API contract enumerates all 65536 controls: while lifecycle is 4, control 2 selects state 2 and every other control selects state 5; both join descriptor-0 reload through 002080 -> 003538. A passive three-second run reads control zero at 2.198518905 seconds, writes state 5 at 2.198519039 and re-enters state 4 at 2.588181162 without guest writes by the observer. The twenty-second Execute trails identify the AA99 02959b reload caller and AA22 0291c7 REL request; they do not show a reset-vector restart or corrupt FRET. The raw data tap is not an all-alias writer census, and its context PC is not instruction ownership. Why the worker reaches cleanup, whether this is EOF, and decoded PCM remain unproved.",
