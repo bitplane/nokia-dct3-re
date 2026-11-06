@@ -126,7 +126,11 @@ alone is not proof of an atomic engine or renewed acceptance.
 - Post-load re-drives peripheral clock-stop as well as PLL-stop, XF and bus
   outputs. The deep-idle fixture poisons an unsaved external observer before
   restore, so a peripheral's independently saved latch cannot mask omission.
-
+- Peripheral arbitration captures CLKMD read deferral before slot advancement.
+  Do not recompute it from advanced slots or resume advancement on the retained
+  read's completion clock. `peripheral_waits` checks both accumulator destinations,
+  the write/read bus order and spacing, and replay before/between/after accesses.
+  Disabling deferral fails on the stale CLKMD read.
 - MVDK owns its source in Access. It must use the same pending on-chip RAM
   forwarding as Read-stage consumers (SPRU131G section 7.3.2). The
   `rmw_move_bypass` section retains 160 alias/nonalias, addressing, operation,
@@ -152,19 +156,24 @@ alone is not proof of an atomic engine or renewed acceptance.
 ## Acceptance
 
 All five retirement stages are complete. The consolidated catalogue independently
-passes all 487 sections and 1,461,937 cases and restores (2,905.815 seconds).
+passes all 487 sections and 1,461,943 cases and restores (3,055.702 seconds).
 Its manifest SHA-256 is
-`031bff8c6519d5e07acf10d428c31483c3ea6b234496a98bc527d156b2e07dd6`.
+`258cae1abf722739cff3e3e443e33f8592cb98fecf8c5e3b881c601fffd39bd0`.
 Fixture consolidation removes no cases, expected results or restore execution.
+Six additional CLKMD write/read cases cover both accumulator destinations and
+three replay boundaries; disabling the retained-read deferral fails this gate.
 Fresh integration checks pass 358 linked ROM4 context cases, cold execution,
 FR/EFR codecs, RF bitmap, clocked serial/replay, backend BSP/requests,
 MU4 original bootstrap with exact 1,339-item replay, and 5110 menu/save-state.
-The host checks pass 366 C54x, 81 runner and 59 device-split/patch/keypad tests.
-The residual-effects census preserves all three caller sets while removing
-105 proven-shadowed conditions/arms and nine unused private helpers. CPU
-component sources shrink from 8,177 to 6,963 lines; the register-effects
-dispatcher shrinks from 1,357 to 226 lines. No saved fields, catalogue cases,
-pipeline ordering or admission/arbitration rules change.
+The host checks pass 367 C54x tests and 66 layout, native-runner,
+device-split/patch/keypad tests. Focused builds refresh changed CPU sources
+automatically rather than relying on a separate overlay invocation.
+The residual-effects census preserves all three caller sets. Its register-only
+dispatcher remains 226 lines. Separating retained waits and peripheral arbitration
+reduces the cycle coordinator from 2,267 to 2,106 lines; explicit helper results
+add 30 lines across the CPU component overall. No saved fields, pipeline ordering
+or admission/arbitration rules change. The remaining interleaved operand and
+forwarding regions stay in the coordinator; the coverage limits above remain open.
 Every catalogue completion also passes
 exact case/restore line validation, including rejection of count suffixes.
 
