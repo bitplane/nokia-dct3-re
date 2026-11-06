@@ -66,8 +66,9 @@ Source archives and per-member hashes are retained in
 The files labelled "virgin eeprom" in those sets are flash-backed PMM tails,
 not external serial EEPROM or internal DSP ROM images. Their archival names
 and matching MAME hashes do not independently establish factory authenticity.
-No ROM5/ROM6 DSP mask dump was acquired, no missing MAD2 ROM is fabricated,
-and acquisition alone does not promote any handset's runtime coverage.
+Those service archives supply no ROM5/ROM6 DSP mask. A separate captured ROM6
+reference is retained below; no missing MAD2 ROM is fabricated, and acquisition
+alone does not promote any handset's runtime coverage.
 
 ### Nokia7110 intact public backups
 
@@ -326,6 +327,49 @@ parallel-control and PCM traffic without physical probing. It remains a 5110
 input: applying values to a 3210 needs cross-product corroboration, and a known
 missing acquisition overlay limits what a completed boot proves. See
 `docs/djr_dsp_integration.md` and `docs/cobba_control_boundary.md`.
+
+### Nokia 8210 DSP ROM6 reference
+
+Source: local `../nokia-dct3-emu`, repository
+[`djr-747/nokia-dct3-emu`](https://github.com/djr-747/nokia-dct3-emu), snapshot
+`dd356ff7c5fc62529ab5843ce737593ebff51f73`. The selected source files are clean
+at that snapshot. The source attributes the captures to a physical 8210;
+acquisition has not been independently repeated here. Nokia ROM bytes remain
+private/ignored, not part of the driver source or its license.
+
+```text
+roms/research/nsm3-rom6/acquisition/{program.be16,maskrom.be16,drom.txt}
+roms/research/nsm3-rom6/sweeps/{low,block,subprobe}-words.txt
+roms/research/nsm3-rom6/working/rom6_program.be16
+roms/research/nsm3-rom6/{manifest.json,SHA256SUMS}
+```
+
+| Input | Bytes | SHA-256 |
+| --- | ---: | --- |
+| Reconstructed program address space | 131,072 | `b450413a3b29a83f691533584f5c923f475e0a720c85acc1ec50097c63eee4cf` |
+| Acquired upper-program image | 40,960 | `fcb9d987110c3288b93b448f2ad5d639399793afff662aa76c20f826de3ed15f` |
+| Separate data-alias text | 430,080 | `0e64f8b15ccc46dd17eb72995cd3079432af7afe69e284237d7f962f534d8e1b` |
+| Low-program sweep text | 159,756 | `f88d3fe8c108c540235fa6d86356e9b9da00fe7e7ead4a952d8f4ed3e78963f1` |
+
+DSP word address `a` is at byte offset `2*a`; each word is big-endian, not
+ARM swap16. Strict row checks find all 12,288 unique words at `8000..afff`,
+including one `ok-confirmed3x` reread, with no missing or conflicting entries.
+The block/subprobe captures cover `0000..007f` and `2000..7fff`; their thirty
+overlapping words agree. Reassembly from the acquired upper-program base and
+ordered sweeps matches the working image byte-for-byte. `0080..1fff` is zero
+padding, not dumped immutable ROM or a cold-RAM snapshot.
+
+The 20,480-word `b000..ffff` data alias differs from the program view at 12,277
+addresses (`b4f8`: data `fa60`, program `f074`). Keep the views separate: using
+the old data alias for program fetch caused execution into tables in the
+reference emulator. Neither aliases nor zero padding may silently become
+program ROM or product-specific startup RAM.
+
+Captured program code exists at our current missing-code calls `2c75` and
+`861f`. This makes it a native-bring-up candidate, not proof that every product
+has this fitted mask. Existing `NO_DUMP` declarations and HLE/native acceptance
+remain unchanged. [ROM6 bring-up](../docs/rom6_dsp_bringup.md) owns the plan and
+the evidence requirements for using this input.
 
 ## Portability ROMs
 

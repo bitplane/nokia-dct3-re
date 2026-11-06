@@ -21,6 +21,11 @@ execution, measured final silicon verdict, speech and full hardware fidelity
 are not claimed. The research phone-service milestone is complete; the normal
 machine remains fail-closed pending authentic native DSP completion.
 
+A captured 8210 ROM6 reference now supplies candidate code at `2c75` in the
+private collection. It is not yet selected or validated for NPE-3; the current
+native stop and HLE acceptance remain unchanged. [ROM6 native bring-up](rom6_dsp_bringup.md)
+owns the cross-product qualification plan.
+
 `npe3mbus` separately enables the firmware-requested MBUSTIM clock on the
 same own-upload/HLE composition. It qualifies read-only version service,
 but exposes an unresolved clock-stop/wake input failure during calls.

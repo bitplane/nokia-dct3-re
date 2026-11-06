@@ -35,6 +35,11 @@ the graphical `CONTACT SERVICE` diagnostic frame. No idle boot, input, SIM, regi
 call or SMS acceptance is claimed. The package supplies MCU and PPM record
 streams, not a matching handset PMM or an internal DSP mask image.
 
+The separate captured 8210 ROM6 reference is now available for future baseband
+compatibility work, but is not selected or qualified for NPM-5. See
+[ROM6 native bring-up](rom6_dsp_bringup.md). It is not a ROM for the independent
+MU4 music DSP and does not change the playback/recording qualification below.
+
 The independent MU4 music-DSP bench completes original recording control,
 storage and metadata transactions. Fresh finalized record/save/cold-reopen
 reaches 376 native AAC calls with consumed-input coverage. The protected and

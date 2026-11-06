@@ -996,8 +996,10 @@ identifies MAD2WD1, CCONT, CHAPS and COBBA-GJP, a 13 MHz system clock and
 flash-backed product data. The stock service package assigns the same MCU
 to ROM5 and ROM6; [service bulletin SB-050](https://www.eserviceinfo.com/downloadsm/225117/NOKIA_NSM3-050.html)
 documents the later ROM6 board revision. The current profile selects ROM6.
-Internal DSP ROM images remain absent. Uniform-fill audit members are not
-executable DSP evidence.
+A captured 8210 ROM6 reference is now in the separate private research
+collection; [ROM6 native bring-up](rom6_dsp_bringup.md) owns its provenance and
+admission plan. It is not yet bound to this machine or qualified against this
+product's uploads. Uniform-fill audit members remain non-executable evidence.
 
 ## Established contracts
 

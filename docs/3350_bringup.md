@@ -26,6 +26,11 @@ effect on the verifier remain unknown without a matching resident program
 source. This is not a completed handshake. No
 ready-bit projection, fabricated return or HLE completion is enabled.
 
+The separately acquired 8210 ROM6 reference contains captured program words at
+`861f`; compatibility with NHM-9 is unproved and no input has been attached to
+`nhm9stage`. [ROM6 native bring-up](rom6_dsp_bringup.md) owns that candidate and
+the qualification plan. The negative boundary below remains the current gate.
+
 Reproduce this negative native boundary with a fresh run directory:
 
 ```sh

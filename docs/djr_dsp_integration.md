@@ -6,14 +6,21 @@ without importing its GPL implementation. Reviewed references include
 `c50f7e272bf10c37a40c57174dbde84d9717b7e3`, `b93a7f7` and
 `2b4c10f`; their admitted contracts and rejected interpretations are below.
 
-The upstream native analysis backend combines a modified C54x core with a
+The earlier reviewed native analysis backend combines a modified C54x core with a
 bring-your-own Nokia 5110 DSP ROM4 dump. That dump is git-ignored and was not
 present in the reviewed repository. Consequently, upstream address annotations
 were initially useful leads rather than local primary evidence. The historical
 archive has since been recovered, retained outside Git, hashed, and structurally
 validated. No dump or third-party source is copied into this BSD-licensed
-driver. The public repository still excludes the Nokia mask-ROM image; local
-hashes and provenance are recorded in `roms/README.md`.
+driver. Local hashes and provenance are recorded in `roms/README.md`.
+
+A separate review of `djr-747/nokia-dct3-emu` at
+`dd356ff7c5fc62529ab5843ce737593ebff51f73` recovered the captured 8210 ROM6
+reference and its reconstruction inputs into the ignored collection. Program
+and data-space views differ materially. [ROM6 native bring-up](rom6_dsp_bringup.md)
+owns those verified input facts, the current external RF/clock leads and their
+local admission requirements; the older implementation-specific comparisons
+below must not be treated as statements about that newer checkout.
 
 ## Contract references
 

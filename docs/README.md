@@ -122,6 +122,7 @@ selection, coverage preservation and retirement rules.
 | `dsp_service_transport_contract.md` | DSP/generic-service ownership and acceptance contract. |
 | `cobba_control_boundary.md` | Opaque DSP-to-COBBA control ownership, capture seam, and promotion requirements. |
 | `rom4_dsp_loader.md` | Recovered ROM4 DSP block descriptor, reset and demand-load contract. |
+| `rom6_dsp_bringup.md` | Acquired ROM6 program/data views, reviewed external leads and gated native bring-up plan. |
 | `djr_dsp_integration.md` | DSP architectural knowledge reviewed from the parallel `djr-747` emulator without importing its code. |
 | `gsm_a5_ciphering.md` | Standards-owned A5 keystream boundary, `COUNT` derivation and ciphering lifecycle. |
 | `gsm_tch_f_l1_completion.md` | Audit of the generic GSM full-rate traffic-channel Layer 1 milestone against evidence. |
