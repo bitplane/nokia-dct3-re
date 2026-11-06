@@ -8,6 +8,15 @@ executes this product's uploaded verifier and loaders, then retains native
 ownership and stops at absent resident DSP routine `0x2c75`. Physical-verdict
 equivalence and complete native DSP runtime are not claimed.
 
+The acquired-ROM6 composition **`nsm3r6`** now independently qualifies native
+verification/self-test, exact own uploads, physical unlock/menu navigation,
+60-second UI stability, cold-persistent SIM phonebook and exact save/restore
+continuation. It uses the documented 45.5 MHz NSM-3 clock and a partial
+port-36 request/strobe/DONE model with unmeasured latency. The acquired
+base-record PMM fixture is required; no native RF or speech is claimed.
+See [the native ROM6 contract](rom6_dsp_bringup.md) and
+`make verify-8210-native-rom6`; this does not promote the normal machine.
+
 The separate `nsm3hle` composition explicitly hands off at that missing-code
 call. With the acquired unchanged base-record storage fixture, fresh
 isolated acceptance scenarios pass: graphical/physical security and menus,

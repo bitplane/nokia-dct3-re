@@ -7,7 +7,7 @@
 # flow is not yet modelled by the gate matrix, so it is copied rather than
 # rebuilt. Those are the remaining migration work.
 
-# 874 gates: 652 generated from typed steps, 222 copied verbatim (shell).
+# 875 gates: 653 generated from typed steps, 222 copied verbatim (shell).
 
 # Shell guards shared by gates that rewrite provisioned state.
 #
@@ -199,9 +199,9 @@ DCT3_PRESS_240_350 := NOKIA_DCT3_POST_READY_KEY_DURATION_MS=240 NOKIA_DCT3_POST_
 	verify-7110-keypad-controller verify-sed1565 verify-7110-verifier \
 	verify-7110-bootstrap verify-6210-keypad-controller \
 	verify-3310-native-verifier verify-6210-verifier verify-6210-bootstrap \
-	verify-8210-verifier verify-8210-bootstrap verify-gsm-fr-codec \
-	verify-gsm-tch-f-l1 verify-gsm-a3a8 verify-gsm-a5 verify-gsm-xcch-l1 \
-	verify-gsm-mobility verify-gsm-sms-transport \
+	verify-8210-native-rom6 verify-8210-verifier verify-8210-bootstrap \
+	verify-gsm-fr-codec verify-gsm-tch-f-l1 verify-gsm-a3a8 verify-gsm-a5 \
+	verify-gsm-xcch-l1 verify-gsm-mobility verify-gsm-sms-transport \
 	verify-radio-periodic-location-update \
 	verify-radio-periodic-location-update-state \
 	verify-3410-radio-periodic-location-update verify-dsp-speech-control-static \
@@ -1554,6 +1554,9 @@ verify-6210-bootstrap: BIOS=556
 verify-6210-bootstrap: build
 	$(MAKE) --no-print-directory run-prebuilt PHONE=noki6210 BIOS=556 RUN_DIR=$(RUN_DIR) SECONDS=3 RUN_VERBOSE=1
 	$(PYTHON) tools/npe3_bootstrap_trace_check.py $(RUN_DIR)/error.log $(RUN_DIR)/boot_summary.txt
+
+verify-8210-native-rom6: normalize-8210 audit-dsp-rom6 build
+	$(PYTHON) tools/run_rom6_native.py --mame $(MAME_DIR)/mame --output-root $(RUN_DIR)/native-rom6
 
 verify-8210-verifier: normalize-8210 build
 	$(PYTHON) tools/nsm3_verifier_check.py $(MAME_DIR)/mame roms/noki8210/8210_5.31ppm_c.fls $(RUN_DIR)

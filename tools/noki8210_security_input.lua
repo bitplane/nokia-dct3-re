@@ -1,7 +1,12 @@
 -- Own NSM-3 matrix already decoded from ROM; physical input only.
 local source = debug.getinfo(1, 'S').source:sub(2)
 _G.noki8210_observe_only = true
-dofile(assert(source:match('^(.*[/])')) .. 'noki8210_menu_input.lua')
+local directory=assert(source:match('^(.*[/])'))
+if manager.machine.system.name=='nsm3r6' then
+    dofile(directory..'rom6_native_observe.lua')
+else
+    dofile(directory..'noki8210_menu_input.lua')
+end
 local machine = manager.machine
 if _G.noki8210_radio_observe or os.getenv('NOKIA_DCT3_8210_PIN_ENTRY') == '1' then
     local cpu = machine.devices[':maincpu']

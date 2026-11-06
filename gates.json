@@ -2311,6 +2311,15 @@
       ]
     },
     {
+      "name": "verify-8210-native-rom6",
+      "prerequisites": ["normalize-8210", "audit-dsp-rom6", "build"],
+      "variables": {},
+      "steps": [
+        {"step": "check", "silent": false, "interpreter": "$(PYTHON)", "before_script": [],
+         "script": "tools/run_rom6_native.py", "arguments": ["--mame", "$(MAME_DIR)/mame", "--output-root", "$(RUN_DIR)/native-rom6"]}
+      ]
+    },
+    {
       "name": "verify-8210-verifier",
       "prerequisites": ["normalize-8210", "build"],
       "variables": {},

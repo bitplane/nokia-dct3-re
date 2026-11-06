@@ -3,7 +3,33 @@ local machine = manager.machine
 assert(machine.system.name == 'nsm3r6')
 local cpu = assert(machine.devices[':dsp_c54x:cpu'])
 assert(not machine.devices[':dsp_hle'] and not machine.devices[':dsp_staged'])
+machine:logerror('rom6_native_composition: hle=0 staged=0 observer_writes=0\n')
 local handles = {}
+local missing_program=0
+handles[#handles+1]=cpu.spaces.program:install_read_tap(0x80,0x1fff,'rom6_program_coverage',function(address)
+    if (cpu.state.PMST.value&0x20)==0 then
+        missing_program=missing_program+1
+        if missing_program<=8 then
+            machine:logerror(string.format('rom6_native_unacquired_program: address=%04x observer_writes=0\n',address))
+        end
+    end
+end)
+local captured={}
+for _,region in ipairs({{'loader2',0x0a00,623,'data'}, {'installed',0x0590,422,'program'}}) do
+    local trigger=region[1]=='loader2' and 0x0a00 or 0x2c75
+    handles[#handles+1]=cpu.spaces.program:install_read_tap(trigger,trigger,
+        'rom6_native_'..region[1],function()
+            if captured[region[1]] then return end
+            captured[region[1]]=true
+            local file=assert(io.open('rom6_native_'..region[1]..'.be16','wb'))
+            for address=region[2],region[2]+region[3]-1 do
+                file:write(string.pack('>I2',cpu.spaces[region[4]]:read_u16(address)))
+            end
+            file:close()
+            machine:logerror(string.format('rom6_native_upload: region=%s words=%d entry=%04x observer_writes=0\n',
+                region[1],region[3],trigger))
+        end)
+end
 local arm=assert(machine.devices[':maincpu'])
 machine.debugger:command('temp4=0')
 arm.debug:bpset(0x2cadd0,'w@10002!=ffff && temp4<10',
@@ -38,18 +64,7 @@ handles[#handles+1] = emu.add_machine_frame_notifier(function()
 end)
 handles[#handles+1] = emu.add_machine_stop_notifier(function()
     snapshot('terminal')
-    machine.debugger:command('dasm dsp-init.asm,a80,100,1,:dsp_c54x:cpu')
-    -- This uploaded instruction is a CPU-admission boundary, not ROM data.
-    local words = {}
-    for address=0x0b30,0x0b5f do
-        words[#words+1] = string.format('%04x',cpu.spaces.program:read_u16(address))
-    end
-    machine:logerror('rom6_native_program: address=0b30 words='..table.concat(words,',')..' observer_writes=0\n')
-    machine:logerror(string.format('rom6_native_context: ar3=%04x ar4=%04x brc=%04x observer_writes=0\n',
-        cpu.state.AR3.value,cpu.state.AR4.value,cpu.state.BRC.value))
-    local data={}
-    for address=0x60,0x6f do data[#data+1]=string.format('%04x',cpu.spaces.data:read_u16(address)) end
-    machine:logerror('rom6_native_data: address=0060 words='..table.concat(data,',')..' observer_writes=0\n')
+    machine:logerror(string.format('rom6_native_coverage: missing_program_reads=%d observer_writes=0\n',missing_program))
 end)
 _G.rom6_native_observers = handles
 machine.debugger:command('g')

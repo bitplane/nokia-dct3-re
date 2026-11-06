@@ -13,7 +13,7 @@ work after fixture state changes. It does not reset architectural registers or
 peripherals. The former boolean selection API and test-case mode field are
 removed; fixture setup and clear-before-restore still perform the same reset.
 
-The 487-section catalogue has 474 generic CPU sections and thirteen copied
+The 490-section catalogue has 477 generic CPU sections and thirteen copied
 firmware sections. Family tables retain independent numeric expectations
 alongside generated timing, ownership and restoration contracts.
 See [the test suite](c54x_test_suite.md) for execution and coverage policy and
@@ -188,7 +188,7 @@ alone is not proof of an atomic engine or renewed acceptance.
 
 ## Acceptance
 
-All five retirement stages are complete. The execution-core checkpoint `9f979059`
+All five retirement stages are complete. The earlier execution-core checkpoint `9f979059`
 passes all 487 sections and 1,461,943 cases and restores (3,055.702 seconds).
 Its manifest SHA-256 is
 `258cae1abf722739cff3e3e443e33f8592cb98fecf8c5e3b881c601fffd39bd0`.
@@ -199,8 +199,8 @@ Fresh integration checks pass 358 linked ROM4 context cases, cold execution,
 FR/EFR codecs, RF bitmap, clocked serial/replay, backend BSP/requests,
 MU4 original bootstrap with exact 1,339-item replay, and 5110 menu/save-state.
 The debugger-only CMPR addition separately passes the full 45-family disassembler
-gate, 140 register-compare and 3,456 delayed-compare cases with replay; execution
-sources, admission and saved state are unchanged from that catalogue checkpoint.
+gate, 140 register-compare and 3,456 delayed-compare cases with replay; that
+debugger-only change did not modify execution or saved state.
 The host checks pass 371 C54x tests and 66 layout, native-runner,
 device-split/patch/keypad tests. Focused builds refresh changed CPU sources
 automatically rather than relying on a separate overlay invocation.
@@ -213,9 +213,22 @@ forwarding regions stay in the coordinator; the coverage limits above remain ope
 Every catalogue completion also passes
 exact case/restore line validation, including rejection of count suffixes.
 
-The uploaded-program verifier and broader handset qualification remain earlier
-results, not renewed certificates from this structural pass. These
-results do not expand physical coverage; suite sizing and build accounting
+The current native-ROM6 execution checkpoint additionally qualifies absolute
+BRC comparison, retained RAM-to-SP copy and older READA destination-address
+publication before younger Access-stage address updates. The complete current
+catalogue passes **490 sections and 1,461,965 cases and restores**: 477 CPU
+sections/1,460,179 cases in 2,853.515 seconds and 13 copied-firmware
+sections/1,786 cases in 76.712 seconds (2,930.227 seconds total). Manifest SHA-256:
+`6d330221ee7d57ecb9f55614bc6f334836c45e923b7099ecae430ad48f906e32`.
+Fresh native 5110 menu and ROM4 EFR decoder/encoder gates also pass, each codec
+covering 163 frames with zero reference mismatches and exact replay. Default
+and coherent 3210 HLE acceptance remain green. These renewed results do not
+extend the ISA, physical timing or native-radio claims beyond their fixtures.
+
+The ROM4 uploaded-program verifier and handset qualifications not listed above
+remain earlier results, not renewed certificates from this pass. Native 8210
+acceptance has its own [ROM6 contract](rom6_dsp_bringup.md). These results do
+not expand physical coverage; suite sizing and build accounting
 are recorded in [the suite guide](c54x_test_suite.md#acceptance).
 
 ## Limits

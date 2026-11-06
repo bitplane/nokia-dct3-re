@@ -6,14 +6,18 @@ return function(config)
     local machine = manager.machine
     local dsp = assert(machine.devices[':dsp_c54x:cpu'])
     local prefix = assert(config.prefix)
-    local anchor, phase, saved, complete
+    local anchor, phase, saved, complete, reference_endpoint
     local retained, events = {}, {reference = {}, restored = {}}
+    local streams,counts,overflow={}, {reference=0,restored=0},false
+    local limit=config.io_stream and 1048576 or 16384
     retained[#retained + 1] = dsp.spaces.io:install_write_tap(0, 0xffff, prefix .. '_state_io', function(address, value, mask)
         local now = machine.time:as_double()
         if not anchor or now < anchor or now >= anchor + 2.7 then return end
-        local list = events[phase]
-        assert(#list < 16384, prefix .. ' state I/O trace overflow')
-        list[#list + 1] = string.format('%.9f:%04x:%04x:%04x', now - anchor, address, value, mask)
+        if counts[phase]>=limit then overflow=true; return end
+        counts[phase]=counts[phase]+1
+        local record=string.format('%.9f:%04x:%04x:%04x',now-anchor,address,value,mask)
+        if config.io_stream then assert(streams[phase]:write(record,'\n'))
+        else events[phase][#events[phase]+1]=record end
     end)
     local function snapshot(label)
         local arm, registers = capture(machine, assert(config.ram_end)), {}
@@ -33,6 +37,7 @@ return function(config)
     end
     retained[#retained + 1] = emu.add_machine_pre_save_notifier(function()
         saved = snapshot('saved')
+        if config.io_stream then streams.reference=assert(io.open(prefix..'_reference.io','wb')) end
         anchor, phase = machine.time:as_double(), 'reference'
     end)
     local function navigate(label)
@@ -44,18 +49,40 @@ return function(config)
         machine:logerror(prefix .. '_state_contact: phase=' .. label .. ' down=0\n')
         assert(emu.wait(1))
         machine.screens[':screen']:snapshot(prefix .. '_state_' .. label .. '.png')
+        if config.io_stream then streams[label]:close(); streams[label]=nil end
+        if config.verify_endpoint then
+            local endpoint=snapshot(label..'_end')
+            if label=='reference' then reference_endpoint=endpoint
+            else assert(endpoint==reference_endpoint,prefix..' replay endpoint differs') end
+        end
     end
     retained[#retained + 1] = emu.add_machine_post_load_notifier(function()
         assert(saved and snapshot('restored') == saved, prefix .. ' native architectural restoration differs')
         phase = 'restored'
+        if config.io_stream then streams.restored=assert(io.open(prefix..'_restored.io','wb')) end
         local replay = coroutine.create(function()
             assert(emu.wait(1.5))
             navigate('restored')
-            assert(#events.reference > 0 and #events.reference == #events.restored, prefix .. ' native I/O replay count differs')
-            for i, event in ipairs(events.reference) do
-                assert(events.restored[i] == event, prefix .. ' native I/O replay differs at ' .. i)
+            assert(not overflow,prefix..' state I/O capture overflow')
+            for i=1,config.io_stream and 0 or math.max(#events.reference,#events.restored) do
+                if events.reference[i]~=events.restored[i] then
+                    machine:logerror(string.format('%s_state_io_divergence: reference=%d restored=%d first=%d\n',
+                        prefix,#events.reference,#events.restored,i))
+                    for index=i,math.min(i+3,math.max(#events.reference,#events.restored)) do
+                        machine:logerror(string.format('%s_state_io_difference: index=%d reference=%s restored=%s\n',
+                            prefix,index,events.reference[index] or 'absent',events.restored[index] or 'absent'))
+                    end
+                    break
+                end
             end
-            machine:logerror(string.format('%s_state_replay: reference=%d restored=%d window=2.7 exact=1\n', prefix, #events.reference, #events.restored))
+            assert(counts.reference>0 and counts.reference==counts.restored,prefix..' native I/O replay count differs')
+            if not config.io_stream then
+                for i,event in ipairs(events.reference) do
+                    assert(events.restored[i]==event,prefix..' native I/O replay differs at '..i)
+                end
+            end
+            machine:logerror(string.format('%s_state_replay: reference=%d restored=%d window=2.7 %s%s\n',
+                prefix,counts.reference,counts.restored,config.io_stream and 'streamed=1' or 'exact=1',config.verify_endpoint and ' endpoint=1' or ''))
             complete = true
             machine:logerror(prefix .. '_state: completed=1\n')
         end)
@@ -72,6 +99,7 @@ return function(config)
     end)
     retained[#retained + 1] = runner
     retained[#retained + 1] = emu.add_machine_stop_notifier(function()
+        for _,stream in pairs(streams) do stream:close() end
         if not complete then machine:logerror(prefix .. '_state: FAIL incomplete\n') end
     end)
     _G[prefix .. '_native_state'] = retained

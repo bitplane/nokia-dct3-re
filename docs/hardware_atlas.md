@@ -498,6 +498,12 @@ errata remain possible. Do not collapse product PCM profiles by part name.
 NPE-3's schematic identifies COBBA_GJP_V4.1 but does not settle its own rate;
 its mapped MCU parameter bits also do not independently supply that meaning.
 
+The same NSM-3 manual's printed/PDF 25 specifies the DSP clock as 13 MHz x 3.5,
+or 45.5 MHz. The acquired-ROM6 `nsm3r6` research composition uses this nominal
+product clock; it is not a universal ROM6 rate or measured cycle-accuracy
+certificate. Its partial control-port model and native initialization/UI/storage
+acceptance are defined in [the ROM6 contract](rom6_dsp_bringup.md).
+
 NSE-3 is now tracked as a future product profile rather than only as
 cross-family PCM evidence. Its Nokia system-module parts list names an Intel
 TE28F800 512K x 16 flash and ROM3 MAD2 variant F711604; the memory description
