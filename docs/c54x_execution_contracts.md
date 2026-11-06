@@ -80,6 +80,20 @@ pass. This is selected regression coverage, not a complete CPU-suite renewal.
 
 ### Harness contract
 
+Absolute `CMPM *(001a), #lk` admits BRC as a mapped source. `brc_compare`
+has eight independent cases for equal/unequal words, retained Read operands,
+TC-only Execute publication and restore points around Read. The 6,814-case
+`mapped_compare` section retains the other control/peripheral exclusions,
+including direct and indirect BRC forms. This is a bounded admission, not
+general MMR comparison coverage (SPRU172C 4-33).
+
+`mvdd_sp` qualifies nonrepeated `e51a` (`MVDD *AR3, *AR4+`) with a RAM source
+and SP destination. Eight positive cases check retained source/address,
+pointer update, SP publication and restoration; four negative cases retain
+neighbouring destination, repeated and different-form exclusions. Status and
+accumulators remain unchanged (SPRU172C 4-107). The asserted bus clocks are
+the model's phase contract, not independent silicon timing measurements.
+
 Short RAM AND/OR/XOR operands can issue through the staged single-instruction
 repeat slots. Each iteration owns one operand read and one pointer update;
 Execute reduces the retained zero-extended word into the selected accumulator

@@ -177,6 +177,7 @@
   "long_memory_logic": 9408,
   "mapped_compare": 6814,
   "brc_compare": 8,
+  "mvdd_sp": 12,
   "addc_chain": 512,
   "load_t_multiply": 256,
   "square_literals": 6,

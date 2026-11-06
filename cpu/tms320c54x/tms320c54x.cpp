@@ -3030,7 +3030,9 @@ void tms320c54x_device::pipeline_step()
 		m_pipeline_immediate[3] = m_ar[xar];
 		m_pipeline_operand_address[3] = m_ar[yar];
 		bool const peripheral_destination = m_pipeline_operand_address[3] >= 0x20 && m_pipeline_operand_address[3] < 0x60;
-		if (m_pipeline_operand_address[3] < 0x20 ||
+		bool const sp_destination = m_pipeline_word[3] == 0xe51a && m_pipeline_operand_address[3] == 0x18 &&
+			m_pipeline_immediate[3] >= 0x60 && !m_pipeline_repeat_active;
+		if ((m_pipeline_operand_address[3] < 0x20 && !sp_destination) ||
 			(peripheral_destination && (m_pipeline_repeat_active || m_pipeline_immediate[3] < 0x60)))
 		{
 			logerror("%s: staged MVDD register/peripheral operand is unsupported instruction=%06x word=%04x source=%04x destination=%04x repeated=%u\n", machine().describe_context(), unsigned(m_pipeline_address[3]), m_pipeline_word[3], m_pipeline_immediate[3], m_pipeline_operand_address[3], unsigned(m_pipeline_repeat_active)); m_illegal = true; return;
