@@ -2867,7 +2867,8 @@ void tms320c54x_device::pipeline_step()
 		{
 			logerror("%s: staged unsigned memory arithmetic mapped-register source is unsupported instruction=%06x word=%04x source=%04x\n", machine().describe_context(), m_pipeline_address[3], m_pipeline_word[3], source); m_illegal = true; return;
 		}
-		if ((m_pipeline_word[3] & 0xff00) == 0x6000 && source < 0x60 && (source < 8 || source > 0x17))
+		bool const absolute_brc_compare = m_pipeline_word[3] == 0x60f8 && source == 0x1a;
+		if ((m_pipeline_word[3] & 0xff00) == 0x6000 && source < 0x60 && (source < 8 || source > 0x17) && !absolute_brc_compare)
 		{
 			logerror("%s: staged CMPM mapped-register source is unsupported instruction=%06x word=%04x source=%04x\n", machine().describe_context(), unsigned(m_pipeline_address[3]), m_pipeline_word[3], source);
 			m_illegal = true; return;
@@ -2891,7 +2892,7 @@ void tms320c54x_device::pipeline_step()
 		{
 			logerror("%s: staged shifted peripheral load repeat/control composition is unsupported\n", machine().describe_context()); m_illegal = true; return;
 		}
-		if (source < 0x60 && (source < (special || shifted || add_sub || bitfield ? 0x08 : 0x10) || source > 0x17) && !bk_arithmetic && !shifted_peripheral && !shifted_unowned && !(bitfield && (source == 6 || source == 7 || source >= 0x20)))
+		if (source < 0x60 && (source < (special || shifted || add_sub || bitfield ? 0x08 : 0x10) || source > 0x17) && !absolute_brc_compare && !bk_arithmetic && !shifted_peripheral && !shifted_unowned && !(bitfield && (source == 6 || source == 7 || source >= 0x20)))
 		{
 			logerror("%s: staged %s control/peripheral source is unsupported instruction=%06x last_fetch_physical=%06x word=%04x source=%04x pmst=%04x\n", machine().describe_context(), shifted ? "shifted load" : special ? "Smem special" : bitfield ? "BITF" : "memory ADD/SUB", unsigned(m_pipeline_address[3]), unsigned(m_pipeline_physical_address[3]), m_pipeline_word[3], source, m_pmst);
 			m_illegal = true; return;

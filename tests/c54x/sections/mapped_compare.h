@@ -77,6 +77,7 @@ inline std::vector<clocked_register_case> section_cases()
 			form,tc,initial_tc,mapped,false,lane + pattern + literal + form + tc + initial_tc);
 	}
 	for (unsigned index = 0; index < 80; ++index) for (unsigned form = 0; form < 3; ++form) for (unsigned initial_tc = 0; initial_tc < 2; ++initial_tc)
+		if (!(index == 10 && form == 2)) // Absolute BRC is covered by brc_compare.
 		append(index < 8 ? index : index + 0x10,0,1,form,0,initial_tc,true,true,index + form + initial_tc);
 	return cases;
 }
