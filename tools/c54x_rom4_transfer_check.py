@@ -48,11 +48,18 @@ def check(text, *, minimum_seconds=8):
     by_producer = {}
     for row in inventory:
         by_producer[row['pc']] = by_producer.get(row['pc'], 0) + int(row['count'])
-    if by_producer.get('a240') != 4 or by_producer.get('3712') != 20:
+    # Bus-time contexts of the unchanged own upload/consumer instructions.
+    # The retired execution path stamped their next/end PCs instead.
+    if by_producer.get('a23f') != 4 or by_producer.get('3711') != 20:
         raise ValueError('transfer pair producer totals changed')
-    for rows, count, cap in ((controls, int(summary['controls']), 64), (pairs, int(summary['pairs']), 64)):
-        if len(rows) != min(count, cap) or [int(row['sequence']) for row in rows] != list(range(1, len(rows) + 1)):
-            raise ValueError('missing or unordered transfer observations')
+    if (len(controls)!=min(int(summary['controls']),64)
+            or [int(row['sequence']) for row in controls]!=list(range(1,len(controls)+1))):
+        raise ValueError('missing or unordered transfer observations')
+    sequences=[int(row['sequence']) for row in pairs]
+    if (len(pairs)!=24 or sequences!=sorted(set(sequences))
+            or not all(1<=value<=int(summary['pairs']) for value in sequences)
+            or any(row['pc'] not in ('a23f','3711') for row in pairs)):
+        raise ValueError('missing or unordered complete queued-pair observations')
     prefix_counts = {}
     for row in pairs:
         key = (row['pc'], row['low'], row['high'])
@@ -78,7 +85,7 @@ def check(text, *, minimum_seconds=8):
         raise ValueError('transfer service histogram differs')
     if int(summary['service']) < 20:
         raise ValueError('missing native transfer-service requests')
-    starts = [i for i, row in enumerate(controls) if row['pc'] == 'a244']
+    starts = [i for i, row in enumerate(controls) if row['pc'] == 'a243']
     if len(starts) != 4 or len(tables) != 4:
         raise ValueError('expected four firmware-owned transfer bursts')
     output = []
@@ -92,18 +99,18 @@ def check(text, *, minimum_seconds=8):
             raise ValueError('transfer descriptor positions changed')
         if len(chain) != 6 or [int(row['value'], 16) for row in chain] != positions:
             raise ValueError('native descriptor rearming did not reach its sentinel')
-        if [row['pc'] for row in chain] != ['a244'] + ['3717'] * 5 or table['time'] != chain[0]['time']:
+        if [row['pc'] for row in chain] != ['a243'] + ['3716'] * 5 or table['time'] != chain[0]['time']:
             raise ValueError('descriptor ownership or table correlation changed')
         if words(chain[0]['pointers']) != [0x1914, 0x1920]:
             raise ValueError('initial queue pointers differ')
         previous = float(controls[start - 1]['time']) if start else -1
         initial = [row for row in pairs if previous < float(row['time']) <= float(chain[0]['time'])]
-        if not initial or initial[-1]['pc'] != 'a240' or [int(initial[-1][key], 16) for key in ('low', 'high')] != payload[:2]:
+        if not initial or initial[-1]['pc'] != 'a23f' or [int(initial[-1][key], 16) for key in ('low', 'high')] != payload[:2]:
             raise ValueError('initial native pair does not match its source table')
         for index in range(5):
             begin, end = float(chain[index]['time']), float(chain[index + 1]['time'])
             emitted = [row for row in pairs if begin < float(row['time']) <= end]
-            if len(emitted) != 1 or emitted[0]['pc'] != '3712':
+            if len(emitted) != 1 or emitted[0]['pc'] != '3711':
                 raise ValueError('missing or interleaved queued transfer')
             if [int(emitted[0][key], 16) for key in ('low', 'high')] != payload[2 * index + 2:2 * index + 4]:
                 raise ValueError('queued pair differs from firmware-owned data')

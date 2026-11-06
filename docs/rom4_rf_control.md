@@ -2,6 +2,15 @@
 
 NSE-1 synthesizer, tuning and receive-window observations. [COBBA control](cobba_control_boundary.md) owns admitted device semantics. Calibrated samples, score-only negatives and opaque serial writes do not establish RF acquisition.
 
+The current `check-c54x-rom4-transfers` gate uses single-engine bus-time PC
+contexts `a23f/3711` for queued pairs and `a243/3716` for compare writes.
+The observer checks the corresponding native PORTW opcode/operand bytes.
+Older end-PC stamps in the maps below are compatibility observations, not
+current issuing-instruction identities. The gate captures all 24 relevant pair
+records for four complete firmware-owned chains; unrelated RF pairs retain a
+complete inventory but cannot consume that capture budget. It proves 20 queued
+advances, exact payloads/pointers and compare/ack causality, not RF delivery.
+
 ## NSE-1 synthesizer boundary
 
 Nokia's NSE-1 System Module manual (03/98, pp. 3-50--51 and 3-61--63),

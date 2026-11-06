@@ -4,7 +4,7 @@ local machine = manager.machine
 local cpu = assert(machine.devices[':dsp_c54x:cpu'])
 local taps = {}
 local controls, requests, service_requests = 0, 0, 0
-local pairs_written, pair_low = 0, 0
+local pairs_written, pair_low, queued_pairs = 0, 0, 0
 local pair_counts = {}
 local values = {}
 local counter, counter_time = 0xffff, 0
@@ -15,7 +15,10 @@ taps[#taps + 1] = cpu.spaces.io:install_write_tap(4, 4, 'native_transfer_control
     controls = controls + 1
     if controls > 64 then return end
     local data = cpu.spaces.data
-    if cpu.state['PC'].value == 0xa244 then
+    -- Bus-time PC in the single execution engine, not the old end-PC stamp.
+    if cpu.state['PC'].value == 0xa243 then
+        assert(cpu.spaces.program:read_u16(0xa242)==0x7592 and cpu.spaces.program:read_u16(0xa243)==4,
+            'own initial compare writer bytes differ')
         local descriptors, payload = {}, {}
         for i = 0, 11 do
             descriptors[#descriptors + 1] = string.format('%04x', data:read_u16(0x1914 + i))
@@ -40,7 +43,14 @@ taps[#taps + 1] = cpu.spaces.io:install_write_tap(0x32, 0x32, 'native_transfer_p
     pairs_written = pairs_written + 1
     local key = string.format('%04x:%04x:%04x', cpu.state['PC'].value, pair_low, value)
     pair_counts[key] = (pair_counts[key] or 0) + 1
-    if pairs_written <= 64 then
+    local pc=cpu.state['PC'].value
+    if pc==0xa23f or pc==0x3711 then
+        local opcode=pc==0xa23f and 0x7595 or 0x7593
+        assert(cpu.spaces.program:read_u16(pc-1)==opcode and cpu.spaces.program:read_u16(pc)==0x32,
+            'own queued port-pair writer bytes differ')
+    end
+    if pc==0xa23f or pc==0x3711 then queued_pairs=queued_pairs+1 end
+    if (pc==0xa23f or pc==0x3711) and queued_pairs<=64 then
         machine:logerror(string.format('rom4_transfer_pair: sequence=%d low=%04x high=%04x pc=%04x t=%.9f\n',
             pairs_written, pair_low, value, cpu.state['PC'].value, machine.time:as_double()))
     end
