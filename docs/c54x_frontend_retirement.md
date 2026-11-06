@@ -64,8 +64,8 @@ and coverage tools reject the truncated capture instead of claiming closure.
 
 `pipeline_step` is an ordered cycle, not six independently reorderable stage
 functions. The regions below execute in order; a return skips every later region.
-The cycle counter increments before any hold. Peripheral clocks are driven by
-the caller, so a pipeline hold is not a stopped device clock.
+The cycle counter increments before any hold. Peripheral timers remain scheduled
+in emulated time, so a pipeline hold is not a stopped device clock.
 
 | Region | Ownership and return boundary | Executable coverage |
 | --- | --- | --- |

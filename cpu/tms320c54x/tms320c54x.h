@@ -163,6 +163,10 @@ private:
 	bool accept_interrupt();
 	void interrupt_entry_step();
 	void reset_pipeline();
+	// A completed retained transfer still consumes its clock without advancing slots.
+	enum class pipeline_cycle_result { proceed, consumed, rejected };
+	pipeline_cycle_result pipeline_service_bus_wait();
+	pipeline_cycle_result pipeline_service_pending_transfer();
 	void pipeline_step();
 	bool pipeline_execute();
 	void pipeline_publish_read_results(bool smem_t_product_read);

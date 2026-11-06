@@ -1357,9 +1357,8 @@ void tms320c54x_device::reset_execution_pipeline()
 	reset_pipeline();
 }
 
-void tms320c54x_device::pipeline_step()
+tms320c54x_device::pipeline_cycle_result tms320c54x_device::pipeline_service_bus_wait()
 {
-	++m_pipeline_cycles;
 	if (m_pipeline_peripheral_read_pending)
 	{
 		// The older peripheral write used the preceding bus cycle. Retain
@@ -1367,7 +1366,7 @@ void tms320c54x_device::pipeline_step()
 		// the older instruction or sampling the register twice.
 		m_pipeline_operand[4] = pipeline_read_data(m_pipeline_operand_address[4]);
 		m_pipeline_peripheral_read_pending = false;
-		return;
+		return pipeline_cycle_result::consumed;
 	}
 	if (software_wait_enabled())
 	{
@@ -1376,7 +1375,7 @@ void tms320c54x_device::pipeline_step()
 		if (read && write)
 		{
 			logerror("%s: overlapping staged external I/O arbitration is unsupported\n", machine().describe_context());
-			m_illegal = true; return;
+			m_illegal = true; return pipeline_cycle_result::rejected;
 		}
 		if (read || write)
 		{
@@ -1389,11 +1388,111 @@ void tms320c54x_device::pipeline_step()
 			}
 			// Hold the retained slot before the actual I/O side effect. Clock
 			// consumers continue; no new interrupt is accepted mid-transfer.
-			if (m_pipeline_io_wait_remaining) { --m_pipeline_io_wait_remaining; return; }
-			if (m_pipeline_io_ready_required && !m_ready_in_cb()) return;
+			if (m_pipeline_io_wait_remaining) { --m_pipeline_io_wait_remaining; return pipeline_cycle_result::consumed; }
+			if (m_pipeline_io_ready_required && !m_ready_in_cb()) return pipeline_cycle_result::consumed;
 			m_pipeline_io_ready_required = false;
 		}
 	}
+	return pipeline_cycle_result::proceed;
+}
+
+tms320c54x_device::pipeline_cycle_result tms320c54x_device::pipeline_service_pending_transfer()
+{
+	if (m_pipeline_compiler_sp_wait) --m_pipeline_compiler_sp_wait;
+	if (m_pipeline_dp_wait)
+	{
+		--m_pipeline_dp_wait;
+		return pipeline_cycle_result::consumed;
+	}
+	if (m_pipeline_long_store_pending)
+	{
+		m_data.write_word(m_pipeline_operand_address[5] ^ 1, m_pipeline_immediate[5]);
+		m_pipeline_long_store_pending = false;
+		pipeline_accept_interrupt();
+		return pipeline_cycle_result::consumed;
+	}
+	if (m_pipeline_far_return_pending)
+	{
+		// Retain the second stack operand while the return holds Read.
+		// This bus placement is a partial model of class 34, not measured
+		// silicon phases. The first sample follows older Execute writes.
+		m_pipeline_operand_address[4] = data_read(m_sp++);
+		m_pipeline_far_return_pending = false;
+		return pipeline_cycle_result::consumed;
+	}
+	if (m_pipeline_acc_transfer_pending)
+	{
+		// Classes 30A/B hold this transfer boundary; only FCALA owns
+		// a second stack write. BACC/FBACC own no stack transaction.
+		// Bus placement is a partial model, not measured silicon phases.
+		if (staged_accumulator_far_call(m_pipeline_word[4])) data_write(m_pipeline_far_call_stack[4], m_pipeline_far_call_page[4], 4);
+		m_pipeline_acc_transfer_pending = false;
+		return pipeline_cycle_result::consumed;
+	}
+	if (m_pipeline_cc_pending)
+	{
+		// The retained nondelayed Class 31B model holds one clock on both
+		// paths. Only a taken predicate owns a stack write; retain that
+		// decision through the held clock.
+		if (m_pipeline_immediate[4]) data_write(m_pipeline_operand_address[4], u16(m_pipeline_address[4] + 2), 4);
+		m_pipeline_cc_pending = false;
+		return pipeline_cycle_result::consumed;
+	}
+	if (m_pipeline_memory_repeat_wait)
+	{
+		--m_pipeline_memory_repeat_wait;
+		return pipeline_cycle_result::consumed;
+	}
+	if (m_pipeline_mvdp_wait)
+	{
+		--m_pipeline_mvdp_wait;
+		return pipeline_cycle_result::consumed;
+	}
+	if (m_pipeline_write_a_wait)
+	{
+		// Class 26's program-bus hold is partial stage placement. A direct
+		// accumulator producer must publish before PAR is retained (7.5.10).
+		if (m_pipeline_write_a_wait == 4)
+		{
+			m_pipeline_write_a_logical = u32(m_a) & (m_extended_program ? 0x7fffff : 0xffff);
+			m_pipeline_write_a_target = physical_program_address(m_pipeline_write_a_logical);
+		}
+		--m_pipeline_write_a_wait;
+		return pipeline_cycle_result::consumed;
+	}
+	if (m_pipeline_read_a_wait)
+	{
+		// READA samples A after older Execute publications, then holds the
+		// program bus for its four extra clocks. Placement is partial.
+		if (m_pipeline_read_a_wait == 4) m_pipeline_read_a_source = u32(m_a);
+		if (!--m_pipeline_read_a_wait)
+			m_pipeline_operand[4] = m_program.read_word(physical_program_address(m_pipeline_read_a_source));
+		return pipeline_cycle_result::consumed;
+	}
+	if (m_pipeline_program_move_pending)
+	{
+		// MVPD's extra program-bus clock holds Read and younger slots.
+		// Retain the sampled word; exact bus phase is a partial model.
+		u32 const source = (m_pipeline_address[4] & 0x7f0000) | m_pipeline_immediate[4];
+		m_pipeline_operand[4] = m_program.read_word(physical_program_address(source));
+		m_pipeline_program_move_pending = false;
+		return pipeline_cycle_result::consumed;
+	}
+	if (m_pipeline_coefficient_pending)
+	{
+		// Class 8 owns an extra program-bus cycle. Hold the sampled X/Y
+		// operands and captured physical coefficient address across it.
+		m_pipeline_immediate[4] = m_program.read_word(m_pipeline_coefficient_source);
+		m_pipeline_coefficient_pending = false;
+		return pipeline_cycle_result::consumed;
+	}
+	return pipeline_cycle_result::proceed;
+}
+
+void tms320c54x_device::pipeline_step()
+{
+	++m_pipeline_cycles;
+	if (pipeline_service_bus_wait() != pipeline_cycle_result::proceed) return;
 	if (m_pipeline_repeat_stream)
 	{
 		if (staged_repeat_port(m_pipeline_repeat_word))
@@ -1485,94 +1584,7 @@ void tms320c54x_device::pipeline_step()
 		pipeline_finish_repeat_iteration();
 		return;
 	}
-	if (m_pipeline_compiler_sp_wait) --m_pipeline_compiler_sp_wait;
-	if (m_pipeline_dp_wait)
-	{
-		--m_pipeline_dp_wait;
-		return;
-	}
-	if (m_pipeline_long_store_pending)
-	{
-		m_data.write_word(m_pipeline_operand_address[5] ^ 1, m_pipeline_immediate[5]);
-		m_pipeline_long_store_pending = false;
-		pipeline_accept_interrupt();
-		return;
-	}
-	if (m_pipeline_far_return_pending)
-	{
-		// Retain the second stack operand while the return holds Read.
-		// This bus placement is a partial model of class 34, not measured
-		// silicon phases. The first sample follows older Execute writes.
-		m_pipeline_operand_address[4] = data_read(m_sp++);
-		m_pipeline_far_return_pending = false;
-		return;
-	}
-	if (m_pipeline_acc_transfer_pending)
-	{
-		// Classes 30A/B hold this transfer boundary; only FCALA owns
-		// a second stack write. BACC/FBACC own no stack transaction.
-		// Bus placement is a partial model, not measured silicon phases.
-		if (staged_accumulator_far_call(m_pipeline_word[4])) data_write(m_pipeline_far_call_stack[4], m_pipeline_far_call_page[4], 4);
-		m_pipeline_acc_transfer_pending = false;
-		return;
-	}
-	if (m_pipeline_cc_pending)
-	{
-		// The retained nondelayed Class 31B model holds one clock on both
-		// paths. Only a taken predicate owns a stack write; retain that
-		// decision through the held clock.
-		if (m_pipeline_immediate[4]) data_write(m_pipeline_operand_address[4], u16(m_pipeline_address[4] + 2), 4);
-		m_pipeline_cc_pending = false;
-		return;
-	}
-	if (m_pipeline_memory_repeat_wait)
-	{
-		--m_pipeline_memory_repeat_wait;
-		return;
-	}
-	if (m_pipeline_mvdp_wait)
-	{
-		--m_pipeline_mvdp_wait;
-		return;
-	}
-	if (m_pipeline_write_a_wait)
-	{
-		// Class 26's program-bus hold is partial stage placement. A direct
-		// accumulator producer must publish before PAR is retained (7.5.10).
-		if (m_pipeline_write_a_wait == 4)
-		{
-			m_pipeline_write_a_logical = u32(m_a) & (m_extended_program ? 0x7fffff : 0xffff);
-			m_pipeline_write_a_target = physical_program_address(m_pipeline_write_a_logical);
-		}
-		--m_pipeline_write_a_wait;
-		return;
-	}
-	if (m_pipeline_read_a_wait)
-	{
-		// READA samples A after older Execute publications, then holds the
-		// program bus for its four extra clocks. Placement is partial.
-		if (m_pipeline_read_a_wait == 4) m_pipeline_read_a_source = u32(m_a);
-		if (!--m_pipeline_read_a_wait)
-			m_pipeline_operand[4] = m_program.read_word(physical_program_address(m_pipeline_read_a_source));
-		return;
-	}
-	if (m_pipeline_program_move_pending)
-	{
-		// MVPD's extra program-bus clock holds Read and younger slots.
-		// Retain the sampled word; exact bus phase is a partial model.
-		u32 const source = (m_pipeline_address[4] & 0x7f0000) | m_pipeline_immediate[4];
-		m_pipeline_operand[4] = m_program.read_word(physical_program_address(source));
-		m_pipeline_program_move_pending = false;
-		return;
-	}
-	if (m_pipeline_coefficient_pending)
-	{
-		// Class 8 owns an extra program-bus cycle. Hold the sampled X/Y
-		// operands and captured physical coefficient address across it.
-		m_pipeline_immediate[4] = m_program.read_word(m_pipeline_coefficient_source);
-		m_pipeline_coefficient_pending = false;
-		return;
-	}
+	if (pipeline_service_pending_transfer() != pipeline_cycle_result::proceed) return;
 	bool const read_peripheral = m_pipeline_valid[3] &&
 		((m_pipeline_operand_address[3] >= 0x20 && m_pipeline_operand_address[3] <= 0x5f &&
 		(staged_memory_load(m_pipeline_word[3]) || staged_shifted_memory_load(m_pipeline_word[3], m_pipeline_immediate[3]) || staged_bitfield(m_pipeline_word[3]) || staged_port_write(m_pipeline_word[3]) || staged_memory_logic(m_pipeline_word[3]) || staged_rmw(m_pipeline_word[3]) || staged_mmr_load(m_pipeline_word[3]) || staged_memory_dp(m_pipeline_word[3]))) ||
