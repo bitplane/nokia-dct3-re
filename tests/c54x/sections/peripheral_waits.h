@@ -39,6 +39,17 @@ inline std::vector<clocked_register_case> section_cases()
 	c.require_idle = false; c.final_pipeline_clock = 6;
 	c.data_events = std::vector<clocked_data_event>{};
 	cases.push_back(std::move(c));
+	for (unsigned destination : {0U,1U}) for (unsigned completed : {0U,1U,2U}) {
+		auto initial = initial_case("CLKMD-write-before-retained-read",{0x7758,2,u16(0x4858 | destination << 8),0xf4e1});
+		initial.initial.insert(initial.initial.end(),{{r::STATE_A,0x1234},{r::STATE_B,0x5678}});
+		auto final = observation("one-write-one-deferred-read",{{r::STATE_A,destination ? 0x1234U : 3U},
+			{r::STATE_B,destination ? 3U : 0x5678U}},{{0x58,3}});
+		clocked_register_case pair{{{0,std::move(initial)},{24,std::move(final)}},5,24};
+		// Capture before the write, between accesses, or after the deferred read.
+		if (completed) pair.checkpoint_after_data_events = completed;
+		pair.data_events = std::vector<clocked_data_event>{{true,0x58,2,0,false},{false,0x58,3,0,false,{},1}};
+		cases.push_back(std::move(pair));
+	}
 	return cases;
 }
 }

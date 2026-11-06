@@ -60,6 +60,34 @@ full extended PCs are observations, not saved architectural state. Fetched
 tuples have a 4,096-entry diagnostic budget; overflow emits `opwords_limit`
 and coverage tools reject the truncated capture instead of claiming closure.
 
+## Cycle ownership
+
+`pipeline_step` is an ordered cycle, not six independently reorderable stage
+functions. The regions below execute in order; a return skips every later region.
+The cycle counter increments before any hold. Peripheral clocks are driven by
+the caller, so a pipeline hold is not a stopped device clock.
+
+| Region | Ownership and return boundary | Executable coverage |
+| --- | --- | --- |
+| Deferred peripheral read, then external I/O wait/READY | Complete the retained read once, or pay/hold the existing I/O owner before its side effect; no slot advancement. Reject overlapping I/O owners. | `register_copy_sequences`, `standard_io_extended`, `c5416_io_extended`, `waited_io_control` |
+| Accelerated repeat | Execute only the retained body/transfer and finish one iteration; ordinary slots stay held. | `repeated_immediate_store`, `repeated_subc`, `repeated_mvdp`, `repeated_accumulator_load`, `waited_io_control` |
+| Pending transfer/latency | After repeat handling, decrement compiler-SP latency and service the first pending DP, long-store, return/call, repeat, program-move or coefficient owner. Return even on its completion clock. Long-store completion alone calls interrupt acceptance here. | `memory_dp`, `store_double_load`, `far_return`, `accumulator_call`, `conditional_control`, `write_a`, `reada_accumulator`, `coefficient_mac_literals` |
+| Peripheral arbitration | Before advancing slots, reject unqualified conflicts or charge one access wait. The serial retry pair and CLKMD write/read are the two qualified overlaps. Carry the CLKMD read-deferral decision across advancement. | `peripheral_waits`, `peripheral_cost_classes`, `register_copy_sequences`, native clocked serial/replay |
+| Slot advancement and front-end/control capture | Move all slots, including invalid ones, in descending order; issue retained repeat literals; advance interrupt entry and capture fetch/control predicates. Later rejection does not roll back completed older work. | `interrupt_entry`, `far_return`, `bio_pipeline`, `xc_condition`, `block_branch` |
+| Decode admission and Access/Read operands | Reject unsupported encodings/compositions at their existing boundary; retain extensions, modes, addresses, early DAGEN updates and bus operands. | `conditional_store_rejections`, `mapped_dual_rejections`, `dagen`, `memory_pairs` |
+| Execute and late publications | Capture Read-owned modes before older Execute; then apply qualified forwarding, late stack reads, control/stack allocations and Read-result publication. | `ram_forwarding`, `stack_interrupt_order`, `status_write_interrupt`, `register_copy_sequences` |
+| Final control, prefetch and interrupt acceptance | Publish MMR moves and block-loop bookkeeping, prefetch once, then check interrupt acceptance. | `block_repeat_control`, `software_interrupt`, `interrupt_mask`, `waited_io_control` |
+
+These are model contracts, not a proof of physical bus priority or all instruction
+compositions. Exact access timestamps/counts and replay cover the named paths;
+unsupported peripheral/I/O overlaps remain deliberate rejection boundaries.
+The direct rejection fixture covers an ordinary adjacent peripheral read/write;
+the CLKMD-move/peripheral and overlapping external-I/O rejection guards do not
+yet have qualified reaching instruction sequences. Keep those guards; their
+presence is not executable coverage or proof that they are unreachable.
+Operand capture and forwarding remain interleaved in the coordinator because
+moving them into textbook stage order would change what adjacent instructions see.
+
 ## Compositions and interfaces
 
 Ordinary `noki5110` selects the native DSP backend and standard SWWSR decoding.

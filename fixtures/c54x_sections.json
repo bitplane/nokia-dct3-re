@@ -254,7 +254,7 @@
   "port_read_forwarding": 832,
   "port_write_sources": 40,
   "peripheral_logic": 108,
-  "peripheral_waits": 9,
+  "peripheral_waits": 15,
   "peripheral_cost_classes": 20,
   "mapped_accumulator_move": 96,
   "status_bitfield": 128,
