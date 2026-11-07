@@ -190,18 +190,71 @@ both. Relative to the manual's 200kHz reference, that implies `M = 2*s`;
 Port-to-wire serialization, reference-divider controls and settling remain open.
 
 The own run issues `4a80` payloads `0402` and `0208`, not the sibling's
-documented whole-word families. Their presence alone is not a validated band
-selector. Trace the own configuration producer and delivered order before
-attaching a band interpretation; do not whitelist imported words or arbitrary
-payloads sharing their low bits.
+documented whole-word families. The firmware configuration-class contract below
+is qualified; physical band-field ownership is not. Do not whitelist imported
+words or arbitrary payloads sharing their low bits.
+
+## Own configuration-class contract
+
+`tools/run_rom6_native.py --scenario config` composes the qualified tuning
+fixture with passive data-store and Execute observations. It qualifies
+**2,749 key classifications, RAM selections and actual issued configuration
+pairs**, covering all548 scan keys. Every configuration is staged before its
+P31/P32 issue, without a device reply, RAM poke or RF-source selection.
+
+The words originate in an upload, not a live threshold calculation:
+
+- The native prefix at data `3e7e..3f10` matches294 MCU bytes at unique file
+  offset `116b08`, SHA256
+  `69d876c8a91b4807e48edeb77b2effabecb01d8c6dca05c4946cc1a9b673f5c2`.
+  Individual `0402/0208` literals have another flash occurrence; the complete
+  prefix distinguishes them.
+- The collector records the published146-word prefix plus the incoming
+  `3f10` store value. That is a transaction artifact, not a claimed post-store
+  RAM snapshot and not an emulated-memory write.
+- Initialization clears both slots at bus-time PC `0f15`; resident
+  `22ad..22ae` copies data through AR2 into AR3, publishing `0402` at `3f0f`
+  and `0208` at `3f10` (bus-time context `22af`). No further slot write occurs
+  in the qualified run.
+
+The key classifier `3d81..3d90` sets `263b.bit2` for0..124 and975..1023,
+clearing it for512..885 while preserving other class bits. The **active**
+configuration selector is different: uploaded `1994..199d` compares the prior
+payload at `1274` with data `3efc`, loads `3f0f` on equality or `3f10` otherwise,
+and stages the selected word with tag `4a80` at `1274/1275`. Its60 uploaded
+bytes at `1990..19ad` match unique MCU offset `1161b0`.
+
+| Key class | Class bit2 | Prior payload | Compared data3efc | Selected tagged word |
+| --- | --- | --- | --- | --- |
+| GSM/E-GSM | Set | `1054` | `1054` | `4a800402` |
+| DCS | Clear | `082a` | `1054` | `4a800208` |
+
+The run has877 GSM/E-GSM and1,872 DCS selections. The classifier, old-payload
+comparison, selected slots and issued pairs agree on every event. The static
+`29c3..29cc` bit-based selector remains a separate route, not the active producer
+in this run. Do not replace the equality test with a class-bit claim.
+
+`rom6_config_contract.py` provides an **analysis-only** whole-word class
+interpretation. Together with the RX scalar inverse it uniquely recovers the
+requested key for all2,743 native tuning pairs. Unknown words, including sibling
+`0c22/2018` values or arbitrary words with the same low bits, stay unsupported.
+A canonical unmatched PLL word remains unmatched under either configuration.
+
+This is not permission to retune at a port write. At11 class transitions the
+last issued configuration still describes the previous class when the native
+PLL pair is issued. The first subsequent configuration matches the requested
+key in every case. Raw issuance order is therefore not a coherent radio-state
+update. Moreover `1054/4100` and `082a/4100` co-vary with these classes; the
+current evidence does not isolate which physical command owns band selection
+or what other fields the `4a80` payload controls.
 
 ## Next implementation boundary
 
-Do not add a second descriptor queue. RX formatter arithmetic is now qualified;
-the next software target is the own `4a80` configuration producer and its
-relation to the colliding channel words. Before attaching a physical decoder
-to a timed output, independently resolve its trigger/latch edge (P32, P04 or
-compare), replacement and serial-completion meaning. The present stable-payload
-prefix does not choose between those models. A clocked sample source with
+Do not add a second descriptor queue. RX arithmetic and configuration-class
+selection are qualified. The next boundary is timed delivery of the co-varying
+`4100`/`4a80` words and PLL programming: recover their trigger/latch edge
+(P32, P04 or compare), physical roles and completion meaning before attaching
+a live RF decoder. The current stable-payload compare prefix does not choose
+between those models. A clocked sample source with
 provenance follows the programming contract; no carrier fallback is permitted.
 Native FCCH/SCH/BCCH, camp and registration come after those boundaries.
