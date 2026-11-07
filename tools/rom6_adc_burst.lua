@@ -13,4 +13,8 @@ _G.rom6_burst_state_tap=cpu.spaces.data:install_write_tap(0x3044,0x3044,'rom6_bu
 end)
 _G.rom6_burst_stop=emu.add_machine_stop_notifier(function()
     machine:logerror(string.format('rom6_burst_complete: count_writes=%d cap=1024 observer_writes=0\n',writes))
+    machine:logerror(string.format('rom6_burst_terminal: pc=%06x ar2=%04x ar3=%04x ar4=%04x ar5=%04x a=%010x b=%010x observer_writes=0\n',
+        cpu.state.GENPC.value,cpu.state.AR2.value,cpu.state.AR3.value,cpu.state.AR4.value,cpu.state.AR5.value,cpu.state.A.value,cpu.state.B.value))
+    machine.debugger.visible_cpu=cpu
+    machine.debugger:command('dasm rom6_burst_search.asm,1c80,c0,1,:dsp_c54x:cpu')
 end)

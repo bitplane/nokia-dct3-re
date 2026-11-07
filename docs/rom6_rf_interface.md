@@ -776,20 +776,25 @@ periodicity. The independent Python trigonometric reference checks delivered
 sample provenance, including the latched-Q boundary. Existing continuous
 tone and silence compositions are unchanged.
 
-The finite waveform advances beyond the continuous-tone path. Its complete
-observed input transport is fault-free: 701312 native reads, peak queued 69,
-and firmware disables the source at 3.296011429 seconds. The retained 3776
-sample words, including 277 nonzero values, match the independent source.
-This is input provenance, not an FCCH or camping verdict.
+The finite waveform advances beyond the continuous-tone path. After the
+independently tested CPU alias fixes, it reaches uploaded sample-processing
+helper `1cc5..1cff`. Those 118 bytes match MCU offset `11681a` and SHA256
+`5d7bf683dab9d7869f16ff09ae114740d11c7c694b9f5e678e11433fac6ed3ba`.
+The helper deliberately uses mapped AR6/AR7 addresses as scratch extrema:
+`1cc6/1cc8` initialize AR2=`0016`, AR3=`0017`; its conditional stores update
+these registers before computing their sum.
 
-Current native execution stops on the generic CPU's indirect constant-ST
-DAGEN ownership guard. The precise witness is resident `5719` (`7684 001a`,
-`ST #001a,*AR4`) in the CALLD delay span targeting division helper `4384`.
-Its caller explicitly initializes `AR4=0015` at `5715`, so the effective
-destination `0015` is an intentional **AR5 register alias**, not a guessed
-bad pointer. The diagnostic retains instruction/destination/mode/AR4/SP;
-the failure's displayed context `4387` is not the offending instruction.
-The unchanged stimulus remains **rejected** while this composition is
-unsupported. Direct and absolute constant-ST early writes already have
-independent CPU contracts; the next work is nonmodifying indirect aliases,
-including retained addresses, adjacent consumers, CALLD and save/replay.
+The current rejection is **Xmem STL to a mapped register** at `1ce7`
+(`9911`, `STL B,1,*AR3`). Terminal read-only observations retain AR2=`0016`,
+AR3=`0017`, AR4=`0080` and AR5=`3ee0`; the displayed failure context `1ceb`
+is not the offending instruction. Its effective destination is thus AR7,
+not an arbitrary bad RAM pointer. The current four/six-second runs retain
+4096 clock-qualified source words and 702112 total native reads. A queue
+overrun at 3.343345846 seconds follows the explicit CPU stop; it is not
+evidence for increasing provisional staging capacity.
+
+The unchanged stimulus remains **rejected**, not a qualified FCCH or camping
+result. Next: independently qualify mapped-register ownership for this
+nonmodifying Xmem-store subset, including source/shift selection, retained
+address, self-alias and adjacent-consumer/save-state behavior. The ordinary
+RAM Xmem-store arithmetic already has independent CPU coverage.
