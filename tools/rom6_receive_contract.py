@@ -32,6 +32,77 @@ def position_reference(ar1,length):
     return (value+length if value<0 else value)&0xffff
 
 
+def capture_start_reference(ar1,lead,length):
+    value=ar1-lead
+    return (value+length if value<0 else value)&0xffff
+
+
+def check_capture_program(program,mcu,resident):
+    # The stop writer is an own uploaded replacement, not the resident 3e7a.
+    block=program[0x15c4*2:0x15d2*2]
+    if (len(program)!=0x20000 or len(resident)!=0x20000 or
+            hashlib.sha256(block).hexdigest()!=
+            '820291aa03aec557fd522ba30fc3d54adc3689b0e4bafb6f6ff37c3b68d65453' or
+            mcu[0x115a18:0x115a18+len(block)]!=block or mcu.count(block)!=1):
+        raise ValueError('capture stop writer is not the pinned own upload')
+    for start,end in ((0x3e1b,0x3e34),(0x3ed8,0x3ee1),(0x3ee1,0x3ef3),
+                      (0x3f25,0x3f3a),(0x3fdc,0x3fe8)):
+        if program[start*2:end*2]!=resident[start*2:end*2]:
+            raise ValueError('capture resident code differs from the supplied ROM')
+
+
+def check_capture_programming(text,stream,program,mcu,resident):
+    check_capture_program(program,mcu,resident)
+    complete=re.findall(r'rom6_capture_complete: writes=(\d+) cap=32768 observer_writes=0',text)
+    rows=[fields(row) for row in re.findall(r'rom6_capture_write: ([^\r\n]+)',text)]
+    if len(complete)!=1 or not 548<int(complete[0])<32768 or len(rows)!=int(complete[0]):
+        raise ValueError('missing, incomplete or capped capture programming')
+    expected={'sequence','t','port','value','ar1','a','b','lead','tail','length','cpu_pc','mask','observer_writes'}
+    counts,leads,tails=Counter(),Counter(),Counter()
+    observed=[]
+    last=-1
+    for index,row in enumerate(rows,1):
+        if set(row)!=expected or row['sequence']!=str(index) or row['mask']!='ffff' or row['observer_writes']!='0':
+            raise ValueError('capture programming metadata differs')
+        stamp=nanoseconds(row['t'])
+        if stamp<last: raise ValueError('capture programming timestamp order differs')
+        last=stamp
+        port,value,ar1,lead,tail,length=(int(row[key],16) for key in ('port','value','ar1','lead','tail','length'))
+        pc=row['cpu_pc']
+        counts[f'{port:04x}:{pc}']+=1
+        if (port,pc)==(0x0a,'003e24'):
+            if value!=capture_start_reference(ar1,lead,length) or value!=int(row['b'],16)&0xffff:
+                raise ValueError('capture start subtraction/wrap differs')
+            leads[f'{lead:04x}']+=1
+        elif (port,pc)==(0x0b,'0015d0'):
+            # A is the value after the stable P0d read, tail addition and one
+            # conditional subtraction. P0d itself is not logged in this census.
+            if value!=int(row['a'],16)&0xffff:
+                raise ValueError('capture stop accumulator differs')
+            tails[f'{tail:04x}']+=1
+        elif (port,pc) in ((0x0a,'003f27'),(0x0a,'003edc'),(0x0b,'003e2c')):
+            if value!=0x3a98: raise ValueError('capture sentinel differs')
+        elif (port,pc)==(0x0b,'003f38'):
+            if value: raise ValueError('capture initial stop differs')
+        elif (port,pc)==(0x11,'003fe5'):
+            if value!=0x01fe: raise ValueError('uninterpreted P11 initialization differs')
+        else:
+            raise ValueError('unclassified capture port writer')
+        observed.append((row['t'],pc,row['port'],row['value'],row['mask']))
+    actual=[]
+    for line in stream:
+        match=WRITE.fullmatch(line)
+        if not match: raise ValueError('malformed capture programming bus source')
+        time,pc,port,value,mask=(item.decode() for item in match.groups())
+        if port in ('000a','000b','0011'): actual.append((time,pc,port,value,mask))
+    if actual!=observed: raise ValueError('capture programming differs from independent bus stream')
+    return dict(writes=len(rows),writers=dict(sorted(counts.items())),
+                lead_values=dict(sorted(leads.items())),tail_values=dict(sorted(tails.items())),
+                start_operand_qualified=True,stop_accumulator_qualified=True,
+                stop_poll_value_qualified=False,physical_capture_edges_qualified=False,
+                p11_capacity_qualified=False)
+
+
 def check_short_program(short_program,mcu):
     block=short_program[0x09d8*2:0x09f4*2]
     if (len(short_program)!=0x4000 or hashlib.sha256(block).hexdigest()!=

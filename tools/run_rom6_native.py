@@ -105,13 +105,17 @@ def main():
                                 (phase/'rom6_radio_first_output.be16').read_bytes(),
                                 (ROOT/'roms/nsm3r6/nsm3_rom6_program.be16').read_bytes())
                     if scenario=='receive':
-                        from tools.rom6_receive_contract import check as check_receive, check_programming
+                        from tools.rom6_receive_contract import check as check_receive, check_programming, check_capture_programming
                         with (phase/'rom6_radio_writes.tsv').open('rb') as stream:
                             report['receive_prefix']=check_receive(text,stream,
                                 (phase/'rom6_receive_first_program.be16').read_bytes(),mcu)
                         with (phase/'rom6_radio_writes.tsv').open('rb') as stream:
                             report['receive_programming']=check_programming(text,stream,
                                 (phase/'rom6_receive_short_frame_program.be16').read_bytes(),mcu)
+                        with (phase/'rom6_radio_writes.tsv').open('rb') as stream:
+                            report['capture_programming']=check_capture_programming(text,stream,
+                                (phase/'rom6_receive_first_program.be16').read_bytes(),mcu,
+                                (ROOT/'roms/nsm3r6/nsm3_rom6_program.be16').read_bytes())
                     if scenario in ('serial','receive'):
                         from tools.rom6_hagar_contract import check as check_hagar
                         report['hagar_commands']=check_hagar(text)

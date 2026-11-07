@@ -381,6 +381,37 @@ consumes four scalar inputs per repeated iteration. These constrain a later
 signal/filter experiment; coefficient shape alone does not establish the ADC
 sample rate, I/Q wire packing, uninterrupted capture or RF interrupt cadence.
 
+### Capture-position programming
+
+The receive fixture independently joins all **11,001** writes to P0a, P0b and
+P11 against the complete bus stream. These are register-value contracts, not
+proof of the corresponding physical capture edges:
+
+| Port / issuing instruction / bus context | Count | Value source |
+| --- | ---: | --- |
+| P0a / `3e23` / `3e24` | 2,749 | AR1 minus data 3ea7; add raw data 036a once if negative |
+| P0a / `3edb` / `3edc` | 2,747 | `3a98` sentinel |
+| P0a / `3f26` / `3f27` | 3 | `3a98` initialization |
+| P0b / uploaded `15cf` / `15d0` | 2,747 | Low A after stable P0d read, addition of data 3eb6 and one conditional subtraction of data 036a |
+| P0b / `3e2b` / `3e2c` | 2,749 | `3a98` sentinel |
+| P0b / `3f37` / `3f38` | 3 | Zero initialization |
+| P11 / `3fe4` / `3fe5` | 3 | `01fe`; field meaning unknown |
+
+Every observed start lead is `00a3` (163), and every observed stop tail is
+`0020` (32). The checker verifies each start calculation and stop accumulator,
+but does not independently capture each preceding P0d read. The stop formula
+is statically decoded; its counter-input chronology is not yet runtime-qualified.
+The uploaded `15c4..15d1` region uniquely matches MCU offset `115a18`, SHA256
+`820291aa03aec557fd522ba30fc3d54adc3689b0e4bafb6f6ff37c3b68d65453`.
+Do not assign these writes to the similar resident `3e7a` instruction.
+
+The start routine writes P0a, defuses P0b, programs P09 and then sets P03 bits
+0/2. The stop routine clears P03 bit 0 before programming P0b; the common tail
+then defuses P0a. This ordering is compatible with an armed, counter-timed
+capture lifecycle rather than immediate P03 level gating. It does not identify
+which compare controls ADC clocks, transfer clocks or interrupt generation.
+In particular, P11=`01fe` is not evidence for a 512-word FIFO.
+
 ## ADC-pin transport experiment
 
 `nsm3adc` and `nsm3ad0` are explicit **laboratory compositions**, not promoted

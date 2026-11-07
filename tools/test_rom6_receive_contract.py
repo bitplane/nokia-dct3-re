@@ -1,7 +1,8 @@
 import unittest
 from unittest.mock import patch
 
-from tools.rom6_receive_contract import check,check_program,position_reference,check_programming,check_short_program
+from tools.rom6_receive_contract import (check,check_program,position_reference,check_programming,
+    check_short_program,capture_start_reference,check_capture_programming,check_capture_program)
 
 
 class ReceiveContractTest(unittest.TestCase):
@@ -48,6 +49,43 @@ class ReceiveContractTest(unittest.TestCase):
                                     (0x1368,4999,0x1348),(0xffff,1350,0xffdf)):
             with self.subTest(ar1=ar1,length=length):
                 self.assertEqual(position_reference(ar1,length),expected)
+
+    def test_capture_start_uses_one_raw_modulus_addition(self):
+        for ar1,lead,length,expected in ((0,163,4999,4836),(1000,163,4999,837),
+                                       (163,163,1350,0),(0,163,1350,1187),
+                                       (0,1500,1350,0xff6a)):
+            with self.subTest(ar1=ar1,lead=lead,length=length):
+                self.assertEqual(capture_start_reference(ar1,lead,length),expected)
+
+    def test_capture_census_rejects_unknown_writers_and_bad_operands(self):
+        lines=[]
+        stream=[]
+        for index in range(1,550):
+            stamp=f'1.{index:09d}'
+            port,pc,value=(('000a','003e24','12e4'),('000b','0015d0','002c'),
+                           ('000a','003f27','3a98'),('000a','003edc','3a98'),
+                           ('000b','003e2c','3a98'),('000b','003f38','0000'),
+                           ('0011','003fe5','01fe'))[(index-1)%7]
+            a='000000002c' if pc=='0015d0' else '0000000000'
+            lines.append(f'rom6_capture_write: sequence={index} t={stamp} port={port} value={value} ar1=0000 a={a} b=00000012e4 lead=00a3 tail=0020 length=1387 cpu_pc={pc} mask=ffff observer_writes=0')
+            stream.append(f'{stamp}\t{pc}\t{port}\t{value}\tffff\n'.encode())
+        lines.append('rom6_capture_complete: writes=549 cap=32768 observer_writes=0')
+        text='\n'.join(lines)
+        with patch('tools.rom6_receive_contract.check_capture_program'):
+            result=check_capture_programming(text,stream,b'',b'',b'')
+            self.assertEqual(result['writes'],549)
+            self.assertEqual(len(result['writers']),7)
+            self.assertFalse(result['physical_capture_edges_qualified'])
+            for old,new in (('value=12e4','value=12e5'),('lead=00a3','lead=00a4'),
+                            ('cpu_pc=003e24','cpu_pc=003e23'),('mask=ffff','mask=00ff'),
+                            ('writes=549','writes=550'),('sequence=1 ','sequence=2 '),
+                            ('a=000000002c','a=000000002d'),
+                            ('value=3a98','value=3a99'),('value=01fe','value=01ff')):
+                with self.subTest(old=old),self.assertRaises(ValueError):
+                    check_capture_programming(text.replace(old,new,1),stream,b'',b'',b'')
+            with self.assertRaises(ValueError):
+                check_capture_programming(text,stream[:-1],b'',b'',b'')
+        with self.assertRaises(ValueError): check_capture_program(bytes(0x20000),b'',bytes(0x20000))
 
     def test_complete_position_programming_and_mutations(self):
         lines=[]

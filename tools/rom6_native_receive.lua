@@ -7,6 +7,18 @@ local reads,handles=0,{}
 local cap=1024
 local positions,programming=0,0
 local short_frame_captured=false
+local capture_writes=0
+for _,port in ipairs({0x0a,0x0b,0x11}) do
+    handles[#handles+1]=cpu.spaces.io:install_write_tap(port,port,'rom6_capture_'..port,function(_,value,mask)
+        capture_writes=capture_writes+1
+        if capture_writes>32768 then return end
+        machine:logerror(string.format('rom6_capture_write: sequence=%d t=%.9f port=%04x value=%04x ar1=%04x a=%010x b=%010x lead=%04x tail=%04x length=%04x cpu_pc=%06x mask=%04x observer_writes=0\n',
+            capture_writes,machine.time:as_double(),port,value,cpu.state.AR1.value,
+            cpu.state.A.value&0xffffffffff,cpu.state.B.value&0xffffffffff,
+            cpu.spaces.data:read_u16(0x3ea7),cpu.spaces.data:read_u16(0x3eb6),
+            cpu.spaces.data:read_u16(0x036a),cpu.state.GENPC.value,mask))
+    end)
+end
 handles[#handles+1]=cpu.spaces.io:install_write_tap(0x0e,0x0e,'rom6_receive_reload',function(_,value,mask)
     machine:logerror(string.format('rom6_receive_reload: t=%.9f value=%04x a=%010x b=%010x ar1=%04x cpu_pc=%06x mask=%04x observer_writes=0\n',
         machine.time:as_double(),value,cpu.state.A.value&0xffffffffff,cpu.state.B.value&0xffffffffff,
@@ -50,6 +62,7 @@ handles[#handles+1]=cpu.spaces.io:install_read_tap(0x27,0x27,'rom6_receive_prefi
     end
 end)
 handles[#handles+1]=emu.add_machine_stop_notifier(function()
+    machine:logerror(string.format('rom6_capture_complete: writes=%d cap=32768 observer_writes=0\n',capture_writes))
     machine:logerror(string.format('rom6_receive_complete: reads=%d captured=%d cap=%d observer_writes=0\n',reads,math.min(reads,cap),cap))
     machine:logerror(string.format('rom6_receive_programming_complete: positions=%d programming=%d cap=16384 observer_writes=0\n',positions,programming))
 end)
