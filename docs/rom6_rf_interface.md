@@ -22,8 +22,8 @@ independently generated payloads from filtered I/Q samples.
 
 | Receive scope | Current evidence | Not established |
 | --- | --- | --- |
-| Isolated SCH | Native frontend, Viterbi and CRC recover exact FN/BSIC for three boundary cases; zero-input control rejects | Raw ADC timing, organic synchronization |
-| Isolated BCCH | Four independent GMSK bursts traverse native frontend, deinterleaving, weighting and Viterbi to exact SI3/parity; another payload passes, zero samples reject | Hardware FIRE completion, RF tuning/camping |
+| Isolated SCH | Raw P27 input through native ISR/FIR, frontend, Viterbi and CRC recovers exact FN/BSIC; zero-input control rejects | Physical interrupt/capture timing, organic synchronization |
+| Isolated BCCH | Four independent raw GMSK bursts traverse native ISR/FIR, frontend, deinterleaving, weighting and Viterbi to exact SI3/parity; another payload passes, zero samples reject | Hardware FIRE completion, RF tuning/camping |
 | Organic ADC laboratory boot | Native FCCH control acceptance; independently checked raw samples and fault-free provisional staging; first SCH aperture misses its source burst | Physical capture/compare epoch and first-valid-sample ownership |
 
 The CPU additions needed by the normal-burst frontend have generic focused
@@ -1037,6 +1037,25 @@ the initial RSSI FIR-prefix test alone does not qualify this whole path.
 
 ### Isolated native control-channel bit decoding
 
+Both receive runners also accept `--raw-adc`. This supplies words through
+the P27 I/O endpoint and invokes native INT0 vector 16 using laboratory
+software interrupt instructions. The actual `07c0` vector, uploaded `1845`
+hook and resident `257d..25d8` ISR perform all FIR and buffer writes.
+The uploaded hook is checked against the own MCU bytes at `115f1a`.
+Ordered I/O stimuli and their cursor replay are test harness facilities, not
+register behavior added to the CPU or a decoder verdict.
+
+The declared entry contract is zero history/DC offset, coefficients
+`0387/11a3/2ad6/4000/4000/2ad6/11a3/0387`, `022a=0`, `022c=2`,
+and a non-expiring isolated block countdown. SCH consumes 23 blocks of
+32 raw words to fill `0080..01ef`; BCCH consumes 19 per burst to fill
+`2667..2796`, 76 blocks/2432 raw words in total. No filtered buffer or
+decoded decisions are supplied by the host. SCH verifies exact FN/BSIC and
+CRC including zero-input rejection; BCCH verifies exact SI3 and all-ones
+payload/parity, with zero raw inputs failing the expected SI3 comparison.
+Save/restore replays the same stream and results. This closes isolated
+ISR/FIR execution, not asynchronous block production or physical INT0 timing.
+
 `tools/run_rom6_xcch_kernel.py --entry-dir <passive-entry-directory>`
 reuses the acquired resident program/DROM and runs native `924c`, followed
 by the actual caller's normalizer at `4d06..4d12`. Low live RAM is cleared;
@@ -1098,7 +1117,8 @@ Normal-burst entry uses class `50`, product mode `30`, TSC selectors
 `250b=2616=2`, filter coefficients `df85/6d1b/df85`, and completed buffer
 pointer `0231=2797`. The caller supplies a complete buffer and equal nonzero
 confidence; these are isolated contracts, not an emulated arrival schedule
-or measured analog gain. Raw ADC interrupt/FIR execution is not included.
+or measured analog gain. Without `--raw-adc`, ADC interrupt/FIR execution
+is not included.
 
 No hardware CRC acceptance, organic BCCH reception or camping is qualified
 by these isolated fixtures.
@@ -1135,7 +1155,7 @@ Both cases have a 1,000-cycle checkpoint and a bounded 200,000-cycle finish;
 all six case/replay pairs pass without any I/O.
 
 This is a positive **native filtered-I/Q kernel** result. The preceding
-ADC ISR/FIR is calculated independently, not executed by this fixture;
+ADC ISR/FIR is calculated independently, not executed in `--frontend` mode;
 its full SCH preprocessing path and real sample arrival/interrupt timing
 remain separate obligations. No MCU-visible result, carrier selection,
 boot synchronization, BCCH or camping is implied.

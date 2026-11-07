@@ -23,8 +23,10 @@ def main():
     parser.add_argument('--fire-transaction',action='store_true',help='verify request ports; halt before hardware status polling')
     parser.add_argument('--bursts',action='store_true',help='run native four-burst deinterleaving and bit decoding')
     parser.add_argument('--frontend',action='store_true',help='run normal-burst frontend from independently filtered I/Q')
+    parser.add_argument('--raw-adc',action='store_true',help='run native ADC ISR/FIR before each normal-burst frontend')
     parser.add_argument('--zero-samples',action='store_true',help='negative control: replace filtered samples by zeros; decoding must fail')
     args=parser.parse_args()
+    if args.raw_adc: args.frontend=True
     if args.frontend: args.bursts=True
     if args.zero_samples and not args.frontend: parser.error('--zero-samples requires --frontend')
     if args.bursts and args.fire_transaction: parser.error('choose one isolated boundary per run')
@@ -40,6 +42,10 @@ def main():
         if len(snapshot)!=131072 or any(snapshot[2*i:2*i+2]!=original[2*i:2*i+2][::-1] for i in range(first,65536)):
             raise ValueError('resident code or DROM differs from acquired ROM6')
         shutil.copyfile(args.entry_dir/f'rom6_sch_decode_{name}.le16',run/f'rom6_sch_decode_{name}.le16')
+        if args.raw_adc and name=='program':
+            mcu=(ROOT/'roms/noki8210/8210_5.31ppm_c.fls').read_bytes()[0x115f1a:0x115f1a+282]
+            if snapshot[0x1845*2:0x18d2*2]!=b''.join(mcu[i:i+2][::-1] for i in range(0,len(mcu),2)):
+                raise ValueError('ADC ISR hook differs from own MCU upload')
     exporter=run/'gsm_xcch_vector'
     subprocess.run(['g++','-std=c++17','-O2',str(ROOT/'tools/gsm_xcch_vector.cpp'),
                     str(ROOT/'driver/gsm_tch_f_l1.cpp'),'-o',str(exporter)],check=True)
@@ -56,10 +62,11 @@ def main():
         burst_words.extend(3 if bit=='0' else 12 for bit in burst[3:60]+burst[88:145])
     (run/'xcch_bursts.le16').write_bytes(b''.join(word.to_bytes(2,'little') for word in burst_words))
     if args.frontend:
-        samples=[]
+        samples=[];raw_samples=[]
         for burst in vector['normal_bursts']:
             raw=[0]*32+[word&0xffff for pair in gmsk_burst_samples(tuple(map(int,burst)),2) for word in pair]
             raw.extend([0]*(32+4*152-len(raw)))
+            raw_samples.extend(raw[32:])
             history=[0]*16
             for number,value in enumerate(raw,1):
                 history[(number-1)%16]=value
@@ -67,6 +74,8 @@ def main():
                     samples.extend(fir_word(history,COEFFICIENTS,(number-1)%16,component) for component in (0,1))
         (run/'xcch_samples.le16').write_bytes(bytes(len(samples)*2) if args.zero_samples else
                 b''.join(word.to_bytes(2,'little') for word in samples))
+        (run/'xcch_raw.le16').write_bytes(bytes(len(raw_samples)*2) if args.zero_samples else
+                b''.join(word.to_bytes(2,'little') for word in raw_samples))
     (run/'source.json').write_text(json.dumps(vector,indent=2)+'\n')
     env=os.environ.copy();env['C54X_ROM6_RECEIVE_DIR']=str(run)
     if args.fire_transaction: env['C54X_ROM6_FIRE_TRANSACTION']='1'
@@ -75,6 +84,8 @@ def main():
     else: env.pop('C54X_ROM6_XCCH_BURSTS',None)
     if args.frontend: env['C54X_ROM6_XCCH_FRONTEND']='1'
     else: env.pop('C54X_ROM6_XCCH_FRONTEND',None)
+    if args.raw_adc: env['C54X_ROM6_XCCH_RAW_ADC']='1'
+    else: env.pop('C54X_ROM6_XCCH_RAW_ADC',None)
     result=subprocess.run([sys.executable,str(ROOT/'tools/run_c54x_section.py'),'rom6_xcch',
         '--fixture-header',str(ROOT/'tests/firmware/rom6_xcch_kernel.h'),'--fixture-cases','1'],
         env=env,capture_output=True,text=True)
@@ -83,8 +94,8 @@ def main():
         fire_request_qualified=args.fire_transaction and result.returncode==0,
         burst_deinterleaver_qualified=args.bursts and result.returncode==0,
         sample_frontend_qualified=args.frontend and result.returncode==0,
-        input_kind='filtered I,Q samples' if args.frontend else 'normal-burst soft nibbles' if args.bursts else 'deinterleaved soft words',
-        zero_sample_negative_control=args.zero_samples,raw_adc_preprocessing_qualified=False,
+        input_kind='raw P27 inputs through native ISR/FIR' if args.raw_adc else 'filtered I,Q samples' if args.frontend else 'normal-burst soft nibbles' if args.bursts else 'deinterleaved soft words',
+        zero_sample_negative_control=args.zero_samples,raw_adc_preprocessing_qualified=args.raw_adc and result.returncode==0,
         physical_capture_qualified=False,entry_directory=str(args.entry_dir.resolve()),
         source_sha256=hashlib.sha256((run/'source.json').read_bytes()).hexdigest())
     (run/'result.json').write_text(json.dumps(report,indent=2)+'\n')

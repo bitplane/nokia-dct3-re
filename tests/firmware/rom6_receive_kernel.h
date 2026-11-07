@@ -22,6 +22,7 @@ inline std::vector<clocked_register_case> section_cases()
         return words;
     };
     bool const frontend=std::getenv("C54X_ROM6_RECEIVE_FRONTEND")!=nullptr;
+    bool const raw=std::getenv("C54X_ROM6_RECEIVE_RAW_ADC")!=nullptr;
     auto initial=initial_case("rom6-sch-uniform-input",{0xf495});
     initial.program=load(frontend ? "rom6_sch_samples_program.le16" : "rom6_sch_decode_program.le16");
     initial.data=load(frontend ? "rom6_sch_samples_data.le16" : "rom6_sch_decode_data.le16");
@@ -42,7 +43,7 @@ inline std::vector<clocked_register_case> section_cases()
         {r::STATE_ST0,0x0e1f},{r::STATE_ST1,0x4100},{r::STATE_PMST,0x07ac},{r::STATE_BK,0x20},
         {r::STATE_AR0,9},{r::STATE_AR1,0x100},{r::STATE_AR2,0xce},{r::STATE_AR3,0x2f82},
         {r::STATE_AR4,0x3210},{r::STATE_AR5,0xdd97},{r::STATE_AR6,0x3222},{r::STATE_AR7,0xd6}});
-    unsigned const inputs=frontend ? 368 : 78, source=frontend ? 0x80 : 0x2f80;
+    unsigned const inputs=raw ? 736 : frontend ? 368 : 78, source=frontend ? 0x80 : 0x2f80;
     if (frontend) {
         initial.initial.insert(initial.initial.end(),{{STATE_GENPC,0x743a},{r::STATE_A,0xfffffffffaULL},
             {r::STATE_B,0x19a},{r::STATE_T,0},{r::STATE_TRN,0},{r::STATE_ST0,0x161f},
@@ -51,21 +52,47 @@ inline std::vector<clocked_register_case> section_cases()
             {r::STATE_AR6,0x3e9d},{r::STATE_AR7,0x60}});
         initial.data.push_back({0xfff,0x4bb2});
         initial.data.push_back({0x231,0x1f0}); // Declared complete sample-buffer precondition.
-        for (unsigned i=0;i<inputs;++i) initial.data.push_back({source+i,0});
+        for (unsigned i=0;i<368;++i) initial.data.push_back({source+i,0});
+    }
+    if(raw) {
+        // Complete, independent32-word peripheral blocks; these software
+        // interrupt entries qualify the real ISR, not physical IRQ timing.
+        unsigned pc=0x80;
+        for(unsigned block=0;block<23;++block)initial.program[pc++].value=0xf7d0;
+        for(u16 opcode:{0xf074,0x743a,0xf073,0x4bb2})initial.program[pc++].value=opcode;
+        initial.initial.push_back({STATE_GENPC,0x80});
+        initial.initial.push_back({r::STATE_SP,0x1000});
+        initial.data.insert(initial.data.end(),{{0x22a,0},{0x22c,2},{0x22f,0xffff},{0x231,0x80}});
+        unsigned index=0;
+        for(u16 coefficient:{0x0387,0x11a3,0x2ad6,0x4000,0x4000,0x2ad6,0x11a3,0x0387})
+            initial.data.push_back({0x3ebd+index++,coefficient});
     }
     initial.data.push_back({0x2f20,0x55aa});
     auto final=observation("native-uniform-input-failure",{{r::STATE_IDLE,1},{r::STATE_SP,0x1000}},
         {{0x2f80,0},{0x2f81,0},{0x2f82,0},{0x2f20,1}});
-    unsigned const finish=frontend ? 200000 : 30000;
+    unsigned const finish=raw ? 400000 : frontend ? 200000 : 30000;
     clocked_register_case result{{{0,std::move(initial)},{finish,std::move(final)}},1000,finish};
     result.io_events=std::vector<clocked_data_event>{};
+    if(raw) {
+        result.scripted_io_reads=true;
+        for(unsigned block=0;block<23;++block) {
+            auto &events=*result.io_events;
+            events.push_back({false,0x21,u16(block ? 0x400 : 0),0,false});
+            events.push_back({true,0x21,0xc00,0,false});
+            for(unsigned i=0;i<32;++i)events.push_back({false,0x27,0,0,false});
+            events.push_back({false,0x21,0xc00,0,false});
+            events.push_back({true,0x21,0x400,0,false});
+        }
+    }
     auto positive=result;
     positive.states[0].observation.id="rom6-sch-independent-soft-input";
     std::ifstream file(std::string(directory)+"/sch_vector.le16",std::ios::binary);
     std::vector<unsigned char> bytes((std::istreambuf_iterator<char>(file)),{});
     if (bytes.size()!=2*(inputs+4)) throw std::runtime_error("ROM6 SCH vector has the wrong input/output length");
     auto word=[&](unsigned i){return u16(bytes[2*i]|(unsigned(bytes[2*i+1])<<8));};
-    for (unsigned i=0;i<inputs;++i) positive.states[0].observation.data.push_back({source+i,word(i)});
+    if(raw) {
+        for(unsigned i=0;i<inputs;++i)(*positive.io_events)[36*(i/32)+2+i%32].value=word(i);
+    } else for (unsigned i=0;i<inputs;++i) positive.states[0].observation.data.push_back({source+i,word(i)});
     positive.states[1].observation.id="native-positive-sch-crc";
     positive.states[1].observation.expected_data={{0x2f80,word(inputs)},{0x2f81,word(inputs+1)},
         {0x2f82,word(inputs+2)},{0x2f20,word(inputs+3)}};

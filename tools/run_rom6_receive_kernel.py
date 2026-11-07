@@ -23,7 +23,9 @@ def main():
     parser.add_argument('--bsic',type=int,default=42)
     parser.add_argument('--capture-frontend',action='store_true',help='also retain the preceding native SCH sample-stage entries')
     parser.add_argument('--frontend',action='store_true',help='exercise the native sample frontend before Viterbi/CRC')
+    parser.add_argument('--raw-adc',action='store_true',help='feed P27 through native ADC ISR/FIR before the sample frontend')
     args=parser.parse_args()
+    if args.raw_adc: args.frontend=True
     if args.frontend: args.capture_frontend=True
     information=sch_information_bits(args.frame,args.bsic)
     coded=sch_coded_bits(information)
@@ -72,6 +74,12 @@ def main():
         configuration=tuple(int.from_bytes(front_data[2*i:2*i+2],'little') for i in (0x524,0x525,0x526,0x250f,0x2f02))
         if configuration!=(0xdf85,0x6d1b,0xdf85,0x30,0x40):
             parser.error('frontend entry is outside the qualified filter/class configuration')
+        if args.raw_adc:
+            mcu=(ROOT/'roms/noki8210/8210_5.31ppm_c.fls').read_bytes()
+            uploaded=mcu[0x115f1a:0x115f1a+282]
+            uploaded_le=b''.join(uploaded[i:i+2][::-1] for i in range(0,len(uploaded),2))
+            if front_program[0x1845*2:0x18d2*2]!=uploaded_le:
+                parser.error('raw ADC interrupt hook differs from own MCU upload')
     # The native decoder itself pads its terminated tail with positive127:
     # positive soft input therefore represents encoded zero, not one.
     words=[(32 if bit==0 else -32)&0xffff for bit in coded]
@@ -84,25 +92,28 @@ def main():
             history[(number-1)%16]=value
             if number>32 and number%4==0:
                 words.extend(fir_word(history,COEFFICIENTS,(number-1)%16,component) for component in (0,1))
+        if args.raw_adc: words=raw[32:]
     words.extend(sum(bit<<(index%16) for index,bit in enumerate(uncoded[:35]) if index//16==word)
                  for word in range(3))
     words.append(0)
     (run/'sch_vector.le16').write_bytes(b''.join(word.to_bytes(2,'little') for word in words))
     report=dict(frame=args.frame,bsic=args.bsic,entry_directory=str(entry.resolve()),
                 program_sha256=hashlib.sha256(program).hexdigest(),data_sha256=hashlib.sha256(data).hexdigest(),
-                input_kind='368 independently filtered I,Q words' if args.frontend else '78 signed soft words, not ADC samples',physical_capture_qualified=False,
+                input_kind='736 raw ADC words through native ISR/FIR' if args.raw_adc else '368 independently filtered I,Q words' if args.frontend else '78 signed soft words, not ADC samples',physical_capture_qualified=False,
                 sch_sample_frontend_qualified=False,camping_qualified=False)
     (run/'inputs.json').write_text(json.dumps(report,indent=2)+'\n')
     env=os.environ.copy();env['C54X_ROM6_RECEIVE_DIR']=str(run)
     if args.frontend: env['C54X_ROM6_RECEIVE_FRONTEND']='1'
     else: env.pop('C54X_ROM6_RECEIVE_FRONTEND',None)
+    if args.raw_adc: env['C54X_ROM6_RECEIVE_RAW_ADC']='1'
+    else: env.pop('C54X_ROM6_RECEIVE_RAW_ADC',None)
     result=subprocess.run([sys.executable,str(ROOT/'tools/run_c54x_section.py'),'rom6_sch',
                     '--fixture-header',str(ROOT/'tests/firmware/rom6_receive_kernel.h'),
                     '--fixture-cases','2'],env=env,capture_output=True,text=True)
     (run/'kernel.log').write_text(result.stdout+result.stderr)
     report['accepted']=result.returncode==0
     report['native_filtered_iq_kernel_qualified']=args.frontend and report['accepted']
-    report['raw_adc_preprocessing_qualified']=False
+    report['raw_adc_preprocessing_qualified']=args.raw_adc and report['accepted']
     (run/'result.json').write_text(json.dumps(report,indent=2)+'\n')
     print(result.stdout+result.stderr,end='')
     result.check_returncode()

@@ -41,27 +41,34 @@ inline std::vector<clocked_register_case> section_cases()
     auto word=[&](unsigned i){return u16(bytes[2*i]|(unsigned(bytes[2*i+1])<<8));};
     if(std::getenv("C54X_ROM6_XCCH_BURSTS")) {
         bool const frontend=std::getenv("C54X_ROM6_XCCH_FRONTEND")!=nullptr;
+        bool const raw=std::getenv("C54X_ROM6_XCCH_RAW_ADC")!=nullptr;
         std::ifstream burst_file(std::string(directory)+"/xcch_bursts.le16",std::ios::binary);
         std::vector<unsigned char> burst_bytes((std::istreambuf_iterator<char>(burst_file)),{});
         if(burst_bytes.size()!=912)throw std::runtime_error("four114-word bursts required");
         auto nibble=[&](unsigned i){return u16(burst_bytes[2*i]|(unsigned(burst_bytes[2*i+1])<<8));};
         std::vector<unsigned char> samples;
         if(frontend) {
-            std::ifstream sample_file(std::string(directory)+"/xcch_samples.le16",std::ios::binary);
+            std::ifstream sample_file(std::string(directory)+(raw ? "/xcch_raw.le16" : "/xcch_samples.le16"),std::ios::binary);
             samples.assign(std::istreambuf_iterator<char>(sample_file),{});
-            if(samples.size()!=4*304*2)throw std::runtime_error("four304-word sample buffers required");
+            if(samples.size()!=4*(raw ? 608 : 304)*2)throw std::runtime_error("wrong normal-burst input length");
         }
         // Laboratory caller supplies four completed normal-burst soft buffers.
         // Native5905/58e0 own all interleaver writes; no decoded block is supplied.
         unsigned pc=0x80;
         for(unsigned burst=0;burst<4;++burst) {
             if(frontend) {
-                for(unsigned i=0;i<304;++i) {
-                    unsigned at=304*burst+i;
-                    initial.data.push_back({0x6000+at,u16(samples[2*at]|(unsigned(samples[2*at+1])<<8))});
+                if(raw) {
+                    for(u16 opcode:{0x76f8,0x231,0x2667})initial.program[pc++].value=opcode;
+                    for(unsigned block=0;block<19;++block)initial.program[pc++].value=0xf7d0;
+                } else {
+                    for(unsigned i=0;i<304;++i) {
+                        unsigned at=304*burst+i;
+                        initial.data.push_back({0x6000+at,u16(samples[2*at]|(unsigned(samples[2*at+1])<<8))});
+                    }
+                    for(u16 opcode:std::vector<u16>{0x7712,u16(0x6000+304*burst),0x7713,0x2667,
+                        0xecff,0xe589,0xec2f,0xe589})initial.program[pc++].value=opcode;
                 }
-                for(u16 opcode:std::vector<u16>{0x7712,u16(0x6000+304*burst),0x7713,0x2667,
-                    0xecff,0xe589,0xec2f,0xe589,0x7711,0,0x7715,0,
+                for(u16 opcode:std::vector<u16>{0x7711,0,0x7715,0,
                     0x76f8,0x2f02,0x50,0xf074,0x743a})initial.program[pc++].value=opcode;
             } else {
                 for(unsigned i=0;i<114;++i)initial.data.push_back({0x6000+114*burst+i,nibble(114*burst+i)});
@@ -85,6 +92,12 @@ inline std::vector<clocked_register_case> section_cases()
             for(auto const &setting:std::vector<memory_word>{{0x524,0xdf85},{0x525,0x6d1b},{0x526,0xdf85},
                     {0x231,0x2797},{0x250b,2},{0x2616,2}})initial.data.push_back(setting);
         }
+        if(raw) {
+            initial.data.insert(initial.data.end(),{{0x22a,0},{0x22c,2},{0x22f,0xffff}});
+            unsigned index=0;
+            for(u16 coefficient:{0x0387,0x11a3,0x2ad6,0x4000,0x4000,0x2ad6,0x11a3,0x0387})
+                initial.data.push_back({0x3ebd+index++,coefficient});
+        }
         // Equal nonzero burst confidence is an isolated test precondition.
         initial.data.push_back({0x264b,0x5000});
         for(unsigned i=0;i<4;++i)initial.data.push_back({0x5000+i,1});
@@ -95,9 +108,23 @@ inline std::vector<clocked_register_case> section_cases()
             if(!frontend)final.expected_data.push_back({0x2c2+i,packed});
         }
         for(unsigned i=0;i<15;++i)final.expected_data.push_back({0x2f80+i,word(456+i)});
-        unsigned const finish=frontend ? 400000 : 200000;
+        unsigned const finish=raw ? 600000 : frontend ? 400000 : 200000;
         clocked_register_case result{{{0,std::move(initial)},{finish,std::move(final)}},1000,finish};
         result.io_events=std::vector<clocked_data_event>{};
+        if(raw) {
+            result.scripted_io_reads=true;
+            for(unsigned block=0;block<76;++block) {
+                auto &events=*result.io_events;
+                events.push_back({false,0x21,u16(block ? 0x400 : 0),0,false});
+                events.push_back({true,0x21,0xc00,0,false});
+                for(unsigned i=0;i<32;++i) {
+                    unsigned at=32*block+i;
+                    events.push_back({false,0x27,u16(samples[2*at]|(unsigned(samples[2*at+1])<<8)),0,false});
+                }
+                events.push_back({false,0x21,0xc00,0,false});
+                events.push_back({true,0x21,0x400,0,false});
+            }
+        }
         return {std::move(result)};
     }
     for(unsigned i=0;i<456;++i)initial.data.push_back({0x2f80+i,word(i)});
