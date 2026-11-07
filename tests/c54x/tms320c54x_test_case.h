@@ -108,6 +108,7 @@ struct clocked_register_case
 	int observed_data_space = AS_DATA; // AS_IO selects port transactions using the same ordered-event policy.
 	std::vector<memory_word> initial_io{};
 	std::optional<std::vector<clocked_data_event>> io_events{}; // Additional IO observation when data_events covers RAM/MMRs.
+	bool scripted_io_reads = false; // Explicit test stimuli from ordered IO events, never a device implementation.
 	bool initial_bio = true;
 	bool initial_ready = true;
 	bool bus_uses_elapsed_clocks = false; // Select CPU elapsed clocks instead of pipeline clocks for bus observations.

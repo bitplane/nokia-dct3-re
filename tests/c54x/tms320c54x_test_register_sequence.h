@@ -233,6 +233,7 @@ private:
 		m_last_data_total.reset();
 		m_first_data_total.reset();
 		require(!(m_input.forbid_data_access && m_input.data_events), "one data-bus observation policy");
+		require(!m_input.scripted_io_reads || m_input.io_events.has_value(),"scripted IO requires an ordered bus contract");
 		require(m_input.volatile_data_reads.empty() || m_input.data_events.has_value(), "volatile endpoints require an ordered bus contract");
 		require(m_input.observe_data_reads || m_input.data_events.has_value(), "write-only data policy requires explicit events");
 		if (m_input.io_events) {
@@ -242,7 +243,15 @@ private:
 				require(accept_bus_event(*m_input.io_events,m_io_cursor,{write,u32(at),value,unsigned(bus_clock())}), "ordered IO transaction");
 			};
 			m_io_tap = m_cpu.space(AS_IO).install_readwrite_tap(0,0xffff,"register_sequence_io",
-				[this,access](offs_t at,u16 &value,u16) { volatile_read(AS_IO,at,value); access(false,at,value); },
+				[this,access](offs_t at,u16 &value,u16) {
+					if(m_input.scripted_io_reads && !m_machine.side_effects_disabled()) {
+						require(m_io_cursor<m_input.io_events->size(),"scripted IO input exists");
+						auto const &event=(*m_input.io_events)[m_io_cursor];
+						require(!event.write && event.address==at,"scripted IO input address/order");
+						value=event.value;
+					}
+					volatile_read(AS_IO,at,value); access(false,at,value);
+				},
 				[access](offs_t at,u16 &value,u16) { access(true,at,value); });
 		}
 		if (m_input.data_events)

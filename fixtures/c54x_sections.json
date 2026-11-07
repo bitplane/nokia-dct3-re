@@ -1,4 +1,5 @@
 {
+  "scripted_io": 4,
   "repeated_accumulator_add": 96,
   "mvmd_accumulator": 144,
   "immediate_store": 8,
