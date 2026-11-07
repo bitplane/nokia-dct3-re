@@ -130,7 +130,9 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     sections = load_sections()
     counts = {name: item['cases'] for name, item in sections.items()}
-    parser.add_argument('section', nargs='?', choices=[*counts, 'all'])
+    parser.add_argument('section', nargs='?')
+    parser.add_argument('--fixture-header',type=Path,help='explicit isolated firmware fixture, excluded from suite discovery')
+    parser.add_argument('--fixture-cases',type=int,default=1,help='expected case count for --fixture-header')
     parser.add_argument('--batch', nargs='+', choices=list(counts), help='build up to eight compatible sections once; execute each separately')
     parser.add_argument('--batch-size', type=int, choices=range(1, 9), default=8, help='maximum small-section batch for all (1 disables batching)')
     parser.add_argument('--list', action='store_true', help='list sections and expected counts without building')
@@ -139,6 +141,14 @@ def main():
     parser.add_argument('--build-only', action='store_true', help='prepare and compile the selected section without executing it')
     parser.add_argument('--negative-control', action='store_true', help='require failure of an intentionally wrong expectation')
     args = parser.parse_args()
+    if args.fixture_header:
+        if (not args.section or args.section=='all' or not args.section.replace('_','').isalnum() or
+                args.batch or args.list or args.fixture_cases<1 or not args.fixture_header.is_file()):
+            parser.error('explicit fixture requires one named section, an existing header and positive case count')
+        sections={args.section:dict(source=args.fixture_header.resolve(),cases=args.fixture_cases,scope='firmware')}
+        counts={args.section:args.fixture_cases}
+    elif args.section is not None and args.section not in (*counts,'all'):
+        parser.error('unknown section: '+args.section)
     if args.batch and (args.section or args.build_only or args.negative_control or len(args.batch) > 8
                        or len(set(args.batch)) != len(args.batch)
                        or not all(batch_compatible(sections[name]) for name in args.batch)):

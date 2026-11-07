@@ -959,6 +959,48 @@ seven writes and the actual packet. It deliberately qualifies only this
 negative control, not the CRC algorithm for arbitrary words or a valid
 SCH decode. Fresh evidence: `tmp/rom6-adc-lab/nsm3afb-xqpil8w6`.
 
+### Isolated positive SCH soft-input decoding
+
+```sh
+.venv/bin/python tools/run_rom6_receive_kernel.py
+```
+
+The runner first makes a passive four-second native entry capture with
+`rom6_receive_entry.lua`, then executes a **separate CPU-only fixture**.
+`--entry-dir` can reuse that capture; `--frame` and `--bsic` select the
+independently encoded laboratory message. The fixture is explicitly selected
+with `run_c54x_section.py --fixture-header`, not included in ISA suite discovery.
+Acquired program/data files remain private inputs, not embedded source arrays.
+
+The native class-40 path copies 78 soft words into `2f80..2fcd`, calls
+Viterbi routine `9268`, normalizes its packed output at `4d9d` and checks
+the SCH polynomial at `4f3a`. The decoder pads its terminal history with
+positive `127`; positive soft input represents encoded zero. The zero-waveform
+frontend actually supplies 78 **+1** words. This uniform-input negative control
+reproduces three zero decoded words and CRC status 1; zero-valued soft inputs
+would instead introduce metric ties and are not the captured contract.
+
+For independently convolutionally encoded input with soft magnitude 32,
+the native decoder/normalizer produces the exact expected 35 information/parity
+bits, packed least-significant-bit first into `2f80..2f82`, and the native
+CRC checker writes status 0. Frame/BSIC cases `(1,42)`, `(11,0)` and
+`(2715638,63)` exercise distinct information fields, including the hyperframe
+boundary. No decoded bits or CRC verdict are supplied to executing code.
+
+The fixture clears all RAM below `b000`, retains acquired DROM tables, gives
+the routine a normal return stack and stops at the original caller's CRC
+continuation, before MDI formatting. The only program adaptation is that
+isolated stop instruction; decoder, normalizer and CRC bytes are checked
+against the acquired ROM6 image. No MCU, radio peer or handset peripheral
+participates, and unexpected I/O fails. Both negative and positive cases have
+a 1,000-cycle snapshot and 30,000-cycle finish with replay. Inputs and results
+live under `tmp/rom6-receive-kernel/`, including per-run `kernel.log`.
+
+This qualifies the soft-input Viterbi/packing/CRC path, **not** the raw-sample
+training/equalizer frontend, organic receive timing, BCCH or camping. The next
+step is to recover the preceding sample-buffer contract and drive it from
+the independent GMSK source without touching the booting phone's state.
+
 ### Correlator input and capture timing
 
 The first correlator pass is not reading stale reset data. All 192 words

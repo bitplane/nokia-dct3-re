@@ -3,6 +3,14 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "nsm3_isolated_sch_soft_decode",
+      "owner": "native_rom6_receive_kernel",
+      "status": "satisfied",
+      "predicate": "The isolated native SCH Viterbi,packing and CRC path decodes independently coded soft inputs into the expected35 information/parity bits",
+      "current": "The CPU-only fixture executes acquired9268,4d9d and4f3a against DROM tables with live RAM cleared. Independently coded78-word inputs of magnitude32 for FN/BSIC(1,42),(11,0),(2715638,63) produce exactLSB-first2f80..82 words and native CRC status0. The captured uniform+1 input is the negative control:decoded words0,status1. Initial status55aa prevents a stale verdict from passing. All6 case/replay pairs pass with a1000-cycle checkpoint and30000-cycle finish; unexpected I/O fails. The harness stops at the original caller's CRC continuation,never attaches a handset or injects a decoded packet. Native entry capture is passive and acquired decoder/DROM bytes are checked. This does not qualify GMSK sample preprocessing,equalization,physical capture timing,BCCH or camping.",
+      "evidence": ["tests/firmware/rom6_receive_kernel.h", "tools/rom6_receive_entry.lua", "tools/run_rom6_receive_kernel.py", "tools/gsm_sch_signal.py", "docs/rom6_rf_interface.md"]
+    },
+    {
       "id": "nsm3_p03_status_completion",
       "owner": "native_rom6_receive_timing",
       "status": "unresolved",
