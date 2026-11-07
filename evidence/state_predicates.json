@@ -3,6 +3,14 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "nsm3_sch_capture_aperture_timing",
+      "owner": "native_rom6_receive_search",
+      "status": "unresolved",
+      "predicate": "The native SCH correlator input is joined to the correct physical capture edge and independently timed SCH symbols",
+      "current": "Run nsm3afb-_wd59bq9 joins192 zero sample words at00d8..0197 to builder7937..7966 writes at3.343444352..3.343500879s,then33 correlation positions starting at3.343508440s without more P27 reads. Read702272 belongs to capture5,after701312 closed-capture reads plus960 current words; source interval43452744..43464252 is outside FCCH. Final controls are P0a117e/P0b3a98/P091221/P030105. P0d1095 at3.342511429s bounds the P09 compare388..389 quarters after immediate P03 start at3.342518747s. SCU and source epochs are distinct. This proves neither the physical trigger nor valid SCH timing. Next: independently encoded absolute-epoch SCH input,then discriminate capture behavior without source retiming or firmware forcing.",
+      "evidence": ["tools/rom6_adc_burst.lua", "driver/nokia_mfi_rx.cpp", "driver/nokia_dsp_c54x.cpp", "docs/rom6_rf_interface.md"]
+    },
+    {
       "id": "nsm3_native_sch_crc_failure_publication",
       "owner": "native_rom6_receive_search",
       "status": "satisfied",

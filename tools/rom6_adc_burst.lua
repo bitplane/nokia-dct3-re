@@ -5,6 +5,51 @@ local machine=manager.machine
 local cpu=assert(machine.devices[':dsp_c54x:cpu'])
 local writes=0
 local adc_reads,active_words=0,0
+local sch_windows=0
+local sch_sample_writes={}
+local last_counter,last_counter_time=0,0
+_G.rom6_burst_counter=cpu.spaces.io:install_read_tap(0x0d,0x0d,'rom6_burst_counter',function(_,value)
+    if sch_windows>0 then return end
+    last_counter=value; last_counter_time=machine.time:as_double()
+end)
+local capture_controls,capture_control_count={},0
+_G.rom6_burst_capture_controls={}
+for _,port in ipairs({0x03,0x09,0x0a,0x0b,0x21}) do
+    _G.rom6_burst_capture_controls[#_G.rom6_burst_capture_controls+1]=cpu.spaces.io:install_write_tap(port,port,'rom6_burst_capture_control',function(_,value)
+        if sch_windows>0 then return end
+        capture_control_count=capture_control_count+1
+        capture_controls[(capture_control_count-1)%128+1]={port=port,value=value,time=machine.time:as_double(),reads=adc_reads,pc=cpu.state.GENPC.value,counter=last_counter,counter_time=last_counter_time}
+    end)
+end
+_G.rom6_burst_sch_samples=cpu.spaces.data:install_write_tap(0xd8,0x197,'rom6_burst_sch_samples',function(address,value)
+    if adc_reads==0 or sch_windows>0 then return end
+    sch_sample_writes[address]={value=value,time=machine.time:as_double(),reads=adc_reads,pc=cpu.state.GENPC.value,input=cpu.state.AR2.value}
+end)
+_G.rom6_burst_sch_window=cpu.spaces.data:install_write_tap(0x10,0x10,'rom6_burst_sch_window',function(_,value)
+    if value~=0x7737 then return end
+    local pc=cpu.state.GENPC.value
+    if pc<0x76a7 or pc>0x76d9 then return end
+    sch_windows=sch_windows+1
+    if sch_windows>40 then return end
+    local samples={}
+    if sch_windows==1 then
+        for index=math.max(1,capture_control_count-127),capture_control_count do
+            local item=capture_controls[(index-1)%128+1]
+            machine:logerror(string.format('rom6_burst_capture_control: sequence=%d t=%.9f port=%02x value=%04x reads=%d pc=%06x counter=%04x counter_t=%.9f observer_writes=0\n',
+                index,item.time,item.port,item.value,item.reads,item.pc,item.counter,item.counter_time))
+        end
+        for address=0xd8,0x197 do samples[#samples+1]=string.format('%04x',cpu.spaces.data:read_u16(address)) end
+        for address=0xd8,0x197 do
+            local last=sch_sample_writes[address]
+            if last then
+                machine:logerror(string.format('rom6_burst_sch_sample_write: address=%04x value=%04x t=%.9f reads=%d pc=%06x input=%04x observer_writes=0\n',
+                    address,last.value,last.time,last.reads,last.pc,last.input))
+            end
+        end
+    end
+    machine:logerror(string.format('rom6_burst_sch_window: sequence=%d t=%.9f reads=%d pointer=%04x pc=%06x samples=%s observer_writes=0\n',
+        sch_windows,machine.time:as_double(),adc_reads,cpu.state.AR3.value,pc,table.concat(samples,',')))
+end)
 _G.rom6_burst_active_tap=cpu.spaces.io:install_read_tap(0x27,0x27,'rom6_burst_active_samples',function(_,value)
     adc_reads=adc_reads+1
     if active_words>=1024 or (active_words==0 and value==0) then return end
@@ -63,6 +108,7 @@ end)
 _G.rom6_burst_stop=emu.add_machine_stop_notifier(function()
     machine:logerror(string.format('rom6_burst_complete: count_writes=%d cap=1024 observer_writes=0\n',writes))
     machine:logerror(string.format('rom6_burst_active_complete: words=%d cap=1024 reads=%d observer_writes=0\n',active_words,adc_reads))
+    machine:logerror(string.format('rom6_burst_sch_complete: windows=%d cap=40 observer_writes=0\n',sch_windows))
     machine:logerror(string.format('rom6_burst_terminal: pc=%06x ar2=%04x ar3=%04x ar4=%04x ar5=%04x a=%010x b=%010x observer_writes=0\n',
         cpu.state.GENPC.value,cpu.state.AR2.value,cpu.state.AR3.value,cpu.state.AR4.value,cpu.state.AR5.value,cpu.state.A.value,cpu.state.B.value))
     machine.debugger.visible_cpu=cpu
@@ -75,4 +121,6 @@ _G.rom6_burst_stop=emu.add_machine_stop_notifier(function()
     machine.debugger:command('dasm rom6_burst_block_result.asm,51c0,100,1,:dsp_c54x:cpu')
     machine.debugger:command('dasm rom6_burst_block_decoder.asm,9200,100,1,:dsp_c54x:cpu')
     machine.debugger:command('dasm rom6_burst_sch.asm,7600,200,1,:dsp_c54x:cpu')
+    machine.debugger:command('dasm rom6_burst_sch_entry.asm,7400,200,1,:dsp_c54x:cpu')
+    machine.debugger:command('dasm rom6_burst_sch_builder.asm,7800,200,1,:dsp_c54x:cpu')
 end)

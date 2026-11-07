@@ -859,10 +859,45 @@ seven writes and the actual packet. It deliberately qualifies only this
 negative control, not the CRC algorithm for arbitrary words or a valid
 SCH decode. Fresh evidence: `tmp/rom6-adc-lab/nsm3afb-xqpil8w6`.
 
+### Correlator input and capture timing
+
+The first correlator pass is not reading stale reset data. All 192 words
+at `00d8..0197` were written by builder `7937..7966` at
+`3.343444352..3.343500879s`, immediately before the first mask-table
+selection at `3.343508440s`. The builder uses the existing complex FIR
+and quarter-rotation operations with coefficients at `0524`; its source
+pointer is three or four words ahead of each observed destination. All words are
+zero in this SCH-absent fixture. Thirty-three correlation positions start
+at `00d8,00da,..0118`, without another P27 read between them.
+
+The shared read count 702272 identifies capture 5: 701312 words were consumed
+in the four closed captures, followed by 960 in the current capture. Its
+declared source interval is ticks `43452744..43464252`, wholly outside an
+active FCCH slot. This is a measured laboratory aperture, not an established
+physical COBBA/MFI acquisition window.
+
+The final control sequence is P0a=`117e`, P0b=`3a98`, P09=`1221`,
+then P03=`0105`. A passive P0d read returns `1095` at `3.342511429s`;
+P03 is written at `3.342518747s`. Advancing that counter at 13MHz/12,
+with its unobserved sub-tick phase bounded by one count, places P09
+388..389 quarter ticks ahead of the immediate lab start (about 358..359us).
+The source's absolute epoch must not be confused with the separately
+loadable SCU counter epoch. These observations expose the unresolved
+arm-versus-compare boundary; they do not establish which compare should
+clock ADC conversion, serial transfer or INT0, or prove that a timing change
+would produce a valid SCH.
+
+Bounded observation: `tmp/rom6-adc-lab/nsm3afb-_wd59bq9`. The observer
+retains only the last 128 relevant controls and the last writer per sample
+address, and freezes them at the first training-mask selection. It neither
+changes registers nor schedules a response.
+
 Reaching this standard-pattern correlator and its later processing does
 not prove FCCH acquisition, SCH synchronization, decoded frame number or
 camping, particularly because the stimulus contains no SCH burst. Next:
-qualify FCCH-to-SCH capture timing, then add an independently encoded SCH
-waveform using GSM 05.02 burst timing and
+add an independently encoded, absolute-epoch SCH waveform using GSM 05.02
+burst timing and
 [GSM 05.03 channel coding](https://www.etsi.org/deliver/etsi_gts/05/0503/05.00.00_60/gsmts_0503v050000p.pdf).
+Then use its known training/data positions to discriminate capture timing;
+do not retime the source to a request or guessed decoder expectation.
 No firmware result or decoded radio message is synthesized.
