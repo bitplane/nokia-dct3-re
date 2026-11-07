@@ -3,10 +3,27 @@
 ## Current boundary
 
 The acquired-ROM6 **8210 NSM-3 v5.31** composition `nsm3r6` already issues
-native radio-facing work. Its next missing external contract is **timed serial
-output delivery and an attached RF/sample path**, not another MCU startup
-report. No receiver, tuning decision, carrier or successful decode is supplied
-by this census. [Native boot acceptance](rom6_dsp_bringup.md) remains separate.
+native radio-facing work. Compare-edge serial output and partial HAGAR
+command-state reception are modeled; the separate ADC-pin laboratory source
+delivers independently scheduled FCCH and coded SCH samples. Native RSSI,
+bounded FIR/mixer/correlation arithmetic and finite-FCCH **control acceptance**
+have focused checks. These do not qualify a physically timed RF receiver.
+[Native boot acceptance](rom6_dsp_bringup.md) remains separate.
+
+The immediate frontier is **capture-edge ownership**: which P09/P0a/P0b
+events start conversion, admit samples and assert MFI INT0, and how those
+events relate to the DSP I/O counter/reload epoch. Under the current declared
+P03-level laboratory gate, the first SCH window contains zeros and native
+decoding fails. Mode-1 product/history and mixer checks do not expose an
+arithmetic defect; the P03 bit-8 poll does not prove a missing hardware clear.
+SCH, BCCH decoding and camping remain unqualified.
+
+The missing independent anchor is a receive-register specification or a
+hardware trace joining a programmed receive window to its first sample/data
+availability and interrupt. Register-value formulas and decoder success are
+not substitutes for that physical timing evidence. Keep any additional
+software inference explicit about which edge it establishes; do not select
+a window by moving the waveform or by replaying decoded results.
 
 ## Reproduction and coverage
 
@@ -26,7 +43,7 @@ This is a manual research instrument, not an RF acceptance gate. Retire its
 broad overlay/port capture when focused serial-device and receiver tests cover
 the recovered boundary; keep only the normalized contract and useful controls.
 
-The qualified current run has a complete **342,473-write** stream. There
+The reference unattached-receiver census has a complete **342,473-write** stream. There
 are 13 observed read addresses and 38 write addresses, not an exhaustive map
 of all reachable firmware paths or physical MAD2 registers.
 
