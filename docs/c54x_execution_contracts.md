@@ -5004,6 +5004,24 @@ save points are distributed. Interrupt and nested-control composition are not
 newly qualified. The native ROM6 witness is `RPT *AR2` at `43b2` followed by
 `SFTL A,-1,A` at `43b3`.
 
+## Repeated paired-word addition
+
+Short-address DADD participates in the existing pipelined single-repeat
+path. Each iteration retains its own parity-ordered pair at Read and uses
+the live source accumulator at Execute; no alternate arithmetic or saved
+state is introduced. Mapped/peripheral pairs remain rejected by the ordinary
+pair-address guard. Extended-address DADD and repeated DSUB/DRSUB are not
+admitted by this change.
+
+`repeated_double_add` checks 72 cases/restores across all four accumulator
+selectors, short/extended-immediate and RAM-count headers, counts 0/4/15,
+and positive/negative pairs. It checks every intermediate accumulator/carry
+publication, paired bus reads, two-word pointer advancement, retained body
+fetch despite opcode poisoning, continuation and distributed save points.
+The existing `long_pair_arithmetic` section separately covers arithmetic
+modes and address forms. Nested-block and interrupt compositions are not
+newly qualified by these repeat tests.
+
 ## Memory SQUR
 
 `SQUR Smem,A/B` (`26xx/27xx`) squares the signed sixteen-bit memory word,

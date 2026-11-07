@@ -799,14 +799,19 @@ each mask through READA into AL, then tests its high bit and shifts it to
 choose the sign of successive complex sample components over four groups
 of sixteen iterations.
 
-The current stop is **Xmem BIT reading mapped AL**: `9630` at `76be`, with
-terminal AR5=`0008` and A=`000000b962`. The displayed context `76c1` is not
-the offending instruction. The core supports Xmem BIT on RAM but excludes
-this mapped source; the disassembler also currently leaves the word unnamed.
-The unchanged waveform remains **rejected** until this CPU subset is tested
-and implemented. Reaching this standard-pattern correlator does not prove
-FCCH acquisition, SCH synchronization, decoded frame number or camping,
-particularly because the stimulus contains no SCH burst. Next: qualify
-nonmodifying Xmem BIT reads of accumulator fields with Read-owned operands,
-guard-word encoding, later accumulator changes and save/replay; decode the
-instruction consistently for subsequent RE.
+The mapped AL BIT read and subsequent single-repeat paired addition now
+use independently tested generic CPU paths. The unchanged six-second
+waveform remains **rejected** at the next composition: `RPTZ A,#9` at
+`77b0`, inside block `77b0..77ba`, preceding `MAC *AR3+,*AR2+,A,A` at
+`77b2`. The displayed stop `77b3` is not the rejected header. The trace
+still has 702272 native input reads, peak queue 69 and no transport fault.
+The corresponding short/extended-immediate and RAM-count DADD tests check
+every intermediate result and paired read across 72 save/replay cases;
+the 8192 ordinary paired-arithmetic controls also pass.
+
+Reaching this standard-pattern correlator and its later processing does
+not prove FCCH acquisition, SCH synchronization, decoded frame number or
+camping, particularly because the stimulus contains no SCH burst. Next:
+qualify zeroing-immediate single repeat inside an active block independently
+before rerunning the unchanged waveform; preserve the outer block count,
+inner count, accumulator-zero ownership and save/replay state.
