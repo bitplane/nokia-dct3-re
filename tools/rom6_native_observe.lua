@@ -32,11 +32,14 @@ for _,region in ipairs({{'loader2',0x0a00,623,'data'}, {'installed',0x0590,422,'
 end
 local arm=assert(machine.devices[':maincpu'])
 machine.debugger:command('temp4=0')
-arm.debug:bpset(0x2cadd0,'w@10002!=ffff && temp4<10',
-    'temp4=temp4+1;logerror "rom6_native_verifier: result0=%04x result1=%04x observer_writes=0\\n",w@10000,w@10002;g')
+-- Conditions use the breakpoint CPU; logerror expressions use the visible
+-- debugger CPU, which a composed DSP observer may change. Qualify ARM memory
+-- and retain its pointer in a debugger temporary, never in emulated state.
+arm.debug:bpset(0x2cadd0,'maincpu.w@10002!=ffff && temp4<10',
+    'temp4=temp4+1;logerror "rom6_native_verifier: result0=%04x result1=%04x observer_writes=0\\n",maincpu.w@10000,maincpu.w@10002;g')
 machine.debugger:command('temp3=0')
-arm.debug:bpset(0x240e20,'temp3<8',
-    'temp3=temp3+1;logerror "rom6_native_selftest: command=%02x faults=%02x flag=%02x observer_writes=0\\n",b@(r4+8),b@(r4+9),b@13fde1;g')
+arm.debug:bpset(0x240e20,'temp3<8 && (temp9=r4)>=0',
+    'temp3=temp3+1;logerror "rom6_native_selftest: command=%02x faults=%02x flag=%02x observer_writes=0\\n",maincpu.b@(temp9+8),maincpu.b@(temp9+9),maincpu.b@13fde1;g')
 for index, site in ipairs({{0xff80,'reset'}, {0x0f00,'upload'}, {0x2c75,'resident'}}) do
     local counter = 'temp'..(index-1)
     machine.debugger:command(counter..'=0')

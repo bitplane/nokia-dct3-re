@@ -4,8 +4,8 @@ dofile(directory..'rom6_native_observe.lua')
 local machine=manager.machine
 local arm=machine.devices[':maincpu']
 machine.debugger:command('temp5=0')
-arm.debug:bpset(0x307df4,'temp5<40',
-    'temp5=temp5+1;logerror "rom6_native_key: decoded=%02x observer_writes=0\\n",r0;g')
+arm.debug:bpset(0x307df4,'temp5<40 && (temp9=r0)>=0',
+    'temp5=temp5+1;logerror "rom6_native_key: decoded=%02x observer_writes=0\\n",temp9;g')
 local function press(column,name)
     local key=assert(machine.ioport.ports[':COL.'..column].fields[name])
     machine:logerror(string.format('rom6_native_physical: key=%s t=%.6f\n',name,machine.time:as_double()))

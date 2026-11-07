@@ -144,6 +144,11 @@ Some recurring mistakes need stronger checks than ordinary source review:
 - An address hit does not establish dispatcher or subsystem ownership. Confirm
   the containing function boundary and exhaustively decode the relevant
   dispatch extent or caller set before assigning an input to a handler.
+- In mixed-CPU debugger fixtures, breakpoint conditions and command actions may
+  resolve expressions in different CPU contexts. Qualify memory-space tags;
+  capture CPU-local registers in debugger temporaries before global actions.
+  Require both CPUs' acceptance observations after composing probes, so a
+  correct DSP trace cannot conceal an ARM observer reading the wrong memory.
 - An encoded operand number is not an effective address. Recover its addressing
   mode and live page/frame controls before naming a mapped register. On C54x,
   a short direct Smem operand inherits DP/CPL, while a literal dmad/MMR
