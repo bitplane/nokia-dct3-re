@@ -32,6 +32,30 @@ not substitutes for that physical timing evidence. Keep any additional
 software inference explicit about which edge it establishes; do not select
 a window by moving the waveform or by replaying decoded results.
 
+### Evidence needed to resume physical capture modeling
+
+The remaining dependency is timing evidence, not another decoded packet or
+an acquired DSP program image. A useful MAD2/MFI programming specification
+would identify the receive-compare, capture/reload and data-ready semantics.
+Alternatively, a measured receive transaction should retain:
+
+- Handset/ASIC and firmware identities, clock reference and reset epoch.
+- Timestamped P03/P09/P0a/P0b programming and counter/reload observations,
+  with issuing DSP instructions distinguished from delayed bus contexts.
+- The first valid ADC/MFI sample and first block-ready/INT0 event on the
+  same time axis, distinguishing production from later CPU reads.
+- At least two requested positions on different sides of the current
+  counter, plus close/cancel behavior, to discriminate a next-match event,
+  an explicit next-cycle event and a completed-block deadline.
+
+A phone need not camp successfully for that trace to answer the timing
+question. Internal register observations and physical IData/QData clocking
+must be related explicitly; a pin trace without the programming sequence,
+or a RAM snapshot without sample timestamps, is insufficient. Another
+emulator's calibrated scheduling policy is not an independent measurement.
+The P03-level, P09-start and P09-completed-block experiments below constrain
+specific candidates but do not select a physical implementation.
+
 ## Reproduction and coverage
 
 ```sh
@@ -1102,10 +1126,9 @@ three quarters of a unit below the exact value).
 The resulting arithmetic is
 `((trunc(-2/7) + 1776 - 18) * 32) mod 5000 = 1256`.
 The frame adjustment and later capture shift, but SCH remains invalid with a
-zero correlator window. Next join the peak indices to their actual sample
-clock and SCU epoch: correct table arithmetic does not by itself prove that
-those indices represent the correct source phase or that the reload/capture
-boundary implements the physical clock.
+zero correlator window. The bounded peak/source-clock join below establishes
+capture-local sample accounting. It does not establish the physical counter
+epoch or prove that the reload/capture boundary implements the silicon clock.
 
 ### Peak indices and the first receive block
 
