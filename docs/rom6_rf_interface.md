@@ -686,3 +686,48 @@ in the mapped MCU decoder; the observed negative result is not FCCH success.
 Whether and how the corrected fields affect the native search decision is
 the next join. The capture does not yet independently qualify MCU packet
 consumption, nor prove that RSSI replies cannot occur in another lifecycle.
+
+### Native search correlation products
+
+`run_rom6_adc_lab.py --detect --machine nsm3adc` (and `nsm3ad0`) uses a
+separate bounded observer for resident `4146..423a`. Its first initialization
+window computes seventeen complex products via `422b..423a`. All seventeen
+captured calls match independent signed dot/cross products of their four
+actual input words, with the resident code, own entry hook and arithmetic
+mode checked. In observed mode 0, for `(x0,y0,x1,y1)`:
+
+```text
+A = x0*x1 + y0*y1
+B = x1*y0 - y1*x0
+```
+
+The tone supplies `(804,-1936,804,-1936)`, yielding `(4394512,0)` every
+time; silence yields `(0,0)`. This extends the qualified FIR/mixer prefix
+into the native search computation without substituting a detector verdict.
+Sixteen subsequent normalized-metric returns per input also match an
+independent integer ratio of the observed correlation sums and energy. For
+the observed nonnegative-energy, nonsaturating mode-0 domain, normalize all
+three inputs with `s = 31 - bit_length(energy)` (zero uses `s=0`), take signed
+bits 32..16 after shifting by `s-9`, square them, and compute:
+
+```text
+denominator = max(1, normalized_energy_squared & 0xffff)
+numerator = 1024 * (normalized_real_squared + normalized_imag_squared)
+quotient, remainder = divmod(numerator, 2 * denominator)
+native_accumulator = (remainder << 15) | quotient
+```
+
+The tone has correlation `(74706704,0)`, energy `19775304`, denominator
+`1369`, numerator `20647936`, and native accumulator `01531d75`: metric word
+**7541**, above both stored thresholds `0405` (**1029**). Silence returns
+zero through the denominator-one guard. This validates ratio arithmetic for
+these actual inputs, not independent generation of the entire energy window.
+The search's consumption of the positive metric, finite-burst requirements,
+other detector modes and FCCH success remain unqualified. In particular a
+continuous tone is not a complete GSM FCCH/SCH waveform; whether its missing
+burst edge prevents progression must be tested rather than assumed.
+
+The detector observer reserves debugger
+temporaries independently of the measurement observer; the base observer's
+`temp9` is reserved for ARM self-test pointers and must not be reused as a
+DSP counter.

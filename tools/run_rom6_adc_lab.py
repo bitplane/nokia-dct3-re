@@ -13,6 +13,7 @@ from tools.run_rom6_native import prepare,execute
 from tools.rom6_adc_lab_check import check
 from tools.rom6_adc_filter_check import check as check_filter,check_mixer
 from tools.rom6_adc_measure_check import check as check_measure,check_frequency_correction,check_rx_publications
+from tools.rom6_adc_detect_check import check as check_detect
 
 
 def main():
@@ -20,9 +21,11 @@ def main():
     parser.add_argument('--machine',choices=('nsm3adc','nsm3ad0'),required=True)
     parser.add_argument('--seconds',type=int,default=6)
     parser.add_argument('--measure',action='store_true',help='Check the bounded native raw log-power/RSSI prefix')
+    parser.add_argument('--detect',action='store_true',help='Observe the bounded native search complex products')
     args=parser.parse_args()
     if not 3<=args.seconds<=30: parser.error('ADC-pin trials are bounded to 3..30 seconds')
     if args.measure and args.seconds<4: parser.error('measurement prefix needs at least four seconds')
+    if args.measure and args.detect: parser.error('measurement and detection observers use separate bounded runs')
     root=ROOT/'tmp/rom6-adc-lab'
     root.mkdir(exist_ok=True)
     run=Path(tempfile.mkdtemp(prefix=args.machine+'-',dir=root))
@@ -30,7 +33,7 @@ def main():
     try:
         prepare(run,(ROOT/'roms/noki8210/8210_5.31ppm_c.fls').read_bytes(),
                 (ROOT/'roms/noki8210/8210 virgin eeprom 003d0000.fls').read_bytes(),machine=args.machine)
-        script='rom6_adc_measure.lua' if args.measure else 'rom6_adc_lab.lua'
+        script='rom6_adc_detect.lua' if args.detect else 'rom6_adc_measure.lua' if args.measure else 'rom6_adc_lab.lua'
         directory,text=execute(run,'primary',script,args.seconds,ROOT/'mame/mame',machine=args.machine)
         report=check(text,args.machine=='nsm3adc')
         report['native_filter']=check_filter(text,
@@ -38,6 +41,11 @@ def main():
             (ROOT/'roms/noki8210/8210_5.31ppm_c.fls').read_bytes(),
             (ROOT/'roms/nsm3r6/nsm3_rom6_program.be16').read_bytes())
         report['native_mixer']=check_mixer(text)
+        if args.detect:
+            report['native_detector_products']=check_detect(text,
+                (directory/'rom6_adc_processing_program.be16').read_bytes(),
+                (ROOT/'roms/noki8210/8210_5.31ppm_c.fls').read_bytes(),
+                (ROOT/'roms/nsm3r6/nsm3_rom6_program.be16').read_bytes())
         if args.measure:
             report['native_measurement']=check_measure(text,
                 (directory/'rom6_adc_processing_program.be16').read_bytes(),
