@@ -3366,7 +3366,8 @@ void tms320c54x_device::pipeline_step()
 		}
 		if (m_pipeline_operand_address[4] >= 0x10 && m_pipeline_operand_address[4] <= 0x19 && mode != 0xf8 && (mode >= 0x80 || BIT(m_pipeline_direct_status[4], 14)))
 		{
-			logerror("%s: staged immediate ST to DAGEN requires early-write ownership\n", machine().describe_context());
+			logerror("%s: staged immediate ST to DAGEN requires early-write ownership instruction=%06x word=%04x destination=%04x mode=%02x ar4=%04x sp=%04x\n",
+				machine().describe_context(), m_pipeline_address[4], m_pipeline_word[4], m_pipeline_operand_address[4], mode, m_ar[4], m_sp);
 			m_illegal = true;
 			return;
 		}

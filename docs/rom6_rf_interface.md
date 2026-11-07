@@ -776,10 +776,20 @@ periodicity. The independent Python trigonometric reference checks delivered
 sample provenance, including the latched-Q boundary. Existing continuous
 tone and silence compositions are unchanged.
 
-The finite waveform advances beyond the continuous-tone path. Current native
-execution reaches resident `43b3` (`RPT *AR2` followed by logical shift
-`f0ff`) and stops at an explicit unsupported CPU repeat composition. The
-later MFI overrun follows that stop and does not justify enlarging staging.
-The run remains **rejected**, not an FCCH or camping acceptance result.
-The next boundary is generic repeated logical-shift execution with independent
-CPU tests, then a rerun of this unchanged external stimulus.
+The finite waveform advances beyond the continuous-tone path. Its complete
+observed input transport is fault-free: 701312 native reads, peak queued 69,
+and firmware disables the source at 3.296011429 seconds. The retained 3776
+sample words, including 277 nonzero values, match the independent source.
+This is input provenance, not an FCCH or camping verdict.
+
+Current native execution stops on the generic CPU's indirect constant-ST
+DAGEN ownership guard. The precise witness is resident `5719` (`7684 001a`,
+`ST #001a,*AR4`) in the CALLD delay span targeting division helper `4384`.
+Its caller explicitly initializes `AR4=0015` at `5715`, so the effective
+destination `0015` is an intentional **AR5 register alias**, not a guessed
+bad pointer. The diagnostic retains instruction/destination/mode/AR4/SP;
+the failure's displayed context `4387` is not the offending instruction.
+The unchanged stimulus remains **rejected** while this composition is
+unsupported. Direct and absolute constant-ST early writes already have
+independent CPU contracts; the next work is nonmodifying indirect aliases,
+including retained addresses, adjacent consumers, CALLD and save/replay.
