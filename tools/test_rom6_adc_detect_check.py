@@ -14,13 +14,17 @@ class NativeComplexProductsTest(unittest.TestCase):
                 f'rom6_detect_product_output: phase={phase} a=000000000b b=0000000002 st1=4103 observer_writes=0'))
         for number in range(1,17):
             lines.append(f'rom6_detect_metric: sequence={number} a=0001531d75 corr=0473,ef10,0000,0000 energy=012d,bf48 thresholds=0405,0405 mode=0000 st1=4103 observer_writes=0')
+            lines.append(f'rom6_detect_threshold: sequence={number} t=2.000000000 value=0574 a=0000001d75 cpu_pc=000b9a observer_writes=0')
+        for number in range(17,33):
+            lines.append(f'rom6_detect_threshold: sequence={number} t=2.000000000 value=0574 a=0000001d75 cpu_pc=000b9a observer_writes=0')
         return '\n'.join(lines+['rom6_detect_product_complete: phases=34 cap=64 observer_writes=0',
+                                'rom6_detect_threshold_complete: reads=500 cap=32 observer_writes=0',
                                 'rom6_detect_metric_complete: calls=16 cap=16 observer_writes=0'])
 
     def checked(self,text):
         program=bytearray(0x20000)
         program[0x604*2:0x605*2]=bytes.fromhex('fc00')
-        with patch('tools.rom6_adc_detect_check.check_filter_program'):
+        with patch('tools.rom6_adc_detect_check.check_filter_program'),patch('tools.rom6_adc_detect_check.check_consumer_program'):
             return check(text,program,b'',program)
 
     def test_independent_signed_vectors(self):
@@ -38,7 +42,9 @@ class NativeComplexProductsTest(unittest.TestCase):
         for old,new in (('000000000b','000000000a'),('0000000002','fffffffffe'),
                         ('phase=3 ','phase=1 '),('st1=4103','st1=4143'),
                         ('mode=0000','mode=0001'),('phases=34','phases=33'),
-                        ('0001531d75','0001531d74'),('energy=012d','energy=013d')):
+                        ('0001531d75','0001531d74'),('energy=012d','energy=013d'),
+                        ('value=0574','value=0575'),('a=0000001d75','a=0000001d74'),
+                        ('cpu_pc=000b9a','cpu_pc=000b9b'),('sequence=17 ','sequence=18 ')):
             with self.subTest(old=old),self.assertRaises(ValueError):
                 self.checked(text.replace(old,new,1))
 

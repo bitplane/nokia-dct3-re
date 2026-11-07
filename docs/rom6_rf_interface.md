@@ -731,3 +731,24 @@ The detector observer reserves debugger
 temporaries independently of the measurement observer; the base observer's
 `temp9` is reserved for ARM self-test pointers and must not be reused as a
 DSP counter.
+
+### Uploaded search threshold and continuous-tone rejection
+
+The actual consumer is the handset's uploaded `0b40..0d7f` code, not the
+resident `40bc` wrapper. Its 1152 bytes match MCU offset `1170b0` and SHA256
+`245f696206a75730ab96ea480d5927b1b194533947d8fb732f057d4dbb3ecfb0`.
+The `0b92` call returns the metric to the `0b94` comparison against data
+`3eaf`, whose observed value is **`0574` (1396)**. Read-side observations at
+bus context `0b9a` join all sixteen qualified metric returns to the actual
+threshold operand. Tone `7541` is above it; silence `0` is below it.
+
+The uploaded positive path increments `3044` at `0b9d`; `0bc3..0bc7` branches
+to failure `0d68` when that count reaches **500**. The continuous-tone run
+has exactly **500** threshold reads, while silence has **15938** before its
+later negative packet. Thus continuous tone already clears the actual
+metric threshold, but triggers a duration/count guard. This supports testing
+an independently timed **finite FCCH burst**, not raising signal amplitude,
+changing thresholds or injecting a success result. The bounded first-32-read
+capture does not claim that every later metric was individually recorded;
+the guard interpretation combines the pinned uploaded code with total read
+counts and the observed native negative packets.

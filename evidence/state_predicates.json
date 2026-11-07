@@ -3,10 +3,18 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "nsm3_uploaded_search_metric_threshold_consumption",
+      "owner": "nsm3_uploaded_fcch_search",
+      "status": "satisfied",
+      "predicate": "Qualified metric returns reach the own uploaded search threshold; continuous tone clears it and its five-hundred comparisons match the mapped positive-count guard",
+      "current": "Own uploaded0b40..0d7f bytes match MCU1170b0 and pinned SHA256. Data3eaf read at bus0b9a joins16 normalized returns per input: tone7541 exceeds actual threshold0574/1396, silence0 does not. The positive branch increments3044 at0b9d and aborts to0d68 at500 via0bc3..0bc7. Total threshold reads are500 for continuous tone and15938 for silence before their previously captured8a/0004 negative reports. Only the first32 operand reads and16 normalized returns are individually retained; later metric values are not claimed as individually checked. Fresh composed manifests:tmp/rom6-adc-lab/nsm3adc-63r1pc7k and nsm3ad0-x3849g3s. This identifies finite-burst stimulation as the next experiment, not a hardware success, qualified FCCH acquisition, or proof of the complete search state machine. No threshold, counter or firmware state is modified.",
+      "evidence": ["tools/rom6_adc_detect.lua", "tools/rom6_adc_detect_check.py", "tools/test_rom6_adc_detect_check.py", "docs/rom6_rf_interface.md"]
+    },
+    {
       "id": "nsm3_native_search_correlation_metric_prefix",
       "owner": "native_rom6_search_computation",
       "status": "satisfied",
-      "predicate": "The native initial complex-product window and sixteen normalized metric returns match independent integer arithmetic on the actual observed inputs; fresh manifests are tmp/rom6-adc-lab/nsm3adc-gtc6fz4d and nsm3ad0-cwdyk11y",
+      "predicate": "The native initial complex-product window and sixteen normalized metric returns match independent integer arithmetic on the actual observed inputs",
       "current": "Paired six-second ADC-pin trials validate all17 initial products through resident422b..423a: tone dot4394512/cross0, silence0/0. Sixteen subsequent metric returns at41da per input match full40-bit quotient/remainder arithmetic from captured correlation/energy. Tone correlation74706704/0 and energy19775304 yield denominator1369, numerator20647936, accumulator01531d75 and metric7541; stored thresholds are1029. Silence uses the denominator-one guard and returns0. Code, entry hook, signed mode and bounded ordering are checked. Other detector modes, independently derived full energy-window state, positive-metric consumption, finite-burst behavior, FCCH success and camping remain unqualified. The separate detector observer avoids sharing measurement temporaries; temp9 remains ARM-selftest-owned.",
       "evidence": ["tools/rom6_adc_detect.lua", "tools/rom6_adc_detect_check.py", "tools/test_rom6_adc_detect_check.py", "tools/run_rom6_adc_lab.py", "docs/rom6_rf_interface.md"]
     },
