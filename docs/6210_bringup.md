@@ -95,6 +95,20 @@ The NPE-3 RFIclk table alone does not establish its DSP multiplier or custom
 PLL/wait-state interpretation. Do not sweep rates or change the policy byte
 to conceal this boundary.
 
+`tools/rom6_counter_trace_check.py` validates the retained observations as
+diagnostics, never handset acceptance. The 13 MHz capture has 63 unequal
+retry pairs; the 45.5 MHz reference has 7 retry pairs and 35 equal adjacent
+readings among its 64 samples. The checker also requires the backend's actual
+terminal clock and rejects mixed, missing or reordered observations.
+
+[TI SPRU172C, PORTR, page 4-129](https://www.ti.com/lit/ug/spru172c/spru172c.pdf)
+specifies external-I/O timing and an extra addressing cycle; it does not
+establish MAD2 internal-port latency. [SPRU131G, table 8-19](https://www.ti.com/lit/ug/spru131g/spru131g.pdf)
+would interpret `51ee` in PLL mode as multiplier 6. Applying an assumed
+13 MHz CLKIN would give 78 MHz, not the documented reference's 45.5 MHz.
+This discrepancy leaves the Lead clock-input/register interpretation open;
+enabling the generic TI PLL-follow mode is not an evidenced Nokia clock fix.
+
 The literal census covers the complete `3a0000`-byte own MCU image in
 halfword steps with `tools/find_literal_loads.py --encoding big`: state-base
 `17fd30` has 12 literal occurrences/19 load candidates, `17fda3` has 4/12,

@@ -3,6 +3,14 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "rom6_counter_retry_conditional_timing",
+      "owner": "native_rom6_counter_read_diagnostic",
+      "status": "satisfied",
+      "predicate": "Captured native counter retry intervals distinguish the stalled provisional13MHz configuration from the running45.5MHz reference without claiming a fitted6210 clock",
+      "current": "The passive64-sample NPE-3 capture has63 retry intervals of14 configured DSP clocks and zero equal adjacent values; the65s NSM-3 reference capture has7 such retry intervals and35 equal adjacent values. The checker requires ordered sample IDs, legal consumer PCs, monotonic time, matching terminal configured clock and expected retry timing. Under the existing13MHz/12 counter model,14-cycle retries need a DSP rate strictly above15.166667MHz to admit equality. This is a model-consistency bound, not a silicon measurement. Both native loaders write SWWSR2000 and CLKMD51ee. TI's generic PLL interpretation plus an assumed13MHz CLKIN would give78MHz, not the independently documented45.5MHz reference, so Lead input/PLL semantics and internal-port latency remain unqualified. No clock rate or wait state is changed.",
+      "evidence": ["tools/rom6_counter_trace_check.py", "tools/test_rom6_counter_trace_check.py", "tools/rom6_reset_policy_observe.lua", "driver/nokia_dsp_c54x.cpp", "docs/6210_bringup.md", "docs/rom6_dsp_bringup.md"]
+    },
+    {
       "id": "npe3_native_dsp_control_readback",
       "owner": "mad2_dsp_control_partial_contract",
       "status": "satisfied",
