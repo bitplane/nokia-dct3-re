@@ -3,6 +3,14 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "nsm3_finite_fcch_native_control_acceptance",
+      "owner": "native_rom6_receive_search",
+      "status": "satisfied",
+      "predicate": "The pinned own FCCH search takes its native acceptance path after confirmations aligned with independently scheduled finite tone bursts",
+      "current": "nsm3afs-qoucdjgr observes seven2f65 writes fromfffa through0000 at instruction0d26; each follows a scheduled FCCH envelope,at source-frame offsets7519..7803 ticks. Native instruction0d5d then sets2627 bit7 at3.296010462s. The checker pins own0b40..0d7f upload,confirmation ordering,source-frame membership and final flag owner. This qualifies control-path acceptance only; derived frequency/frame timing,physical capture semantics,SCH,BCCH and camping remain unqualified. Raw derived state and later zero SCH window are recorded in the RF interface contract.",
+      "evidence": ["tools/rom6_adc_burst.lua", "tools/rom6_adc_detect_check.py", "tools/test_rom6_adc_detect_check.py", "docs/rom6_rf_interface.md"]
+    },
+    {
       "id": "sch_laboratory_source_information_and_gmsk",
       "owner": "nokia_rf_laboratory",
       "status": "satisfied",

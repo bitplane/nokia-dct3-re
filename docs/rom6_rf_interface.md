@@ -956,3 +956,25 @@ validation of the separate coded SCH source remains necessary. Use its
 known training/data positions to discriminate capture timing;
 do not retime the source to a request or guessed decoder expectation.
 No firmware result or decoded radio message is synthesized.
+
+### Native finite-search acceptance boundary
+
+The own uploaded `0b40..0d7f` search has a positive control path before
+the failed SCH operation. Passive writes in `nsm3afs-qoucdjgr` show seven
+`2f65` updates at issuing instruction `0d26`, from `fffa` through zero.
+Each occurs in source frame 30/40/0/10/20/30/40, shortly after its FCCH
+envelope ends (source-frame offsets 7519..7803 ticks versus end 7104).
+The following branch sets bit 7 of `2627` at instruction `0d5d`, observed
+at `3.296010462s`; it follows the zero confirmation count. The independent
+checker pins the complete own uploaded search code and checks chronology,
+counter progression and absolute-source burst alignment. This establishes
+**native search-control acceptance**, not independently correct frequency,
+frame phase, physical capture gating or SCH synchronization.
+
+At this boundary the observed words are `2f78=fff7`, `2f7b=06f0`,
+`2f6c=d5cb`, `2f6d=0000`, `2f68..69=0000,0000` and
+`247a..7b=0000,0001`. These are raw state, not yet qualified semantic
+measurements. The next question is whether their derivation and later
+capture selection agree with the known source epoch. Keep that check
+separate from merely observing the acceptance flag; do not shift the
+source to make the selected aperture appear correct.

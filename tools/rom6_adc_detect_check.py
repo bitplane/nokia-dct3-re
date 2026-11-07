@@ -3,11 +3,54 @@ import hashlib
 import re
 
 from tools.rom6_adc_filter_check import check_filter_program,signed
+from tools.rom6_timed_output_check import nanoseconds
 
 INPUT=re.compile(r'rom6_detect_product_input: phase=(\d+) mode=([0-9a-f]{4}) values=([0-9a-f]{4}(?:,[0-9a-f]{4}){3}) st1=([0-9a-f]{4}) observer_writes=0')
 OUTPUT=re.compile(r'rom6_detect_product_output: phase=(\d+) a=([0-9a-f]{10}) b=([0-9a-f]{10}) st1=([0-9a-f]{4}) observer_writes=0')
 METRIC=re.compile(r'rom6_detect_metric: sequence=(\d+) a=([0-9a-f]{10}) corr=([0-9a-f]{4}(?:,[0-9a-f]{4}){3}) energy=([0-9a-f]{4},[0-9a-f]{4}) thresholds=([0-9a-f]{4},[0-9a-f]{4}) mode=([0-9a-f]{4}) st1=([0-9a-f]{4}) observer_writes=0')
 THRESHOLD=re.compile(r'rom6_detect_threshold: sequence=(\d+) t=(\d+\.\d{9}) value=([0-9a-f]{4}) a=([0-9a-f]{10}) cpu_pc=000b9a observer_writes=0')
+FCCH_STATE=re.compile(r'rom6_burst_fcch_state: sequence=(\d+) t=(\d+\.\d{9}) address=([0-9a-f]{4}) value=([0-9a-f]{4}) pc=([0-9a-f]{6}) reads=(\d+) observer_writes=0')
+
+
+def check_finite_search_acceptance(text,program,mcu):
+    """Observe native control acceptance, not independently decoded FCCH timing."""
+    check_consumer_program(program,mcu)
+    rows=list(FCCH_STATE.finditer(text))
+    totals=re.findall(r'rom6_burst_fcch_complete: writes=(\d+) cap=256 observer_writes=0',text)
+    if (not rows or len(rows)!=text.count('rom6_burst_fcch_state:') or
+            totals!=[str(len(rows))] or len(rows)>256):
+        raise ValueError('incomplete finite FCCH state observations')
+    updates=[]
+    accepted=None
+    last_time=last_read=-1
+    for number,row in enumerate(rows,1):
+        sequence,stamp,address,value,pc,reads=row.groups()
+        if int(sequence)!=number:
+            raise ValueError('finite FCCH state ordering differs')
+        time,read=nanoseconds(stamp),int(reads)
+        if time<last_time or read<last_read:
+            raise ValueError('finite FCCH state chronology differs')
+        last_time,last_read=time,read
+        if address=='2f65':
+            value=int(value,16)
+            if accepted is not None or pc!='000d27' or updates and value!=((updates[-1][0]+1)&0xffff):
+                raise ValueError('finite FCCH confirmation counter differs')
+            tick=nanoseconds(stamp)*13_000_000//1_000_000_000
+            if tick//60000%51 not in (0,10,20,30,40) or not 7104<=tick%60000<9000:
+                raise ValueError('FCCH confirmations no longer follow scheduled tone bursts')
+            updates.append((value,stamp))
+        if address=='2627':
+            if pc!='000d60' or int(value,16)&0x80==0 or accepted is not None:
+                raise ValueError('native finite-search acceptance flag differs')
+            if len(updates)<6 or updates[-1][0]!=0:
+                raise ValueError('search acceptance preceded its confirmation sequence')
+            accepted=stamp
+    if accepted is None:
+        raise ValueError('native finite-search acceptance path not observed')
+    return dict(native_acceptance_observed=True,confirmation_updates=len(updates),
+                acceptance_time=accepted,source_burst_alignment_observed=True,
+                physical_capture_qualified=False,fcch_timing_qualified=False,
+                sch_qualified=False,camping_qualified=False)
 
 
 def check_consumer_program(program,mcu):

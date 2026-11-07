@@ -7,6 +7,31 @@ local writes=0
 local adc_reads,active_words=0,0
 local sch_raw_words=0
 local sch_windows=0
+local fcch_state_writes=0
+_G.rom6_burst_fcch_state={}
+for _,address in ipairs({0x2f65,0x2f6b,0x2f7a,0x2f7b,0x2477,0x247a,0x247b,0x2627}) do
+    _G.rom6_burst_fcch_state[#_G.rom6_burst_fcch_state+1]=cpu.spaces.data:install_write_tap(address,address,'rom6_burst_fcch_state',function(at,value)
+        local pc=cpu.state.GENPC.value
+        if pc<0xb40 or pc>=0xe00 then return end
+        fcch_state_writes=fcch_state_writes+1
+        if fcch_state_writes>256 then return end
+        machine:logerror(string.format('rom6_burst_fcch_state: sequence=%d t=%.9f address=%04x value=%04x pc=%06x reads=%d observer_writes=0\n',
+            fcch_state_writes,machine.time:as_double(),at,value,pc,adc_reads))
+        if at==0x2627 then
+            local function word(address) return cpu.spaces.data:read_u16(address) end
+            machine:logerror(string.format('rom6_burst_fcch_fields: t=%.9f word2f65=%04x word2f78=%04x word2f7b=%04x word2f6c=%04x word2f6d=%04x words2f68=%04x,%04x words247a=%04x,%04x observer_writes=0\n',
+                machine.time:as_double(),word(0x2f65),word(0x2f78),word(0x2f7b),word(0x2f6c),word(0x2f6d),word(0x2f68),word(0x2f69),word(0x247a),word(0x247b)))
+        end
+    end)
+end
+local counter_loads=0
+_G.rom6_burst_counter_load=cpu.spaces.io:install_write_tap(0x0d,0x0d,'rom6_burst_counter_load',function(_,value)
+    counter_loads=counter_loads+1
+    if counter_loads<=32 then
+        machine:logerror(string.format('rom6_burst_counter_load: sequence=%d t=%.9f value=%04x pc=%06x reads=%d observer_writes=0\n',
+            counter_loads,machine.time:as_double(),value,cpu.state.GENPC.value,adc_reads))
+    end
+end)
 local sch_sample_writes={}
 local last_counter,last_counter_time=0,0
 _G.rom6_burst_counter=cpu.spaces.io:install_read_tap(0x0d,0x0d,'rom6_burst_counter',function(_,value)
@@ -120,6 +145,8 @@ _G.rom6_burst_rx_context=cpu.spaces.data:install_write_tap(0x8e4,0x8e4,'rom6_bur
 end)
 _G.rom6_burst_stop=emu.add_machine_stop_notifier(function()
     machine:logerror(string.format('rom6_burst_complete: count_writes=%d cap=1024 observer_writes=0\n',writes))
+    machine:logerror(string.format('rom6_burst_fcch_complete: writes=%d cap=256 observer_writes=0\n',fcch_state_writes))
+    machine:logerror(string.format('rom6_burst_counter_load_complete: writes=%d cap=32 observer_writes=0\n',counter_loads))
     machine:logerror(string.format('rom6_burst_active_complete: words=%d cap=1024 reads=%d observer_writes=0\n',active_words,adc_reads))
     if machine.system.name=='nsm3afs' then
         machine:logerror(string.format('rom6_burst_sch_raw_complete: words=%d cap=1024 reads=%d observer_writes=0\n',sch_raw_words,adc_reads))
@@ -139,4 +166,6 @@ _G.rom6_burst_stop=emu.add_machine_stop_notifier(function()
     machine.debugger:command('dasm rom6_burst_sch.asm,7600,200,1,:dsp_c54x:cpu')
     machine.debugger:command('dasm rom6_burst_sch_entry.asm,7400,200,1,:dsp_c54x:cpu')
     machine.debugger:command('dasm rom6_burst_sch_builder.asm,7800,200,1,:dsp_c54x:cpu')
+    machine.debugger:command('dasm rom6_burst_fcch_search.asm,b40,2c0,1,:dsp_c54x:cpu')
+    machine.debugger:command('dasm rom6_burst_capture_program.asm,3d00,350,1,:dsp_c54x:cpu')
 end)

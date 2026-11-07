@@ -1,10 +1,37 @@
 import unittest
 from unittest.mock import patch
 
-from tools.rom6_adc_detect_check import check,complex_products,normalized_metric
+from tools.rom6_adc_detect_check import check,complex_products,normalized_metric,check_finite_search_acceptance
 
 
 class NativeComplexProductsTest(unittest.TestCase):
+    def finite_fixture(self):
+        lines=[]
+        for index,frame in enumerate((642,652,663,673,683,693,703),1):
+            tick=frame*60000+7800
+            seconds,fraction=divmod(tick*1_000_000_000//13_000_000,1_000_000_000)
+            lines.append(f'rom6_burst_fcch_state: sequence={index} t={seconds}.{fraction:09d} address=2f65 value={(index-7)&0xffff:04x} pc=000d27 reads={index*32} observer_writes=0')
+        lines.append('rom6_burst_fcch_state: sequence=8 t=3.296010462 address=2627 value=0080 pc=000d60 reads=701312 observer_writes=0')
+        lines.append('rom6_burst_fcch_complete: writes=8 cap=256 observer_writes=0')
+        return '\n'.join(lines)
+
+    @patch('tools.rom6_adc_detect_check.check_consumer_program')
+    def test_finite_search_control_acceptance_is_not_synchronization(self,_):
+        result=check_finite_search_acceptance(self.finite_fixture(),b'',b'')
+        self.assertTrue(result['native_acceptance_observed'])
+        self.assertFalse(result['fcch_timing_qualified'])
+        self.assertFalse(result['sch_qualified'])
+
+    @patch('tools.rom6_adc_detect_check.check_consumer_program')
+    def test_finite_search_rejects_count_timing_flag_and_truncation_drift(self,_):
+        text=self.finite_fixture()
+        for old,new in [('value=fffa','value=fffb'),('t=2.963676923','t=2.960000000'),
+                        ('value=0080','value=0000'),('pc=000d60','pc=000d61'),
+                        ('writes=8','writes=9'),('value=0000 pc=000d27','value=0001 pc=000d27')]:
+            self.assertIn(old,text)
+            with self.subTest(old=old),self.assertRaises(ValueError):
+                check_finite_search_acceptance(text.replace(old,new),b'',b'')
+
     def fixture(self):
         lines=[]
         for number in range(17):
