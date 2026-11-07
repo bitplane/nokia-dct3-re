@@ -488,5 +488,6 @@
   "block_delayed_far_call": 576,
   "shifted_unowned": 20480,
   "shifted_bsp": 5120,
-  "accumulator_call_frames": 216
+  "accumulator_call_frames": 216,
+  "return_delay_absolute_dst": 24
 }

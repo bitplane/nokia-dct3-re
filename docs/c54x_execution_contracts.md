@@ -1627,6 +1627,19 @@ Execute result/status, exact data ordering and final continuation/frame state.
 For a short FCALLD delay, Read precedes the caller-page Write at the same
 pipeline clock; extended forms publish that frame before the later Read.
 
+### Absolute double-word store in RETD delay words
+
+`return_delay_absolute_dst` covers 24 independent cases/restores: either
+accumulator, three absolute addresses (including an odd opcode-shaped literal
+and the top RAM pair), and four in-flight save points. RETD's two delay words
+contain one two-word absolute DST. The high word writes to the addressed
+location, then the low word to its XOR-1 partner; the return continuation sees
+both writes, with one stack pop and unchanged accumulators/status. This uses
+the existing retained DST address/source and two-write path without new state.
+Other extended DST addressing forms and other delayed-control owners remain
+outside this newly admitted composition. The native NSM-3 witness is RETD at
+`0dfd`, DST B at `0dfe`, absolute destination `2f68` at `0dff`.
+
 ### Double-word loads in control delay words
 
 `delayed_paired_load` owns 1,200 independent cases/restores over BD,
