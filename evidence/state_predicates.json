@@ -3,11 +3,19 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "sch_laboratory_source_information_and_gmsk",
+      "owner": "nokia_rf_laboratory",
+      "status": "satisfied",
+      "predicate": "Independent SCH source functions pack normative frame/BSIC information and generate ideal GMSK samples with checked bit order, filter and phase",
+      "current": "sch_information_bits follows GSM04.08v5.0.0 9.1.30,GSM05.02 T1/T2/T3' and the LSB-first octet convention; independent indexed extraction reconstructs BSIC/FN including hyperframe edges. gmsk_burst_samples applies dummy ones,differential precoding,BT0.3 and h1/2 per GSM05.04v5.0.1. Analytical pulse integration agrees with numerical filter and modulation-frequency integration; known tones and constant-envelope checks pass. Four source samples/symbol cover both quarter-bit phases of the two-complex-samples/symbol interface,not a new interface rate. Absolute-frame ADC integration and native decoding remain outstanding. No DSP memory,message or verdict is generated; no RF ramp/noise/channel is claimed.",
+      "evidence": ["tools/gsm_sch_signal.py", "tools/test_gsm_sch_signal.py", "docs/rom6_rf_interface.md"]
+    },
+    {
       "id": "sch_laboratory_source_channel_coding",
       "owner": "nokia_rf_laboratory",
       "status": "satisfied",
       "predicate": "The independent SCH source bit encoder follows normative parity/convolutional/burst layout and agrees with an external channel-coding vector",
-      "current": "gsm_sch_signal.py maps25 information bits through ten parity bits with remainder03ff,four tails,78 convolutional output bits and148 active burst bits with the normative64-bit training mask. Published Osmocom packed01020300 vector agrees on all78 coded bits; independent long division covers zero/all-one/25 basis vectors. Burst placement and invalid-input tests pass. BSIC/frame packing,GMSK and clocked integration remain outstanding. No DSP memory,message or verdict is generated; this is not a receive/synchronization/camping qualification.",
+      "current": "gsm_sch_signal.py maps25 information bits through ten parity bits with remainder03ff,four tails,78 convolutional output bits and148 active burst bits with the normative64-bit training mask. Published Osmocom packed01020300 vector agrees on all78 coded bits; independent long division covers zero/all-one/25 basis vectors. Burst placement and invalid-input tests pass. Information packing and GMSK have a separate source-function predicate; clocked integration and native decoding remain outstanding. No DSP memory,message or verdict is generated; this is not a receive/synchronization/camping qualification.",
       "evidence": ["tools/gsm_sch_signal.py", "tools/test_gsm_sch_signal.py", "docs/rom6_rf_interface.md"]
     },
     {

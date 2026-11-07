@@ -907,10 +907,30 @@ Separate polynomial long division checks zero, all-one and each information
 basis vector; tests also check burst placement and reject malformed inputs.
 The implementation is derived from the standards, not the handset decoder.
 
-These functions do **not** write DSP memory or messages and are not yet
-connected to a handset. Remaining source layers are BSIC/frame-information
-packing, GMSK modulation and absolute-frame scheduling. A channel-coding
-test is not an RF, synchronization or camping result.
+BSIC/frame packing follows
+[GSM 04.08 v5.0.0 section 9.1.30](https://www.etsi.org/deliver/etsi_gts/04/0408/05.00.00_60/gsmts_0408v050000p.pdf),
+GSM 05.02's T1/T2/T3' definitions, and the least-significant-bit-first
+octet mapping also specified by
+[TS 44.004 v4.0.0 section 7.10](https://www.etsi.org/deliver/etsi_ts/144000_144099/144004/04.00.00_60/ts_144004v040000p.pdf).
+An independently indexed field decoder reconstructs BSIC/FN, including T1
+and hyperframe boundaries; malformed or unscheduled SCH positions are rejected.
+
+The ideal GMSK source follows
+[GSM 05.04 v5.0.1 sections 2.2-2.6](https://www.etsi.org/deliver/etsi_i_ets/300900_300999/300959/01_60/ets_300959e01p.pdf):
+dummy ones outside the burst, differential precoding, BT=0.3 Gaussian
+filtering and modulation index 1/2. The Gaussian/rectangle pulse is
+integrated analytically; phase at burst start is chosen as zero. Numerical
+integration of the filter and instantaneous modulation frequency independently
+checks the implementation, alongside constant-envelope and known-tone tests.
+There is no BTS power-ramp, noise or channel model.
+
+Four source samples per symbol represent either quarter-bit phase at which
+the two-complex-samples/symbol lab interface can first be enabled; they do
+not double the interface clock. Q must still be latched from the same I
+conversion. These Python functions do **not** write DSP memory or messages
+and are not yet connected to a handset. Remaining work is a separately
+declared, absolute-frame ADC source and native receive validation. Source
+unit tests are not RF, synchronization or camping results.
 
 Reaching this standard-pattern correlator and its later processing does
 not prove FCCH acquisition, SCH synchronization, decoded frame number or
