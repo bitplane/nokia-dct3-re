@@ -3,6 +3,14 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "sch_laboratory_source_channel_coding",
+      "owner": "nokia_rf_laboratory",
+      "status": "satisfied",
+      "predicate": "The independent SCH source bit encoder follows normative parity/convolutional/burst layout and agrees with an external channel-coding vector",
+      "current": "gsm_sch_signal.py maps25 information bits through ten parity bits with remainder03ff,four tails,78 convolutional output bits and148 active burst bits with the normative64-bit training mask. Published Osmocom packed01020300 vector agrees on all78 coded bits; independent long division covers zero/all-one/25 basis vectors. Burst placement and invalid-input tests pass. BSIC/frame packing,GMSK and clocked integration remain outstanding. No DSP memory,message or verdict is generated; this is not a receive/synchronization/camping qualification.",
+      "evidence": ["tools/gsm_sch_signal.py", "tools/test_gsm_sch_signal.py", "docs/rom6_rf_interface.md"]
+    },
+    {
       "id": "nsm3_sch_capture_aperture_timing",
       "owner": "native_rom6_receive_search",
       "status": "unresolved",

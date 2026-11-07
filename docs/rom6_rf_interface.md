@@ -892,6 +892,26 @@ retains only the last 128 relevant controls and the last writer per sample
 address, and freezes them at the first training-mask selection. It neither
 changes registers nor schedules a response.
 
+### Independent SCH source coding
+
+`tools/gsm_sch_signal.py` implements the source bit layers from GSM 05.03
+section 4.7 and GSM 05.02 section 5.2.5: 25 information bits, ten parity
+bits giving polynomial remainder `03ff`, four terminating zeros, 78
+convolutionally coded bits and the 148-bit synchronization burst. The
+64-bit training sequence is placed between the two 39-bit coded halves.
+
+The independently published
+[Osmocom coding test vector](https://github.com/osmocom/libosmocore/blob/master/tests/coding/coding_test.ok)
+for packed information `01020300` agrees bit-for-bit on all 78 output bits.
+Separate polynomial long division checks zero, all-one and each information
+basis vector; tests also check burst placement and reject malformed inputs.
+The implementation is derived from the standards, not the handset decoder.
+
+These functions do **not** write DSP memory or messages and are not yet
+connected to a handset. Remaining source layers are BSIC/frame-information
+packing, GMSK modulation and absolute-frame scheduling. A channel-coding
+test is not an RF, synchronization or camping result.
+
 Reaching this standard-pattern correlator and its later processing does
 not prove FCCH acquisition, SCH synchronization, decoded frame number or
 camping, particularly because the stimulus contains no SCH burst. Next:
