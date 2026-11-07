@@ -877,6 +877,14 @@ pointer is three or four words ahead of each observed destination. All words are
 zero in the current coded-SCH fixture. Thirty-three correlation positions start
 at `00d8,00da,..0118`, without another P27 read between them.
 
+A twelve-second unchanged-source run (`nsm3afs-eliz4fsi`) retains exactly
+these 33 correlation positions and one type-80 failed SCH publication at
+`3.344087736s`. The six captured native ring commits also include a later
+type-8b RSSI survey at `6.862295780s`; receive activity continues, but merely
+extending this run does not produce another SCH attempt. Its raw transport
+remains fault-free with the same provisional 96-word staging and peak 69.
+This bounds the waiting experiment, not the physical sampling contract.
+
 The shared read count 702272 identifies capture 5: 701312 words were consumed
 in the four closed captures, followed by 960 in the current capture. Its
 declared source interval is ticks `43445256..43456764`: it begins within
