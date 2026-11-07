@@ -31,7 +31,9 @@ public:
 			device_t *owner, u32 clock = 0);
 	auto rf_receive_cb() { return m_rf_receive_cb.bind(); }
 	auto rf_transmit_cb() { return m_rf_transmit_cb.bind(); }
-	u16 rf_receive_sample();
+	// Component is a lab callback selector (I/Q), not a recovered bus address.
+	// An attached clock calls this boundary; CPU reads need not generate it.
+	u16 rf_receive_sample(offs_t component = 0);
 	void rf_transmit_sample(u16 data);
 	u64 rf_receive_samples() const { return m_rf_receive_samples; }
 	u64 rf_transmit_samples() const { return m_rf_transmit_samples; }

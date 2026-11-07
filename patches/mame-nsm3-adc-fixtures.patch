@@ -1,0 +1,8 @@
+diff --git a/src/mame/mame.lst b/src/mame/mame.lst
+--- a/src/mame/mame.lst
++++ b/src/mame/mame.lst
+@@ -47200,2 +47200,4 @@
+ nsm3r6
++nsm3adc
++nsm3ad0
+ 

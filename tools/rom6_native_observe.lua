@@ -1,6 +1,6 @@
 -- Read-only entry observations for the acquired NSM-3 ROM6 composition.
 local machine = manager.machine
-assert(machine.system.name == 'nsm3r6')
+assert(machine.system.name == 'nsm3r6' or machine.system.name == 'nsm3adc' or machine.system.name == 'nsm3ad0')
 local cpu = assert(machine.devices[':dsp_c54x:cpu'])
 assert(not machine.devices[':dsp_hle'] and not machine.devices[':dsp_staged'])
 machine:logerror('rom6_native_composition: hle=0 staged=0 observer_writes=0\n')

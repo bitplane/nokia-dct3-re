@@ -96,14 +96,14 @@ void nokia_cobba_device::device_reset()
 	m_rf_receive_observation = 0;
 }
 
-u16 nokia_cobba_device::rf_receive_sample()
+u16 nokia_cobba_device::rf_receive_sample(offs_t component)
 {
 	if (machine().side_effects_disabled())
 		return m_rf_receive_observation;
 	// An unattached RF front end is deterministic silence; filtering and
 	// measurement decisions remain inside the emulated DSP.
 	++m_rf_receive_samples;
-	m_rf_receive_observation = m_rf_receive_cb();
+	m_rf_receive_observation = m_rf_receive_cb(component);
 	return m_rf_receive_observation;
 }
 

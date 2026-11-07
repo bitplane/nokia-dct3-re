@@ -17,18 +17,18 @@ from tools.rom6_native_check import MCU_SHA1, CALL_REGISTER_TEXT_SHA256, check_c
 PMM_SHA256='31f51bcd69e183f23c39136574bd6a44864eb2ba1939417b9d848a3e0639ec59'
 
 
-def prepare(run,mcu,pmm):
+def prepare(run,mcu,pmm,*,machine='nsm3r6'):
     if hashlib.sha1(mcu).hexdigest()!=MCU_SHA1 or hashlib.sha256(pmm).hexdigest()!=PMM_SHA256:
         raise ValueError('native fixture requires pinned own MCU/PMM inputs')
-    storage=run/'nvram/nsm3r6'
+    storage=run/'nvram'/machine
     storage.mkdir(parents=True,exist_ok=False)
     (storage/'flash').write_bytes(mcu+base_record_fixture(pmm))
 
 
-def execute(run,phase,script,seconds,binary,*,persist=False,verbose=False):
+def execute(run,phase,script,seconds,binary,*,persist=False,verbose=False,machine='nsm3r6'):
     directory=run/phase
     directory.mkdir()
-    command=[str(binary),'nsm3r6','-rompath',str(ROOT/'roms'),
+    command=[str(binary),machine,'-rompath',str(ROOT/'roms'),
              '-nvram_directory',str(run/'nvram'),'-cfg_directory','cfg',
              '-state_directory',str(run/'sta'),'-snapshot_directory','snap',
              '-noreadconfig','-joystickprovider','none','-midiprovider','none',

@@ -45,7 +45,8 @@ MAME_PATCHES := patches/mame-nokia-dct3-driver-name.patch \
 	patches/mame-c54x-isa-test.patch \
 	patches/mame-c54x-test-compositions.patch \
 	patches/mame-c54x-firmware-registration.patch \
-	patches/mame-c54x-serial-test.patch
+	patches/mame-c54x-serial-test.patch \
+	patches/mame-nsm3-adc-fixtures.patch
 LIB_COMPONENTS := lib/util/gsmfr.cpp lib/util/gsmfr.h
 CPU_COMPONENTS := cpu/tms320c54x/tms320c54x.cpp \
 	cpu/tms320c54x/tms320c54x.h cpu/tms320c54x/tms320c54x_decode.h \
@@ -54,6 +55,7 @@ DRIVER_COMPONENTS := $(filter-out driver/nokia_dct3_trace_config.h,$(wildcard dr
 	driver/nokia_ccont.cpp driver/nokia_ccont.h \
 	driver/nokia_cobba.cpp driver/nokia_cobba.h \
 	driver/nokia_hagar.cpp driver/nokia_hagar.h driver/nokia_hagar_command_state.h \
+	driver/nokia_mfi_rx.cpp driver/nokia_mfi_rx.h driver/nokia_mfi_rx_state.h \
 	driver/nokia_dsp_backend.h \
 	driver/gsm_subscription_storage.h \
 	driver/nokia_dsp_c54x.cpp driver/nokia_dsp_c54x.h \
@@ -818,7 +820,7 @@ rom4-dsp-inputs:
 		roms/research/nse1-rom4/working/dsp_drom.txt \
 		roms/noki5110/nse1_rom4_dsp_data.bin
 
-HANDSET_MAME_SOURCES := src/mame/nokia/nokia_dct3.cpp,src/mame/nokia/nokia_dct3_research.cpp,src/mame/nokia/tms320c54x_dma.cpp,src/mame/nokia/tms320c54x_mcbsp.cpp,src/mame/nokia/tlv320aic23.cpp,src/mame/nokia/nokia_ccont.cpp,src/mame/nokia/nokia_cobba.cpp,src/mame/nokia/nokia_hagar.cpp,src/mame/nokia/nokia_dsp_c54x.cpp,src/mame/nokia/nokia_dsp_hle.cpp,src/mame/nokia/nokia_dsp_staged.cpp,src/mame/nokia/nokia_dspif.cpp,src/mame/nokia/nokia_external_service.cpp,src/mame/nokia/nokia_gensio.cpp,src/mame/nokia/gsm_a3a8.cpp,src/mame/nokia/gsm_a5.cpp,src/mame/nokia/gsm_cell_broadcast.cpp,src/mame/nokia/gsm_ems.cpp,src/mame/nokia/gsm_mm_authentication.cpp,src/mame/nokia/gsm_tch_f_l1.cpp,src/mame/nokia/gsm_xcch_l1.cpp,src/mame/nokia/nokia_gsm_network.cpp,src/mame/nokia/nokia_gsm_session.cpp,src/mame/nokia/nokia_gsm_voice_peer.cpp,src/mame/nokia/nokia_lapdm_link.cpp,src/mame/nokia/nokia_kbgpio.cpp,src/mame/nokia/nokia_mad2.cpp,src/mame/nokia/nokia_mad2_pcm.cpp,src/mame/nokia/nokia_mbus.cpp,src/mame/nokia/nokia_mbus_terminal.cpp,src/mame/nokia/nokia_pup.cpp,src/mame/nokia/nokia_radio_peer.cpp,src/mame/nokia/nokia_simi.cpp,src/mame/nokia/nokia_sim_card.cpp,src/mame/nokia/nokia_uif.cpp
+HANDSET_MAME_SOURCES := src/mame/nokia/nokia_dct3.cpp,src/mame/nokia/nokia_dct3_research.cpp,src/mame/nokia/tms320c54x_dma.cpp,src/mame/nokia/tms320c54x_mcbsp.cpp,src/mame/nokia/tlv320aic23.cpp,src/mame/nokia/nokia_ccont.cpp,src/mame/nokia/nokia_cobba.cpp,src/mame/nokia/nokia_hagar.cpp,src/mame/nokia/nokia_mfi_rx.cpp,src/mame/nokia/nokia_dsp_c54x.cpp,src/mame/nokia/nokia_dsp_hle.cpp,src/mame/nokia/nokia_dsp_staged.cpp,src/mame/nokia/nokia_dspif.cpp,src/mame/nokia/nokia_external_service.cpp,src/mame/nokia/nokia_gensio.cpp,src/mame/nokia/gsm_a3a8.cpp,src/mame/nokia/gsm_a5.cpp,src/mame/nokia/gsm_cell_broadcast.cpp,src/mame/nokia/gsm_ems.cpp,src/mame/nokia/gsm_mm_authentication.cpp,src/mame/nokia/gsm_tch_f_l1.cpp,src/mame/nokia/gsm_xcch_l1.cpp,src/mame/nokia/nokia_gsm_network.cpp,src/mame/nokia/nokia_gsm_session.cpp,src/mame/nokia/nokia_gsm_voice_peer.cpp,src/mame/nokia/nokia_lapdm_link.cpp,src/mame/nokia/nokia_kbgpio.cpp,src/mame/nokia/nokia_mad2.cpp,src/mame/nokia/nokia_mad2_pcm.cpp,src/mame/nokia/nokia_mbus.cpp,src/mame/nokia/nokia_mbus_terminal.cpp,src/mame/nokia/nokia_pup.cpp,src/mame/nokia/nokia_radio_peer.cpp,src/mame/nokia/nokia_simi.cpp,src/mame/nokia/nokia_sim_card.cpp,src/mame/nokia/nokia_uif.cpp
 CONFORMANCE_MAME_SOURCES := $(addprefix src/mame/nokia/,$(notdir $(filter %.cpp,$(TEST_DRIVER_COMPONENTS))))
 CONFORMANCE_MAME_SOURCES := $(subst $(space),$(comma),$(CONFORMANCE_MAME_SOURCES))
 BUILD_MAME_SOURCES := $(HANDSET_MAME_SOURCES)

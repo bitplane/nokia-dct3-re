@@ -8,8 +8,71 @@
 #include "nokia_dct3_research.h"
 #include "nokia_dsp_staged.h"
 #include "nokia_hagar.h"
+#include "nokia_mfi_rx.h"
 
 namespace nokia_dct3 {
+
+void dct3_rf_adc_fixture_state::nsm3adc(machine_config &config)
+{
+	nsm3r6(config);
+	auto &mfi = NOKIA_MFI_RX(config, "mfi_rx", 13'000'000);
+	mfi.set_word_divider(6); // Candidate 4 complex samples/symbol; unmeasured.
+	mfi.adc_cb().set("cobba", FUNC(nokia_cobba_device::rf_receive_sample));
+	mfi.data_available_cb().set("dsp_c54x", FUNC(nokia_dsp_c54x_device::rf_data_available_w));
+	mfi.fault_observer_cb().set(FUNC(dct3_rf_adc_fixture_state::fault_observe_w));
+	auto &backend = *subdevice<nokia_dsp_c54x_device>("dsp_c54x");
+	backend.set_external_rf_receive(true);
+	backend.rf_receive_cb().set(mfi, FUNC(nokia_mfi_rx_device::read));
+	backend.rf_control_cb().set(FUNC(dct3_rf_adc_fixture_state::control_w));
+	subdevice<nokia_cobba_device>("cobba")->rf_receive_cb().set(FUNC(dct3_rf_adc_fixture_state::sample_r));
+}
+
+void dct3_rf_adc_fixture_state::nsm3ad0(machine_config &config)
+{
+	nsm3adc(config);
+	m_tone = false;
+}
+
+void dct3_rf_adc_fixture_state::machine_start()
+{
+	nokia_dct3_state::machine_start();
+	save_item(NAME(m_q_latch));
+	save_item(NAME(m_adc_receive_control)); save_item(NAME(m_adc_mfi_control));
+	machine().logerror("rf_adc_lab: direct_adc=1 tuned_air_source=0 tone=%u reference=13000000 complex_divider=12 amplitude=1024 physical_clock_claim=0\n",m_tone);
+}
+
+void dct3_rf_adc_fixture_state::control_w(offs_t port, u16 data)
+{
+	// Testable lab wiring, not a fitted MFI truth table. The always-on bit10
+	// candidate overran before RF work; keep the observed port3 RX window.
+	if (port == 3) m_adc_receive_control = data;
+	if (port == 0x21) m_adc_mfi_control = data;
+	subdevice<nokia_mfi_rx_device>("mfi_rx")->enable_w(BIT(m_adc_receive_control,0)
+		&& BIT(m_adc_mfi_control,10) && !BIT(m_adc_mfi_control,12));
+}
+
+void dct3_rf_adc_fixture_state::fault_observe_w(int state)
+{
+	if (!state) return;
+	auto &cpu = *subdevice<tms320c54x_device>("dsp_c54x:cpu");
+	machine().logerror("rf_adc_lab_fault_context: cpu_pc=%06x st1=%04x imr=%04x ifr=%04x observer_writes=0 t=%.9f\n",
+		u32(cpu.state_int(tms320c54x_device::STATE_PC)),u16(cpu.state_int(tms320c54x_device::STATE_ST1)),
+		u16(cpu.state_int(tms320c54x_device::STATE_IMR)),u16(cpu.state_int(tms320c54x_device::STATE_IFR)),machine().time().as_double());
+}
+
+u16 dct3_rf_adc_fixture_state::sample_r(offs_t component)
+{
+	// Independently reproducible periodic laboratory oscillator, not a finite
+	// capture wrapped on exhaustion. I/Q conversion is simultaneous; Q stays
+	// latched across the following MFI scalar transfer.
+	static constexpr s16 i[16] = {1024,946,724,392,0,-392,-724,-946,-1024,-946,-724,-392,0,392,724,946};
+	static constexpr s16 q[16] = {0,392,724,946,1024,946,724,392,0,-392,-724,-946,-1024,-946,-724,-392};
+	if (!m_tone) return 0;
+	if (component) return u16(m_q_latch);
+	unsigned const index = (machine().time().as_ticks(13'000'000) / 12) % 16;
+	m_q_latch = q[index];
+	return u16(i[index]);
+}
 
 void nokia_dct3_state::dct3_nsm1_research_map(address_map &map)
 {

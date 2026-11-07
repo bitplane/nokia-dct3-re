@@ -19,7 +19,9 @@ nokia_dsp_c54x_device::nokia_dsp_c54x_device(const machine_config &mconfig,
 	m_ccont(*this, finder_base::DUMMY_TAG),
 	m_program_rom(*this, finder_base::DUMMY_TAG),
 	m_data_rom(*this, finder_base::DUMMY_TAG),
-	m_transfer_compare_cb(*this)
+	m_transfer_compare_cb(*this),
+	m_rf_receive_cb(*this, 0),
+	m_rf_control_cb(*this)
 {
 }
 
@@ -195,7 +197,7 @@ TIMER_CALLBACK_MEMBER(nokia_dsp_c54x_device::frame_timer_expired)
 				u16(m_cpu->state_int(tms320c54x_device::STATE_IFR)),
 				u16(m_cpu->state_int(tms320c54x_device::STATE_IMR)),
 				machine().time().as_double());
-	if (enabled)
+	if (enabled && !(m_external_rf_receive && BIT(m_io[3],0)))
 	{
 		m_cpu->set_input_line(0, HOLD_LINE); // CTSI/GSM frame interrupt
 	}
@@ -300,6 +302,7 @@ void nokia_dsp_c54x_device::reset_line_w(int released)
 	}
 	else
 	{
+		if (m_external_rf_receive) m_rf_control_cb(0x21, 0);
 		m_bsp.reset();
 		m_port36.reset();
 		m_port36_timer->adjust(attotime::never);
@@ -308,6 +311,12 @@ void nokia_dsp_c54x_device::reset_line_w(int released)
 		m_slot_timer->adjust(attotime::never);
 		m_transfer_timer->adjust(attotime::never);
 	}
+}
+
+void nokia_dsp_c54x_device::rf_data_available_w(int state)
+{
+	if (state && m_external_rf_receive && m_reset_released)
+		m_cpu->set_input_line(0, HOLD_LINE);
 }
 
 TIMER_CALLBACK_MEMBER(nokia_dsp_c54x_device::port36_complete)
@@ -544,14 +553,14 @@ u16 nokia_dsp_c54x_device::io_r(offs_t offset)
 		return frame_counter();
 	case 0x27:
 		if (machine().side_effects_disabled())
-			return m_cobba->rf_receive_sample();
+			return m_external_rf_receive ? m_rf_receive_cb() : m_cobba->rf_receive_sample();
 		if (m_rf_trace_count++ < 16)
 			machine().logerror("rom4_rf_read: sample=%u pc=%04x frame=%llu t=%.6f\n",
 					m_rf_trace_count,
 					u16(m_cpu->state_int(tms320c54x_device::STATE_PC)),
 					m_frame_timer_expiries,
 					machine().time().as_double());
-		return m_cobba->rf_receive_sample();
+		return m_external_rf_receive ? m_rf_receive_cb() : m_cobba->rf_receive_sample();
 	case 0x38:
 		++m_rf_port38_reads;
 		return m_io[0x38];
@@ -585,6 +594,7 @@ void nokia_dsp_c54x_device::io_w(offs_t offset, u16 data)
 		return; // Selected control state owns this word, not the opaque bank.
 	}
 	m_io[port] = data;
+	if (m_external_rf_receive && (port == 3 || port == 0x21)) m_rf_control_cb(port, data);
 	if (m_port36_handshake && port == 0 && m_port36.strobe_w(BIT(data, 4)))
 		// Deferred completion, not a read-triggered answer. One backend clock
 		// is an unmeasured latency policy, not an identified peripheral rate.

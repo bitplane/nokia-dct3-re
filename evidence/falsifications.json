@@ -3,6 +3,13 @@
   "kind": "falsifications",
   "entries": [
     {
+      "id": "nsm3_continuous_mfi_two_bank_candidate_is_lossless",
+      "status": "disproven",
+      "hypothesis": "A continuous 13MHz/6 scalar ADC clock with32-word notifications,64-word buffering and P21.bit10 enable produces a lossless native NSM-3 receive stream, optionally gated by P03.bit0",
+      "conclusion": "Tone and silence both overrun the P21-only candidate at0.803263846 before RF work. With the observed P03 receive window added, both preserve native initialization and match2752 delivered prefix words against an independent absolute-time oscillator/zero reference, but overrun at2.548358769 and2.680066615. Passive fault observations show INT0 enabled and pending while global INTM is set at both window-gated overflows; this does not establish physical buffering or gating. The direct-ADC source is not a tuned carrier; no RSSI or decoder success qualifies. The result rejects sufficiency of those exact cadence/capacity/gating combinations, not the physical sample rate, actual buffer depth, all data-available IRQ models or P09-based capture. The prototype deliberately stops on overflow and the checker rejects any fault across counter resets. MAME partial-buffer save/restore and exact first restored word-clock boundary pass separately. Existing ROM4/HLE and native baseline UI/storage/state/serial acceptance remain green. Capture boundaries P09/P0a/P0b and programmed P11=01fe remain the next contract question; no buffer-size sweep or firmware state forcing is retained.",
+      "evidence": ["docs/rom6_rf_interface.md", "driver/nokia_mfi_rx.cpp", "driver/nokia_mfi_rx_state.h", "driver/nokia_dct3_research.cpp", "tests/unit/test_mfi_rx.cpp", "tests/devices/nokia_dsp_serial_test.cpp", "tools/run_rom6_adc_lab.py", "tools/rom6_adc_lab_check.py", "tools/test_rom6_adc_lab_check.py"]
+    },
+    {
       "id": "nam2_bsi_fixture_is_not_physical_voltage_proof",
       "status": "disproven",
       "hypothesis": "The retained NAM-2 raw BSI input0b6 is established as the manual's0.5V point by a2.8V ADC reference, and its failed readiness experiment excludes correct BSI provisioning",

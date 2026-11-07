@@ -135,6 +135,10 @@ remain separately unmeasured for ROM6.
 
 ## Cross-reference limits
 
+Port numbers here are hexadecimal. Check literal I/O operands before importing
+external labels: the stable-read helper `3ee1..3ef2` reads `000d`, which may be
+called decimal "PA13" elsewhere; it is not a separate P13 input.
+
 Dan's snapshot `dd356ff7c5fc62529ab5843ce737593ebff51f73`, especially
 `rom6-rf-acquisition-current.md`, `rom6-pll-unmatched-o3x.md` and
 `rom6-frame-int0-ownership.md`, supplies hypotheses, not an 8210 specification.
@@ -376,3 +380,57 @@ At the first P27 read, the eight live data 3ebd coefficients are
 consumes four scalar inputs per repeated iteration. These constrain a later
 signal/filter experiment; coefficient shape alone does not establish the ADC
 sample rate, I/Q wire packing, uninterrupted capture or RF interrupt cadence.
+
+## ADC-pin transport experiment
+
+`nsm3adc` and `nsm3ad0` are explicit **laboratory compositions**, not promoted
+handsets or RF acceptance gates. They attach `nokia_mfi_rx_device` between a
+clocked COBBA ADC callback and P27. The former applies an analytic periodic
+67.708333kHz I/Q tone of amplitude 1024; the latter supplies matched zeros.
+Neither source uses HAGAR's candidate, an ARFCN or a firmware PC. This is
+direct ADC-pin stimulation, **not a tuned over-the-air signal**.
+
+```sh
+.venv/bin/python tools/run_rom6_adc_lab.py --machine nsm3adc
+.venv/bin/python tools/run_rom6_adc_lab.py --machine nsm3ad0
+make check-c54x-serial-compare
+```
+
+The candidate clocks scalar words at 13MHz/6, not from P27 demand. Its two
+32-word banks are an explicit unmeasured capacity policy. Words, transfer ticks,
+queue state and the next clock deadline are saved. Block notifications drive
+INT0 instead of the inherited frame pulse during the port3 receive window;
+the inactive baseline is retained. Experimental enable wiring requires
+P03.bit0, P21.bit10 and clear P21.bit12. This is a hypothesis, **not a recovered
+truth table**; P09/P0a/P0b capture boundaries are not implemented here.
+
+The oscillator latches simultaneous I/Q at the I transfer and serializes Q six
+reference ticks later. Logged `source_tick` is the **scalar interface-transfer
+timestamp**, not necessarily analogue conversion time. The independent checker
+evaluates sine/cosine from these timestamps and rejects skipped or future words.
+Periodicity is intrinsic to the analytic source, not finite-capture fallback.
+
+The result is **negative**: both six-second inputs preserve native initialization
+and deliver 2,752 checked prefix words across three activations, but overrun at
+2.548358769s and 2.680066615s. The always-on P21-only candidate had instead
+overrun at 0.803263846s, before RF work. These combinations are not qualified
+receive models. The result does not isolate the wrong clock, capacity, IRQ or
+capture gate; do not increase capacity simply to hide the failure. The runner
+rejects any fault record, including earlier activations with reset counters.
+
+At both overflows the passive fault observer sees IMR=`035f`, IFR=`0021` and
+ST1=`c903`/`4903`: INT0 is enabled and pending, but global INTM is set. This
+identifies native critical-section backpressure at those events, not a missing
+IRQ request. It does not establish the physical buffer capacity or clock gate.
+
+Logical tests cover ordering, provenance, peeks, partial blocks, overrun,
+underrun and reset. The MAME component gate saves a partial buffer and checks
+its exact first restored block, transfer ticks and completion time. An
+in-callback stream load does not rewind the test timer's scheduler-local
+relative deadline; its later callback is not an equal-time endpoint. Neither
+this component test nor the good source prefix qualifies a native ADC session.
+No RSSI, FCCH, SCH, BCCH or camping result is claimed.
+
+The next boundary is capture lifecycle, including P09/P0a/P0b and the programmed
+P11=`01fe`, not another MCU readiness response. Retire the direct-ADC compositions
+and field probe when a focused clocked-air gate covers that recovered contract.

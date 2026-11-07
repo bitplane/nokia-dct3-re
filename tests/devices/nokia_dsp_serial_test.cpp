@@ -7,6 +7,7 @@
 #include "nokia_dsp_c54x.h"
 #include "nokia_dspif.h"
 #include "nokia_hagar.h"
+#include "nokia_mfi_rx.h"
 #include "tms320c54x_test_snapshot.h"
 #include <sstream>
 
@@ -15,13 +16,16 @@ class c54x_serial_test_state : public driver_device
 {
 public:
 	c54x_serial_test_state(machine_config const &config, device_type type, char const *tag)
-		: driver_device(config,type,tag), m_backend(*this,"backend"),m_cpu(*this,"backend:cpu"),m_hagar(*this,"rf") { }
+		: driver_device(config,type,tag), m_backend(*this,"backend"),m_cpu(*this,"backend:cpu"),m_hagar(*this,"rf"),m_mfi(*this,"mfi") { }
 	void test(machine_config &config)
 	{
 		NOKIA_DSPIF(config,"transport",0);
 		NOKIA_COBBA(config,"codec",0);
 		NOKIA_CCONT(config,"power",0);
 		NOKIA_HAGAR(config,m_hagar,0);
+		NOKIA_MFI_RX(config,m_mfi,13'000'000);
+		m_mfi->adc_cb().set(FUNC(c54x_serial_test_state::adc_sample));
+		m_mfi->data_available_cb().set(FUNC(c54x_serial_test_state::adc_ready));
 		NOKIA_DSP_C54X(config,m_backend,13'000'000);
 		m_backend->set_transport_tag("^transport"); m_backend->set_cobba_tag("^codec");
 		m_backend->set_ccont_tag("^power"); m_backend->set_program_rom_tag("^program");
@@ -33,6 +37,9 @@ protected:
 	{
 		m_timer=timer_alloc(FUNC(c54x_serial_test_state::step),this);
 		save_item(NAME(m_events)); save_item(NAME(m_tuple)); save_item(NAME(m_time));
+		save_item(NAME(m_adc_source)); save_item(NAME(m_adc_consumed)); save_item(NAME(m_adc_blocks));
+		save_item(NAME(m_adc_time)); save_item(NAME(m_adc_last_tick));
+		save_item(NAME(m_adc_first_time)); save_item(NAME(m_adc_first_tick)); save_item(NAME(m_adc_first_source));
 	}
 	void machine_reset() override
 	{
@@ -48,6 +55,27 @@ private:
 		m_hagar->compare_output_w(tuple);
 		++m_events; m_tuple=tuple; m_time=machine().time();
 		expect(m_cpu->space(AS_IO).read_word(0x0d)==u16(tuple),"event is on its own counter tick");
+	}
+	u16 adc_sample(offs_t component)
+	{
+		expect(component==(m_adc_source&1),"ADC component order");
+		return 0x1000 + m_adc_source++;
+	}
+	void adc_ready(int state)
+	{
+		if (!state) return;
+		++m_adc_blocks; m_adc_time=machine().time();
+		for (unsigned word=0; word<32; ++word)
+		{
+			u64 const tick=m_mfi->front_source_tick();
+			expect(!m_adc_last_tick || tick==m_adc_last_tick+6,"MFI producer provenance is at exact reference ticks");
+			m_adc_last_tick=tick;
+			expect(m_mfi->read()==0x1000+m_adc_consumed++,"MFI contains actual clocked words in order");
+		}
+		if (m_adc_blocks==1)
+		{
+			m_adc_first_time=m_adc_time; m_adc_first_tick=m_adc_last_tick; m_adc_first_source=m_adc_source;
+		}
 	}
 	TIMER_CALLBACK_MEMBER(step)
 	{
@@ -107,20 +135,50 @@ private:
 			expect(m_hagar->transactions()==5,"held DSP reset does not invent an off-chip reset");
 			m_hagar->reset();
 			expect(!m_hagar->transactions() && !m_hagar->last_word(),"explicit RF-device reset clears command state");
-			osd_printf_info("C54x compare boundary: PASS replacement=1 armed_restore=1 exact_time=1 ack_ports=1,2 periodic=1 raw_zero=1 cancellation=1 reset_abort=1 hagar_restore=1 physical_latch_claim=0\n");
+			m_mfi->enable_w(1); break;
+		case 8:
+			expect(m_mfi->produced()>0 && m_mfi->produced()<32 && !m_adc_blocks,"partial clocked MFI block before save");
+			expect(c54x_test::capture_snapshot(machine(),m_saved)==STATERR_NONE,"save partial MFI block and word clock");
+			break;
+		case 9:
+			expect(m_adc_blocks==1 && m_adc_consumed==32 && !m_mfi->overruns() && !m_mfi->underruns(),"one complete reference MFI block");
+			m_reference_adc_time=m_adc_first_time; m_reference_adc_source=m_adc_first_source; m_reference_adc_tick=m_adc_first_tick;
+			m_mfi->enable_w(0);
+			m_saved.clear(); m_saved.seekg(0);
+			expect(machine().save().read_stream(m_saved)==STATERR_NONE,"restore MFI clock and queued provenance");
+			expect(!m_adc_blocks && !m_adc_consumed,"restore partial MFI consumer state");
+			break;
+		case 10:
+			// An in-callback stream load does not rewind this callback's
+			// scheduler-local relative deadline. Compare the producer's first
+			// restored boundary, not the later test-timer observation time.
+			expect(m_adc_blocks>=1 && m_adc_first_time==m_reference_adc_time
+				&& m_adc_first_source==m_reference_adc_source && m_adc_first_tick==m_reference_adc_tick,
+				"MFI exact first restored time, source words and provenance");
+			m_mfi->enable_w(0); m_disabled_adc_source=m_adc_source; m_disabled_adc_blocks=m_adc_blocks; break;
+		case 11:
+			expect(m_adc_source==m_disabled_adc_source && m_adc_blocks==m_disabled_adc_blocks,"disabled MFI does not clock or notify");
+			m_mfi->reset(); expect(!m_mfi->produced() && !m_mfi->consumed(),"MFI reset clears state");
+			osd_printf_info("C54x compare boundary: PASS replacement=1 armed_restore=1 exact_time=1 ack_ports=1,2 periodic=1 raw_zero=1 cancellation=1 reset_abort=1 hagar_restore=1 mfi_clock_restore=1 physical_latch_claim=0\n");
 			fatalerror("C54x compare boundary tests complete");
 		}
 		++m_stage;
-		u32 const delays[]={50,60,100,100,1000,1100,1100};
+		u32 const delays[]={50,60,100,100,1000,1100,1100,7,13,13,30};
 		m_timer->adjust(attotime::from_usec(delays[m_stage-1]));
 	}
 	required_device<nokia_dsp_c54x_device> m_backend;
 	required_device<tms320c54x_device> m_cpu;
 	required_device<nokia_hagar_device> m_hagar;
+	required_device<nokia_mfi_rx_device> m_mfi;
 	emu_timer *m_timer=nullptr;
 	unsigned m_stage=0,m_events=0;
 	u64 m_tuple=0;
 	attotime m_time,m_reference_time;
+	u64 m_adc_source=0,m_adc_consumed=0,m_adc_blocks=0,m_adc_last_tick=0;
+	u64 m_reference_adc_source=0,m_reference_adc_tick=0;
+	attotime m_adc_time,m_reference_adc_time;
+	attotime m_adc_first_time;
+	u64 m_adc_first_tick=0,m_adc_first_source=0,m_disabled_adc_source=0,m_disabled_adc_blocks=0;
 	std::stringstream m_saved;
 };
 ROM_START(tms54scu)

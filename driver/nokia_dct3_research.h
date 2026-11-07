@@ -47,6 +47,24 @@ private:
 	void frame_w(int state);
 };
 
+// ADC-pin experiment only: no over-the-air source or camping qualification.
+class dct3_rf_adc_fixture_state : public nokia_dct3_state
+{
+public:
+	using nokia_dct3_state::nokia_dct3_state;
+	void nsm3adc(machine_config &config);
+	void nsm3ad0(machine_config &config);
+protected:
+	void machine_start() override;
+private:
+	void control_w(offs_t port, u16 data);
+	u16 sample_r(offs_t component);
+	void fault_observe_w(int state);
+	bool m_tone = true;
+	s16 m_q_latch = 0;
+	u16 m_adc_receive_control = 0, m_adc_mfi_control = 0;
+};
+
 INPUT_PORTS_EXTERN(nmp5stage);
 INPUT_PORTS_EXTERN(nsb1r4t);
 INPUT_PORTS_EXTERN(nsb3r4t);
