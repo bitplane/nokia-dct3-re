@@ -3,6 +3,14 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "nsm3_p03_status_completion",
+      "owner": "native_rom6_receive_timing",
+      "status": "unresolved",
+      "predicate": "P03 bit8 has evidence-backed hardware completion semantics at the firmware-owned receive lifecycle boundary",
+      "current": "The twelve-second passive status-du8pcopi census covers7060 P03 reads in7 consumer contexts with zero overflow. Poll6867..6870 executes10 times between3.298898132s and3.341567451s; every read has0100 set(value0104),so the calls return without publishing263a.bit7. Firmware4899/ac77 sets the bit and67b2 can clear it on another branch;20eb later has1548 clear-bit reads. The backend stores P03 without a hardware completion edge. The sibling P0f=0ed8 clear is not adopted: neither its physical trigger nor its necessity for this SCH failure is qualified. Native raw transport,seven FCCH confirmations,eight residual updates and128 retained peak joins still pass under the observer.",
+      "evidence": ["tools/rom6_adc_status.lua", "driver/nokia_dsp_c54x.cpp", "docs/rom6_rf_interface.md"]
+    },
+    {
       "id": "nsm3_frame_record_and_timing_tuple_ownership",
       "owner": "native_rom6_receive_timing",
       "status": "unresolved",
