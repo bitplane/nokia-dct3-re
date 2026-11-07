@@ -1012,6 +1012,43 @@ entirely zero ADC transaction. The uploaded `18a4` preprocessing reader,
 resident `2439` discard path and `2592` sample-storage path all participate;
 the initial RSSI FIR-prefix test alone does not qualify this whole path.
 
+### Isolated positive SCH filtered-sample frontend
+
+```sh
+.venv/bin/python tools/run_rom6_receive_kernel.py --frontend
+```
+
+This starts at native sample routine `743a`, not the Viterbi entry. Its
+input is 184 complex samples (368 words) in **I,Q** order at `0080..01ef`.
+The native `2592..25af` FIR/storage path writes I then Q, unlike the earlier
+RSSI observer's Q,I output ordering. The test supplies a complete buffer
+(`0231=01f0`) as an isolated entry precondition, not a state write in a
+booting handset.
+
+The independent BT=0.3 GMSK generator produces two complex samples/symbol.
+An independent eight-coefficient FIR/decimation calculation produces the
+one-complex-sample/symbol input in that buffer, with the declared zero
+history and no receiver-selected waveform shift. Native `743a` then runs
+the three-tap/quarter-rotation builder, extended training correlation,
+channel estimation/equalization, soft decisions and the previously qualified
+Viterbi/packing/CRC chain. Exact decoded information/parity words and status
+0 pass for FN/BSIC `(1,42)`, `(11,0)` and `(2715638,63)`.
+
+All live RAM is cleared except five explicit captured configuration words:
+`0524..0526=df85,6d1b,df85`, `250f=0030`, `2f02=0040`. Input buffer,
+available-buffer count, return stack and a non-verdict status sentinel are
+initialized by the testbench. Acquired DROM tables remain intact, and the
+entire resident frontend program matches the acquired ROM6 image. The
+zero-sample control must produce zero decoded words and CRC status 1.
+Both cases have a 1,000-cycle checkpoint and a bounded 200,000-cycle finish;
+all six case/replay pairs pass without any I/O.
+
+This is a positive **native filtered-I/Q kernel** result. The preceding
+ADC ISR/FIR is calculated independently, not executed by this fixture;
+its full SCH preprocessing path and real sample arrival/interrupt timing
+remain separate obligations. No MCU-visible result, carrier selection,
+boot synchronization, BCCH or camping is implied.
+
 ### Correlator input and capture timing
 
 The first correlator pass is not reading stale reset data. All 192 words

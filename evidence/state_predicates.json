@@ -3,6 +3,14 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "nsm3_isolated_sch_filtered_iq_decode",
+      "owner": "native_rom6_receive_kernel",
+      "status": "satisfied",
+      "predicate": "The isolated native SCH sample frontend and decoder recover known information/parity bits and CRC acceptance from independently generated filtered I,Q samples",
+      "current": "Native743a receives368 I,Q words derived from independent BT=0.3 GMSK and the eight-coefficient FIR/decimator. Training correlation,equalization,soft decisions,Viterbi,packing and CRC produce exact35-bit outputs/status0 for FN/BSIC(1,42),(11,0),(2715638,63). The zero-sample negative control produces decoded0/status1. All6 case/replay pairs pass at1000/200000-cycle boundaries,with no I/O. RAM is cleared apart from five declared filter/class words; samples,complete-buffer count,return stack and status55aa are testbench inputs. Resident frontend/DROM bytes match acquired ROM6. This does not execute the preceding ADC ISR/FIR or qualify physical sample timing,MCU synchronization,BCCH or camping.",
+      "evidence": ["tests/firmware/rom6_receive_kernel.h", "tools/run_rom6_receive_kernel.py", "tools/rom6_receive_frontend.lua", "tools/gsm_sch_signal.py", "tools/rom6_adc_filter_check.py", "docs/rom6_rf_interface.md"]
+    },
+    {
       "id": "nsm3_isolated_sch_soft_decode",
       "owner": "native_rom6_receive_kernel",
       "status": "satisfied",
