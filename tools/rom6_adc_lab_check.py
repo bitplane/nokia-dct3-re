@@ -1,6 +1,8 @@
 """Independently check raw ADC oscillator provenance; never qualify RF decoding."""
 import math
 import re
+from functools import lru_cache
+from tools.gsm_sch_signal import HYPERFRAME, sch_information_bits, sch_burst_bits, gmsk_burst_samples
 from tools.rom6_timed_output_check import nanoseconds
 
 WORD=re.compile(r'mfi_rx_word: sequence=(\d+) value=([0-9a-f]{4}) source_tick=(\d+) t=(\d+\.\d{9})')
@@ -51,22 +53,35 @@ def queued_read_count(text):
     return total
 
 
-def reference_word(sequence,tick,tone,word_divider=6,burst=False):
+@lru_cache(maxsize=16)
+def sch_reference(frame):
+    return gmsk_burst_samples(sch_burst_bits(sch_information_bits(frame,42)))
+
+
+def reference_word(sequence,tick,tone,word_divider=6,burst=False,sch=False):
     if not tone: return 0
     component=(sequence-1)&1
     conversion_tick=tick-word_divider*component # Q is latched with the preceding I.
+    if sch and (conversion_tick//60000)%51 in (1,11,21,31,41) and conversion_tick%60000<7104:
+        if word_divider!=12:
+            raise ValueError('SCH fixture requires the declared twelve-tick word clock')
+        return sch_reference((conversion_tick//60000)%HYPERFRAME)[(conversion_tick%60000)//12][component]&0xffff
     if burst and not ((conversion_tick//60000)%51 in (0,10,20,30,40) and conversion_tick%60000<7104):
         return 0
     phase=2*math.pi*((conversion_tick//12)%16)/16
     return round(1024*(math.sin(phase) if component else math.cos(phase)))&0xffff
 
 
-def check_active_burst_window(text):
+def check_active_burst_window(text,sch=False,window='active'):
     """Join a later raw-read window to clock epochs, not read-time phase."""
-    rows=list(ACTIVE_WORD.finditer(text))
-    complete=re.findall(r'rom6_burst_active_complete: words=(\d+) cap=1024 reads=(\d+) observer_writes=0',text)
+    if window not in ('active','sch_raw'):
+        raise ValueError('unknown raw sample observation window')
+    prefix=f'rom6_burst_{window}'
+    pattern=ACTIVE_WORD if window=='active' else re.compile(prefix+r'_word: sequence=(\d+) read=(\d+) value=([0-9a-f]{4}) t=(\d+\.\d{9}) observer_writes=0')
+    rows=list(pattern.finditer(text))
+    complete=re.findall(prefix+r'_complete: words=(\d+) cap=1024 reads=(\d+) observer_writes=0',text)
     totals=re.findall(r'rom6_adc_lab_complete: result_words=\d+ cap=32768 reads=(\d+) observer_writes=0',text)
-    if (len(rows)!=1024 or len(rows)!=text.count('rom6_burst_active_word:') or len(complete)!=1 or
+    if (len(rows)!=1024 or len(rows)!=text.count(prefix+'_word:') or len(complete)!=1 or
             complete[0][0]!='1024' or len(totals)!=1 or complete[0][1]!=totals[0]):
         raise ValueError('incomplete active-burst raw-read window')
     active=False
@@ -74,6 +89,7 @@ def check_active_burst_window(text):
     closed=0
     last_read=None
     active_words=inactive_words=epochs=0
+    sch_words=sch_nonzero=0
     observed_epochs=set()
     ticks=[]
     events=sorted([(m.start(),'enable',m) for m in ENABLE.finditer(text)]+
@@ -102,13 +118,17 @@ def check_active_burst_window(text):
                 raise ValueError('active-burst raw window skips a read')
             local=read-closed
             tick=first_tick+(local-1)*12
-            if value!=reference_word(local,tick,True,12,True):
+            if value!=reference_word(local,tick,True,12,True,sch):
                 raise ValueError('active burst differs from independent clocked waveform')
             if tick*1_000_000_000>(nanoseconds(stamp)+1)*13_000_000:
                 raise ValueError('active burst consumed before its conversion clock')
             if not ticks and not value: raise ValueError('active window did not begin on a nonzero word')
             conversion=tick-12*((local-1)&1)
+            is_sch=sch and (conversion//60000)%51 in (1,11,21,31,41) and conversion%60000<7104
+            sch_words+=int(is_sch)
+            sch_nonzero+=int(is_sch and value!=0)
             on=(conversion//60000)%51 in (0,10,20,30,40) and conversion%60000<7104
+            on=on or (sch and (conversion//60000)%51 in (1,11,21,31,41) and conversion%60000<7104)
             active_words+=int(on)
             inactive_words+=int(not on)
             ticks.append(tick)
@@ -116,20 +136,25 @@ def check_active_burst_window(text):
             last_read=read
     if not active_words or not inactive_words or last_read>int(totals[0]):
         raise ValueError('active window does not cover both tone and off-slot samples')
+    if window=='sch_raw' and not sch_nonzero:
+        raise ValueError('SCH observation window contains no delivered coded waveform')
     return dict(checked_words=len(rows),first_read=int(rows[0].group(2)),last_read=last_read,
                 first_source_tick=ticks[0],last_source_tick=ticks[-1],
-                tone_words=active_words,off_slot_words=inactive_words,
+                tone_words=active_words,off_slot_words=inactive_words,sch_words=sch_words,sch_nonzero_words=sch_nonzero,
                 source_epochs=len(observed_epochs),fcch_detection_qualified=False,sch_qualified=False)
 
 
-def check(text,tone,burst=False):
+def check(text,tone,burst=False,sch=False):
     headers=re.findall(r'rf_adc_lab: direct_adc=1 tuned_air_source=0 tone=([01]) reference=13000000 source_phase_divider=12 word_divider=(6|12) amplitude=1024 physical_clock_claim=0',text)
     if len(headers)!=1 or text.count('rf_adc_lab:')!=1 or headers[0][0]!=str(int(tone)):
         raise ValueError('missing explicit ADC-pin laboratory source')
     divider=int(headers[0][1])
     burst_header='rf_adc_burst: frame_ticks=60000 multiframe=51 frames=0,10,20,30,40 active_ticks=7104 epoch=0 envelope=rectangular other_slots=zero tuned_air_source=0'
-    if text.count('rf_adc_burst:')!=int(burst) or burst and text.count(burst_header)!=1:
+    if text.count('rf_adc_burst:')!=int(burst and not sch) or burst and not sch and text.count(burst_header)!=1:
         raise ValueError('finite-burst ADC source declaration differs')
+    sync_header='rf_adc_sync: frame_ticks=60000 multiframe=51 fcch_frames=0,10,20,30,40 sch_frames=1,11,21,31,41 active_ticks=7104 epoch=0 envelope=rectangular bt=0.3 bsic=42 waveform_samples_per_symbol=4 other_slots=zero tuned_air_source=0'
+    if text.count('rf_adc_sync:')!=int(sch) or sch and (not burst or divider!=12 or text.count(sync_header)!=1):
+        raise ValueError('coded SCH source declaration differs')
     summaries=re.findall(r'mfi_rx_summary: [^\r\n]*\bdivider=(\d+) physical_clock_claim=0',text)
     if summaries!=[str(divider)]: raise ValueError('MFI word clock differs from declared fixture')
     totals=re.findall(r'rom6_adc_lab_complete: result_words=(\d+) cap=32768 reads=(\d+) observer_writes=0',text)
@@ -166,7 +191,7 @@ def check(text,tone,burst=False):
             raise ValueError('delivered waveform epoch is missing its first word')
         if (last_sequence is not None and (sequence!=last_sequence+1 or tick!=last_tick+divider)):
             raise ValueError('delivered waveform prefix skips a source clock')
-        if int(value,16)!=reference_word(sequence,tick,tone,divider,burst):
+        if int(value,16)!=reference_word(sequence,tick,tone,divider,burst,sch):
             raise ValueError('ADC waveform differs from independent oscillator reference')
         # Log timestamps have nanosecond precision; the component gate checks
         # exact attoseconds independently. This is only a formatting allowance.
@@ -180,7 +205,7 @@ def check(text,tone,burst=False):
     fault_times=re.findall(r'mfi_rx_fault: [^\r\n]*\bt=(\d+\.\d{9})',text)
     if len(fault_times)!=len(faults) or [row[-1] for row in contexts]!=fault_times:
         raise ValueError('fault context is not on the matching transport event')
-    return dict(direct_adc_only=True,tone=tone,finite_fcch_bursts=burst,word_divider=divider,
+    return dict(direct_adc_only=True,tone=tone,finite_fcch_bursts=burst,coded_sch_source=sch,word_divider=divider,
                 provisional_staging_words=capacity,peak_queued_words=peak,physical_buffer_capacity_qualified=False,
                 checked_prefix_words=len(words),
                 total_p27_reads=int(native[0]),independent_read_count_matches=True,

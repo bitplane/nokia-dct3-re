@@ -5,6 +5,7 @@ local machine=manager.machine
 local cpu=assert(machine.devices[':dsp_c54x:cpu'])
 local writes=0
 local adc_reads,active_words=0,0
+local sch_raw_words=0
 local sch_windows=0
 local sch_sample_writes={}
 local last_counter,last_counter_time=0,0
@@ -52,6 +53,18 @@ _G.rom6_burst_sch_window=cpu.spaces.data:install_write_tap(0x10,0x10,'rom6_burst
 end)
 _G.rom6_burst_active_tap=cpu.spaces.io:install_read_tap(0x27,0x27,'rom6_burst_active_samples',function(_,value)
     adc_reads=adc_reads+1
+    if machine.system.name=='nsm3afs' and sch_raw_words<1024 then
+        local tick=math.floor(machine.time:as_double()*13000000)
+        local frame=math.floor(tick/60000)%51
+        local sch_frame=frame==1 or frame==11 or frame==21 or frame==31 or frame==41
+        -- Only choose an observation window here. The checker reconstructs
+        -- conversion time from queue epochs, not this delayed CPU read time.
+        if sch_raw_words>0 or (sch_frame and tick%60000<7104 and value~=0) then
+            sch_raw_words=sch_raw_words+1
+            machine:logerror(string.format('rom6_burst_sch_raw_word: sequence=%d read=%d value=%04x t=%.9f observer_writes=0\n',
+                sch_raw_words,adc_reads,value&0xffff,machine.time:as_double()))
+        end
+    end
     if active_words>=1024 or (active_words==0 and value==0) then return end
     active_words=active_words+1
     machine:logerror(string.format('rom6_burst_active_word: sequence=%d read=%d value=%04x t=%.9f observer_writes=0\n',
@@ -108,6 +121,9 @@ end)
 _G.rom6_burst_stop=emu.add_machine_stop_notifier(function()
     machine:logerror(string.format('rom6_burst_complete: count_writes=%d cap=1024 observer_writes=0\n',writes))
     machine:logerror(string.format('rom6_burst_active_complete: words=%d cap=1024 reads=%d observer_writes=0\n',active_words,adc_reads))
+    if machine.system.name=='nsm3afs' then
+        machine:logerror(string.format('rom6_burst_sch_raw_complete: words=%d cap=1024 reads=%d observer_writes=0\n',sch_raw_words,adc_reads))
+    end
     machine:logerror(string.format('rom6_burst_sch_complete: windows=%d cap=40 observer_writes=0\n',sch_windows))
     machine:logerror(string.format('rom6_burst_terminal: pc=%06x ar2=%04x ar3=%04x ar4=%04x ar5=%04x a=%010x b=%010x observer_writes=0\n',
         cpu.state.GENPC.value,cpu.state.AR2.value,cpu.state.AR3.value,cpu.state.AR4.value,cpu.state.AR5.value,cpu.state.A.value,cpu.state.B.value))

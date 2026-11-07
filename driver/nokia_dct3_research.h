@@ -55,6 +55,7 @@ public:
 	void nsm3adc(machine_config &config);
 	void nsm3ad0(machine_config &config);
 	void nsm3afb(machine_config &config);
+	void nsm3afs(machine_config &config);
 protected:
 	void machine_start() override;
 private:
@@ -63,6 +64,11 @@ private:
 	void fault_observe_w(int state);
 	bool m_tone = true;
 	bool m_burst = false;
+	bool m_sch = false;
+	// Pure FN-derived memoization, not independent emulated state. Never
+	// restore its key separately from its table; a time rewind misses/rebuilds it.
+	u32 m_sch_cache_frame = ~u32(0);
+	std::array<std::array<s16, 2>, 148 * 4> m_sch_cache{};
 	s16 m_q_latch = 0;
 	u16 m_adc_receive_control = 0, m_adc_mfi_control = 0;
 };

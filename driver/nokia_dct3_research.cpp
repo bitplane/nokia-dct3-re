@@ -41,6 +41,12 @@ void dct3_rf_adc_fixture_state::nsm3afb(machine_config &config)
 	m_burst = true;
 }
 
+void dct3_rf_adc_fixture_state::nsm3afs(machine_config &config)
+{
+	nsm3afb(config);
+	m_sch = true;
+}
+
 void dct3_rf_adc_fixture_state::machine_start()
 {
 	nokia_dct3_state::machine_start();
@@ -48,7 +54,9 @@ void dct3_rf_adc_fixture_state::machine_start()
 	save_item(NAME(m_adc_receive_control)); save_item(NAME(m_adc_mfi_control));
 	machine().logerror("rf_adc_lab: direct_adc=1 tuned_air_source=0 tone=%u reference=13000000 source_phase_divider=12 word_divider=%u amplitude=1024 physical_clock_claim=0\n",
 		m_tone,subdevice<nokia_mfi_rx_device>("mfi_rx")->word_divider());
-	if (m_burst)
+	if (m_sch)
+		machine().logerror("rf_adc_sync: frame_ticks=60000 multiframe=51 fcch_frames=0,10,20,30,40 sch_frames=1,11,21,31,41 active_ticks=7104 epoch=0 envelope=rectangular bt=0.3 bsic=42 waveform_samples_per_symbol=4 other_slots=zero tuned_air_source=0\n");
+	else if (m_burst)
 		machine().logerror("rf_adc_burst: frame_ticks=60000 multiframe=51 frames=0,10,20,30,40 active_ticks=7104 epoch=0 envelope=rectangular other_slots=zero tuned_air_source=0\n");
 }
 
@@ -81,6 +89,18 @@ u16 dct3_rf_adc_fixture_state::sample_r(offs_t component)
 	if (!m_tone) return 0;
 	if (component) return u16(m_q_latch);
 	u64 const tick = machine().time().as_ticks(13'000'000);
+	if (m_sch && nokia_rf_lab::sch_active(tick))
+	{
+		u32 const frame = (tick / 60'000) % nokia_rf_lab::hyperframe;
+		if (frame != m_sch_cache_frame)
+		{
+			m_sch_cache = nokia_rf_lab::sch_samples(frame, 42);
+			m_sch_cache_frame = frame;
+		}
+		auto const &sample = m_sch_cache[(tick % 60'000) / 12];
+		m_q_latch = sample[1];
+		return u16(sample[0]);
+	}
 	unsigned const index = (tick / 12) % 16;
 	bool const active = !m_burst || nokia_rf_lab::fcch_active(tick);
 	m_q_latch = active ? q[index] : 0;

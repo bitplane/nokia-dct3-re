@@ -3,21 +3,45 @@ from tools.rom6_adc_lab_check import check,reference_word,continuous_queue_bound
 
 
 class AdcLabCheckTest(unittest.TestCase):
-    def active_fixture(self):
+    def test_sch_reference_uses_frame_and_latched_iq_epoch(self):
+        from tools.gsm_sch_signal import sch_information_bits,sch_burst_bits,gmsk_burst_samples
+        samples=gmsk_burst_samples(sch_burst_bits(sch_information_bits(11,42)))
+        for index in (0,1,17,295,591):
+            tick=660000+index*12
+            self.assertEqual(reference_word(1,tick,True,12,True,True),samples[index][0]&0xffff)
+            self.assertEqual(reference_word(2,tick+12,True,12,True,True),samples[index][1]&0xffff)
+        self.assertEqual(reference_word(1,667104,True,12,True,True),0)
+        self.assertEqual(reference_word(2,667104,True,12,True,True),samples[-1][1]&0xffff)
+        self.assertEqual(reference_word(1,660000,True,12,True),0)
+
+    def active_fixture(self,sch=False):
+        first_tick=667080 if sch else 607080
         lines=['mfi_rx_enable: state=1 produced=0 consumed=0 overrun=0 underrun=0 t=0.000000000',
                'mfi_rx_epoch: first_tick=0 divider=12 physical_clock_claim=0',
                'mfi_rx_enable: state=0 produced=40 consumed=32 overrun=0 underrun=0 t=0.001000000',
                'mfi_rx_enable: state=1 produced=0 consumed=0 overrun=0 underrun=0 t=0.046000000',
-               'mfi_rx_epoch: first_tick=607080 divider=12 physical_clock_claim=0']
+               f'mfi_rx_epoch: first_tick={first_tick} divider=12 physical_clock_claim=0']
         for sequence in range(1,1025):
-            tick=607080+(sequence-1)*12
+            tick=first_tick+(sequence-1)*12
             stamp=(tick+48)*1_000_000_000//13_000_000
             seconds,fraction=divmod(stamp,1_000_000_000)
-            value=reference_word(sequence,tick,True,12,True)
+            value=reference_word(sequence,tick,True,12,True,sch)
             lines.append(f'rom6_burst_active_word: sequence={sequence} read={sequence+32} value={value:04x} t={seconds}.{fraction:09d} observer_writes=0')
         lines.extend(['rom6_burst_active_complete: words=1024 cap=1024 reads=1056 observer_writes=0',
                       'rom6_adc_lab_complete: result_words=0 cap=32768 reads=1056 observer_writes=0'])
-        return '\n'.join(lines)
+        text='\n'.join(lines)
+        return text.replace('rom6_burst_active_','rom6_burst_sch_raw_') if sch else text
+
+    def test_sch_window_requires_real_coded_samples_and_source_epoch(self):
+        text=self.active_fixture(True)
+        report=check_active_burst_window(text,True,'sch_raw')
+        self.assertEqual(report['sch_words'],2)
+        self.assertGreater(report['sch_nonzero_words'],0)
+        self.assertFalse(report['sch_qualified'])
+        with self.assertRaises(ValueError):
+            check_active_burst_window(text.replace('first_tick=667080','first_tick=667104'),True,'sch_raw')
+        with self.assertRaises(ValueError):
+            check_active_burst_window(self.active_fixture().replace('rom6_burst_active_','rom6_burst_sch_raw_'),True,'sch_raw')
 
     def test_active_window_uses_source_epoch_and_closed_capture_counts(self):
         report=check_active_burst_window(self.active_fixture())

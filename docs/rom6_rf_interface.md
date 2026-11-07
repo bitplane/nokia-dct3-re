@@ -927,17 +927,32 @@ There is no BTS power-ramp, noise or channel model.
 Four source samples per symbol represent either quarter-bit phase at which
 the two-complex-samples/symbol lab interface can first be enabled; they do
 not double the interface clock. Q must still be latched from the same I
-conversion. These Python functions do **not** write DSP memory or messages
-and are not yet connected to a handset. Remaining work is a separately
-declared, absolute-frame ADC source and native receive validation. Source
-unit tests are not RF, synchronization or camping results.
+conversion. These Python functions do **not** write DSP memory or messages.
+The separate `nsm3afs` ADC laboratory machine supplies the corresponding
+C++ waveform at absolute frame epoch zero, with BSIC 42 and frame-derived
+SCH information. Its first-timeslot SCH frames are 1/11/21/31/41 in each
+51-frame multiframe; FCCH remains at 0/10/20/30/40. Other slots are zero.
+Independent Python comparison checks every quantized I/Q pair for four
+frame/BSIC cases. The original `nsm3afb` remains FCCH-only, including its
+failed-SCH negative acceptance. Neither machine is a tuned-air receiver.
+Source unit tests are not RF, synchronization or camping results.
+
+The six-second `nsm3afs-3tq6lnj4` trial independently checks delivery of
+1024 consecutive raw words starting at global read 5655. Source ticks
+33060000..33072276 cover frame 551's SCH: 592 active scalar words (516
+nonzero) and 432 off-slot words. Every value agrees with the Python encoder
+and modulation reference, including simultaneous-I/Q latch ownership.
+The full run consumes 1464672 words without transport faults (peak staging
+69 of the provisional 96 words). Nevertheless, the later 192-word
+correlator window remains zero and the native failed-SCH packet is unchanged.
+Thus adding a correctly delivered SCH source does not by itself correct the
+unqualified acquisition aperture. Do not tune its absolute epoch to the
+firmware request or interpret packet publication as synchronization.
 
 Reaching this standard-pattern correlator and its later processing does
 not prove FCCH acquisition, SCH synchronization, decoded frame number or
-camping, particularly because the stimulus contains no SCH burst. Next:
-add an independently encoded, absolute-epoch SCH waveform using GSM 05.02
-burst timing and
-[GSM 05.03 channel coding](https://www.etsi.org/deliver/etsi_gts/05/0503/05.00.00_60/gsmts_0503v050000p.pdf).
-Then use its known training/data positions to discriminate capture timing;
+camping, particularly for the FCCH-only negative stimulus. Native receive
+validation of the separate coded SCH source remains necessary. Use its
+known training/data positions to discriminate capture timing;
 do not retime the source to a request or guessed decoder expectation.
 No firmware result or decoded radio message is synthesized.
