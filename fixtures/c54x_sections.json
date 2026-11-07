@@ -491,5 +491,6 @@
   "accumulator_call_frames": 216,
   "return_delay_absolute_dst": 24,
   "repeated_logical_shift": 180,
-  "indirect_constant_ar_store": 93
+  "indirect_constant_ar_store": 93,
+  "stlm_accumulator_fields": 96
 }

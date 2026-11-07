@@ -663,7 +663,7 @@ constexpr bool decode_staged_store(u16 word)
 
 constexpr bool staged_accumulator_mmr_store(u16 word)
 {
-	return (word & 0xfe00) == 0x8800 && (u8(word) <= 0x01 || u8(word) == 0x07 || (u8(word) >= 0x0e && u8(word) <= 0x17) || u8(word) == 0x19 || u8(word) == 0x1a || u8(word) == 0x1d || u8(word) == 0x21 || (u8(word) >= 0x80 && u8(word) < 0x98));
+	return (word & 0xfe00) == 0x8800 && (u8(word) <= 0x01 || u8(word) == 0x07 || (u8(word) >= 0x08 && u8(word) <= 0x17) || u8(word) == 0x19 || u8(word) == 0x1a || u8(word) == 0x1d || u8(word) == 0x21 || (u8(word) >= 0x80 && u8(word) < 0x98));
 }
 
 constexpr bool staged_mmr_load(u16 word)

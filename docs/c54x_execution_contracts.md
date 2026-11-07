@@ -1595,6 +1595,23 @@ Older shared-bank conflicts reuse existing logic but are not independently
 expanded by this alias fixture. The NSM-3 witness is constant ST at `5719`,
 through AR4=`0015`, in a CALLD delay to `4384`.
 
+### Direct STLM accumulator-field destinations
+
+The direct MMR destinations AL/AH/AG/BL/BH/BG (`08..0d`) are admitted for
+STLM from either accumulator. The existing Execute-owned store samples the
+live source low word and updates only the destination field through the
+ordinary register map; guard fields retain only eight bits. No second store
+implementation, state member or arithmetic shortcut is introduced.
+
+`stlm_accumulator_fields` has 96 cases/replays: six fields, either source,
+four guard/low-word patterns and an optional immediately preceding LD
+producer. An adjacent DST observes the changed accumulator; exact field and
+RAM writes, full accumulator values, unrelated status and four distributed
+save points are checked. These vectors use SST=0 and ordinary execution;
+they do not newly qualify saturation modes, indirect accumulator destinations
+or control/repeat/interrupt compositions. The NSM-3 witness is `STLM A,AH`
+at resident `5c76` (`8809`).
+
 ### Signed MAC/MAS with a BK operand
 
 `memory_mac` owns 15,616 cases/replays across MAC/MACR/MAS/MASR,
@@ -2797,7 +2814,7 @@ word is rejected. The legacy factory/setup/checker/routes are deleted.
 LD's immediate is eight bits.
 The unseparated short-form direct-LD case checks an Access-owned pipeline
 projection, not a guaranteed silicon result for violating the latency rule.
-STLM-to-accumulator sources, general producer/interrupt/repeat compositions
+STLM-produced accumulator inputs to MVDK, general producer/interrupt/repeat compositions
 and measured physical timing remain unvalidated.
 
 Actual read-identity acceptance is separate from that timing projection.
