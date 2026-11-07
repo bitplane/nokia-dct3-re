@@ -449,6 +449,18 @@ receive models. The result does not isolate the wrong clock, capacity, IRQ or
 capture gate; do not increase capacity simply to hide the failure. The runner
 rejects any fault record, including earlier activations with reset counters.
 
+A separate counter-timed candidate armed on P03, started at the next P09
+position and used a one-shot P0b stop (replacement and out-of-range defuse
+followed the existing counter model). It also failed: both inputs started at
+2.538393231s and overran at 2.548362462s, with 21,600 produced and 21,536
+consumed words. Each independently checked 1,024 prefix words; INT0 remained
+enabled/pending while global INTM was set (bus context `b572`, ST1=`c903`,
+IMR=`035f`, IFR=`0021`). Binary SHA256:
+`9ab1193cbc569076b78dc97f144443868a5aa3816cfca7a54c59b9633f5ba657`.
+This rejects the sufficiency of that exact timed-gate/64-word/13MHz-div6
+combination, not the physical P09/P0b roles. Its implementation was removed;
+the laboratory compositions retain the prior explicitly unqualified P03 model.
+
 At both overflows the passive fault observer sees IMR=`035f`, IFR=`0021` and
 ST1=`c903`/`4903`: INT0 is enabled and pending, but global INTM is set. This
 identifies native critical-section backpressure at those events, not a missing

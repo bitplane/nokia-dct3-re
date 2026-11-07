@@ -3,6 +3,13 @@
   "kind": "falsifications",
   "entries": [
     {
+      "id": "nsm3_p09_start_p0b_stop_two_bank_candidate_is_lossless",
+      "status": "disproven",
+      "hypothesis": "Replacing immediate P03 gating with a P03-armed, one-shot P09 start and P0b stop makes the 13MHz-div6,32-word-notification,64-word-buffer ADC candidate lossless",
+      "conclusion": "Fresh six-second tone and silence runs preserve native initialization and independently match1024 delivered words each, but both overrun at2.548362462s after starting at2.538393231s:21600 produced,21536 consumed. At the overflow, bus contextb572 has ST1c903,IMR035f,IFR0021:INT0 is enabled/pending but globally masked. Binary SHA2569ab1193cbc569076b78dc97f144443868a5aa3816cfca7a54c59b9633f5ba657. The candidate used the existing epoch/period/equality policy, latest-value replacement, out-of-range cancellation and no firmware-state writes. This is a sufficiency rejection for that exact combination, not a hardware edge proof or buffer-depth/rate determination. Candidate implementation removed; original laboratory gating restored. Raw evidence remains under tmp/rom6-adc-lab/nsm3ad0-p77_qxvp and nsm3adc-ba5bkwxg. No native RSSI, FCCH, SCH, BCCH or camping qualification follows.",
+      "evidence": ["docs/rom6_rf_interface.md", "tools/rom6_adc_lab_check.py", "tools/run_rom6_adc_lab.py", "tools/rom6_receive_contract.py"]
+    },
+    {
       "id": "nsm3_continuous_mfi_two_bank_candidate_is_lossless",
       "status": "disproven",
       "hypothesis": "A continuous 13MHz/6 scalar ADC clock with32-word notifications,64-word buffering and P21.bit10 enable produces a lossless native NSM-3 receive stream, optionally gated by P03.bit0",
