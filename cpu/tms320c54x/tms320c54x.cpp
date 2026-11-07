@@ -2313,13 +2313,17 @@ void tms320c54x_device::pipeline_step()
 	if (retained_ar_operand_read)
 		m_pipeline_operand[4] = pipeline_read_data(m_pipeline_operand_address[4]);
 	if (m_pipeline_valid[3] && (m_pipeline_word[3] & 0xff00) == 0x7600 &&
-		(m_pipeline_word[3] == 0x76f8 || (u8(m_pipeline_word[3]) < 0x80 && !BIT(m_pipeline_direct_status[3], 14))))
+		(m_pipeline_word[3] == 0x76f8 || ((m_pipeline_word[3] & 0xfff8) == 0x7680 && !indirect_compatibility(3)) ||
+		 (u8(m_pipeline_word[3]) < 0x80 && !BIT(m_pipeline_direct_status[3], 14))))
 	{
 		// SPRU131G table 7-4 includes constant ST with the early DAGEN
-		// writers. Retained direct/absolute forms know their destination here;
-		// indirect aliases still require separate address/publication coverage.
-		u16 const destination = m_pipeline_word[3] == 0x76f8 ? m_pipeline_operand_address[3] : u16((m_pipeline_direct_status[3] & 0x1ff) << 7) | u8(m_pipeline_word[3]);
-		if (destination >= 0x10 && destination <= 0x19)
+		// writers. Nonmodifying indirect AR aliases retain their address before
+		// publication: a self-alias may change its own pointer at this clock.
+		bool const indirect_alias = (m_pipeline_word[3] & 0xfff8) == 0x7680;
+		u16 const destination = indirect_alias ? short_smem_address(u8(m_pipeline_word[3]), 3) :
+			m_pipeline_word[3] == 0x76f8 ? m_pipeline_operand_address[3] : u16((m_pipeline_direct_status[3] & 0x1ff) << 7) | u8(m_pipeline_word[3]);
+		if (indirect_alias) m_pipeline_operand_address[3] = destination;
+		if (destination >= 0x10 && destination <= (indirect_alias ? 0x17 : 0x19))
 		{
 			if (m_pipeline_repeat_active && m_pipeline_repeat_body_latched && m_pipeline_address[3] == m_pipeline_repeat_address)
 			{
@@ -3342,6 +3346,8 @@ void tms320c54x_device::pipeline_step()
 	if (m_pipeline_valid[4] && (m_pipeline_word[4] & 0xff00) == 0x7600)
 	{
 		u8 const mode = m_pipeline_word[4];
+		bool const retained_ar_alias = (m_pipeline_word[4] & 0xfff8) == 0x7680 && !indirect_compatibility(4) &&
+			m_pipeline_operand_address[4] >= 0x10 && m_pipeline_operand_address[4] <= 0x17;
 		if (staged_extended_immediate_store(m_pipeline_word[4]))
 		{
 			// Three-word Decode retains the offset separately from its value.
@@ -3353,7 +3359,7 @@ void tms320c54x_device::pipeline_step()
 				m_illegal = true; return;
 			}
 		}
-		else if (mode != 0xf8 && (m_pipeline_word[4] & 0xfff8) != 0x7690)
+		else if (!retained_ar_alias && mode != 0xf8 && (m_pipeline_word[4] & 0xfff8) != 0x7690)
 		{
 			bool const preincrement = BIT(mode, 7) && (mode & 0x78) == 0x18;
 			if (preincrement) indirect_modify(mode, false, 4);
@@ -3364,7 +3370,7 @@ void tms320c54x_device::pipeline_step()
 			}
 			if (BIT(mode, 7) && !preincrement) indirect_modify(mode, false, 4);
 		}
-		if (m_pipeline_operand_address[4] >= 0x10 && m_pipeline_operand_address[4] <= 0x19 && mode != 0xf8 && (mode >= 0x80 || BIT(m_pipeline_direct_status[4], 14)))
+		if (!retained_ar_alias && m_pipeline_operand_address[4] >= 0x10 && m_pipeline_operand_address[4] <= 0x19 && mode != 0xf8 && (mode >= 0x80 || BIT(m_pipeline_direct_status[4], 14)))
 		{
 			logerror("%s: staged immediate ST to DAGEN requires early-write ownership instruction=%06x word=%04x destination=%04x mode=%02x ar4=%04x sp=%04x\n",
 				machine().describe_context(), m_pipeline_address[4], m_pipeline_word[4], m_pipeline_operand_address[4], mode, m_ar[4], m_sp);

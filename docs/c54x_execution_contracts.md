@@ -1570,9 +1570,30 @@ case so consumer Decode follows publication. The closer deferred-BK case
 samples the old value in this frontend; its silicon behavior is unvalidated,
 not an admitted new latency rule. The BK=1 fixture starts at `5002`, not
 `5003`, so its starting index is inside the one-word circular buffer.
-Repeated mapped stores reject before any
-register publication. Indirect/compiler-relative aliases, CPL=1 stack behavior,
-interrupts and control-delay compositions need separate acceptance.
+Repeated mapped stores reject before any register publication. Compiler-relative
+aliases, CPL=1 stack behavior, interrupts and modifying indirect/control-delay
+compositions need separate acceptance; the nonmodifying AR subset is below.
+
+### Nonmodifying indirect constant-ST AR aliases
+
+With standard indirect addressing, `ST #value,*ARn` can deliberately name
+AR0..AR7 through their memory-mapped addresses `0010..0017`. This subset now
+reuses the existing Access-time constant-ST publication and saved deferral
+machinery. It retains the effective address before writing, so self-aliasing
+cannot redirect the later store to RAM or cause a second publication.
+
+`indirect_constant_ar_store` has 88 positive cases/replays: all eight target
+registers, self/adjacent/AR4 pointer choices with duplicates removed, two
+values, and ordinary or CALLD-delay execution. The CALLD cases include an
+actual STM pointer producer before the call. An immediately adjacent indirect
+load in the continuation consumes the new register as a RAM address; exact
+register writes, stack frames and RAM reads are checked, along with unrelated
+registers and four distributed snapshots. Five further cases retain rejection
+without target publication for SP, BK, compatibility-mode, modifying-pointer
+and repeated aliases. This is not a silicon-trap claim for excluded forms.
+Older shared-bank conflicts reuse existing logic but are not independently
+expanded by this alias fixture. The NSM-3 witness is constant ST at `5719`,
+through AR4=`0015`, in a CALLD delay to `4384`.
 
 ### Signed MAC/MAS with a BK operand
 
