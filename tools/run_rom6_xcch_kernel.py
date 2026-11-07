@@ -12,6 +12,8 @@ import tempfile
 ROOT=Path(__file__).resolve().parents[1]
 if __package__ in (None,''): sys.path.insert(0,str(ROOT))
 from tools.gsm_xcch_signal import check_vector,control_bits
+from tools.gsm_sch_signal import gmsk_burst_samples
+from tools.rom6_adc_filter_check import COEFFICIENTS,fir_word
 
 
 def main():
@@ -20,7 +22,11 @@ def main():
     parser.add_argument('--octets',default='49061b000100f11000014000000000000000002b2b2b2b',help='exactly23 radio octets, hex')
     parser.add_argument('--fire-transaction',action='store_true',help='verify request ports; halt before hardware status polling')
     parser.add_argument('--bursts',action='store_true',help='run native four-burst deinterleaving and bit decoding')
+    parser.add_argument('--frontend',action='store_true',help='run normal-burst frontend from independently filtered I/Q')
+    parser.add_argument('--zero-samples',action='store_true',help='negative control: replace filtered samples by zeros; decoding must fail')
     args=parser.parse_args()
+    if args.frontend: args.bursts=True
+    if args.zero_samples and not args.frontend: parser.error('--zero-samples requires --frontend')
     if args.bursts and args.fire_transaction: parser.error('choose one isolated boundary per run')
     octets=bytes.fromhex(args.octets)
     control_bits(octets) # Reject malformed input before building.
@@ -49,19 +55,36 @@ def main():
     for burst in vector['normal_bursts']:
         burst_words.extend(3 if bit=='0' else 12 for bit in burst[3:60]+burst[88:145])
     (run/'xcch_bursts.le16').write_bytes(b''.join(word.to_bytes(2,'little') for word in burst_words))
+    if args.frontend:
+        samples=[]
+        for burst in vector['normal_bursts']:
+            raw=[0]*32+[word&0xffff for pair in gmsk_burst_samples(tuple(map(int,burst)),2) for word in pair]
+            raw.extend([0]*(32+4*152-len(raw)))
+            history=[0]*16
+            for number,value in enumerate(raw,1):
+                history[(number-1)%16]=value
+                if number>32 and number%4==0:
+                    samples.extend(fir_word(history,COEFFICIENTS,(number-1)%16,component) for component in (0,1))
+        (run/'xcch_samples.le16').write_bytes(bytes(len(samples)*2) if args.zero_samples else
+                b''.join(word.to_bytes(2,'little') for word in samples))
     (run/'source.json').write_text(json.dumps(vector,indent=2)+'\n')
     env=os.environ.copy();env['C54X_ROM6_RECEIVE_DIR']=str(run)
     if args.fire_transaction: env['C54X_ROM6_FIRE_TRANSACTION']='1'
     else: env.pop('C54X_ROM6_FIRE_TRANSACTION',None)
     if args.bursts: env['C54X_ROM6_XCCH_BURSTS']='1'
     else: env.pop('C54X_ROM6_XCCH_BURSTS',None)
+    if args.frontend: env['C54X_ROM6_XCCH_FRONTEND']='1'
+    else: env.pop('C54X_ROM6_XCCH_FRONTEND',None)
     result=subprocess.run([sys.executable,str(ROOT/'tools/run_c54x_section.py'),'rom6_xcch',
         '--fixture-header',str(ROOT/'tests/firmware/rom6_xcch_kernel.h'),'--fixture-cases','1'],
         env=env,capture_output=True,text=True)
     (run/'kernel.log').write_text(result.stdout+result.stderr)
     report.update(native_decoding_qualified=result.returncode==0,hardware_fire_qualified=False,
         fire_request_qualified=args.fire_transaction and result.returncode==0,
-        burst_deinterleaver_qualified=args.bursts and result.returncode==0,sample_frontend_qualified=False,
+        burst_deinterleaver_qualified=args.bursts and result.returncode==0,
+        sample_frontend_qualified=args.frontend and result.returncode==0,
+        input_kind='filtered I,Q samples' if args.frontend else 'normal-burst soft nibbles' if args.bursts else 'deinterleaved soft words',
+        zero_sample_negative_control=args.zero_samples,raw_adc_preprocessing_qualified=False,
         physical_capture_qualified=False,entry_directory=str(args.entry_dir.resolve()),
         source_sha256=hashlib.sha256((run/'source.json').read_bytes()).hexdigest())
     (run/'result.json').write_text(json.dumps(report,indent=2)+'\n')

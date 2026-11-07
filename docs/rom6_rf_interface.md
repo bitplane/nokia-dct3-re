@@ -1060,8 +1060,25 @@ block reproduce all payload/parity bits and save/restore replay. No handset
 RAM or native decoder code is changed; the small laboratory caller is not
 part of the booting phone.
 
-No hardware CRC acceptance, normal-burst sample frontend, organic BCCH
-reception or camping is qualified by this fixture.
+`--frontend` replaces the supplied nibbles with four independently generated
+GMSK normal bursts at TSC2, filtered using the separately checked three-tap
+FIR. Each 304-word I,Q buffer represents 152 complex samples, including the
+zero history/trailing padding. The native `743a` normal-burst frontend owns
+training correlation, channel estimation, equalization and soft decisions;
+its output flows directly into `5905`, not back through a host decoder.
+Both SI3 and an all-ones block reproduce the exact payload/parity with
+restore replay. `--frontend --zero-samples` fails at the payload comparison
+(`2f80=0`, expected SI3 `0649`), after reaching the same halt without an
+illegal instruction. The signal, not retained phone RAM, supplies the result.
+
+Normal-burst entry uses class `50`, product mode `30`, TSC selectors
+`250b=2616=2`, filter coefficients `df85/6d1b/df85`, and completed buffer
+pointer `0231=2797`. The caller supplies a complete buffer and equal nonzero
+confidence; these are isolated contracts, not an emulated arrival schedule
+or measured analog gain. Raw ADC interrupt/FIR execution is not included.
+
+No hardware CRC acceptance, organic BCCH reception or camping is qualified
+by these isolated fixtures.
 
 ### Isolated positive SCH filtered-sample frontend
 

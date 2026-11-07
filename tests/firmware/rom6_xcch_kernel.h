@@ -40,17 +40,36 @@ inline std::vector<clocked_register_case> section_cases()
     if(bytes.size()!=2*(456+15))throw std::runtime_error("wrong xCCH vector length");
     auto word=[&](unsigned i){return u16(bytes[2*i]|(unsigned(bytes[2*i+1])<<8));};
     if(std::getenv("C54X_ROM6_XCCH_BURSTS")) {
+        bool const frontend=std::getenv("C54X_ROM6_XCCH_FRONTEND")!=nullptr;
         std::ifstream burst_file(std::string(directory)+"/xcch_bursts.le16",std::ios::binary);
         std::vector<unsigned char> burst_bytes((std::istreambuf_iterator<char>(burst_file)),{});
         if(burst_bytes.size()!=912)throw std::runtime_error("four114-word bursts required");
         auto nibble=[&](unsigned i){return u16(burst_bytes[2*i]|(unsigned(burst_bytes[2*i+1])<<8));};
+        std::vector<unsigned char> samples;
+        if(frontend) {
+            std::ifstream sample_file(std::string(directory)+"/xcch_samples.le16",std::ios::binary);
+            samples.assign(std::istreambuf_iterator<char>(sample_file),{});
+            if(samples.size()!=4*304*2)throw std::runtime_error("four304-word sample buffers required");
+        }
         // Laboratory caller supplies four completed normal-burst soft buffers.
         // Native5905/58e0 own all interleaver writes; no decoded block is supplied.
         unsigned pc=0x80;
         for(unsigned burst=0;burst<4;++burst) {
-            for(unsigned i=0;i<114;++i)initial.data.push_back({0x6000+114*burst+i,nibble(114*burst+i)});
-            for(u16 opcode:std::vector<u16>{0x7712,u16(0x6000+114*burst),0x7713,0x160,
-                    0xec71,0xe589,0xf074,0x5905})initial.program[pc++].value=opcode;
+            if(frontend) {
+                for(unsigned i=0;i<304;++i) {
+                    unsigned at=304*burst+i;
+                    initial.data.push_back({0x6000+at,u16(samples[2*at]|(unsigned(samples[2*at+1])<<8))});
+                }
+                for(u16 opcode:std::vector<u16>{0x7712,u16(0x6000+304*burst),0x7713,0x2667,
+                    0xecff,0xe589,0xec2f,0xe589,0x7711,0,0x7715,0,
+                    0x76f8,0x2f02,0x50,0xf074,0x743a})initial.program[pc++].value=opcode;
+            } else {
+                for(unsigned i=0;i<114;++i)initial.data.push_back({0x6000+114*burst+i,nibble(114*burst+i)});
+                for(u16 opcode:std::vector<u16>{0x7712,u16(0x6000+114*burst),0x7713,0x160,
+                    0xec71,0xe589})initial.program[pc++].value=opcode;
+            }
+            initial.program[pc++].value=0xf074;
+            initial.program[pc++].value=0x5905;
         }
         // Continue through the real caller's unpack/weight/Viterbi sequence.
         // 4ceb supplies this unpack count before the source selection at4cf7.
@@ -62,6 +81,10 @@ inline std::vector<clocked_register_case> section_cases()
         initial.initial.push_back({r::STATE_SP,0x1000});
         initial.data.push_back({0x250f,0x30});
         initial.data.push_back({0x2510,0x50});
+        if(frontend) {
+            for(auto const &setting:std::vector<memory_word>{{0x524,0xdf85},{0x525,0x6d1b},{0x526,0xdf85},
+                    {0x231,0x2797},{0x250b,2},{0x2616,2}})initial.data.push_back(setting);
+        }
         // Equal nonzero burst confidence is an isolated test precondition.
         initial.data.push_back({0x264b,0x5000});
         for(unsigned i=0;i<4;++i)initial.data.push_back({0x5000+i,1});
@@ -69,10 +92,11 @@ inline std::vector<clocked_register_case> section_cases()
         for(unsigned i=0;i<114;++i) {
             u16 packed=0;
             for(unsigned j=0;j<4;++j)packed|=(word(4*i+j)==32 ? 3 : 12)<<(4*j);
-            final.expected_data.push_back({0x2c2+i,packed});
+            if(!frontend)final.expected_data.push_back({0x2c2+i,packed});
         }
         for(unsigned i=0;i<15;++i)final.expected_data.push_back({0x2f80+i,word(456+i)});
-        clocked_register_case result{{{0,std::move(initial)},{200000,std::move(final)}},1000,200000};
+        unsigned const finish=frontend ? 400000 : 200000;
+        clocked_register_case result{{{0,std::move(initial)},{finish,std::move(final)}},1000,finish};
         result.io_events=std::vector<clocked_data_event>{};
         return {std::move(result)};
     }
