@@ -105,7 +105,7 @@ No one-ACK-per-packet hardware FIFO follows from this; delayed service can
 coalesce pending bits.
 
 All observed compare-edge controls are `0100`; raw `0000` writes do not reach
-a compare in this run. At the edge, tags `4400`, `4100`, `4a80` occur2,750,
+a compare in this run. At the edge, tags `4400`, `4100`, `4a80` occur 2,750,
 5,506 and2,749 times respectively. The raw callback does not interpret these
 families, declare a physical serial completion or supply an RF response.
 Its bounded verbose capture rejects truncation rather than weakening coverage.
@@ -272,3 +272,39 @@ a live RF decoder. The complete stable-payload compare capture does not choose
 between those models. A clocked sample source with
 provenance follows the programming contract; no carrier fallback is permitted.
 Native FCCH/SCH/BCCH, camp and registration come after those boundaries.
+
+## Receive interrupt and clock boundary
+
+`tools/run_rom6_native.py --scenario receive` adds a passive 1,024-read prefix
+and a first-read program view to the qualified serial/UI fixture. The complete
+342,473-write stream remains byte-identical to the earlier observers (SHA256
+`40f8ae09eb4e7a3cc124bf2d7f9c4e197e831fc122e3cd58830cb24f82f32b6f`).
+All 1,245,280 P27 reads still consume unattached silence, not a clocked buffer.
+
+The prefix contains 32 groups of 32 words. Group starts are 4.589913–4.615385ms
+apart, compatible with the inherited frame-driven INT0 policy; this is not a
+measurement of the physical COBBA sample clock. The first read occurs with
+last-written P03=`0000` and P09=`3a98`, before an in-range P09 position is
+programmed. Therefore these reads cannot qualify a P09-driven producer.
+
+Own-code ownership is concrete:
+
+- PMST=`07ac` selects INT0 vector `07c0`, which far-branches to `22da`.
+  That entry calls uploaded hook `05da`, branching to the live `1845` routine.
+- The uploaded routine repeats four P27 reads eight times. Observed bus-time
+  contexts `18a9/18af/18b5/18bb` accompany instructions at
+  `18a4/18aa/18b0/18b6`; do not identify instruction addresses from bus PCs.
+  Live `1845..18d1` matches 282 own MCU bytes at `115f1a`, SHA256
+  `bce951612776b11c87f4beda52b0ee527056fc0f9e8767174b626f64c6b786c3`.
+- Uploaded `1405..140c` constructs data `1844` as a position minus 32, wrapping
+  through data `036a`. `1988..198d` later writes that position to P09.
+  Resident `3e31` is another position writer; `3f17` disables P09 with the
+  same out-of-range sentinel used for the existing comparators.
+
+This supports investigating P09 as a receive-position comparator, but does not
+prove its interrupt route, recurring cadence, buffer ownership, sample rate or
+signed-position rule. The backend currently stores P09 without scheduling it;
+its frame callback independently asserts INT0 when the CCONT clock is enabled.
+Do not transplant the sibling's explicitly diagnostic PA09 cadence as measured
+hardware. A receive model must separate sample production, data-available
+notification and frame timing before a native decoder result can qualify it.
