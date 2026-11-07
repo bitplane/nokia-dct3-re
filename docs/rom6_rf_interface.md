@@ -1022,3 +1022,35 @@ zero correlator window. Next join the peak indices to their actual sample
 clock and SCU epoch: correct table arithmetic does not by itself prove that
 those indices represent the correct source phase or that the reload/capture
 boundary implements the physical clock.
+
+### Peak indices and the first receive block
+
+`check_peak_clock` joins the bounded peak-write prefix to actual capture
+epochs and consumed P27 words. In `nsm3afs-9lqtp5ki` all 128 retained
+peak updates (of 198 observed writes) satisfy exactly:
+
+```text
+peak_index = capture_local_consumed_words / 32 + 1
+last_consumed_source_tick = first_tick + (capture_local_consumed_words - 1) * 12
+```
+
+Every joined read count is a block multiple. The result holds in both
+search modes: native mode 0 publishes four mixed scalar words per block
+and the metric consumes four; mode 1 publishes two and consumes two.
+Both therefore advance their index once per 32 raw words, matching the
+32-quarter-symbol timing units in the peak-offset table under the declared
+word clock. The checker derives source time from the queue epoch, never
+from the delayed CPU read timestamp; mutation tests guard capture accounting,
+index bias, source-before-use and the two observed store owners.
+
+The immediate P03 gating does **not** align its first completed block with
+P09. The two FCCH starts program P09=`1368` (4968). Passive P0d samples
+and the existing 13MHz/12, 5000-quarter counter model bound the first-word
+counter at 19..20 and 3886..3887 respectively. Their first completed
+32-word blocks consequently occur around counter 50..51 and 3917..3918,
+not at 4968. These are laboratory-clock observations, not physical edge
+measurements. They motivate testing P09 as the **first completed-block
+deadline**, distinct from the previous producer-start hypothesis. Keep
+absolute waveform timing unchanged and preserve the immediate-gated run
+as a control; neither success nor failure alone establishes the silicon
+truth table.

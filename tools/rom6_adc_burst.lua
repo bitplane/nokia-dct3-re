@@ -7,6 +7,19 @@ local writes=0
 local adc_reads,active_words=0,0
 local sch_raw_words=0
 local sch_windows=0
+local last_counter,last_counter_time=0,0
+local receive_position,receive_lead=0,0
+local arm_count,receive_enabled=0,false
+local peak_writes=0
+_G.rom6_burst_peak=cpu.spaces.data:install_write_tap(0x2f58,0x2f58,'rom6_burst_peak_index',function(_,value)
+    local pc=cpu.state.GENPC.value
+    if pc<0xb40 or pc>=0xe00 then return end
+    peak_writes=peak_writes+1
+    if peak_writes>128 then return end
+    machine:logerror(string.format('rom6_burst_peak: sequence=%d t=%.9f index=%04x reads=%d mode=%04x producer=%04x consumer=%04x pc=%06x observer_writes=0\n',
+        peak_writes,machine.time:as_double(),value,adc_reads,cpu.spaces.data:read_u16(0x56e),
+        cpu.spaces.data:read_u16(0x518),cpu.spaces.data:read_u16(0x519),pc))
+end)
 local fcch_state_writes=0
 _G.rom6_burst_fcch_state={}
 for _,address in ipairs({0x2f65,0x2f6b,0x2f6c,0x2f7a,0x2f7b,0x2477,0x247a,0x247b,0x2627}) do
@@ -39,7 +52,6 @@ _G.rom6_burst_counter_load=cpu.spaces.io:install_write_tap(0x0d,0x0d,'rom6_burst
     end
 end)
 local sch_sample_writes={}
-local last_counter,last_counter_time=0,0
 local adjust_reads=0
 _G.rom6_burst_adjust_reads={}
 for _,spec in ipairs({{cpu.spaces.io,0x10,'port10'},{cpu.spaces.data,0x557,'word0557'},{cpu.spaces.data,0x265a,'word265a'}}) do
@@ -56,9 +68,22 @@ _G.rom6_burst_counter=cpu.spaces.io:install_read_tap(0x0d,0x0d,'rom6_burst_count
 end)
 local capture_controls,capture_control_count={},0
 _G.rom6_burst_capture_controls={}
-for _,port in ipairs({0x03,0x09,0x0a,0x0b,0x21}) do
+for _,port in ipairs({0x03,0x09,0x0a,0x0b,0x0e,0x21}) do
     _G.rom6_burst_capture_controls[#_G.rom6_burst_capture_controls+1]=cpu.spaces.io:install_write_tap(port,port,'rom6_burst_capture_control',function(_,value)
         if sch_windows>0 then return end
+        if port==9 then receive_position=value end
+        if port==0x0a then receive_lead=value end
+        if port==3 then
+            local enabled=value&1~=0
+            if enabled and not receive_enabled then
+                arm_count=arm_count+1
+                if arm_count<=16 then
+                    machine:logerror(string.format('rom6_burst_arm: sequence=%d t=%.9f target=%04x lead=%04x counter=%04x counter_t=%.9f reads=%d observer_writes=0\n',
+                        arm_count,machine.time:as_double(),receive_position,receive_lead,last_counter,last_counter_time,adc_reads))
+                end
+            end
+            receive_enabled=enabled
+        end
         capture_control_count=capture_control_count+1
         capture_controls[(capture_control_count-1)%128+1]={port=port,value=value,time=machine.time:as_double(),reads=adc_reads,pc=cpu.state.GENPC.value,counter=last_counter,counter_time=last_counter_time}
     end)
@@ -164,6 +189,8 @@ _G.rom6_burst_stop=emu.add_machine_stop_notifier(function()
     machine:logerror(string.format('rom6_burst_fcch_complete: writes=%d cap=256 observer_writes=0\n',fcch_state_writes))
     machine:logerror(string.format('rom6_burst_counter_load_complete: writes=%d cap=32 observer_writes=0\n',counter_loads))
     machine:logerror(string.format('rom6_burst_adjust_complete: reads=%d cap=32 observer_writes=0\n',adjust_reads))
+    machine:logerror(string.format('rom6_burst_peak_complete: writes=%d cap=128 observer_writes=0\n',peak_writes))
+    machine:logerror(string.format('rom6_burst_arm_complete: arms=%d cap=16 until_first_sch=1 observer_writes=0\n',arm_count))
     machine:logerror(string.format('rom6_burst_active_complete: words=%d cap=1024 reads=%d observer_writes=0\n',active_words,adc_reads))
     if machine.system.name=='nsm3afs' then
         machine:logerror(string.format('rom6_burst_sch_raw_complete: words=%d cap=1024 reads=%d observer_writes=0\n',sch_raw_words,adc_reads))

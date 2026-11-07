@@ -13,7 +13,7 @@ from tools.run_rom6_native import prepare,execute
 from tools.rom6_adc_lab_check import check,check_active_burst_window
 from tools.rom6_adc_filter_check import check as check_filter,check_mixer
 from tools.rom6_adc_measure_check import check as check_measure,check_frequency_correction,check_rx_publications,check_fcch_only_sch_failure
-from tools.rom6_adc_detect_check import check as check_detect,check_finite_search_acceptance,check_finite_peak_accumulation
+from tools.rom6_adc_detect_check import check as check_detect,check_finite_search_acceptance,check_finite_peak_accumulation,check_peak_clock
 
 
 def main():
@@ -56,6 +56,7 @@ def main():
                 report['native_fcch_residuals']=check_finite_peak_accumulation(text,
                     (directory/'rom6_adc_processing_program.be16').read_bytes(),
                     (ROOT/'roms/noki8210/8210_5.31ppm_c.fls').read_bytes())
+                report['native_peak_clock']=check_peak_clock(text)
             if args.machine=='nsm3afb' and args.seconds>=4:
                 report['native_sch_negative']=check_fcch_only_sch_failure(text,
                     (directory/'rom6_adc_processing_program.be16').read_bytes())

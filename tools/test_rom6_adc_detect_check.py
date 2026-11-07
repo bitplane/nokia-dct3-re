@@ -1,10 +1,35 @@
 import unittest
 from unittest.mock import patch
 
-from tools.rom6_adc_detect_check import check,complex_products,normalized_metric,check_finite_search_acceptance,check_finite_peak_accumulation
+from tools.rom6_adc_detect_check import (check,complex_products,normalized_metric,
+    check_finite_search_acceptance,check_finite_peak_accumulation,check_peak_clock)
 
 
 class NativeComplexProductsTest(unittest.TestCase):
+    def peak_fixture(self,closed=False):
+        prefix=('mfi_rx_enable: state=1 produced=0 consumed=0 overrun=0 underrun=0 t=0.001000000\n'
+                'mfi_rx_epoch: first_tick=13008 divider=12 physical_clock_claim=0\n'
+                'mfi_rx_enable: state=0 produced=32 consumed=32 overrun=0 underrun=0 t=0.009000000\n') if closed else ''
+        return prefix+('mfi_rx_enable: state=1 produced=0 consumed=0 overrun=0 underrun=0 t=0.010000000\n'
+                       'mfi_rx_epoch: first_tick=130008 divider=12 physical_clock_claim=0\n'
+                       f'rom6_burst_peak: sequence=1 t=0.010070000 index=0003 reads={96 if closed else 64} mode=0000 producer=0080 consumer=0080 pc=000bab observer_writes=0\n'
+                       'rom6_burst_peak_complete: writes=1 cap=128 observer_writes=0')
+
+    def test_peak_index_joins_capture_local_blocks_and_not_read_time(self):
+        for closed in (False,True):
+            report=check_peak_clock(self.peak_fixture(closed))
+            self.assertEqual(report['first_last_source_ticks'],[130764,130764])
+            self.assertEqual(report['index_bias'],1)
+            self.assertFalse(report['physical_capture_qualified'])
+
+    def test_peak_index_rejects_count_clock_and_owner_drift(self):
+        text=self.peak_fixture()
+        for old,new in [('index=0003','index=0004'),('reads=64','reads=65'),
+                        ('mode=0000','mode=0002'),('pc=000bab','pc=000baf'),
+                        ('writes=1','writes=2'),('t=0.010070000','t=0.010020000')]:
+            with self.subTest(old=old),self.assertRaises(ValueError):
+                check_peak_clock(text.replace(old,new,1))
+
     def residual_fixture(self):
         program=bytearray(131072)
         for number in range(1,21):

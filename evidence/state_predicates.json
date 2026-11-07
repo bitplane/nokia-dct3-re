@@ -3,6 +3,14 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "nsm3_fcch_peak_index_source_clock",
+      "owner": "native_rom6_receive_timing",
+      "status": "satisfied",
+      "predicate": "The bounded native FCCH peak indices join exactly to capture-local consumed blocks and their source-clock epochs",
+      "current": "nsm3afs-9lqtp5ki retains128 of198 peak writes. Every mode0/1 peak index equals(capture-local P27 reads/32)+1,with block-multiple reads and source-before-use timestamps. Mode0 publishes/consumes four mixed scalar words per block; mode1 publishes/consumes two. Under the declared12-reference-tick word clock,an index advances32 quarter symbols. First completed blocks under immediate P03 gating do not coincide with programmed P09=4968: passive-counter bounds are50..51 and3917..3918 for the two FCCH starts. This motivates a separate first-completed-block deadline experiment,not a physical-trigger conclusion or source retiming. SCH and camping remain unqualified.",
+      "evidence": ["tools/rom6_adc_burst.lua", "tools/rom6_adc_detect_check.py", "tools/test_rom6_adc_detect_check.py", "docs/rom6_rf_interface.md"]
+    },
+    {
       "id": "c54x_mapped_reada_consumer_publication",
       "owner": "tms320c54x_cpu",
       "status": "satisfied",

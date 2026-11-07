@@ -11,6 +11,52 @@ METRIC=re.compile(r'rom6_detect_metric: sequence=(\d+) a=([0-9a-f]{10}) corr=([0
 THRESHOLD=re.compile(r'rom6_detect_threshold: sequence=(\d+) t=(\d+\.\d{9}) value=([0-9a-f]{4}) a=([0-9a-f]{10}) cpu_pc=000b9a observer_writes=0')
 FCCH_STATE=re.compile(r'rom6_burst_fcch_state: sequence=(\d+) t=(\d+\.\d{9}) address=([0-9a-f]{4}) value=([0-9a-f]{4}) pc=([0-9a-f]{6}) reads=(\d+) observer_writes=0')
 FCCH_ACCUMULATE=re.compile(r'rom6_burst_fcch_accumulate: t=(\d+\.\d{9}) previous=([0-9a-f]{4}) value=([0-9a-f]{4}) a=([0-9a-f]{10}) b=([0-9a-f]{10}) st1=([0-9a-f]{4}) peak=([0-9a-f]{4}) base=([0-9a-f]{4}) index=([0-9a-f]{4}) pc=000d0c observer_writes=0')
+PEAK=re.compile(r'rom6_burst_peak: sequence=(\d+) t=(\d+\.\d{9}) index=([0-9a-f]{4}) reads=(\d+) mode=([0-9a-f]{4}) producer=([0-9a-f]{4}) consumer=([0-9a-f]{4}) pc=([0-9a-f]{6}) observer_writes=0')
+
+
+def check_peak_clock(text):
+    """Join bounded peak indices to delivered source clocks, not CPU read phase."""
+    from tools.rom6_adc_lab_check import ENABLE,EPOCH
+    rows=list(PEAK.finditer(text))
+    totals=re.findall(r'rom6_burst_peak_complete: writes=(\d+) cap=128 observer_writes=0',text)
+    if (len(totals)!=1 or len(rows)!=text.count('rom6_burst_peak:') or
+            not rows or len(rows)!=min(int(totals[0]),128)):
+        raise ValueError('incomplete bounded native peak observations')
+    events=sorted([(m.start(),'enable',m) for m in ENABLE.finditer(text)]+
+                  [(m.start(),'epoch',m) for m in EPOCH.finditer(text)]+
+                  [(m.start(),'peak',m) for m in rows])
+    closed=0
+    active=False
+    epoch=None
+    joined=[]
+    for _,kind,row in events:
+        if kind=='enable':
+            state,produced,consumed,overrun,underrun=map(int,row.groups())
+            if bool(state)==active or overrun or underrun or consumed>produced:
+                raise ValueError('invalid peak-clock capture transition')
+            active=bool(state)
+            epoch=None
+            if not active: closed+=consumed
+        elif kind=='epoch':
+            if not active or epoch is not None or row[2]!='12':
+                raise ValueError('native peak source epoch differs')
+            epoch=int(row[1])
+        else:
+            sequence,stamp,index,reads,mode,producer,consumer,pc=row.groups()
+            index,reads,mode=int(index,16),int(reads),int(mode,16)
+            local=reads-closed
+            if (not active or epoch is None or local<=0 or local%32 or
+                    index!=local//32+1 or int(sequence)!=len(joined)+1 or mode not in (0,1) or
+                    pc not in ('000bab','000ced')):
+                raise ValueError('native peak index differs from consumed 32-word blocks')
+            tick=epoch+(local-1)*12
+            if tick*1_000_000_000>(nanoseconds(stamp)+1)*13_000_000:
+                raise ValueError('native peak precedes its source samples')
+            joined.append((tick,mode))
+    return dict(checked_peaks=len(joined),observed_peak_writes=int(totals[0]),
+                first_last_source_ticks=[joined[0][0],joined[-1][0]],
+                modes=sorted({row[1] for row in joined}),words_per_index=32,index_bias=1,
+                physical_capture_qualified=False,sch_qualified=False,camping_qualified=False)
 
 
 def check_finite_peak_accumulation(text,program,mcu):
