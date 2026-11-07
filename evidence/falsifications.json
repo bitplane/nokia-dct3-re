@@ -3,6 +3,13 @@
   "kind": "falsifications",
   "entries": [
     {
+      "id": "nsm3_p09_completed_block_deadline_is_sufficient_for_sch",
+      "status": "disproven",
+      "hypothesis": "With corrected native peak arithmetic,aligning the first completed32-word block to the next P09 match is sufficient to acquire the independently timed coded SCH source",
+      "conclusion": "The four-second nsm3afq-79w8cr8i trial uses the existing13MHz/12 SCU model,divider12,96-word staging and unchanged absolute FCCH/SCH waveform. It chooses a future P09 match with enough lead to acquire32 real words,rounds the match to the scalar clock and starts31 word clocks before that deadline. Pending starts honor latest P09/reload writes; P03/MFI disable cancels. All4096 retained raw words match independently,totalP27 reads912608,peak staging69,no transport faults or unsupported CPU execution. Five retained actual first-word clocks exactly match scheduled first clocks,each372 reference ticks before its completed-block deadline. Native FCCH accepts with residual0,but SCH remains three zero decoded words,remainder0,status1 and type80 payload40000100000b0004000000000000 at3.343457692s. The immediate-control peak-index checker rejects the changed bias: all128 retained peaks have bias0 rather than1; that is not treated as a waveform fault or repaired by changing its expectation. The separate failed-SCH evidence rejects sufficiency. Candidate machine,clock API,callback changes and registration patch were removed. This does not disprove every P09 timing interpretation or prove its physical trigger.",
+      "evidence": ["docs/rom6_rf_interface.md", "tools/rom6_adc_lab_check.py", "tools/rom6_adc_detect_check.py", "tools/rom6_adc_measure_check.py"]
+    },
+    {
       "id": "nsm3_p21_service_rearm_alone_resolves_64_word_overrun",
       "status": "disproven",
       "hypothesis": "Holding data-ready during P21.bit11 read service and re-notifying complete queued blocks at service end makes the64-word clocked laboratory receiver lossless",

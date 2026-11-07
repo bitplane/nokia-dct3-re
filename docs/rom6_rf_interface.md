@@ -1049,8 +1049,31 @@ and the existing 13MHz/12, 5000-quarter counter model bound the first-word
 counter at 19..20 and 3886..3887 respectively. Their first completed
 32-word blocks consequently occur around counter 50..51 and 3917..3918,
 not at 4968. These are laboratory-clock observations, not physical edge
-measurements. They motivate testing P09 as the **first completed-block
-deadline**, distinct from the previous producer-start hypothesis. Keep
-absolute waveform timing unchanged and preserve the immediate-gated run
-as a control; neither success nor failure alone establishes the silicon
-truth table.
+measurements. A **first completed-block deadline** hypothesis is distinct
+from the previous producer-start hypothesis, but was also insufficient in
+the bounded trial below. Neither result establishes the silicon truth table.
+
+The removed completed-block candidate used the same source, scalar divider
+12 and 96-word staging. It selected a future P09 match with enough lead for
+32 real samples, rounded the deadline up to the scalar clock and placed
+the first word 31 clocks before it. Latest P09/reload writes replaced a
+pending start; P03/MFI disable cancelled it. No samples were backfilled.
+In `nsm3afq-79w8cr8i`, all 4096 retained raw words match the independent
+waveform and 912608 total reads have no transport faults (peak staging 69).
+Five retained first-word clocks equal their scheduled values, each 372
+reference ticks before its completed-block deadline. Native FCCH accepts
+with residual zero, yet the SCH result remains three zero words, remainder
+zero and error status one; its native type-80 packet at `3.343457692s` is
+`40000100000b0004000000000000`.
+
+The control's peak-index invariant does not automatically transfer to a
+different start lifecycle: the candidate's retained peaks all have bias
+zero instead of one. The existing checker correctly rejects that mismatch;
+it was not weakened to accept the experiment. The failed native SCH result
+independently rejects the candidate's sufficiency. Its machine, clock API
+and registration changes were deleted rather than promoted into the driver.
+
+Next resolve **which frame** the firmware selects for class-40 acquisition:
+the FCCH frame adjustment into `0912..0913`, subsequent frame advances,
+and the scheduler's preparation-versus-sampling boundary. Do not compensate
+for an unresolved frame-selection error by shifting the laboratory source.
