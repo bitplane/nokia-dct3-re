@@ -19,7 +19,9 @@ def main():
     parser.add_argument('--entry-dir',type=Path,required=True,help='passive SCH capture containing resident program and DROM')
     parser.add_argument('--octets',default='49061b000100f11000014000000000000000002b2b2b2b',help='exactly23 radio octets, hex')
     parser.add_argument('--fire-transaction',action='store_true',help='verify request ports; halt before hardware status polling')
+    parser.add_argument('--bursts',action='store_true',help='run native four-burst deinterleaving and bit decoding')
     args=parser.parse_args()
+    if args.bursts and args.fire_transaction: parser.error('choose one isolated boundary per run')
     octets=bytes.fromhex(args.octets)
     control_bits(octets) # Reject malformed input before building.
     parent=ROOT/'tmp/rom6-receive-kernel';parent.mkdir(exist_ok=True)
@@ -43,17 +45,23 @@ def main():
     words=[32 if bit=='0' else 0xffe0 for bit in vector['coded']]
     words.extend(sum(bit<<(index%16) for index,bit in enumerate(bits) if index//16==word) for word in range(15))
     (run/'xcch_vector.le16').write_bytes(b''.join(word.to_bytes(2,'little') for word in words))
+    burst_words=[]
+    for burst in vector['normal_bursts']:
+        burst_words.extend(3 if bit=='0' else 12 for bit in burst[3:60]+burst[88:145])
+    (run/'xcch_bursts.le16').write_bytes(b''.join(word.to_bytes(2,'little') for word in burst_words))
     (run/'source.json').write_text(json.dumps(vector,indent=2)+'\n')
     env=os.environ.copy();env['C54X_ROM6_RECEIVE_DIR']=str(run)
     if args.fire_transaction: env['C54X_ROM6_FIRE_TRANSACTION']='1'
     else: env.pop('C54X_ROM6_FIRE_TRANSACTION',None)
+    if args.bursts: env['C54X_ROM6_XCCH_BURSTS']='1'
+    else: env.pop('C54X_ROM6_XCCH_BURSTS',None)
     result=subprocess.run([sys.executable,str(ROOT/'tools/run_c54x_section.py'),'rom6_xcch',
         '--fixture-header',str(ROOT/'tests/firmware/rom6_xcch_kernel.h'),'--fixture-cases','1'],
         env=env,capture_output=True,text=True)
     (run/'kernel.log').write_text(result.stdout+result.stderr)
     report.update(native_decoding_qualified=result.returncode==0,hardware_fire_qualified=False,
         fire_request_qualified=args.fire_transaction and result.returncode==0,
-        burst_deinterleaver_qualified=False,sample_frontend_qualified=False,
+        burst_deinterleaver_qualified=args.bursts and result.returncode==0,sample_frontend_qualified=False,
         physical_capture_qualified=False,entry_directory=str(args.entry_dir.resolve()),
         source_sha256=hashlib.sha256((run/'source.json').read_bytes()).hexdigest())
     (run/'result.json').write_text(json.dumps(report,indent=2)+'\n')

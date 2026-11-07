@@ -1044,8 +1044,24 @@ accelerator's status. The consumer accepts status `20` directly and uses
 status `40` for a correction path reading ports `3a/3b`; other results
 produce the failure flag. A future model must compute the polynomial and
 must not interpret the request's `5` as a completed, successful check.
-No hardware CRC acceptance, native burst deinterleaving, normal-burst sample
-frontend, organic BCCH reception or camping is qualified by this fixture.
+The `--bursts` option instead supplies the four independent normal bursts'
+114 soft nibbles, excluding tails/training/stealing flags, to native
+`5905/58e0`. Their interleaver writes are checked against every one of the
+114 packed words at `02c2`. The routine starts each half-burst at
+`57*burst` and `57*(burst+4)`, then advances 64 modulo 456, matching the
+independent GSM control-channel mapping. The adjacent `5b26` path and its
+`dcc2` table are a different layout, not this four-burst control path.
+
+The isolated caller then enters `4cf7` with the actual caller's unpack
+count `AR1=71`, and executes `5b18`, `4da7`, `924c` and the normalizer.
+Equal, nonzero per-burst confidence is an explicit laboratory precondition;
+positive/negative decisions use nibbles `3/c`. Known SI3 and an all-ones
+block reproduce all payload/parity bits and save/restore replay. No handset
+RAM or native decoder code is changed; the small laboratory caller is not
+part of the booting phone.
+
+No hardware CRC acceptance, normal-burst sample frontend, organic BCCH
+reception or camping is qualified by this fixture.
 
 ### Isolated positive SCH filtered-sample frontend
 
