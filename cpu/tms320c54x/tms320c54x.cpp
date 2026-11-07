@@ -2703,11 +2703,11 @@ void tms320c54x_device::pipeline_step()
 		}
 		bool const status = (m_pipeline_word[3] == 0x7308 || m_pipeline_word[3] == 0x730b) && destination == 7;
 		bool const brc = destination == 0x1a;
-		if ((m_pipeline_word[3] == 0x7308 || m_pipeline_word[3] == 0x730b) && !status && !brc && destination < 0x60)
+		if ((m_pipeline_word[3] == 0x7308 || m_pipeline_word[3] == 0x730b) && !status && !brc && !staged_accumulator_destination_move(m_pipeline_word[3], destination) && destination < 0x60)
 		{
 			logerror("%s: staged MVMD accumulator-to-register destination is unsupported\n", machine().describe_context()); m_illegal = true; return;
 		}
-		if (staged_direct_mvmd(m_pipeline_word[3]) && !status && !brc && !staged_t_register_move(m_pipeline_word[3], destination) && destination < 0x60 && (destination < 0x10 || destination > 0x19))
+		if (staged_direct_mvmd(m_pipeline_word[3]) && !status && !brc && !staged_accumulator_destination_move(m_pipeline_word[3], destination) && !staged_t_register_move(m_pipeline_word[3], destination) && destination < 0x60 && (destination < 0x10 || destination > 0x19))
 		{
 			logerror("%s: staged MVMD control/peripheral destination is unsupported\n", machine().describe_context()); m_illegal = true; return;
 		}

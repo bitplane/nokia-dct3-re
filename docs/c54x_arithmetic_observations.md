@@ -1372,3 +1372,20 @@ inference: MCU writes to MAD2 byte `0x20002` are `1` (cold release), `0`
 MAD2 now exports this product-mask-derived level to the backend; the C54x
 implementation drives the CPU reset input so CPU state restarts while the
 external DSPIF/on-chip DARAM stores survive the warm transition.
+
+### Mapped accumulator moves and repeated register arithmetic
+
+`mvmd_accumulator` covers all six accumulator-word sources and destinations
+with four operand patterns (144 cases plus restore replay). `MVMD` retains
+the source word, updates only the selected destination field at its mapped
+write clock, and masks guard writes to eight bits. These are ordinary mapped
+accesses, not direct ALU operations; see [SPRU131G section 7.5.10](https://www.ti.com/lit/ug/spru131g/spru131g.pdf).
+The ROM6 normal-burst frontend uses `MVMD AL,AH` at `7720` and `BL,BH`
+at `78bc`; these previously hit explicit unsupported-operation guards.
+
+`repeated_accumulator_add` checks zero-shift accumulator ADD/SUB with all
+source/destination pairs, counts 0/1/25/255 and signed/wrapping operands
+(96 cases plus restore replay). Each retained issue consumes the live
+accumulator result; it does not replay a precomputed operand/result. This
+enables the normal-burst quality calculation's `RPT #25; ADD B,A` at
+`78da..78db`. Other shift encodings are not enabled by this extension.

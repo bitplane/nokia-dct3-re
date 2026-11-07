@@ -193,8 +193,9 @@ constexpr bool decode_staged_pipelined_repeat(u16 word)
 	bool const coefficient_repeat = staged_firs(word) || (staged_coefficient_mac(word) && !BIT(word, 9) && u8(word) < 0xe0);
 	// SFTL consumes the live accumulator in Execute, once per retained issue.
 	bool const logical_shift = (word & 0xfce0) == 0xf0e0;
+	bool const accumulator_add_sub = (word & 0xfcff) == 0xf400 || (word & 0xfcff) == 0xf420;
 	bool const short_double_add = (word & 0xfc00) == 0x5000 && u8(word) < 0x98;
-	return short_double_add || logical_shift || coefficient_repeat || short_add || short_logic || short_mar || staged_repeat_data_copy(word) || staged_repeat_destination_copy(word) || staged_repeat_accumulator_store(word) || staged_poly(word) || decode_staged_parallel_load(word) || staged_parallel_alu(word) || ((square_accumulate(word) || (word & 0xf800) == 0x2800) && u8(word) < 0x98) || (word & 0xf000) == 0xb000 || staged_mvdd(word) || (((word & 0xff00) == 0x4b00 || (word & 0xff00) == 0x8b00) && u8(word) < 0x98);
+	return accumulator_add_sub || short_double_add || logical_shift || coefficient_repeat || short_add || short_logic || short_mar || staged_repeat_data_copy(word) || staged_repeat_destination_copy(word) || staged_repeat_accumulator_store(word) || staged_poly(word) || decode_staged_parallel_load(word) || staged_parallel_alu(word) || ((square_accumulate(word) || (word & 0xf800) == 0x2800) && u8(word) < 0x98) || (word & 0xf000) == 0xb000 || staged_mvdd(word) || (((word & 0xff00) == 0x4b00 || (word & 0xff00) == 0x8b00) && u8(word) < 0x98);
 }
 
 constexpr bool staged_repeat_accumulator_load(u16 word)
@@ -338,7 +339,7 @@ constexpr bool staged_indexed_move(u16 word)
 
 constexpr bool staged_direct_mvmd(u16 word)
 {
-	return (word & 0xfff8) == 0x7310 || word == 0x7308 || word == 0x730b || word == 0x730e || word == 0x730f || word == 0x7319 || word == 0x731a;
+	return (word & 0xfff8) == 0x7310 || (word >= 0x7308 && word <= 0x730f) || word == 0x7319 || word == 0x731a;
 }
 
 constexpr bool decode_staged_move(u16 word)
@@ -802,7 +803,7 @@ inline bool staged_mar(u16 word) { return BIT(staged_opcode_flags[word], 31); }
 
 inline bool staged_accumulator_destination_move(u16 word, u16 destination)
 {
-	return (word & 0xff00) == 0x7100 && staged_move(word) && destination >= 8 && destination <= 0x0d;
+	return ((word & 0xff00) == 0x7100 || staged_direct_mvmd(word)) && staged_move(word) && destination >= 8 && destination <= 0x0d;
 }
 
 inline bool staged_clock_destination_move(u16 word, u16 destination)
