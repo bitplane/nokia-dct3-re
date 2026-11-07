@@ -1,0 +1,59 @@
+import unittest
+
+from tools.run_npe3_native import check_execution
+
+
+class Native6210EvidenceTest(unittest.TestCase):
+    def setUp(self):
+        self.flash = bytearray(0x26000)
+        self.flash[0x24b7c:0x24b7c + 1258] = bytes([0xa5]) * 1258
+        self.flash[0x1eac4:0x1eac4 + 844] = bytes([0x3c]) * 844
+        self.loader = self.flash[0x24b7c:0x24b7c + 1258]
+        self.program = bytearray(0x20000)
+        self.program[0x590 * 2:0x736 * 2] = self.flash[0x1eac4:0x1eac4 + 844]
+        self.text = '\n'.join((
+            'npe3_native_composition: hle=0 staged=0 clock_policy=13000000 fitted_mask_claim=0 observer_writes=0',
+            'npe3_native_verifier: result0=0000 result1=0006 observer_writes=0',
+            'npe3_native_entry: kind=reset ordinal=1 observer_writes=0',
+            'npe3_native_entry: kind=reset ordinal=2 observer_writes=0',
+            'npe3_native_entry: kind=loader ordinal=1 observer_writes=0',
+            'npe3_native_entry: kind=loader ordinal=2 observer_writes=0',
+            'npe3_native_entry: kind=resident ordinal=1 observer_writes=0',
+            'npe3_native_selftest: command=0d faults=00 flag=c4 observer_writes=0',
+            'npe3_native_terminal: t=30.016667 arm=005078a8 dsp=003999 illegal=0 idle=1 pmst=07ac observer_writes=0',
+            'npe3_native_coverage: missing_program_reads=0 observer_writes=0',
+        ))
+
+    def check(self, text=None, loader=None, program=None):
+        check_execution(self.text if text is None else text,
+                        self.loader if loader is None else loader,
+                        self.program if program is None else program, self.flash)
+
+    def test_complete_own_uploads(self):
+        self.check()
+
+    def test_restarts_missing_terminal_and_failed_contracts_reject(self):
+        cases = [self.text + '\nnpe3_native_entry: kind=reset ordinal=3',
+                 self.text + '\n' + self.text,
+                 self.text.replace('illegal=0', 'illegal=1'),
+                 self.text.replace('faults=00', 'faults=01'),
+                 self.text.replace('missing_program_reads=0', 'missing_program_reads=1'),
+                 self.text.replace('hle=0', 'hle=1'),
+                 self.text.replace('npe3_native_terminal:', 'missing_terminal:'),
+                 self.text + '\nLua error: observer failed']
+        for text in cases:
+            with self.subTest(text=text), self.assertRaises(ValueError):
+                self.check(text=text)
+
+    def test_foreign_or_incomplete_uploads_reject(self):
+        with self.assertRaises(ValueError):
+            self.check(loader=self.loader[:-2])
+        for index in (0x590 * 2, 0x736 * 2 - 1):
+            changed = self.program.copy()
+            changed[index] ^= 1
+            with self.subTest(index=index), self.assertRaises(ValueError):
+                self.check(program=changed)
+
+
+if __name__ == '__main__':
+    unittest.main()

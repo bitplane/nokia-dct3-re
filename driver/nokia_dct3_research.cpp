@@ -926,6 +926,28 @@ void nokia_dct3_state::npe3stage(machine_config &config)
 	staged.set_observe_after_missing_code(true);
 }
 
+void nokia_dct3_state::npe3r6(machine_config &config)
+{
+	noki6210(config);
+	nokia_product_config native = m_product;
+	// Own 3d71f8 battery conversion: nominal input, not measured ADC units.
+	native.ccont_board.channel_defaults[2] = 0x230;
+	native.simi_controller = true;
+	native.synthetic_sim_card = true;
+	apply_product_config(native);
+	config.device_remove("dsp_hle");
+	// Compatibility trial at the staged fixture's 13 MHz policy. NPE-3's
+	// physical DSP multiplier is not established by its 13 MHz RFIclk table.
+	NOKIA_DSP_C54X(config, m_dsp_c54x, 13'000'000);
+	configure_native_dsp_attachments(*m_dsp_c54x);
+	m_dsp_c54x->set_overlay_end(0x2000);
+	m_dsp_c54x->set_port36_handshake(true);
+	auto &cpu = *subdevice<tms320c54x_device>("dsp_c54x:cpu");
+	cpu.set_extended_program(true);
+	cpu.set_power_on_imr(0);
+	m_dsp_c54x->tone_update_cb().set(FUNC(nokia_dct3_state::dsp_tone_update_w));
+}
+
 void nokia_dct3_state::npe3hle(machine_config &config)
 {
 	npe3stage(config);

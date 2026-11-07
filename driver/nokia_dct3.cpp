@@ -2926,6 +2926,24 @@ ROM_START( npe3hle )
 		CRC(3c6d3437) SHA1(b3a527ede1be87bd715fb3741a81eef5bd422efa))
 ROM_END
 
+// Acquired NSM-3 mask candidate with NPE-3's own MCU/PMM and uploads.
+// A compatibility experiment, not identification of the fitted NPE-3 mask.
+ROM_START( npe3r6 )
+	ROM_REGION16_BE(0x10000, "boot_rom", ROMREGION_ERASEFF)
+	ROM_LOAD("mad2_mask_rom.bin", 0, 0x10000, NO_DUMP)
+	ROM_REGION16_BE(0x20000, "dsp_program", ROMREGION_ERASEFF)
+	ROM_LOAD("nsm3_rom6_program.be16", 0, 0x20000,
+		CRC(f90ba19a) SHA1(d6b1f40eaa4b2c8a9f7adcb6cb5864d9cc1354fc))
+	ROM_REGION16_BE(0x20000, "dsp_data", ROMREGION_ERASE00)
+	ROM_LOAD("nsm3_rom6_data.be16", 0, 0x20000,
+		CRC(bdb0b876) SHA1(845133638256ed1f07e014437fdee3ececc4508f))
+	ROM_REGION16_BE(0x400000, "flash", ROMREGION_ERASEFF)
+	ROM_LOAD("6210_556c.fls", 0, 0x3a0000,
+		CRC(203fb962) SHA1(3d9ea319503e78ec69b60d72cda23e461e118ea9))
+	ROM_LOAD("6210 virgin eeprom 005fa000.fls", 0x3fa000, 0x6000,
+		CRC(3c6d3437) SHA1(b3a527ede1be87bd715fb3741a81eef5bd422efa))
+ROM_END
+
 // Same own flash/PMM inputs; only the unresolved MBUSTIM/sleep composition differs.
 #define rom_npe3mbus rom_npe3hle
 
@@ -3220,6 +3238,7 @@ SYST( 2000, noki3310, 0,      0,      noki3310, noki3310, nokia_dct3_state, empt
 SYST( 2002, noki3610, 0,      0,      noki3610, noki3310, nokia_dct3_state, empty_init, "Nokia", "Nokia 3610 (NAM-1 bring-up)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2000, noki6210, 0,      0,      noki6210, noki6210, nokia_dct3_state, empty_init, "Nokia", "Nokia 6210", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2000, npe3stage, noki6210, 0, npe3stage, noki6210, nokia_dct3_state, empty_init, "Nokia", "6210 product-local staged DSP (research fixture)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
+SYST( 2000, npe3r6, noki6210, 0, npe3r6, noki6210, nokia_dct3_state, empty_init, "Nokia", "6210 acquired ROM6 compatibility trial (research fixture)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2000, npe3hle, noki6210, 0, npe3hle, noki6210, nokia_dct3_state, empty_init, "Nokia", "6210 native uploads with runtime HLE (research fixture)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2000, npe3mbus, noki6210, 0, npe3mbus, noki6210, nokia_dct3_state, empty_init, "Nokia", "6210 clocked MBUS and sleep (research fixture)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2000, noki6250, 0,      0,      noki6250, noki6250, nokia_dct3_state, empty_init, "Nokia", "Nokia 6250", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )

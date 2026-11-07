@@ -3,6 +3,30 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "rom6_isolated_raw_adc_native_receive",
+      "owner": "native_rom6_receive_kernel",
+      "status": "satisfied",
+      "predicate": "Independent raw ADC words traverse the native ADC ISR/FIR and SCH or four-burst BCCH decoder with exact outputs and restore replay",
+      "current": "The isolated SCH caller raises 23 software INTR16 interrupts for 736 raw scalar words; the real vector, own uploaded hook and resident ISR/FIR generate all filtered samples before native frontend, Viterbi and CRC. FN/BSIC pairs (1,42), (11,0) and (2715638,63) pass exact outputs/status; all-zero raw input fails CRC. BCCH uses 19 interrupts and 608 raw scalar words per burst, four bursts, then native frontend/deinterleave/Viterbi/packing; SI3 and all-ones payloads match all 23 bytes, while zero raw input is rejected. Checkpoint/replay passes. Ordered I/O supplies only raw endpoint reads, not decoded buffers or verdicts. Block-ready conditions, filter setup and isolated nonexpiring countdown are testbench preconditions, not physical capture/IRQ cadence. Whole-phone synchronization, camping and registration remain unqualified.",
+      "evidence": ["tools/run_rom6_receive_kernel.py", "tools/run_rom6_xcch_kernel.py", "tools/gsm_sch_signal.py", "tools/gsm_xcch_signal.py", "tests/c54x/tms320c54x_test_register_sequence.h", "tests/c54x/sections/scripted_io.h", "docs/rom6_rf_interface.md"]
+    },
+    {
+      "id": "rom6_fire_224_bit_check",
+      "owner": "nokia_dsp_c54x_fire",
+      "status": "satisfied",
+      "predicate": "The observed FIRE check transaction accepts valid 224-bit codewords and rejects corruption without writable success status",
+      "current": "P3c controls 3/5, fourteen P39 words, P3c fffc/2 and P38 command5 (optional bit4) implement the native caller's complemented-parity convention and polynomial (x^23+1)(x^17+x^3+1). Remainder zero publishes status20; malformed, incomplete, overflowed or unsupported transactions cannot publish success. Three independent codewords and all 672 single-bit corruptions pass host checks. The executable backend saves a nonzero seven-word prefix, poisons live input, restores and finishes successfully; reset/corrupt/status-write controls pass. Completion is synchronous functional HLE, not physical busy timing, burst correction, encoding or cipher support.",
+      "evidence": ["driver/nokia_dsp_fire_state.h", "driver/nokia_dsp_c54x.cpp", "tests/unit/test_dsp_fire_state.cpp", "tests/devices/nokia_dsp_c54x_test.cpp", "tools/test_dsp_fire_cpp.py", "tools/run_c54x_backend_bsp.py", "docs/rom6_rf_interface.md"]
+    },
+    {
+      "id": "npe3_native_rom6_bounded_ui_storage",
+      "owner": "npe3_native_rom6_research_composition",
+      "status": "satisfied",
+      "predicate": "The candidate ROM6 executes own 6210 uploads and bounded physical Menu and persistent SIM-contact interaction without HLE takeover",
+      "current": "The npe3r6 research composition uses own v5.56 PPM C MCU and unchanged own PMM, nominal ADC2=230 and a provisional 13MHz DSP clock. Exact own second-loader629/resident-prefix422 words, verifier0000/0006, self-test0d/00/c4, two reset/loader entries, one resident entry, zero illegal instructions and zero unacquired low-ROM reads pass. Physical Menu renders reviewed Messages pixels. Physical A/123 saves via UPDATE RECORD and survives an independent cold read with exact card/protocol/contact pixels. Runs end at30s/27s. The34s negative stability control rejects repeated initialization: own monitor requests software reset reason68 via3059a2->50096a near31.97s, not watchdog expiry. This bounded result does not identify the fitted mask or multiplier, prove sustained DSP activity, or qualify native radio/speech/normal-machine promotion.",
+      "evidence": ["driver/nokia_dct3_research.cpp", "tools/run_npe3_native.py", "tools/npe3_native_observe.lua", "tools/test_run_npe3_native.py", "tools/run_noki6210_acceptance.py", "docs/6210_bringup.md", "docs/rom6_dsp_bringup.md"]
+    },
+    {
       "id": "nsm3_isolated_sch_filtered_iq_decode",
       "owner": "native_rom6_receive_kernel",
       "status": "satisfied",

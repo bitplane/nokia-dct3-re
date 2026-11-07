@@ -6,7 +6,13 @@ A captured 8210 ROM6 reference is available in the private collection; hashes,
 source snapshot and reconstruction policy are in [the ROM inventory](../roms/README.md#nokia-8210-dsp-rom6-reference).
 No ordinary machine or acceptance result is promoted by acquisition. The
 explicit `nsm3r6` research composition selects the audited candidate; existing
-HLE and staged configurations retain their separate contracts.
+HLE and staged configurations retain their separate contracts. The separate
+`npe3r6` composition also qualifies bounded native 6210 initialization,
+physical Menu interaction and persistent SIM-contact save/cold readback using
+its own MCU uploads and provisioning; see [6210 bring-up](6210_bringup.md).
+Its fitted mask and DSP multiplier remain unknown, and a DSP restart near
+32 seconds prevents a long-run stability claim. It is not a promoted normal
+machine or a native radio/speech result.
 
 ## Current native boundary
 

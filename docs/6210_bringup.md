@@ -16,15 +16,41 @@ the own compact self-test consumer and a declared nominal battery sample.
 Acceptance gates prove graphical Menu/SIM PIN interaction, Calculator,
 persistent SIM contacts with cold readback, laboratory registration/operator
 presentation, physical incoming/outgoing call signaling and incoming/outgoing
-SMS. Physical Menu decodes as `19` on the 96x60 display. Native resident DSP
-execution, measured final silicon verdict, speech and full hardware fidelity
+SMS. Physical Menu decodes as `19` on the 96x60 display. Measured final silicon
+verdict, speech and full hardware fidelity
 are not claimed. The research phone-service milestone is complete; the normal
 machine remains fail-closed pending authentic native DSP completion.
 
-A captured 8210 ROM6 reference now supplies candidate code at `2c75` in the
-private collection. It is not yet selected or validated for NPE-3; the current
-native stop and HLE acceptance remain unchanged. [ROM6 native bring-up](rom6_dsp_bringup.md)
-owns the cross-product qualification plan.
+The explicit `npe3r6` research composition uses the captured ROM6 candidate
+without HLE or staged takeover. Own MCU uploads match exactly: second loader
+629 words at file offset `24b7c`, resident prefix 422 words at `1eac4`.
+Native initialization returns verifier `0000/0006` and self-test `0d/00/c4`.
+Physical Menu renders the reviewed Messages menu. Physical contact entry
+saves `A / 123` through SIM UPDATE RECORD; a fresh boot retrieves and renders
+the retained record without rewriting it. The bounded runs finish before
+32 seconds, with no illegal instruction or uncovered low-program ROM read.
+
+This is compatibility evidence, not identification of the fitted DSP mask.
+The explicit 13 MHz DSP clock is provisional (the manual establishes RFIclk,
+not the DSP multiplier). A longer run requests MCU software reset near
+32 seconds, despite successful initial port-36 request completion. Own monitor
+`305924..3059a6` increments missing-activity byte `17fd9e` when activity byte
+`17fda3` is zero; at 15 misses it calls reset `50096a` from `3059a2` with reason
+`68`. The observed MAD2 reset-bit write is `5009a2` at 31.971824 seconds, not
+watchdog expiry. This establishes a sustained-activity frontier; it does not
+identify a legitimate DSP packet or justify injecting a heartbeat. Long-run stability,
+native radio service and speech remain unqualified. The normal machine and
+HLE acceptance are unchanged. Reproduce with:
+
+```sh
+.venv/bin/python tools/run_npe3_native.py
+.venv/bin/python tools/run_npe3_native.py --scenario phonebook
+# Extended stability control: currently rejects the extra reset/loader entries.
+.venv/bin/python tools/run_npe3_native.py --seconds 34
+```
+
+[ROM6 native bring-up](rom6_dsp_bringup.md) owns the cross-product qualification
+and unresolved physical-interface boundaries.
 
 `npe3mbus` separately enables the firmware-requested MBUSTIM clock on the
 same own-upload/HLE composition. It qualifies read-only version service,
