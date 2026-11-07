@@ -3,6 +3,14 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "nsm3_native_adc_signed_fir_prefix",
+      "owner": "native_rom6_receive_processing",
+      "status": "satisfied",
+      "predicate": "The first128 native FIR output words agree with an independent signed convolution of the actual delivered ADC input prefix",
+      "current": "Fresh six-second analytic-tone and zero runs join all1024 first-prefix P27 words to their native0200..020f history writes. Following a32-word discard, each four scalar inputs yield Q,I output with complex decimation2 and the observed eight signed Q16 coefficients. All128 captured output values match independent half-up convolution; tone has128 nonzero outputs, zero has none. Scope is128 checked values, not all496 counted stores in the1024-input window. Live resident filter bytes and own uploaded entry/payload are checked against pinned inputs. The64-word transport still overruns; no physical clock/capacity, RSSI result, FCCH detection, SCH, BCCH or camping qualification is claimed. Raw captures tmp/rom6-adc-lab/nsm3adc-ixdfdht5 and nsm3ad0-rddfsxji include the processing program view and sample-prefix reports.",
+      "evidence": ["tools/rom6_adc_lab.lua", "tools/rom6_adc_filter_check.py", "tools/test_rom6_adc_filter_check.py", "tools/run_rom6_adc_lab.py", "docs/rom6_rf_interface.md"]
+    },
+    {
       "id": "nsm3_laboratory_mfi_exclusive_interrupt_and_word_ownership",
       "owner": "nokia_dsp_c54x_lab_receiver",
       "status": "satisfied",

@@ -488,6 +488,34 @@ relative deadline; its later callback is not an equal-time endpoint. Neither
 this component test nor the good source prefix qualifies a native ADC session.
 No RSSI, FCCH, SCH, BCCH or camping result is claimed.
 
-The next boundary is capture lifecycle, including P09/P0a/P0b and the programmed
-P11=`01fe`, not another MCU readiness response. Retire the direct-ADC compositions
-and field probe when a focused clocked-air gate covers that recovered contract.
+### Qualified native FIR prefix
+
+`rom6_adc_filter_check.py` joins the first 1,024 clock-delivered scalar words to
+all 1,024 writes into native history `0200..020f`. It then independently checks
+the first 128 output words stored at `00c8..00d7`: tone produces 128 nonzero
+words, silence produces 128 zero words. The 32-word discard, subsequent
+four-input/two-output ordering and signed arithmetic are checked, not inferred
+from a changed screenshot or merely nonzero RAM.
+
+The reference is an eight-tap signed convolution over the observed circular
+history, with Q16 coefficients and half-up high-word rounding. Native output
+order is **Q,I**, with complex decimation by two. A separate constant-lane
+test uses the coefficients' unity DC gain as its oracle rather than generating
+expected values with the convolution under test. Actual native runs agree
+word-for-word; no CPU arithmetic change was needed.
+
+The checker pins the resident image, live `2468..2499` filter bytes, own uploaded
+entry and the complete own `0590..0735` payload. The capture is intentionally
+bounded: its counter sees 496 filter stores within the first 1,024 inputs, but
+only the first 128 output **values** are qualified. It does not validate RF
+timing, an RSSI result, FCCH detection or later data after an overrun.
+
+The next software discriminator is the **post-filter** accumulator at
+`249f..24d2`, which adds/subtracts I/Q with a quarter-rate rotation. Combined
+with the proved decimation, this offers a way to test input cadence using the
+known physical tone rather than transport greenness. Two-complex-samples per
+symbol remains a live hypothesis: the earlier negative trial disproved
+losslessness of that complete prototype, not its rate in isolation. MFI
+bank/acknowledgement semantics (notably P21), COBBA control gating, capture
+edges and P11=`01fe` remain unqualified. Retire the direct-ADC compositions and
+field probes when a focused clocked-air gate covers the recovered contract.
