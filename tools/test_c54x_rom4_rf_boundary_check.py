@@ -24,6 +24,17 @@ def summary(*, frames=865, reads=26752, first_frame=30, pairs=13,
 
 
 class C54xRom4RfBoundaryCheckTest(unittest.TestCase):
+    def test_instruction_owner_is_independent_of_fetch_pc(self):
+        text=summary()
+        for old,owner in [('a240','00a23e'),('3712','003710'),('4028','004025')]:
+            text=text.replace('pc='+old,'pc=ffff owner='+owner)
+        text=text.replace('pc=a1bc t=1.5','pc=ffff t=1.5 owner=00a1ba')
+        self.assertEqual(check(text)['rf_port32_writes'],13)
+        with self.assertRaisesRegex(ValueError,'sequence changed'):
+            check(text.replace('owner=003710','owner=003711'))
+        with self.assertRaisesRegex(ValueError,'owner coverage'):
+            check(text.replace(' owner=004025',''))
+
     def scan_summary(self):
         text = '\n'.join(line for line in summary(frames=20280, reads=648032, pairs=1537).splitlines()
                          if not line.startswith('rom4_rf_port32:')) + '\n'

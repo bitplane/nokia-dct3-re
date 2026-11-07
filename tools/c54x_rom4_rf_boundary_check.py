@@ -18,7 +18,7 @@ SUMMARY_RE = re.compile(
 FIRST_RF_READ_RE = re.compile(r"rom4_rf_read: sample=1 pc=[0-9a-fA-F]{4} frame=(\d+)")
 RF_WRITE_RE = re.compile(
     r"rom4_rf_port32: sequence=(\d+) port31=([0-9a-fA-F]{4}) "
-    r"port32=([0-9a-fA-F]{4}) pc=([0-9a-fA-F]{4})")
+    r"port32=([0-9a-fA-F]{4}) pc=([0-9a-fA-F]{4})(?: owner=([0-9a-fA-F]{6}))?")
 
 
 def check(text: str, minimum_frames: int = 800, *, scan_30s: bool = False) -> dict[str, int]:
@@ -58,8 +58,12 @@ def check(text: str, minimum_frames: int = 800, *, scan_30s: bool = False) -> di
             f"RF read cadence changed: {result['rf_reads']} reads, "
             f"expected {expected_reads} for {result['frame_expiries']} frames"
         )
-    writes = [tuple(int(value, 16 if index else 10) for index, value in enumerate(row))
-              for row in RF_WRITE_RE.findall(text)]
+    raw_writes=RF_WRITE_RE.findall(text)
+    owned=any(row[4] for row in raw_writes)
+    if owned and not all(row[4] for row in raw_writes):
+        raise ValueError('incomplete RF instruction-owner coverage')
+    writes = [tuple(int(value, 16 if index else 10) for index, value in enumerate((*row[:3],row[4] if owned else row[3])))
+              for row in raw_writes]
     # The four-second coherent boot drains two complete descriptor bursts,
     # followed by the firmware's first operational control. The old five-write
     # fingerprint omitted descriptor entries and is not accepted alongside it.
@@ -95,6 +99,9 @@ def check(text: str, minimum_frames: int = 800, *, scan_30s: bool = False) -> di
             raise ValueError("missing uploaded scan reload")
         if not re.search(r"rom4_speech_state: address=0284 value=007c mask=ffff pc=3d8f\b.*t=6\.", text):
             raise ValueError("missing later search-list selector")
+    if owned:
+        owner={0xa240:0xa23e,0x3712:0x3710,0x4028:0x4025}
+        expected_writes=[(*row[:3],owner[row[3]]) for row in expected_writes]
     if result["rf_port32_writes"] != expected_count or writes != expected_writes:
         first_difference = next(
             (index for index in range(max(len(writes), len(expected_writes)))
@@ -110,7 +117,8 @@ def check(text: str, minimum_frames: int = 800, *, scan_30s: bool = False) -> di
     # FIQ1 TX completion exposes this additional firmware-owned queue item.
     # Require its producer, rather than accepting a bare synthetic port pair.
     for address, value in (("1922", "0041"), ("1923", "0040")):
-        if not re.search(rf"rom4_speech_state: address={address} value={value} mask=ffff pc=a1bc\b", text):
+        site=r'pc=[0-9a-f]{4}\b.*owner=00a1ba\b' if owned else r'pc=a1bc\b'
+        if not re.search(rf"rom4_speech_state: address={address} value={value} mask=ffff {site}", text):
             raise ValueError("missing firmware RF queue producer")
     if result["rf_port38_reads"] or result["rf_port39_reads"]:
         raise ValueError("ROM4 parallel burst path unexpectedly became active")

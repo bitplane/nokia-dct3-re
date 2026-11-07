@@ -1389,3 +1389,10 @@ source/destination pairs, counts 0/1/25/255 and signed/wrapping operands
 accumulator result; it does not replay a precomputed operand/result. This
 enables the normal-burst quality calculation's `RPT #25; ADD B,A` at
 `78da..78db`. Other shift encodings are not enabled by this extension.
+
+Fresh ROM4 serial and RF regression traces identify the issuing instruction
+through `READPC` for reads and `EXECPC` for writes. The later fetch-context
+`PC` is retained for diagnostics, not used as instruction ownership. Legacy
+fixture logs remain a separate supported format; mixed owner coverage and
+incorrect owners are rejected. The four-second coherent gate retains its
+exact 13 RF writes, 865 frame expiries and 26752 reads with this correction.

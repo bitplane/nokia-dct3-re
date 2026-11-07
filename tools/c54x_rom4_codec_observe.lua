@@ -26,8 +26,9 @@ for _, kind in ipairs({'data', 'io'}) do
                 emitted[output_key] = (emitted[output_key] or 0) + 1
                 if emitted[output_key] <= 16 then
                     machine:logerror(string.format(
-                        'rom4_serial_audit: space=%s direction=%s address=%04x value=%04x mask=%04x pc=%04x t=%.9f\n',
-                        kind, direction, address, value, mask, cpu.state['PC'].value, machine.time:as_double()))
+                        'rom4_serial_audit: space=%s direction=%s address=%04x value=%04x mask=%04x pc=%04x t=%.9f owner=%06x\n',
+                        kind, direction, address, value, mask, cpu.state['PC'].value, machine.time:as_double(),
+                        cpu.state[direction=='read' and 'READPC' or 'EXECPC'].value))
                 end
             end)
         end
@@ -44,8 +45,8 @@ for _, address in ipairs({0xac, 0x0284, 0x0285, 0x0e13, 0x216d, 0x216e, 0x216f, 
         counts[key] = counts[key] + 1
         if counts[key] <= 32 then
             machine:logerror(string.format(
-                'rom4_speech_state: address=%04x value=%04x mask=%04x pc=%04x t=%.9f\n',
-                address, value, mask, cpu.state['PC'].value, machine.time:as_double()))
+                'rom4_speech_state: address=%04x value=%04x mask=%04x pc=%04x t=%.9f owner=%06x\n',
+                address, value, mask, cpu.state['PC'].value, machine.time:as_double(),cpu.state.EXECPC.value))
         end
     end)
 end

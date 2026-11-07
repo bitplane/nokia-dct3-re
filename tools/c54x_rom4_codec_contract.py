@@ -534,24 +534,36 @@ def check_schedule_data(image: bytes) -> int:
 
 
 def check_trace(text: str) -> None:
-    records = re.findall(
+    observed = re.findall(
         r"rom4_serial_audit: space=(data|io) direction=(read|write) "
         r"address=([0-9a-f]{4}) value=([0-9a-f]{4}) mask=ffff "
-        r"pc=([0-9a-f]{4}) t=([0-9.]+)", text)
+        r"pc=([0-9a-f]{4}) t=([0-9.]+)(?: owner=([0-9a-f]{6}))?", text)
+    owned = any(record[6] for record in observed)
+    if owned and not all(record[6] for record in observed):
+        raise ValueError("mixed serial instruction-owner coverage")
+    records = [(*record[:4], record[6] if owned else record[4], record[5]) for record in observed]
+    # Legacy fixtures retain fetch-context PCs. Fresh traces identify the
+    # actual port instruction through the pipeline's Read/Execute exports.
+    instruction = dict(zip(
+        ('0e31','0e5d','3464','358b','0e22','0e24','4555','4559','455d','3221','3228','33f6','33fd'),
+        ('000e30','000e5c','003461','00358a','000e20','000e22','004553','004557','00455b','00321e','003225','0033f3','0033fa')))
+    def sites(expected):
+        return [(*row[:-1], instruction[row[-1]] if owned else row[-1]) for row in expected]
     if any(space == "data" and address == "0032"
            for space, _, address, _, _, _ in records):
         raise ValueError("unresolved data0032 access requires peripheral review")
     echo = [(direction, address, value, pc)
             for space, direction, address, value, pc, _ in records
             if space == "data" and address in ("0020", "0021")]
-    if echo != [("write", "0021", "0aaa", "0e31"),
+    expected_echo = [("write", "0021", "0aaa", "0e31"),
                 ("read", "0020", "0aaa", "0e5d"),
                 ("read", "0020", "0aaa", "3464"),
-                ("write", "0021", "ffd5", "358b")]:
+                ("write", "0021", "ffd5", "358b")]
+    if echo != sites(expected_echo):
         raise ValueError("data-space boot echo/receive ISR missing, duplicated or changed")
     setup = [(direction, value, pc) for space, direction, address, value, pc, _ in records
              if space == "data" and address == "0022" and direction == "write"]
-    if setup[:2] != [("write", "c008", "0e22"), ("write", "c0c8", "0e24")]:
+    if setup[:2] != sites([("write", "c008", "0e22"), ("write", "c0c8", "0e24")]):
         raise ValueError("missing native serial reset/release setup")
     io = [(direction, value, pc) for space, direction, address, value, pc, _ in records
           if space == "io" and address == "0021"]
@@ -559,7 +571,7 @@ def check_trace(text: str) -> None:
                 ("write", "0482", "455d")]
     expected += [("read", "0482", "3221"), ("write", "0c82", "3228"),
                  ("read", "0c82", "33f6"), ("write", "0482", "33fd")] * 3
-    if io[:len(expected)] != expected:
+    if io[:len(expected)] != sites(expected):
         raise ValueError("I/O control readback does not preserve initialization/frame masks")
     if "Lua error" in text:
         raise ValueError("Lua observation failed")

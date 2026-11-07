@@ -201,6 +201,19 @@ class CodecTraceTests(unittest.TestCase):
     def test_separate_paths(self):
         check_trace(self.trace())
 
+    def test_instruction_owners_not_later_fetch_context(self):
+        owners = {'0e22':'000e20','0e24':'000e22','0e31':'000e30','0e5d':'000e5c',
+                  '3464':'003461','358b':'00358a','4555':'004553','4559':'004557',
+                  '455d':'00455b','3221':'00321e','3228':'003225','33f6':'0033f3','33fd':'0033fa'}
+        trace='\n'.join(line.replace('pc='+pc,'pc=ffff')+' owner='+owners[pc]
+                        for line in self.trace().splitlines()
+                        for pc in [line.split('pc=')[1][:4]])
+        check_trace(trace)
+        with self.assertRaisesRegex(ValueError,'boot echo'):
+            check_trace(trace.replace('owner=003461','owner=003462'))
+        with self.assertRaisesRegex(ValueError,'owner coverage'):
+            check_trace(trace.replace(' owner=003461',''))
+
     def test_new_unresolved_register_access_requires_review(self):
         event = ("\nrom4_serial_audit: space=data direction=write address=0032 "
                  "value=c0c8 mask=ffff pc=3b60 t=3.0")
