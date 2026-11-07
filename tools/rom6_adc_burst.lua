@@ -11,6 +11,31 @@ local last_counter,last_counter_time=0,0
 local receive_position,receive_lead=0,0
 local arm_count,receive_enabled=0,false
 local peak_writes=0
+local frame_writes,frame_history=0,{}
+_G.rom6_burst_frame=cpu.spaces.data:install_write_tap(0x912,0x913,'rom6_burst_frame',function(address,value)
+    if sch_windows>0 then return end
+    frame_writes=frame_writes+1
+    frame_history[(frame_writes-1)%64+1]={address=address,value=value,
+        high=address==0x912 and value or cpu.spaces.data:read_u16(0x912),
+        low=address==0x913 and value or cpu.spaces.data:read_u16(0x913),
+        time=machine.time:as_double(),pc=cpu.state.GENPC.value,owner=cpu.state.EXECPC.value}
+end)
+local timing_reads,timing_pending=0,0
+_G.rom6_burst_timing_ports={}
+for _,port in ipairs({1,0x13,0x14,0x15}) do
+    _G.rom6_burst_timing_ports[#_G.rom6_burst_timing_ports+1]=cpu.spaces.io:install_read_tap(port,port,'rom6_burst_timing_ports',function(_,value)
+        if sch_windows>0 then return end
+        if port==1 then
+            if value&0x80~=0 then timing_pending=timing_pending+1 end
+        else
+            timing_reads=timing_reads+1
+            if timing_reads<=16 then
+                machine:logerror(string.format('rom6_burst_timing_port: sequence=%d t=%.9f port=%02x value=%04x pc=%06x observer_writes=0\n',
+                    timing_reads,machine.time:as_double(),port,value,cpu.state.GENPC.value))
+            end
+        end
+    end)
+end
 _G.rom6_burst_peak=cpu.spaces.data:install_write_tap(0x2f58,0x2f58,'rom6_burst_peak_index',function(_,value)
     local pc=cpu.state.GENPC.value
     if pc<0xb40 or pc>=0xe00 then return end
@@ -100,6 +125,11 @@ _G.rom6_burst_sch_window=cpu.spaces.data:install_write_tap(0x10,0x10,'rom6_burst
     if sch_windows>40 then return end
     local samples={}
     if sch_windows==1 then
+        for index=math.max(1,frame_writes-63),frame_writes do
+            local item=frame_history[(index-1)%64+1]
+            machine:logerror(string.format('rom6_burst_frame: sequence=%d t=%.9f address=%04x value=%04x frame=%04x,%04x pc=%06x owner=%08x observer_writes=0\n',
+                index,item.time,item.address,item.value,item.high,item.low,item.pc,item.owner))
+        end
         for index=math.max(1,capture_control_count-127),capture_control_count do
             local item=capture_controls[(index-1)%128+1]
             machine:logerror(string.format('rom6_burst_capture_control: sequence=%d t=%.9f port=%02x value=%04x reads=%d pc=%06x counter=%04x counter_t=%.9f observer_writes=0\n',
@@ -191,6 +221,8 @@ _G.rom6_burst_stop=emu.add_machine_stop_notifier(function()
     machine:logerror(string.format('rom6_burst_adjust_complete: reads=%d cap=32 observer_writes=0\n',adjust_reads))
     machine:logerror(string.format('rom6_burst_peak_complete: writes=%d cap=128 observer_writes=0\n',peak_writes))
     machine:logerror(string.format('rom6_burst_arm_complete: arms=%d cap=16 until_first_sch=1 observer_writes=0\n',arm_count))
+    machine:logerror(string.format('rom6_burst_frame_complete: writes=%d cap=64 until_first_sch=1 observer_writes=0\n',frame_writes))
+    machine:logerror(string.format('rom6_burst_timing_complete: tuple_reads=%d cap=16 pending80_reads=%d until_first_sch=1 observer_writes=0\n',timing_reads,timing_pending))
     machine:logerror(string.format('rom6_burst_active_complete: words=%d cap=1024 reads=%d observer_writes=0\n',active_words,adc_reads))
     if machine.system.name=='nsm3afs' then
         machine:logerror(string.format('rom6_burst_sch_raw_complete: words=%d cap=1024 reads=%d observer_writes=0\n',sch_raw_words,adc_reads))

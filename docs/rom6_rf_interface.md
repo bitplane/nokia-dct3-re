@@ -1077,3 +1077,39 @@ Next resolve **which frame** the firmware selects for class-40 acquisition:
 the FCCH frame adjustment into `0912..0913`, subsequent frame advances,
 and the scheduler's preparation-versus-sampling boundary. Do not compensate
 for an unresolved frame-selection error by shifting the laboratory source.
+
+### Frame records and the unmodeled timing-tuple path
+
+The complete 24-write journal up to the first SCH mask in
+`nsm3afs-2b3tr0fm` distinguishes the owners of `0912..0913` through the
+CPU's exported Execute PC, not only its later bus-context PC:
+
+| Time | Completed low-word value | Execute owner |
+| --- | --- | --- |
+| 0.535307451 | 0 | `2085`, initialization |
+| 3.298844110 | 1 | `4272`, normal increment helper |
+| 3.298862440 | 2 | `5714`, FCCH offset application |
+| 3.304613934 | 3 | `4272` |
+| 3.341538242 | 11 | `4272`, following eight more regular increments |
+
+The offset routine `56fc..573a` adds `247a..247b` to the existing record,
+then recomputes the modular fields. `57fe` copies the record to `091c`
+and increments that copy through `425f`, so current/next records must not
+be conflated. A pre-SCH software frame count is not itself a decoded GSM
+FN: its preparation-versus-sampling convention remains to be established.
+
+There is also a distinct timing-tuple interrupt path. The resident
+dispatcher at `281d..281f` tests P01 bit `0080` and branches to `2afc`.
+That handler acknowledges `0080`, reads P13/P14/P15 into a ring selected
+by `0553`, masks the middle word to 14 bits, and compares the first tuple
+word with saved P10 at `0557`. On equality it adjusts the saved `053a`
+correction by `4999 - P0e`. The current backend's P01 projection produces
+only slot `0008`, transfer `1000` and host-ring `0002`; it cannot reach
+this handler. Passive counts confirm zero P01-bit-80 observations and zero
+P13..P15 reads before the first SCH operation.
+
+This is an identified **unmodeled contract**, not proof that the event must
+occur during ordinary receive, nor evidence for a particular tuple value.
+P10's observed non-use therefore does not close the wider timing subsystem.
+Resolve the handler's event origin and record ownership before synthesizing
+an interrupt or exposing a guessed free-running readback.

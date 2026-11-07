@@ -3,6 +3,14 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "nsm3_frame_record_and_timing_tuple_ownership",
+      "owner": "native_rom6_receive_timing",
+      "status": "unresolved",
+      "predicate": "Current/next frame records and the P01-bit80 timing-tuple path have the physical event and epoch ownership required by native receive",
+      "current": "nsm3afs-2b3tr0fm records all24 writes to0912..13 before the first SCH mask,using exported EXECPC ownership. Initialization sets0;4272 writes1 at3.298844110s;5714 applies the FCCH offset to produce2 at3.298862440s;later4272 increments reach11 at3.341538242s. 57fe separately copies to091c and increments that next record. Pre-SCH count is not a decoded GSM FN. Dispatcher281d..281f routes P01 bit80 to2afc,which readsP13..15,compares the first tuple word with0557 and conditionally adjusts053a using4999-P0e. Backend P01 currently exposes only8/1000/2;passive counts are0 bit80 observations and0 tuple reads before SCH. Event necessity,tuple contents and physical trigger remain unqualified;no interrupt or readback is invented.",
+      "evidence": ["tools/rom6_adc_burst.lua", "driver/nokia_dsp_c54x.cpp", "docs/rom6_rf_interface.md"]
+    },
+    {
       "id": "nsm3_fcch_peak_index_source_clock",
       "owner": "native_rom6_receive_timing",
       "status": "satisfied",
