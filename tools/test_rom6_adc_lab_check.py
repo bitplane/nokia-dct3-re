@@ -1,5 +1,5 @@
 import unittest
-from tools.rom6_adc_lab_check import check,reference_word
+from tools.rom6_adc_lab_check import check,reference_word,continuous_queue_bound
 
 
 class AdcLabCheckTest(unittest.TestCase):
@@ -14,6 +14,7 @@ class AdcLabCheckTest(unittest.TestCase):
             if sequence==1:
                 lines.append(f'rom6_adc_first_read: t={seconds}.{fraction:09d} cpu_pc=002446 observer_writes=0')
         lines.extend(['rom6_adc_lab_complete: result_words=0 cap=32768 reads=64 observer_writes=0',
+                      'mfi_rx_capacity_observation: configured=64 peak=64 physical_capacity_claim=0',
                       'mfi_rx_trace_complete: words=64 blocks=0 word_cap=4096 block_cap=128',
                       'rom4_interface_summary: completion_strobes=0 rf_reads=64',
                       f'mfi_rx_summary: produced=64 consumed=64 queued=0 overrun=0 underrun=0 fault=0 divider={divider} physical_clock_claim=0'])
@@ -45,6 +46,11 @@ class AdcLabCheckTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             check(text.replace('state=1 produced=0 consumed=0','state=1 produced=1 consumed=0'),False)
 
+    def test_service_gap_bound_and_clock_edge_uncertainty(self):
+        self.assertEqual(continuous_queue_bound(32992152,12,11616,2548643758),(69,69))
+        self.assertEqual(continuous_queue_bound(0,12,0,923),(1,2))
+        with self.assertRaises(ValueError): continuous_queue_bound(0,0,0,0)
+
     def test_bad_word_provenance_or_missing_source_fails(self):
         text=self.fixture(False)
         for old,new in [('value=0000','value=ffff'),('source_tick=130008','source_tick=130014'),
@@ -56,7 +62,9 @@ class AdcLabCheckTest(unittest.TestCase):
                         ('consumed=64 queued=0','consumed=64 queued=1'),
                         ('state=1 produced=0','state=0 produced=0'),
                         ('words=64 blocks=0','words=63 blocks=0'),
-                        ('words=64 blocks=0','words=64 blocks=129')]:
+                        ('words=64 blocks=0','words=64 blocks=129'),
+                        ('configured=64 peak=64','configured=64 peak=65'),
+                        ('configured=64 peak=64','configured=63 peak=63')]:
             with self.subTest(old=old),self.assertRaises(ValueError): check(text.replace(old,new,1),False)
         with self.assertRaises(ValueError):
             check('\n'.join(line for line in text.splitlines() if not line.startswith('mfi_rx_word: sequence=1 ')),False)

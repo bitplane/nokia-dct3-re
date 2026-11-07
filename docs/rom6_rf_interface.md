@@ -429,8 +429,10 @@ make check-c54x-serial-compare
 
 The candidate clocks scalar words at 13MHz/12, not from P27 demand. This is
 the two-complex-samples/symbol composition matched to the native accumulator
-below, not a measured silicon clock. Its two
-32-word banks are an explicit unmeasured capacity policy. Words, transfer ticks,
+below, not a measured silicon clock. The laboratory now uses a 96-word staging
+limit derived from the service-gap bound below, **not a measured MFI capacity**.
+The component's default 64-word limit remains a logical negative control.
+Words, transfer ticks,
 queue state and the next clock deadline are saved. Block notifications
 exclusively own INT0 throughout these laboratory compositions, including
 inactive capture periods. The non-laboratory compositions retain their existing
@@ -451,7 +453,7 @@ P27 reads reconcile with consumed clock-produced words across activation
 counter resets; none is an inactive retained-register read. The checker also
 qualifies 2,752 actual word values across three activation prefixes.
 
-The transport result remains **negative**. Matched tone/silence trials reject
+The original 64-word transport result is **negative**. Matched tone/silence trials reject
 the sufficiency of each exact combination below, not its individual physical
 rate, comparator or capacity hypothesis:
 
@@ -462,15 +464,15 @@ rate, comparator or capacity hypothesis:
 | P03-armed one-shot P09 start / P0b stop | 6 | 2.548362462s (21,600 produced / 21,536 consumed) |
 | P03 gating, cadence-only comparison | 12 | 2.548639385s (11,680 / 11,616) |
 | P03 gating, exclusive MFI INT0 | 6 | 2.548358769s (22,752 / 22,688) |
-| Current P03 gating, exclusive MFI INT0 | 12 | 2.548639385s (11,680 / 11,616) |
+| P03 gating, exclusive MFI INT0 | 12 | 2.548639385s (11,680 / 11,616) |
 
 The timed-gate implementation was removed. The slower divider was initially
 restored after its transport-only test, then selected by the independent
 post-filter signal test below; it still does not qualify losslessness. Exact
 binary hashes, fault contexts and retained raw-capture locations for those
 rejections are in [the falsification ledger](../evidence/falsifications.json).
-These failures do not establish physical buffer capacity or justify increasing
-it until a run passes. The runner rejects every fault across counter resets.
+These failures do not establish physical buffer capacity or justify a capacity
+sweep. The runner rejects every fault across counter resets.
 The header distinguishes oscillator phase divisor from MFI scalar divisor;
 the checker rejects disagreement with the device summary. Cadence comparisons
 must not retime the laboratory oscillator.
@@ -544,11 +546,11 @@ described in the primary [FCCH detector patent US7590419B2](https://patents.goog
 The inference assumes unshifted complex baseband at the ADC fixture; it does
 not identify an actual MFI wire clock or exclude an undiscovered hardware NCO.
 
-The paired six-second divider-12 runs reconcile 975,264 tone and 1,340,800 zero
+The original 64-word six-second divider-12 runs reconcile 975,264 tone and 1,340,800 zero
 P27 reads to clocked queue consumption; each independently checks a bounded
-4,096-word prefix. Both retain the initial overrun at 2.548639385s, so the
-receiver gate remains red. Changed measurement activity is not an accepted
-RSSI/FCCH result after that transport fault. MFI bank/acknowledgement semantics
+4,096-word prefix. Both retain the initial overrun at 2.548639385s. Changed
+measurement activity after that fault is not an accepted RSSI/FCCH result.
+MFI bank/acknowledgement semantics
 (notably P21), COBBA control gating, capture edges and P11=`01fe` remain the
 next boundary. Retire the direct-ADC compositions and field probes when a
 focused clocked-air gate covers the recovered contract.
@@ -559,3 +561,48 @@ bytes are checked against the own upload and resident image. Bit 11 therefore
 brackets the software read interval; its physical meaning (bank ownership,
 acknowledgement, clock control or something else) is not established. Do not
 treat the current opaque P21 latch as a recovered MFI handshake.
+
+### Service-gap staging bound
+
+A passive first-window trace has 11,648 P27 reads, 794 control transactions
+and 362 read gaps above half a block period, without hitting its cap. The
+fault lies in a **55.934us** read gap, from 2.548587824s (after read 11,616)
+to 2.548643758s (read 11,617). It includes COBBA register-8/9 transactions
+while INTM is set; P21's software read-interval bit is clear. The program-fetch
+mask observations are samples, not exact instruction-ownership or idle-state
+proofs.
+
+For the declared uninterrupted producer, first source tick 32,992,152 and
+scalar divider 12 imply 11,685 produced words just before that next read:
+
+```text
+backlog before next read = 11685 - 11616 = 69 words
+smallest 32-word-rounded staging limit covering this bound = 96 words
+```
+
+`continuous_queue_bound` independently accounts for nanosecond log rounding;
+both bounds are 69. No new 32-word notification would occur between the old
+overflow and this read (the next boundary is 11,712), so this local demand
+calculation does not assume an extra interrupt or a changed CPU path. A
+different physical capture gate or banking policy could change that demand;
+69 is not a lower bound on silicon RAM independent of this producer model. A
+P21.bit11 service-hold/re-notification candidate with the original 64-word
+queue fails at the identical first overflow and was removed; it establishes
+no physical acknowledgement semantics.
+
+The single pre-registered **96-word laboratory staging** trial completes
+matched three- and six-second tone/zero runs with no raw transport faults,
+and reports a peak of **69** in every run, matching the independent bound.
+No samples are overwritten, discarded, padded or demand-generated; all P27
+reads still reconcile with clock-produced queue consumption. The 96-slot
+backing is saved/resettable, and focused tests exercise full wrap/provenance
+and snapshot copies at that limit as well as the default 64-word overflow.
+
+This unblocks native signal-processing experiments, **not hardware receiver
+qualification**. It neither proves that silicon has a 96-word FIFO nor that
+all future workloads fit it. The fixture reports provisional limit/peak and
+keeps `physical_buffer_capacity_qualified=false`; a later overflow is a new
+contract question, not permission to keep increasing storage. Current MFI
+bank/acknowledgement and capture gating remain open. The raw first-window
+trace and its read-only observer are retained at
+`tmp/rom6-adc-lab/window-nuza6oxg`.

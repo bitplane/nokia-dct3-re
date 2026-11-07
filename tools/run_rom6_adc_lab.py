@@ -41,7 +41,8 @@ def main():
     (run/'sample-prefix.json').write_text(json.dumps(report,indent=2)+'\n')
     if not report['transport_fault_free']:
         parser.exit(1,'ADC lab rejected: raw transport fault; no decoder qualification\n')
-    print('ADC lab native initialization completed; receiver result is not yet qualified')
+    print(f"ADC lab: no raw faults with provisional {report['provisional_staging_words']}-word staging "
+          f"(peak {report['peak_queued_words']}); physical receiver remains unqualified")
 
 
 if __name__=='__main__': main()

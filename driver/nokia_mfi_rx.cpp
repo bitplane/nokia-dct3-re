@@ -14,6 +14,8 @@ nokia_mfi_rx_device::nokia_mfi_rx_device(machine_config const &mconfig, char con
 void nokia_mfi_rx_device::device_start()
 {
 	if (clock() != 13'000'000 || !m_divider) fatalerror("MFI prototype requires the declared 13MHz reference and a nonzero divider");
+	if (!m_staging_limit || m_staging_limit % 32 || m_staging_limit > nokia_mfi_rx_state::storage_words)
+		fatalerror("MFI laboratory staging limit must be a supported block multiple");
 	m_timer = timer_alloc(FUNC(nokia_mfi_rx_device::word_tick), this);
 	save_item(NAME(m_state.words)); save_item(NAME(m_state.source_ticks));
 	save_item(NAME(m_state.head)); save_item(NAME(m_state.count)); save_item(NAME(m_state.last));
@@ -50,7 +52,8 @@ TIMER_CALLBACK_MEMBER(nokia_mfi_rx_device::word_tick)
 {
 	if (!m_state.enabled || m_state.fault) return;
 	u16 const sample = m_adc_cb(m_state.produced & 1);
-	bool const ready = m_state.clock(sample, m_next_tick);
+	bool const ready = m_state.clock(sample, m_next_tick, m_staging_limit);
+	m_peak_queued = std::max(m_peak_queued, m_state.count);
 	if (m_state.fault)
 	{
 		machine().logerror("mfi_rx_fault: overrun=1 produced=%llu consumed=%llu t=%.9f\n",produced(),consumed(),machine().time().as_double());
@@ -90,6 +93,7 @@ u16 nokia_mfi_rx_device::read()
 
 void nokia_mfi_rx_device::device_stop()
 {
+	machine().logerror("mfi_rx_capacity_observation: configured=%u peak=%u physical_capacity_claim=0\n",m_staging_limit,m_peak_queued);
 	machine().logerror("mfi_rx_trace_complete: words=%u blocks=%u word_cap=4096 block_cap=128\n",m_word_trace_count,m_block_trace_count);
 	machine().logerror("mfi_rx_summary: produced=%llu consumed=%llu queued=%u overrun=%llu underrun=%llu fault=%u divider=%u physical_clock_claim=0\n",
 		produced(),consumed(),m_state.count,overruns(),underruns(),m_state.fault,m_divider);

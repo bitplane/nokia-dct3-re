@@ -3,6 +3,14 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "nsm3_adc_lab_service_gap_staging_bound",
+      "owner": "nokia_mfi_lab_staging",
+      "status": "satisfied",
+      "predicate": "A clock/read-derived69-word demand is covered without faults by the single block-rounded96-word laboratory staging trial, without claiming physical MFI capacity",
+      "current": "The complete first-window observer records11648 reads,794 controls and362 gaps. Across the55.934us gap ending2.548643758s after11616 prior reads, source tick32992152/divider12 predicts11685 produced words:69 outstanding, unchanged by plus/minus1ns log rounding. No next block IRQ occurs until11712, so this local counterfactual does not assume a new interrupt. Three- and six-second tone/zero trials with provisional96-word staging all report peak69, no overrun/underrun and full P27-to-queue accounting. Fitted MFI size, bank/acknowledgement/capture semantics, physical cadence and receiver results remain unqualified; altered gating could change the bound. The component default remains64; full96-word wrap/provenance/snapshot copies are tested independently. Raw observer and trace:tmp/rom6-adc-lab/window-nuza6oxg. Six-second pair:nsm3adc-a8qzxu0p,nsm3ad0-q5m_l9s4 under that root. No capacity sweep, overwrite, discard, padding, decoded message or success injection is used.",
+      "evidence": ["driver/nokia_mfi_rx_state.h", "driver/nokia_mfi_rx.cpp", "driver/nokia_mfi_rx.h", "driver/nokia_dct3_research.cpp", "tests/unit/test_mfi_rx.cpp", "tools/test_mfi_rx_cpp.py", "tools/rom6_adc_lab_check.py", "tools/test_rom6_adc_lab_check.py", "docs/rom6_rf_interface.md"]
+    },
+    {
       "id": "nsm3_native_quarter_rate_accumulator_prefix",
       "owner": "native_rom6_receive_processing",
       "status": "satisfied",

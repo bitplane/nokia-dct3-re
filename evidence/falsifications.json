@@ -3,6 +3,13 @@
   "kind": "falsifications",
   "entries": [
     {
+      "id": "nsm3_p21_service_rearm_alone_resolves_64_word_overrun",
+      "status": "disproven",
+      "hypothesis": "Holding data-ready during P21.bit11 read service and re-notifying complete queued blocks at service end makes the64-word clocked laboratory receiver lossless",
+      "conclusion": "Matched three-second native tone and zero candidates still overflow at2.548639385s with11680 produced/11616 consumed and ST1c903,IMR035f,IFR0021,bus context4042. Native waveform/FIR/mixer checks remain valid. Binary SHA25691b50b85a782f29b87fa21a31aa062919937043376f502317339c26b2fdbba80. Raw captures:tmp/rom6-adc-lab/nsm3adc-0j48y64w and nsm3ad0-sb6esayw. Candidate implementation removed. This rejects sufficiency with that64-word policy, not all P21 acknowledgement interpretations or their interaction with other capacities. A separate uninterrupted-producer service-gap calculation requires69 words before the next read; it is not a physical-capacity proof.",
+      "evidence": ["docs/rom6_rf_interface.md", "tools/rom6_adc_lab_check.py", "tools/test_rom6_adc_lab_check.py"]
+    },
+    {
       "id": "nsm3_two_sample_cadence_alone_resolves_mfi_overrun",
       "status": "disproven",
       "hypothesis": "Using two rather than four complex samples per GSM symbol, without changing the64-word buffer or P03 gating, removes the native ADC transport overrun",

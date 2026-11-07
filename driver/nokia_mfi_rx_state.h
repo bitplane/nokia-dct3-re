@@ -5,13 +5,13 @@
 #include <array>
 #include <cstdint>
 
-// Laboratory transport prototype: two 32-word banks, not a claim about fitted
-// MFI RAM capacity. Qualification must reject every overrun and underrun.
+// Laboratory staging FIFO, not a recovered physical MFI RAM organization.
+// The larger backing supports one block-rounded service-gap experiment.
 struct nokia_mfi_rx_state
 {
-	static constexpr unsigned block_words = 32, capacity = 64;
-	std::array<std::uint16_t, capacity> words{};
-	std::array<std::uint64_t, capacity> source_ticks{};
+	static constexpr unsigned block_words = 32, capacity = 64, storage_words = 96;
+	std::array<std::uint16_t, storage_words> words{};
+	std::array<std::uint64_t, storage_words> source_ticks{};
 	std::uint16_t head = 0, count = 0, last = 0;
 	std::uint64_t produced = 0, consumed = 0, overruns = 0, underruns = 0;
 	bool enabled = false, fault = false;
@@ -25,11 +25,11 @@ struct nokia_mfi_rx_state
 		fault = false;
 		produced = consumed = overruns = underruns = 0;
 	}
-	bool clock(std::uint16_t word, std::uint64_t source_tick)
+	bool clock(std::uint16_t word, std::uint64_t source_tick, unsigned limit = capacity)
 	{
 		if (!enabled || fault) return false;
-		if (count == capacity) { ++overruns; fault = true; return false; }
-		unsigned const tail = (head + count) % capacity;
+		if (!limit || limit > storage_words || count >= limit) { ++overruns; fault = true; return false; }
+		unsigned const tail = (head + count) % storage_words;
 		words[tail] = word;
 		source_ticks[tail] = source_tick;
 		++count;
@@ -41,7 +41,7 @@ struct nokia_mfi_rx_state
 		if (!enabled) return last; // Inactive register retention, no FIFO pop.
 		if (!count) { ++underruns; return last; }
 		last = words[head];
-		head = (head + 1) % capacity;
+		head = (head + 1) % storage_words;
 		--count;
 		++consumed;
 		return last;

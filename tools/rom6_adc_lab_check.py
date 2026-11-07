@@ -8,6 +8,17 @@ ENABLE=re.compile(r'mfi_rx_enable: state=([01]) produced=(\d+) consumed=(\d+) ov
 SUMMARY=re.compile(r'mfi_rx_summary: produced=(\d+) consumed=(\d+) queued=(\d+) overrun=(\d+) underrun=(\d+) fault=([01]) divider=(\d+) physical_clock_claim=0')
 
 
+def continuous_queue_bound(first_tick,divider,consumed,next_read_ns):
+    """Counterfactual uninterrupted-producer demand, allowing log rounding."""
+    if min(first_tick,consumed,next_read_ns)<0 or divider<=0:
+        raise ValueError('invalid continuous queue bound arguments')
+    def required(stamp):
+        reference_tick=max(0,stamp)*13_000_000//1_000_000_000
+        produced=max(0,(reference_tick-first_tick)//divider+1)
+        return max(0,produced-consumed)
+    return required(next_read_ns-1),required(next_read_ns+1)
+
+
 def queued_read_count(text):
     active=False
     total=0
@@ -60,6 +71,12 @@ def check(text,tone):
     consumed=queued_read_count(text)
     if consumed!=int(native[0]):
         raise ValueError('P27 reads include words not consumed from the clocked queue')
+    capacities=re.findall(r'mfi_rx_capacity_observation: configured=(\d+) peak=(\d+) physical_capacity_claim=0',text)
+    if len(capacities)!=1 or text.count('mfi_rx_capacity_observation:')!=1:
+        raise ValueError('missing provisional staging capacity accounting')
+    capacity,peak=map(int,capacities[0])
+    if capacity<32 or capacity%32 or peak>capacity:
+        raise ValueError('invalid provisional staging capacity accounting')
     words=list(WORD.finditer(text))
     if len(words)<32 or len(words)!=text.count('mfi_rx_word:'):
         raise ValueError('missing or malformed delivered waveform prefix')
@@ -95,7 +112,9 @@ def check(text,tone):
     fault_times=re.findall(r'mfi_rx_fault: [^\r\n]*\bt=(\d+\.\d{9})',text)
     if len(fault_times)!=len(faults) or [row[-1] for row in contexts]!=fault_times:
         raise ValueError('fault context is not on the matching transport event')
-    return dict(direct_adc_only=True,tone=tone,word_divider=divider,checked_prefix_words=len(words),
+    return dict(direct_adc_only=True,tone=tone,word_divider=divider,
+                provisional_staging_words=capacity,peak_queued_words=peak,physical_buffer_capacity_qualified=False,
+                checked_prefix_words=len(words),
                 total_p27_reads=int(native[0]),independent_read_count_matches=True,
                 no_pre_capture_p27_read=True,all_reads_from_clocked_queue=True,
                 observed_prefix_epochs=epochs,transport_faults=faults,

@@ -36,7 +36,7 @@ and ordinary board callbacks are shared, not forked for these machines.
 | power management | `nokia_ccont_device` | extracted partial hardware |
 | audio/RF codec | `nokia_cobba_device` | serial-control capture seam and partial PCM/audio model |
 | RF synthesizer/control | `nokia_hagar_device` | NSM-3 native-ROM6 research only: saved compare-edge command state and conditional RX arithmetic; no lock, RF readiness or samples |
-| MFI receive transport | `nokia_mfi_rx_device` | direct-ADC lab prototype only; clocked words and saved provenance work, native trials still overrun; no physical cadence/capacity/IRQ qualification |
+| MFI receive transport | `nokia_mfi_rx_device` | direct-ADC lab prototype only; the 64-word trial fails, an independently derived 69-word service-gap demand is covered by provisional 96-word staging; saved clock/provenance and fault-free lab runs work, but physical cadence/capacity/IRQ remain unqualified |
 | persistent storage | native flash and I2C EEPROM devices; ST owns command/protection/deferred-operation and persistent OTP engines, literal CFI and explicit identity/electrical limits in `flash_storage.md` | present, partially validated |
 | display | geometry-configured PCD8544-family device | present |
 | SIM | SIMI controller plus replaceable card-side protocol device | present |
