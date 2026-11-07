@@ -109,6 +109,9 @@ def main():
                         with (phase/'rom6_radio_writes.tsv').open('rb') as stream:
                             report['receive_prefix']=check_receive(text,stream,
                                 (phase/'rom6_receive_first_program.be16').read_bytes(),mcu)
+                    if scenario in ('serial','receive'):
+                        from tools.rom6_hagar_contract import check as check_hagar
+                        report['hagar_commands']=check_hagar(text)
                     (run/'radio-census.json').write_text(json.dumps(report,indent=2)+'\n')
             elif scenario=='state':
                 with Image.open(phase/'snap/nsm3r6_state_reference.png') as reference, Image.open(phase/'snap/nsm3r6_state_restored.png') as restored:

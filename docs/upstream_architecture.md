@@ -35,6 +35,7 @@ and ordinary board callbacks are shared, not forked for these machines.
 | MAD2 system logic | Nokia MAD2 devices: CTSI, PUP, KBGPIO, UIF, GENSIO, MBUS, SIMI and DSPIF | extracted partial hardware |
 | power management | `nokia_ccont_device` | extracted partial hardware |
 | audio/RF codec | `nokia_cobba_device` | serial-control capture seam and partial PCM/audio model |
+| RF synthesizer/control | `nokia_hagar_device` | NSM-3 native-ROM6 research only: saved compare-edge command state and conditional RX arithmetic; no lock, RF readiness or samples |
 | persistent storage | native flash and I2C EEPROM devices; ST owns command/protection/deferred-operation and persistent OTP engines, literal CFI and explicit identity/electrical limits in `flash_storage.md` | present, partially validated |
 | display | geometry-configured PCD8544-family device | present |
 | SIM | SIMI controller plus replaceable card-side protocol device | present |

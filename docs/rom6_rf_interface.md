@@ -33,8 +33,8 @@ of all reachable firmware paths or physical MAD2 registers.
 | Observed operation | Count | Boundary |
 | --- | ---: | --- |
 | P27 sample reads | 1,245,280 | Every value is zero; first 0.535343582s, last 60.014753494s. COBBA's unattached callback supplies deterministic silence, not measured receiver noise. |
-| P31 / P32 writes | 30,354 each | Backend retains words but does not decode an RF chip or apply tuning. |
-| P04 writes | 35,855 | Existing comparator raises transfer pending; no serial payload is delivered to a modeled RF device. |
+| P31 / P32 writes | 30,354 each | Backend retains words; compare-edge projection reaches the partial HAGAR command-state device, without applying RF tuning. |
+| P04 writes | 35,855 | Existing comparator raises transfer pending independently of the raw command-state receipt. |
 | P30 writes | 30,789 | Raw values 0000/00bb/0100/0103; their physical meanings are not established here. |
 | P0e frame-length writes | 11 | Values 0546/1387; inherited quarter-symbol/frame notification policy still needs ROM6-specific validation. |
 
@@ -265,13 +265,43 @@ or what other fields the `4a80` payload controls.
 ## Next implementation boundary
 
 Do not add a second descriptor queue. RX arithmetic and configuration-class
-selection are qualified. The next boundary is timed delivery of the co-varying
-`4100`/`4a80` words and PLL programming: recover their trigger/latch edge
-(P32, P04 or compare), physical roles and completion meaning before attaching
-a live RF decoder. The complete stable-payload compare capture does not choose
-between those models. A clocked sample source with
-provenance follows the programming contract; no carrier fallback is permitted.
+selection are qualified, and the partial device below receives raw compare
+projections. The next boundary is physical interpretation of the co-varying
+`4100`/`4a80` controls and receive-clock/sample ownership. The complete
+stable-payload capture does not uniquely choose a physical latch edge; the
+device's compare-edge policy is explicit, not a measured silicon conclusion.
+A clocked sample source with provenance follows; no carrier fallback is permitted.
 Native FCCH/SCH/BCCH, camp and registration come after those boundaries.
+
+## Partial HAGAR command state
+
+Only the `nsm3r6` research composition attaches `nokia_hagar_device`. It receives
+the raw P30/P31/P32/P04 tuple on actual compare callbacks, not port reads or
+firmware-PC hooks. It owns the last `4100`, `4400` and `4a80` words, their
+validity and receipt count. All are saved/resettable. No second descriptor queue,
+completion IRQ, PLL-lock indication or received sample is introduced.
+
+The device exposes a **conditional arithmetic candidate**, not RF readiness:
+both `1054/4100 + 0402/4a80` or `082a/4100 + 0208/4a80` must agree, and the
+PLL word must have a unique matching key in that class. Disagreement, unknown
+control, unsupported transactions and unmatched `9044` have no fallback.
+Unsupported transactions invalidate the known-family set; all three families
+must be received again. Interleaved `4680` retains the conditional arithmetic
+candidate without assigning gain semantics or authorizing sample reception.
+
+Independent executable tests cover all 548 keys, the two interpretations of
+`48c8`, class disagreement, unknown words/control, unmatched PLL, snapshot and
+reset. The MAME compare fixture additionally saves/restores an actual configured
+device and checks repeated delivery and reset. Holding the DSP in reset stops
+new compare receipts but does not invent an off-chip HAGAR reset; board-level
+reset-pin ownership remains unproved. The serial acceptance checks every device
+receipt against independent bus/word replay. This is partial stateful hardware
+modelling, not qualification of physical divider fields, RF gain, settling,
+reference-divider control, serial clocks or a working receiver.
+
+The qualified 60-second serial run checks all 24,914 device receipts: 19,205
+have a conditional candidate and 5,709 remain unresolved, covering all 548 scan
+keys. Its complete timestamped write stream retains the baseline SHA256 above.
 
 ## Receive interrupt and clock boundary
 

@@ -7,6 +7,7 @@
 #include "speaker.h"
 #include "nokia_dct3_research.h"
 #include "nokia_dsp_staged.h"
+#include "nokia_hagar.h"
 
 namespace nokia_dct3 {
 
@@ -505,6 +506,9 @@ void nokia_dct3_state::nsm3r6(machine_config &config)
 	// Partial request/strobe/DONE/ack contract recovered from resident I/O.
 	// This supplies no RF/sample data or MCU/DSP service verdict.
 	m_dsp_c54x->set_port36_handshake(true);
+	// Observed NSM-3 serial command state only; no RF lock or samples.
+	auto &hagar = NOKIA_HAGAR(config, "hagar", 0);
+	m_dsp_c54x->transfer_compare_cb().set(hagar, FUNC(nokia_hagar_device::compare_output_w));
 	// Own uploaded code uses FB at 07e6. Enable the existing extended-control
 	// grammar; only the acquired page-zero address map is supplied here.
 	subdevice<tms320c54x_device>("dsp_c54x:cpu")->set_extended_program(true);
