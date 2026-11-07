@@ -801,10 +801,17 @@ of sixteen iterations.
 
 The mapped AL BIT read and subsequent single-repeat paired addition now
 use independently tested generic CPU paths. The unchanged six-second
-waveform remains **rejected** at the next composition: `RPTZ A,#9` at
-`77b0`, inside block `77b0..77ba`, preceding `MAC *AR3+,*AR2+,A,A` at
-`77b2`. The displayed stop `77b3` is not the rejected header. The trace
-still has 702272 native input reads, peak queue 69 and no transport fault.
+waveform also passes `RPTZ A,#9` at `77b0`, inside block `77b0..77ba`,
+preceding `MAC *AR3+,*AR2+,A,A` at `77b2`. Eighteen generic nested-repeat
+cases check re-zeroing and independent outer/inner counts with replay;
+192 existing block/single-repeat controls pass.
+
+The current waveform remains **rejected** at `9007`: `7212 001a`,
+disassembled as `MVDM $001a,$12`, copies mapped BRC into AR2 before the
+routine replaces BRC with 6 and saves AR2 on the stack. The common MVKD
+source guard excludes this control-register read. Displayed `900b` is
+not the operand-owning instruction. The trace still has 702272 native
+input reads, peak queue 69 and no transport fault.
 The corresponding short/extended-immediate and RAM-count DADD tests check
 every intermediate result and paired read across 72 save/replay cases;
 the 8192 ordinary paired-arithmetic controls also pass.
@@ -812,6 +819,6 @@ the 8192 ordinary paired-arithmetic controls also pass.
 Reaching this standard-pattern correlator and its later processing does
 not prove FCCH acquisition, SCH synchronization, decoded frame number or
 camping, particularly because the stimulus contains no SCH burst. Next:
-qualify zeroing-immediate single repeat inside an active block independently
-before rerunning the unchanged waveform; preserve the outer block count,
-inner count, accumulator-zero ownership and save/replay state.
+qualify the mapped repeat-counter read independently before rerunning the
+unchanged waveform; preserve Read ownership, live BRC versus block-control
+state, register forwarding and save/replay.

@@ -5090,6 +5090,17 @@ are not established.
 
 ## Repeated fixed-accumulator transfer
 
+The ordinary block-interior immediate-repeat admission also includes RPTZ
+for A or B, provided its complete header and following body fit inside the
+block. Each block iteration executes the zeroing header anew, while the
+single-repeat count remains separate from BRC. `block_zero_repeat` checks
+18 cases/restores: outer counts 0/1/3, inner counts 0/2/9 and both cleared
+accumulators. Independent dot products and one output store per outer
+iteration check re-zeroing, MAC accumulation, both advancing input pointers,
+outer suffix execution, preserved opposite accumulator/status and completed
+continuation. Four save points are distributed. This does not qualify
+interrupt composition or physical pipeline timing.
+
 RPTZ's sequence-opening clear precedes the first MVMD read of the same
 accumulator (SPRU172C 4-150). In the staged prototype, the matching AL/BL
 source sample is retained after the older RPTZ Execute, not before it in

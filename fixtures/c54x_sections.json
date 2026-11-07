@@ -1,6 +1,7 @@
 {
   "immediate_store": 8,
   "repeated_double_add": 72,
+  "block_zero_repeat": 18,
   "basic_memory": 18,
   "stack": 141,
   "dagen": 292,
