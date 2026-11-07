@@ -3,6 +3,14 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "nsm3_frame_adjustment_readback_contract",
+      "owner": "native_rom6_receive_timing",
+      "status": "unresolved",
+      "predicate": "P10 and the P0e adjustment/reload boundary implement their physical timing and snapshot ownership",
+      "current": "Own56de..56fb records P10 to0557 for nonzero adjustment and writes4999+adjustment toP0e; observed2477=1880 produces1adf. In four-second nsm3afs-lhizd1pj,all11 P10 reads return0: one at56ec and ten ata2e1,which stores265a. The total is below32 cap. Neither0557 nor265a is read before the failed SCH result; their mapped consumers are2b29 and gateda49a. Therefore these missing readback values are not a demonstrated cause of this bounded failure,and no candidate counter is implemented. Physical P10 meaning,reload latch edge and FCCH-derived index/epoch correctness remain open.",
+      "evidence": ["tools/rom6_adc_burst.lua", "driver/nokia_dsp_c54x.cpp", "docs/rom6_rf_interface.md"]
+    },
+    {
       "id": "nsm3_finite_fcch_native_control_acceptance",
       "owner": "native_rom6_receive_search",
       "status": "satisfied",

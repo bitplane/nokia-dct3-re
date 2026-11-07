@@ -978,3 +978,33 @@ measurements. The next question is whether their derivation and later
 capture selection agree with the known source epoch. Keep that check
 separate from merely observing the acceptance flag; do not shift the
 source to make the selected aperture appear correct.
+
+### Frame-adjustment readback boundary
+
+Own routine `56de..56fb` adds the pending correction at `2658` to its
+argument, accumulates it into `053b`, records P10 into `0557` for a nonzero
+adjustment (otherwise `ffff`), and writes `4999 + adjustment` to P0e.
+The finite-source run applies `2477=0758` (1880), producing reload `1adf`.
+The zero-adjustment reload `1387` follows on subsequent scheduler entries.
+This is firmware arithmetic, not proof of the physical reload/latch edge.
+
+P10 is still opaque in the backend. In the four-second
+`nsm3afs-lhizd1pj` run all **11** observed P10 reads return zero: one at
+issuing instruction `56ec`, ten at `a2e1`. The passive trace's total is
+below its cap of 32. The latter routine stores its read into `265a` and
+then overwrites A with unrelated initialization constants. Both saved
+values have identifiable consumers: `0557` is compared with a P13-derived
+tuple field at `2b29`, and `265a` is compared with a fresh P10 read at
+`a49a` behind the `262c`/`2615` gates. **Neither saved value is read in
+this bounded run before the failed SCH operation.** Therefore its zero
+readback cannot explain the current failure through either mapped consumer.
+This does not qualify a physical P10 value or exclude its later lifecycle.
+Do not add a free-running-counter answer solely because the port is missing.
+
+Next, independently join the search's timing calculation to its sample
+indices and SCU epoch. In the observed result, the arithmetic from signed
+`2f6c=d5cb`, unsigned `2f7b=06f0` and the decoded constants is consistent
+with `((trunc(-10805/7) + 1776 - 18) * 32) mod 5000 = 1880`.
+Agreement of this one calculation is not proof that those input indices
+represent the correct source burst position or that the selected reload
+and capture boundary implement the physical clock.

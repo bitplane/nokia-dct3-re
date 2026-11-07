@@ -34,6 +34,16 @@ _G.rom6_burst_counter_load=cpu.spaces.io:install_write_tap(0x0d,0x0d,'rom6_burst
 end)
 local sch_sample_writes={}
 local last_counter,last_counter_time=0,0
+local adjust_reads=0
+_G.rom6_burst_adjust_reads={}
+for _,spec in ipairs({{cpu.spaces.io,0x10,'port10'},{cpu.spaces.data,0x557,'word0557'},{cpu.spaces.data,0x265a,'word265a'}}) do
+    _G.rom6_burst_adjust_reads[#_G.rom6_burst_adjust_reads+1]=spec[1]:install_read_tap(spec[2],spec[2],'rom6_burst_adjust_read',function(_,value)
+        adjust_reads=adjust_reads+1
+        if adjust_reads>32 then return end
+        machine:logerror(string.format('rom6_burst_adjust_read: sequence=%d t=%.9f source=%s value=%04x pc=%06x a=%010x b=%010x observer_writes=0\n',
+            adjust_reads,machine.time:as_double(),spec[3],value,cpu.state.GENPC.value,cpu.state.A.value,cpu.state.B.value))
+    end)
+end
 _G.rom6_burst_counter=cpu.spaces.io:install_read_tap(0x0d,0x0d,'rom6_burst_counter',function(_,value)
     if sch_windows>0 then return end
     last_counter=value; last_counter_time=machine.time:as_double()
@@ -147,6 +157,7 @@ _G.rom6_burst_stop=emu.add_machine_stop_notifier(function()
     machine:logerror(string.format('rom6_burst_complete: count_writes=%d cap=1024 observer_writes=0\n',writes))
     machine:logerror(string.format('rom6_burst_fcch_complete: writes=%d cap=256 observer_writes=0\n',fcch_state_writes))
     machine:logerror(string.format('rom6_burst_counter_load_complete: writes=%d cap=32 observer_writes=0\n',counter_loads))
+    machine:logerror(string.format('rom6_burst_adjust_complete: reads=%d cap=32 observer_writes=0\n',adjust_reads))
     machine:logerror(string.format('rom6_burst_active_complete: words=%d cap=1024 reads=%d observer_writes=0\n',active_words,adc_reads))
     if machine.system.name=='nsm3afs' then
         machine:logerror(string.format('rom6_burst_sch_raw_complete: words=%d cap=1024 reads=%d observer_writes=0\n',sch_raw_words,adc_reads))
@@ -172,4 +183,7 @@ _G.rom6_burst_stop=emu.add_machine_stop_notifier(function()
     machine.debugger:command('dasm rom6_burst_timing_result.asm,2f20,a0,1,:dsp_c54x:cpu')
     machine.debugger:command('dasm rom6_burst_sch_schedule.asm,5350,2b0,1,:dsp_c54x:cpu')
     machine.debugger:command('dasm rom6_burst_frame_adjust.asm,56c0,100,1,:dsp_c54x:cpu')
+    machine.debugger:command('dasm rom6_burst_frame_adjust_consumer.asm,2b00,a0,1,:dsp_c54x:cpu')
+    machine.debugger:command('dasm rom6_burst_counter_readback.asm,a2b0,c0,1,:dsp_c54x:cpu')
+    machine.debugger:command('dasm rom6_burst_counter_consumer.asm,a470,80,1,:dsp_c54x:cpu')
 end)
