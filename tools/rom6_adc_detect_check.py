@@ -10,6 +10,41 @@ OUTPUT=re.compile(r'rom6_detect_product_output: phase=(\d+) a=([0-9a-f]{10}) b=(
 METRIC=re.compile(r'rom6_detect_metric: sequence=(\d+) a=([0-9a-f]{10}) corr=([0-9a-f]{4}(?:,[0-9a-f]{4}){3}) energy=([0-9a-f]{4},[0-9a-f]{4}) thresholds=([0-9a-f]{4},[0-9a-f]{4}) mode=([0-9a-f]{4}) st1=([0-9a-f]{4}) observer_writes=0')
 THRESHOLD=re.compile(r'rom6_detect_threshold: sequence=(\d+) t=(\d+\.\d{9}) value=([0-9a-f]{4}) a=([0-9a-f]{10}) cpu_pc=000b9a observer_writes=0')
 FCCH_STATE=re.compile(r'rom6_burst_fcch_state: sequence=(\d+) t=(\d+\.\d{9}) address=([0-9a-f]{4}) value=([0-9a-f]{4}) pc=([0-9a-f]{6}) reads=(\d+) observer_writes=0')
+FCCH_ACCUMULATE=re.compile(r'rom6_burst_fcch_accumulate: t=(\d+\.\d{9}) previous=([0-9a-f]{4}) value=([0-9a-f]{4}) a=([0-9a-f]{10}) b=([0-9a-f]{10}) st1=([0-9a-f]{4}) peak=([0-9a-f]{4}) base=([0-9a-f]{4}) index=([0-9a-f]{4}) pc=000d0c observer_writes=0')
+
+
+def check_finite_peak_accumulation(text,program,mcu):
+    """Join table contents and signed residuals, not a physical phase verdict."""
+    check_consumer_program(program,mcu)
+    table=[int.from_bytes(program[2*at:2*at+2],'big') for at in range(0xd76,0xd8a)]
+    # Twenty successive FCCH offsets: five per 51-frame multiframe. The
+    # firmware represents time in 32-quarter-symbol units. Do not impose a
+    # nearest-rounding policy: its sixteenth entry differs by 3/4 of a unit.
+    for number,value in enumerate(table,1):
+        frames=(number//5)*51+(number%5)*10
+        if abs(value*32-frames*5000)>32:
+            raise ValueError('native FCCH timing table differs from GSM frame spacing')
+    rows=list(FCCH_ACCUMULATE.finditer(text))
+    if not rows or len(rows)!=text.count('rom6_burst_fcch_accumulate:'):
+        raise ValueError('missing or unsupported native FCCH residual observations')
+    previous=None
+    last_time=-1
+    for row in rows:
+        stamp,old,value,a,b,st1,peak,base,index=row.groups()
+        old,value,a,b,st1,peak,base,index=[int(word,16) for word in (old,value,a,b,st1,peak,base,index)]
+        address=0xd89+signed(index)
+        if not 0xd76<=address<0xd8a or nanoseconds(stamp)<last_time:
+            raise ValueError('native FCCH table selection/order differs')
+        expected_table=table[address-0xd76]
+        expected=(signed(old)+peak-base-expected_table)&((1<<40)-1)
+        if (a!=expected_table or b!=expected or value!=(expected&0xffff) or
+                previous is not None and old not in (0,previous)):
+            raise ValueError('native FCCH residual differs from independent table arithmetic')
+        previous=value
+        last_time=nanoseconds(stamp)
+    return dict(checked_updates=len(rows),table_entries=len(table),last_residual=signed(previous),
+                mapped_table_read_qualified=True,physical_frame_phase_qualified=False,
+                sch_qualified=False,camping_qualified=False)
 
 
 def check_finite_search_acceptance(text,program,mcu):

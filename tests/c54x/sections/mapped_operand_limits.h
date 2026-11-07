@@ -11,6 +11,9 @@ inline std::vector<clocked_register_case> section_cases()
 	{
 		bool const destination = operation == 4;
 		u16 const literal = destination ? std::array<u16,5>{0,0x18,0x19,0x1a,0x1f}[selector] : sources[selector];
+		// MVDM BRC,AR2 is covered positively by brc_to_ar; it is no
+		// longer one of the model's unsupported mapped-source operands.
+		if (operation == 3 && literal == 0x1a) continue;
 		auto initial = initial_case("mapped-operand-limit", {std::array<u16,5>{0x00f8,0x01f8,0x7092,0x7212,0x70f8}[operation],literal,0x18});
 		initial.initial.insert(initial.initial.end(), {{r::STATE_ST0,0xa008},{r::STATE_ST1,0x900},
 			{r::STATE_AR2,0x1400},{r::STATE_A,0x123456789aULL},{r::STATE_B,0x2233445566ULL}});

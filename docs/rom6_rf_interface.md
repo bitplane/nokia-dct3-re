@@ -863,22 +863,23 @@ SCH decode. Fresh evidence: `tmp/rom6-adc-lab/nsm3afb-xqpil8w6`.
 
 The first correlator pass is not reading stale reset data. All 192 words
 at `00d8..0197` were written by builder `7937..7966` at
-`3.343444352..3.343500879s`, immediately before the first mask-table
-selection at `3.343508440s`. The builder uses the existing complex FIR
+`3.342868352..3.342924879s`, immediately before the first mask-table
+selection at `3.342932440s`. The builder uses the existing complex FIR
 and quarter-rotation operations with coefficients at `0524`; its source
 pointer is three or four words ahead of each observed destination. All words are
-zero in this SCH-absent fixture. Thirty-three correlation positions start
+zero in the current coded-SCH fixture. Thirty-three correlation positions start
 at `00d8,00da,..0118`, without another P27 read between them.
 
 The shared read count 702272 identifies capture 5: 701312 words were consumed
 in the four closed captures, followed by 960 in the current capture. Its
-declared source interval is ticks `43452744..43464252`, wholly outside an
-active FCCH slot. This is a measured laboratory aperture, not an established
+declared source interval is ticks `43445256..43456764`: it begins within
+frame 724's FCCH envelope but ends before frame 725's SCH. The later
+correlator window is zero. This is a measured laboratory aperture, not an established
 physical COBBA/MFI acquisition window.
 
 The final control sequence is P0a=`117e`, P0b=`3a98`, P09=`1221`,
-then P03=`0105`. A passive P0d read returns `1095` at `3.342511429s`;
-P03 is written at `3.342518747s`. Advancing that counter at 13MHz/12,
+then P03=`0105`. A passive P0d read returns `1095` at `3.341935429s`;
+P03 is written at `3.341942747s`. Advancing that counter at 13MHz/12,
 with its unobserved sub-tick phase bounded by one count, places P09
 388..389 quarter ticks ahead of the immediate lab start (about 358..359us).
 The source's absolute epoch must not be confused with the separately
@@ -887,7 +888,8 @@ arm-versus-compare boundary; they do not establish which compare should
 clock ADC conversion, serial transfer or INT0, or prove that a timing change
 would produce a valid SCH.
 
-Bounded observation: `tmp/rom6-adc-lab/nsm3afb-_wd59bq9`. The observer
+Bounded observation: `tmp/rom6-adc-lab/nsm3afs-mpd0rspg` after the mapped
+READA correction described below. The observer
 retains only the last 128 relevant controls and the last writer per sample
 address, and freezes them at the first training-mask selection. It neither
 changes registers nor schedules a response.
@@ -960,21 +962,21 @@ No firmware result or decoded radio message is synthesized.
 ### Native finite-search acceptance boundary
 
 The own uploaded `0b40..0d7f` search has a positive control path before
-the failed SCH operation. Passive writes in `nsm3afs-qoucdjgr` show seven
+the failed SCH operation. Passive writes in `nsm3afs-mpd0rspg` show seven
 `2f65` updates at issuing instruction `0d26`, from `fffa` through zero.
 Each occurs in source frame 30/40/0/10/20/30/40, shortly after its FCCH
 envelope ends (source-frame offsets 7519..7803 ticks versus end 7104).
 The following branch sets bit 7 of `2627` at instruction `0d5d`, observed
-at `3.296010462s`; it follows the zero confirmation count. The independent
+at `3.296011297s`; it follows the zero confirmation count. The independent
 checker pins the complete own uploaded search code and checks chronology,
 counter progression and absolute-source burst alignment. This establishes
 **native search-control acceptance**, not independently correct frequency,
 frame phase, physical capture gating or SCH synchronization.
 
 At this boundary the observed words are `2f78=fff7`, `2f7b=06f0`,
-`2f6c=d5cb`, `2f6d=0000`, `2f68..69=0000,0000` and
-`247a..7b=0000,0001`. These are raw state, not yet qualified semantic
-measurements. The next question is whether their derivation and later
+`2f6c=fffe`, `2f6d=0000`, `2f68..69=0000,0000` and
+`247a..7b=0000,0001`. The timing residual has an independent arithmetic
+check below; these are not yet qualified physical measurements. The next question is whether their derivation and later
 capture selection agree with the known source epoch. Keep that check
 separate from merely observing the acceptance flag; do not shift the
 source to make the selected aperture appear correct.
@@ -984,7 +986,7 @@ source to make the selected aperture appear correct.
 Own routine `56de..56fb` adds the pending correction at `2658` to its
 argument, accumulates it into `053b`, records P10 into `0557` for a nonzero
 adjustment (otherwise `ffff`), and writes `4999 + adjustment` to P0e.
-The finite-source run applies `2477=0758` (1880), producing reload `1adf`.
+The finite-source run applies `2477=04e8` (1256), producing reload `186f`.
 The zero-adjustment reload `1387` follows on subsequent scheduler entries.
 This is firmware arithmetic, not proof of the physical reload/latch edge.
 
@@ -1001,10 +1003,22 @@ readback cannot explain the current failure through either mapped consumer.
 This does not qualify a physical P10 value or exclude its later lifecycle.
 Do not add a free-running-counter answer solely because the port is missing.
 
-Next, independently join the search's timing calculation to its sample
-indices and SCU epoch. In the observed result, the arithmetic from signed
-`2f6c=d5cb`, unsigned `2f7b=06f0` and the decoded constants is consistent
-with `((trunc(-10805/7) + 1776 - 18) * 32) mod 5000 = 1880`.
-Agreement of this one calculation is not proof that those input indices
-represent the correct source burst position or that the selected reload
-and capture boundary implement the physical clock.
+The search computes eight accumulated differences at `0d0b` from the old
+signed residual, unsigned peak/base indices and a table word selected through
+READA into AL followed immediately by LDM AL,A. A generic CPU bypass defect
+formerly supplied the table address rather than its contents. The standalone
+72-case mapped-program-read fixture reproduces and guards the correction.
+Native A now matches the actual selected words, and every 40-bit difference
+matches `signed(previous) + peak - base - table_word`; the final residual is
+`-2`, not the invalid accumulated address differences. The 20 table entries
+represent successive 10/11-frame FCCH offsets in 32-quarter-symbol units,
+within one unit; no uniform nearest-rounding rule is assumed (entry 16 is
+three quarters of a unit below the exact value).
+
+The resulting arithmetic is
+`((trunc(-2/7) + 1776 - 18) * 32) mod 5000 = 1256`.
+The frame adjustment and later capture shift, but SCH remains invalid with a
+zero correlator window. Next join the peak indices to their actual sample
+clock and SCU epoch: correct table arithmetic does not by itself prove that
+those indices represent the correct source phase or that the reload/capture
+boundary implements the physical clock.

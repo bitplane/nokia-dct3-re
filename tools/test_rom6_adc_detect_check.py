@@ -1,10 +1,42 @@
 import unittest
 from unittest.mock import patch
 
-from tools.rom6_adc_detect_check import check,complex_products,normalized_metric,check_finite_search_acceptance
+from tools.rom6_adc_detect_check import check,complex_products,normalized_metric,check_finite_search_acceptance,check_finite_peak_accumulation
 
 
 class NativeComplexProductsTest(unittest.TestCase):
+    def residual_fixture(self):
+        program=bytearray(131072)
+        for number in range(1,21):
+            frames=(number//5)*51+(number%5)*10
+            value=(frames*5000+16)//32
+            address=0xd75+number
+            program[2*address:2*address+2]=value.to_bytes(2,'big')
+        text=('rom6_burst_fcch_accumulate: t=3.000000000 previous=0000 value=ffff a=0000001250 b=ffffffffff st1=6103 peak=193f base=06f0 index=ffef pc=000d0c observer_writes=0\n'
+              'rom6_burst_fcch_accumulate: t=3.100000000 previous=ffff value=ffff a=000000186a b=ffffffffff st1=4103 peak=1f5a base=06f0 index=fff0 pc=000d0c observer_writes=0')
+        return text,bytes(program)
+
+    @patch('tools.rom6_adc_detect_check.check_consumer_program')
+    def test_peak_accumulation_reads_table_contents_not_addresses(self,_):
+        text,program=self.residual_fixture()
+        result=check_finite_peak_accumulation(text,program,b'')
+        self.assertEqual(result['last_residual'],-1)
+        self.assertEqual(result['checked_updates'],2)
+        self.assertFalse(result['physical_frame_phase_qualified'])
+
+    @patch('tools.rom6_adc_detect_check.check_consumer_program')
+    def test_peak_accumulation_rejects_stale_alias_and_arithmetic_drift(self,_):
+        text,program=self.residual_fixture()
+        for old,new in [('a=0000001250','a=0000000d78'),('b=ffffffffff','b=00000004d7'),
+                        ('index=ffef','index=0000'),('value=ffff','value=04d7'),
+                        ('t=3.100000000','t=2.900000000'),('pc=000d0c','pc=000c0c')]:
+            with self.subTest(old=old),self.assertRaises(ValueError):
+                check_finite_peak_accumulation(text.replace(old,new,1),program,b'')
+        wrong=bytearray(program)
+        wrong[2*0xd78:2*0xd78+2]=(4690).to_bytes(2,'big')
+        with self.assertRaises(ValueError):
+            check_finite_peak_accumulation(text,wrong,b'')
+
     def finite_fixture(self):
         lines=[]
         for index,frame in enumerate((642,652,663,673,683,693,703),1):

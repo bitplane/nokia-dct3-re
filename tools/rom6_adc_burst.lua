@@ -9,7 +9,7 @@ local sch_raw_words=0
 local sch_windows=0
 local fcch_state_writes=0
 _G.rom6_burst_fcch_state={}
-for _,address in ipairs({0x2f65,0x2f6b,0x2f7a,0x2f7b,0x2477,0x247a,0x247b,0x2627}) do
+for _,address in ipairs({0x2f65,0x2f6b,0x2f6c,0x2f7a,0x2f7b,0x2477,0x247a,0x247b,0x2627}) do
     _G.rom6_burst_fcch_state[#_G.rom6_burst_fcch_state+1]=cpu.spaces.data:install_write_tap(address,address,'rom6_burst_fcch_state',function(at,value)
         local pc=cpu.state.GENPC.value
         if pc<0xb40 or pc>=0xe00 then return end
@@ -17,6 +17,12 @@ for _,address in ipairs({0x2f65,0x2f6b,0x2f7a,0x2f7b,0x2477,0x247a,0x247b,0x2627
         if fcch_state_writes>256 then return end
         machine:logerror(string.format('rom6_burst_fcch_state: sequence=%d t=%.9f address=%04x value=%04x pc=%06x reads=%d observer_writes=0\n',
             fcch_state_writes,machine.time:as_double(),at,value,pc,adc_reads))
+        if at==0x2f6c then
+            local function word(address) return cpu.spaces.data:read_u16(address) end
+            machine:logerror(string.format('rom6_burst_fcch_accumulate: t=%.9f previous=%04x value=%04x a=%010x b=%010x st1=%04x peak=%04x base=%04x index=%04x pc=%06x observer_writes=0\n',
+                machine.time:as_double(),word(at),value,cpu.state.A.value,cpu.state.B.value,cpu.state.ST1.value,
+                word(0x2f58),word(0x2f7b),word(0x2f79),pc))
+        end
         if at==0x2627 then
             local function word(address) return cpu.spaces.data:read_u16(address) end
             machine:logerror(string.format('rom6_burst_fcch_fields: t=%.9f word2f65=%04x word2f78=%04x word2f7b=%04x word2f6c=%04x word2f6d=%04x words2f68=%04x,%04x words247a=%04x,%04x observer_writes=0\n',
@@ -186,4 +192,6 @@ _G.rom6_burst_stop=emu.add_machine_stop_notifier(function()
     machine.debugger:command('dasm rom6_burst_frame_adjust_consumer.asm,2b00,a0,1,:dsp_c54x:cpu')
     machine.debugger:command('dasm rom6_burst_counter_readback.asm,a2b0,c0,1,:dsp_c54x:cpu')
     machine.debugger:command('dasm rom6_burst_counter_consumer.asm,a470,80,1,:dsp_c54x:cpu')
+    machine.debugger:command('dasm rom6_burst_metric_input.asm,4140,a0,1,:dsp_c54x:cpu')
+    machine.debugger:command('dasm rom6_burst_input_wait.asm,70a,90,1,:dsp_c54x:cpu')
 end)

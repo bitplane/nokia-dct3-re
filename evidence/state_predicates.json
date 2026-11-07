@@ -3,11 +3,19 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "c54x_mapped_reada_consumer_publication",
+      "owner": "tms320c54x_cpu",
+      "status": "satisfied",
+      "predicate": "A mapped accumulator consumer immediately after READA receives the fetched word rather than the old program address",
+      "current": "The mapped_program_read section has72 independent cases covering AL/AH/AG/BL/BH/BG,two words,A/B LDM consumers and0/1/2 gaps,with restore replay. The immediate case failed before the generic retained-word bypass. SPRU131G7.5.10/example7-67 distinguishes mapped-write/read from direct-ALU producer latency. Real Execute publication is unchanged,program memory is not reread,and guard fields mask to8bits. In native nsm3afs-mpd0rspg,eight FCCH peak residual updates now match signed(previous)+peak-base-program_table[index] exactly; final2f6c=-2 and2477=1256. SCH remains failed,so no physical capture or synchronization qualification follows.",
+      "evidence": ["cpu/tms320c54x/tms320c54x.cpp", "tests/c54x/sections/mapped_program_read.h", "tools/rom6_adc_detect_check.py", "tools/test_rom6_adc_detect_check.py", "docs/c54x_execution_contracts.md", "docs/rom6_rf_interface.md"]
+    },
+    {
       "id": "nsm3_frame_adjustment_readback_contract",
       "owner": "native_rom6_receive_timing",
       "status": "unresolved",
       "predicate": "P10 and the P0e adjustment/reload boundary implement their physical timing and snapshot ownership",
-      "current": "Own56de..56fb records P10 to0557 for nonzero adjustment and writes4999+adjustment toP0e; observed2477=1880 produces1adf. In four-second nsm3afs-lhizd1pj,all11 P10 reads return0: one at56ec and ten ata2e1,which stores265a. The total is below32 cap. Neither0557 nor265a is read before the failed SCH result; their mapped consumers are2b29 and gateda49a. Therefore these missing readback values are not a demonstrated cause of this bounded failure,and no candidate counter is implemented. Physical P10 meaning,reload latch edge and FCCH-derived index/epoch correctness remain open.",
+      "current": "Own56de..56fb records P10 to0557 for nonzero adjustment and writes4999+adjustment toP0e; after the mapped READA correction,2477=1256 produces186f. In four-second nsm3afs-lhizd1pj,all11 P10 reads return0: one at56ec and ten ata2e1,which stores265a. The total is below32 cap. Neither0557 nor265a is read before the failed SCH result; their mapped consumers are2b29 and gateda49a. Therefore these missing readback values are not a demonstrated cause of this bounded failure,and no candidate counter is implemented. Physical P10 meaning,reload latch edge and FCCH-derived index/epoch correctness remain open.",
       "evidence": ["tools/rom6_adc_burst.lua", "driver/nokia_dsp_c54x.cpp", "docs/rom6_rf_interface.md"]
     },
     {
@@ -47,7 +55,7 @@
       "owner": "native_rom6_receive_search",
       "status": "unresolved",
       "predicate": "The native SCH correlator input is joined to the correct physical capture edge and independently timed SCH symbols",
-      "current": "Run nsm3afb-_wd59bq9 joins192 zero sample words at00d8..0197 to builder7937..7966 writes at3.343444352..3.343500879s,then33 correlation positions starting at3.343508440s without more P27 reads. Read702272 belongs to capture5,after701312 closed-capture reads plus960 current words; source interval43452744..43464252 is outside FCCH. Final controls are P0a117e/P0b3a98/P091221/P030105. P0d1095 at3.342511429s bounds the P09 compare388..389 quarters after immediate P03 start at3.342518747s. SCU and source epochs are distinct. The separate nsm3afs-3tq6lnj4 source delivers independently checked SCH but leaves this later zero correlator window and failed packet unchanged. Next discriminate acquisition scheduling and physical capture behavior without source retiming or firmware forcing; neither trigger nor valid SCH timing is proved.",
+      "current": "After the mapped READA correction,nsm3afs-mpd0rspg joins192 zero sample words at00d8..0197 to builder7937..7966 writes at3.342868352..3.342924879s,then33 correlation positions starting at3.342932440s without more P27 reads. Read702272 belongs to capture5,after701312 closed-capture reads plus960 current words; source interval43445256..43456764 begins in FCCH frame724 but ends before SCH frame725. Final controls are P0a117e/P0b3a98/P091221/P030105. P0d1095 at3.341935429s bounds the P09 compare388..389 quarters after immediate P03 start at3.341942747s. SCU and source epochs are distinct. Corrected FCCH residual arithmetic changes the capture time but does not supply valid SCH samples to this correlator window. Next discriminate sample-index origins and physical capture behavior without source retiming or firmware forcing; neither trigger nor valid SCH timing is proved.",
       "evidence": ["tools/rom6_adc_burst.lua", "driver/nokia_mfi_rx.cpp", "driver/nokia_dsp_c54x.cpp", "docs/rom6_rf_interface.md"]
     },
     {

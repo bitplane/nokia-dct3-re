@@ -103,6 +103,18 @@ scratch-pointer balance, copied words and restoration. This catches a loop
 that passes standalone instruction tests but reads the scratch word on the
 wrong side of an older postdecrement.
 
+`READA` into AL/AH/AG/BL/BH/BG is also a mapped accumulator writer.
+An immediately following mapped read receives its retained program word,
+including the eight-bit guard-field mask, without advancing the real EB
+write or rereading program memory. This follows the mapped-write/read
+case in [SPRU131G 7.5.10, example 7-67](https://www.ti.com/lit/ug/spru131g/spru131g.pdf),
+not the separate direct-ALU producer latency. `mapped_program_read` has
+72 independent cases across all six fields, two word patterns, A/B LDM
+consumers and zero/one/two separating instructions, with restore replay.
+The immediate case failed before the bypass, returning the old table address.
+The isolated `brc_to_ar` positive coverage also supersedes the old BRC-source
+rejection in `mapped_operand_limits`; the remaining 44 admission limits stay.
+
 Short RAM AND/OR/XOR operands can issue through the staged single-instruction
 repeat slots. Each iteration owns one operand read and one pointer update;
 Execute reduces the retained zero-extended word into the selected accumulator

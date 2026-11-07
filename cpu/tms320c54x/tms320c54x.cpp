@@ -4691,6 +4691,13 @@ bool tms320c54x_device::observe_staged_mvdd_write(u16 address, u32 &instruction,
 
 u16 tms320c54x_device::pipeline_read_data(u16 address, unsigned stage)
 {
+	// SPRU131G 7.5.10/example 7-67: a mapped accumulator write followed
+	// by a mapped read has no conflict. READA already retained the program
+	// word during its bus hold; forward it without moving the real EB write
+	// or relaxing the separate direct-ALU-to-mapped-read latency.
+	if (address >= 8 && address <= 0x0d && m_pipeline_valid[5] &&
+		staged_read_a(m_pipeline_word[5]) && address == m_pipeline_operand_address[5])
+		return address == 0x0a || address == 0x0d ? u8(m_pipeline_operand[5]) : m_pipeline_operand[5];
 	// SPRU131G 7.3.2: a same-location on-chip read can bypass a pending
 	// write through an internal bus. Preserve the real EB write and flags;
 	// This partial model covers retained copies, RMW, ordinary and double stores,
