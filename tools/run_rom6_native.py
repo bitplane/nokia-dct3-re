@@ -23,12 +23,18 @@ def prepare(run,mcu,pmm,*,machine='nsm3r6'):
     storage=run/'nvram'/machine
     storage.mkdir(parents=True,exist_ok=False)
     (storage/'flash').write_bytes(mcu+base_record_fixture(pmm))
+    # Share the acquired DSP pack without an invalid clone-of-clone or
+    # copies in the permanent ROM collection. Parent MCU files stay there.
+    roms=run/'roms'
+    roms.mkdir()
+    (roms/machine).symlink_to(ROOT/'roms/nsm3r6',target_is_directory=True)
 
 
 def execute(run,phase,script,seconds,binary,*,persist=False,verbose=False,machine='nsm3r6'):
     directory=run/phase
     directory.mkdir()
-    command=[str(binary),machine,'-rompath',str(ROOT/'roms'),
+    rompath=f'{run/"roms"};{ROOT/"roms"}'
+    command=[str(binary),machine,'-rompath',rompath,
              '-nvram_directory',str(run/'nvram'),'-cfg_directory','cfg',
              '-state_directory',str(run/'sta'),'-snapshot_directory','snap',
              '-noreadconfig','-joystickprovider','none','-midiprovider','none',
