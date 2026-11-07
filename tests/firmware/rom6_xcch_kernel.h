@@ -26,8 +26,9 @@ inline std::vector<clocked_register_case> section_cases()
     initial.data=load("rom6_sch_decode_data.le16");
     initial.data.erase(initial.data.begin(),initial.data.begin()+0x60);
     for (auto &word:initial.data) if(word.address<0xb000)word.value=0;
-    // Halt before the hardware FIRE transaction: no synthetic CRC verdict.
-    initial.program[0x4d13].value=0xf4e1;
+    bool const fire=std::getenv("C54X_ROM6_FIRE_TRANSACTION")!=nullptr;
+    // Optionally observe the request, but always halt before reading its verdict.
+    initial.program[fire ? 0x3ade : 0x4d13].value=0xf4e1;
     initial.data.push_back({0xfff,0x4d06});
     initial.initial.insert(initial.initial.end(),{{STATE_GENPC,0x924c},{r::STATE_SP,0xfff},
         {r::STATE_A,0},{r::STATE_B,0},{r::STATE_T,1},{r::STATE_TRN,0xffff},
@@ -39,10 +40,23 @@ inline std::vector<clocked_register_case> section_cases()
     if(bytes.size()!=2*(456+15))throw std::runtime_error("wrong xCCH vector length");
     auto word=[&](unsigned i){return u16(bytes[2*i]|(unsigned(bytes[2*i+1])<<8));};
     for(unsigned i=0;i<456;++i)initial.data.push_back({0x2f80+i,word(i)});
-    auto final=observation("native-xcch-before-fire",{{r::STATE_IDLE,1},{r::STATE_SP,0x1000}},{});
+    auto final=observation("native-xcch-before-fire",{{r::STATE_IDLE,1}},{});
+    if(!fire)final.expected.push_back({r::STATE_SP,0x1000});
     for(unsigned i=0;i<15;++i)final.expected_data.push_back({0x2f80+i,word(456+i)});
     clocked_register_case result{{{0,std::move(initial)},{200000,std::move(final)}},1000,200000};
     result.io_events=std::vector<clocked_data_event>{};
+    if(fire) {
+        auto &events=*result.io_events;
+        events.push_back({true,0x3c,3,0,false});
+        events.push_back({true,0x3c,5,0,false});
+        for(unsigned i=0;i<14;++i)events.push_back({true,0x39,word(456+i),0,false});
+        events.push_back({true,0x3c,0xfffc,0,false});
+        events.push_back({true,0x3c,2,0,false});
+        events.push_back({false,0,0,0,false});
+        events.push_back({true,0,0x60,0,false});
+        events.push_back({false,0x38,0,0,false});
+        events.push_back({true,0x38,5,0,false});
+    }
     return {std::move(result)};
 }
 }

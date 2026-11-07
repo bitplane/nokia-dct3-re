@@ -18,6 +18,7 @@ def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--entry-dir',type=Path,required=True,help='passive SCH capture containing resident program and DROM')
     parser.add_argument('--octets',default='49061b000100f11000014000000000000000002b2b2b2b',help='exactly23 radio octets, hex')
+    parser.add_argument('--fire-transaction',action='store_true',help='verify request ports; halt before hardware status polling')
     args=parser.parse_args()
     octets=bytes.fromhex(args.octets)
     control_bits(octets) # Reject malformed input before building.
@@ -44,11 +45,14 @@ def main():
     (run/'xcch_vector.le16').write_bytes(b''.join(word.to_bytes(2,'little') for word in words))
     (run/'source.json').write_text(json.dumps(vector,indent=2)+'\n')
     env=os.environ.copy();env['C54X_ROM6_RECEIVE_DIR']=str(run)
+    if args.fire_transaction: env['C54X_ROM6_FIRE_TRANSACTION']='1'
+    else: env.pop('C54X_ROM6_FIRE_TRANSACTION',None)
     result=subprocess.run([sys.executable,str(ROOT/'tools/run_c54x_section.py'),'rom6_xcch',
         '--fixture-header',str(ROOT/'tests/firmware/rom6_xcch_kernel.h'),'--fixture-cases','1'],
         env=env,capture_output=True,text=True)
     (run/'kernel.log').write_text(result.stdout+result.stderr)
     report.update(native_decoding_qualified=result.returncode==0,hardware_fire_qualified=False,
+        fire_request_qualified=args.fire_transaction and result.returncode==0,
         burst_deinterleaver_qualified=False,sample_frontend_qualified=False,
         physical_capture_qualified=False,entry_directory=str(args.entry_dir.resolve()),
         source_sha256=hashlib.sha256((run/'source.json').read_bytes()).hexdigest())

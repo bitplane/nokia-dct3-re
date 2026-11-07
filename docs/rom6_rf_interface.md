@@ -1034,6 +1034,16 @@ a different, MSB-first internal representation and is deliberately not used.
 Remaining boundary: native `3a26` writes 14 packed words to port `39` under
 port `3c` control, and `3a81/3ade` consume status bits `60` from port `38`.
 The backend's opaque storage is **not** evidence of a working FIRE engine.
+The fixture's `--fire-transaction` option verifies the complete observed
+request and save/restore replay, halting at `3ade` before status polling:
+`3c <- 3,5`; fourteen LSB-first packed words to `39`; `3c <- fffc,2`;
+port `00` read/OR `60`/write; port `38` read/AND `10`/OR `5`/write.
+Its declared zero initial I/O bank supplies no status-success bits.
+This establishes the request format, not the meaning or latency of the
+accelerator's status. The consumer accepts status `20` directly and uses
+status `40` for a correction path reading ports `3a/3b`; other results
+produce the failure flag. A future model must compute the polynomial and
+must not interpret the request's `5` as a completed, successful check.
 No hardware CRC acceptance, native burst deinterleaving, normal-burst sample
 frontend, organic BCCH reception or camping is qualified by this fixture.
 
