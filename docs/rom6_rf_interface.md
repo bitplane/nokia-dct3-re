@@ -326,10 +326,8 @@ Own-code ownership is concrete:
   `18a4/18aa/18b0/18b6`; do not identify instruction addresses from bus PCs.
   Live `1845..18d1` matches 282 own MCU bytes at `115f1a`, SHA256
   `bce951612776b11c87f4beda52b0ee527056fc0f9e8767174b626f64c6b786c3`.
-- Uploaded `1405..140c` constructs data `1844` as a position minus 32, wrapping
-  through data `036a`. `1988..198d` later writes that position to P09.
-  Resident `3e31` is another position writer; `3f17` disables P09 with the
-  same out-of-range sentinel used for the existing comparators.
+- P09's position producers and the receive reload are qualified below; these
+  remain separate from physical sample production and interrupt ownership.
 
 This supports investigating P09 as a receive-position comparator, but does not
 prove its interrupt route, recurring cadence, buffer ownership, sample rate or
@@ -338,3 +336,43 @@ its frame callback independently asserts INT0 when the CCONT clock is enabled.
 Do not transplant the sibling's explicitly diagnostic PA09 cadence as measured
 hardware. A receive model must separate sample production, data-available
 notification and frame timing before a native decoder result can qualify it.
+
+### Qualified receive positions
+
+The same receive fixture captures every data 1844 store and P09 write, joined to
+the independent complete I/O stream. All 5,495 observed P09 writes are classified:
+
+| Issuing instruction / bus context | Count | Value source |
+| --- | ---: | --- |
+| `3e31` / `3e32` | 2,749 | Current AR1, including zero |
+| uploaded `198b` / `198c` | 2,743 | Latest stored data 1844 |
+| `3f17` / `3f18` | 3 | Out-of-range `3a98` sentinel |
+
+Data 1844 has two initialization clears and 2,749 writes at instruction `140c`
+(bus context `140d`). Every calculated value matches this exact reference:
+
+```text
+position = AR1 - 32
+if position < 0: position += data036a
+store low16(position) at data1844
+```
+
+This is one conditional addition of the **raw firmware modulus**, not arbitrary
+modulo reduction and not addition of reload+1. Nine calculations use `1387`
+(4999); 2,740 use `0546` (1350). The first-read code view qualifies the uploaded
+producer and deferred writer against own MCU ranges, and the checker joins
+every deferred read to the latest observed store. No unseen writer is assumed.
+
+The short receive-loop reload is intentional own code: uploaded `09ed..09f3`
+sets data 036a=`0546` and writes it to P0e. Its 56-byte enclosing range
+`09d8..09f3` uniquely matches MCU offset `116de0`, SHA256
+`3bc200ec0b2f0dc4e405da8bc274db0a660220a3ef8dc11c192c3e53cdf62825`.
+All 11 reload writes are independently bus-correlated. Do not replace this with
+a fixed GSM-frame interval or infer CPU corruption from the shorter scan cycle.
+Physical reload/compare semantics remain a distinct question.
+
+At the first P27 read, the eight live data 3ebd coefficients are
+`0387,11a3,2ad6,4000,4000,2ad6,11a3,0387` (sum 65536). The uploaded reader
+consumes four scalar inputs per repeated iteration. These constrain a later
+signal/filter experiment; coefficient shape alone does not establish the ADC
+sample rate, I/Q wire packing, uninterrupted capture or RF interrupt cadence.
