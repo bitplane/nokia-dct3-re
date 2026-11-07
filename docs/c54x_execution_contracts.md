@@ -3391,22 +3391,33 @@ address on EAB in Read and write EB in Execute, following SPRU131G section
 7.1 and SPRU172C Class 10A. Source shifting and SST saturation use the
 Execute-visible accumulator; this is distinct from a memory operand sample.
 AR modification occurs once with the write address, before younger Access
-uses the pointer. CPU low-page register/peripheral destinations remain excluded.
+uses the pointer. Mapped endpoints are restricted to the nonmodifying AR subset
+described below; other low-page register/peripheral destinations remain excluded.
 
-`xmem-store` passes 786,432 cases/restores across all 1,024 STL/STH encodings:
-16 Xmem modes, shifts 0..15, eight 40-bit source patterns, both accumulators,
-16 status combinations, two pages and three snapshots. The fixture changes
+The current `xmem_store` section has 32,768 cases/restores across all 1,024
+STL/STH encodings: 16 Xmem modes, shifts 0..15, eight 40-bit source patterns,
+both accumulators and SXM/SST. OVM, compatibility/page and checkpoint choices
+are distributed rather than fully crossed. The fixture changes
 AR after EAB sampling and the source accumulator before Execute, then checks
 the actual RAM word. SST, SXM and OVM vary independently; neither the source
 accumulator nor status is changed by the store. There are no destination reads.
-`xmem-store-bp` adds 288 cases/restores for same-location store-to-load bypass,
+The Xmem subset of `store_forwarding` covers same-location store-to-load bypass
 with zero/one gap, alias/nonalias addresses, six producers and both load
 destinations. A bypass suppresses only the stale backing-memory read, not the
 store's real Execute write. Physical bank arbitration remains unvalidated.
 
-The original `9808` at `03:83ad` executes after a long-offset load and advances
-to the current boundary. The passive source observer also reports terminal
-live PC, illegal and idle state; a quiet short run is not acceptance.
+`xmem_ar_store` adds 96 positive cases/restores for nonmodifying stores to
+AR0..AR7: both sources, low/high halves and shifts 0/1/15. Self-aliasing
+pointer cases retain EAB before the pointer is poisoned after Read, while
+the accumulator source is supplied only before Execute. A one-gap LDM
+consumer sees the new register value. Exact write/read clocks, untouched
+registers/status and four distributed save points are checked. Five negative
+cases retain rejection before publication for SP/BK/accumulator fields,
+modifying pointers and single repeat. These vectors use SST=0; broader
+arithmetic policy remains in the RAM section. They do not establish a
+zero-gap mapped consumer or physical bus phase. The native NSM-3 witness
+is `9911` at uploaded `1ce7`, writing AR7 through AR3=`0017`.
+
 DRSUB (`5800/5900`) uses the same retained paired-read path as DADD/DSUB,
 but computes memory minus the selected accumulator. At original `02:8d23`,
 `58f8 efb8` consumes the RAM pair `efb8/efb9` after a DLD from `efbe/efbf`.

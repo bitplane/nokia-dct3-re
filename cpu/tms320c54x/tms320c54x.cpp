@@ -2439,7 +2439,8 @@ void tms320c54x_device::pipeline_step()
 		// SPRU131G 7.1: a store presents EAB in Read and drives EB in Execute.
 		u8 const xmem = m_pipeline_word[4] >> 4;
 		m_pipeline_operand_address[4] = m_ar[2 + (xmem & 3)];
-		if (m_pipeline_operand_address[4] < 0x60)
+		bool const mapped_ar = !(xmem & 12) && m_pipeline_operand_address[4] >= 0x10 && m_pipeline_operand_address[4] <= 0x17;
+		if (m_pipeline_operand_address[4] < 0x60 && !mapped_ar)
 		{
 			logerror("%s: staged Xmem store register/peripheral destination is unsupported\n", machine().describe_context()); m_illegal = true; return;
 		}

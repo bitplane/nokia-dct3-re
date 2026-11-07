@@ -492,5 +492,6 @@
   "return_delay_absolute_dst": 24,
   "repeated_logical_shift": 180,
   "indirect_constant_ar_store": 93,
-  "stlm_accumulator_fields": 96
+  "stlm_accumulator_fields": 96,
+  "xmem_ar_store": 101
 }
