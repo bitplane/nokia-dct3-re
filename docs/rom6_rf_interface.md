@@ -744,6 +744,14 @@ branch to `4238`; mode 1 does not omit either term. The two delayed `MVDD`
 instructions leave `(x1,y1,x1,y1)` in `2f52..2f55`, independently checked
 alongside the products. This qualifies products/history only, not the mode-1
 normalized metric or SCH decoding.
+The same observer also retains sixteen consecutive later mode-1 mixer
+blocks, starting at the first nonzero FIR block. All 256 observed FIR words
+at `00c8..00d7` produce exactly the 32 published words under the independent
+eight-pair quarter-rate rotation/sum; circular output pointers and producer
+context `24d7` also match. The bounded filter observation has zero overflow.
+This joins actual FIR outputs to mixer outputs, not an independent check of
+these later FIR inputs against the waveform. It excludes a mode-1 summation
+or output-pointer error in that window, not a capture-timing error.
 Sixteen subsequent normalized-metric returns per input also match an
 independent integer ratio of the observed correlation sums and energy. For
 the observed nonnegative-energy, nonsaturating mode-0 domain, normalize all
@@ -762,10 +770,10 @@ The tone has correlation `(74706704,0)`, energy `19775304`, denominator
 **7541**, above both stored thresholds `0405` (**1029**). Silence returns
 zero through the denominator-one guard. This validates ratio arithmetic for
 these actual inputs, not independent generation of the entire energy window.
-The search's consumption of the positive metric, finite-burst requirements,
-other detector modes and FCCH success remain unqualified. In particular a
-continuous tone is not a complete GSM FCCH/SCH waveform; whether its missing
-burst edge prevents progression must be tested rather than assumed.
+Mode-1 normalized metrics and physical FCCH timing remain unqualified;
+finite-burst control acceptance is qualified separately below. A continuous
+tone alone is not a complete GSM FCCH/SCH waveform and cannot establish
+decoder success.
 
 The detector observer reserves debugger
 temporaries independently of the measurement observer; the base observer's

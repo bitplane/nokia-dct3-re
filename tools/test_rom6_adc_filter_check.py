@@ -1,10 +1,34 @@
 import unittest
 from unittest.mock import patch
 
-from tools.rom6_adc_filter_check import COEFFICIENTS,check,check_filter_program,fir_word,quarter_rate_mix,check_mixer
+from tools.rom6_adc_filter_check import COEFFICIENTS,check,check_filter_program,fir_word,quarter_rate_mix,check_mixer,check_mode1_mixer
 
 
 class AdcFilterCheckTest(unittest.TestCase):
+    def mode1_fixture(self):
+        tone=[0,1000,1000,0,0,0xfc18,0xfc18,0]*2
+        inputs=','.join(f'{word:04x}' for word in tone)
+        addresses=','.join(f'{word:04x}' for word in range(0xc8,0xd8))
+        lines=[]
+        previous=0xc4
+        for number in range(1,17):
+            pointer=0x80+(previous-0x80+2)%0x48
+            lines.append(f'rom6_mode1_mixer: block={number} previous={previous:04x} pointer={pointer:04x} inputs={inputs} addresses={addresses} outputs=1f40,0000 pc=0024d7 observer_writes=0')
+            previous=pointer
+        return '\n'.join(lines+['rom6_mode1_mixer_complete: blocks=16 cap=16 observer_writes=0',
+                                'rom6_mode1_filter_complete: overflow=0 observer_writes=0'])
+
+    def test_later_mode1_mixer_and_wrap(self):
+        self.assertEqual(check_mode1_mixer(self.mode1_fixture())['checked_output_words'],32)
+
+    def test_later_mode1_rejects_arithmetic_order_and_overflow(self):
+        text=self.mode1_fixture()
+        for old,new in [('outputs=1f40','outputs=1f41'),('previous=00c4','previous=00c3'),
+                        ('addresses=00c8','addresses=00c9'),('pc=0024d7','pc=0024d8'),
+                        ('overflow=0','overflow=1'),('blocks=16','blocks=15')]:
+            with self.subTest(old=old),self.assertRaises(ValueError):
+                check_mode1_mixer(text.replace(old,new,1))
+
     def fixture(self,mixer_mode=0,mixer_pointer=0x80):
         lines=['rom6_adc_processing_initial: history='+','.join(['0000']*16)+
                ' coefficients='+','.join(f'{word:04x}' for word in COEFFICIENTS)+' observer_writes=0']

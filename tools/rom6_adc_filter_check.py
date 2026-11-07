@@ -125,3 +125,32 @@ def check_mixer(text):
     return dict(checked_blocks=8,checked_output_words=len(values),modes=sorted(modes),
                 adjacent_group_dot_products=adjacent,physical_clock_qualified=False,
                 fcch_detection_qualified=False,camping_qualified=False)
+
+
+def check_mode1_mixer(text):
+    """Join later eight-pair mixer outputs to observed FIR words, not to RF."""
+    expression=re.compile(r'rom6_mode1_mixer: block=(\d+) previous=([0-9a-f]{4}) pointer=([0-9a-f]{4}) inputs=([0-9a-f]{4}(?:,[0-9a-f]{4}){15}) addresses=([0-9a-f]{4}(?:,[0-9a-f]{4}){15}) outputs=([0-9a-f]{4},[0-9a-f]{4}) pc=0024d7 observer_writes=0')
+    rows=list(expression.finditer(text))
+    if (len(rows)!=16 or text.count('rom6_mode1_mixer:')!=16 or
+            re.findall(r'rom6_mode1_mixer_complete: blocks=(\d+) cap=16 observer_writes=0',text)!=['16'] or
+            re.findall(r'rom6_mode1_filter_complete: overflow=(\d+) observer_writes=0',text)!=['0']):
+        raise ValueError('incomplete native mode-1 mixer observations')
+    previous=None
+    values=set()
+    for number,row in enumerate(rows,1):
+        sequence,old,pointer,inputs,addresses,outputs=row.groups()
+        old,pointer=int(old,16),int(pointer,16)
+        words=[int(word,16) for word in inputs.split(',')]
+        actual=[int(word,16) for word in outputs.split(',')]
+        if (int(sequence)!=number or not 0x80<=old<0xc8 or
+                pointer!=0x80+(old-0x80+2)%0x48 or previous is not None and old!=previous or
+                [int(word,16) for word in addresses.split(',')]!=list(range(0xc8,0xd8)) or
+                actual!=quarter_rate_mix(words,8)):
+            raise ValueError('native mode-1 mixer arithmetic/order differs')
+        previous=pointer
+        values.add(tuple(actual))
+    if not any(any(value) for value in values):
+        raise ValueError('mode-1 mixer window contains no nonzero result')
+    return dict(checked_blocks=len(rows),checked_output_words=2*len(rows),
+                distinct_outputs=len(values),fir_inputs_independently_qualified=False,
+                physical_clock_qualified=False,sch_qualified=False,camping_qualified=False)
