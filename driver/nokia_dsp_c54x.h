@@ -25,9 +25,9 @@ public:
 	// P30:P31:P32:P04, high to low16-bit words. This is not a claim about
 	// physical SCU payload latching or serial-shift completion.
 	auto transfer_compare_cb() { return m_transfer_compare_cb.bind(); }
-	// Explicit lab receiver substitution. External data-available owns INT0
-	// during the port3 receive window instead of the inherited frame pulse;
-	// this is not fitted mux knowledge. The inactive baseline is unchanged.
+	// Explicit lab receiver substitution. External data-available exclusively
+	// owns INT0, including idle capture periods; do not also inject frame pulses.
+	// This is not fitted mux knowledge. Non-laboratory compositions are unchanged.
 	void set_external_rf_receive(bool enabled) { m_external_rf_receive = enabled; }
 	auto rf_receive_cb() { return m_rf_receive_cb.bind(); }
 	auto rf_control_cb() { return m_rf_control_cb.bind(); }

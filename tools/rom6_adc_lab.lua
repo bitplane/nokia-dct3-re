@@ -5,7 +5,12 @@ local machine=manager.machine
 local cpu=assert(machine.devices[':dsp_c54x:cpu'])
 local results,reads=0,0
 local handles={}
-handles[#handles+1]=cpu.spaces.io:install_read_tap(0x27,0x27,'rom6_adc_reads',function() reads=reads+1 end)
+handles[#handles+1]=cpu.spaces.io:install_read_tap(0x27,0x27,'rom6_adc_reads',function()
+    reads=reads+1
+    if reads==1 then
+        machine:logerror(string.format('rom6_adc_first_read: t=%.9f cpu_pc=%06x observer_writes=0\n',machine.time:as_double(),cpu.state.GENPC.value))
+    end
+end)
 handles[#handles+1]=cpu.spaces.data:install_write_tap(0x022b,0x022b,'rom6_adc_result',function(_,value,mask)
     results=results+1
     if results>32768 then return end

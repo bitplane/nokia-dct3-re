@@ -197,7 +197,7 @@ TIMER_CALLBACK_MEMBER(nokia_dsp_c54x_device::frame_timer_expired)
 				u16(m_cpu->state_int(tms320c54x_device::STATE_IFR)),
 				u16(m_cpu->state_int(tms320c54x_device::STATE_IMR)),
 				machine().time().as_double());
-	if (enabled && !(m_external_rf_receive && BIT(m_io[3],0)))
+	if (enabled && !m_external_rf_receive)
 	{
 		m_cpu->set_input_line(0, HOLD_LINE); // CTSI/GSM frame interrupt
 	}

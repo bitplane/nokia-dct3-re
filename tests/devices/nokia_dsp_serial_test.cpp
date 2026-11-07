@@ -31,6 +31,10 @@ public:
 		m_backend->set_ccont_tag("^power"); m_backend->set_program_rom_tag("^program");
 		m_backend->set_data_rom_tag("^data");
 		m_backend->transfer_compare_cb().set(FUNC(c54x_serial_test_state::compare));
+		auto &external=NOKIA_DSP_C54X(config,"external",13'000'000);
+		external.set_transport_tag("^transport"); external.set_cobba_tag("^codec");
+		external.set_ccont_tag("^power"); external.set_program_rom_tag("^program");
+		external.set_data_rom_tag("^data"); external.set_external_rf_receive(true);
 	}
 protected:
 	void machine_start() override
@@ -84,6 +88,15 @@ private:
 		{
 		case 0:
 			m_cpu->suspend(SUSPEND_REASON_DISABLE,true); m_backend->reset_line_w(1);
+			{
+				auto &external=*subdevice<nokia_dsp_c54x_device>("external");
+				auto &cpu=*subdevice<tms320c54x_device>("external:cpu");
+				cpu.suspend(SUSPEND_REASON_DISABLE,true); external.reset_line_w(1);
+				cpu.space(AS_IO).write_word(0x0e,999); cpu.space(AS_IO).write_word(0x0d,0);
+				auto &power=*subdevice<nokia_ccont_device>("power");
+				power.select_w(1); power.serial_w(6<<3); power.serial_w(2); power.select_w(0);
+				expect(power.dsp_frame_clock_enabled(),"frame clock enabled for IRQ ownership controls");
+			}
 			io.write_word(0x0e,999); io.write_word(0x0d,0);
 			io.write_word(0x30,0x100); io.write_word(0x31,0xaaaa); io.write_word(0x32,0xbbbb);
 			io.write_word(4,100); break;
@@ -123,11 +136,20 @@ private:
 			io.write_word(1,0x1000); expect(!(io.read_word(1)&0x1000),"acknowledge only clears pending");
 			io.write_word(0x30,0); break;
 		case 5:
+			{
+				auto &external=*subdevice<nokia_dsp_c54x_device>("external");
+				auto &cpu=*subdevice<tms320c54x_device>("external:cpu");
+				expect(m_cpu->state_int(tms320c54x_device::STATE_IFR)&1,"default composition retains frame INT0");
+				expect(!(cpu.state_int(tms320c54x_device::STATE_IFR)&1),"external owner has no idle frame INT0");
+				external.rf_data_available_w(1);
+			}
 			expect(m_events==2 && m_tuple==0x0000ccccbbbb00c8ULL,"next frame still observes raw zero control");
 			io.write_word(4,15000); expect(io.read_word(1)&0x1000,"cancel does not acknowledge pending");
 			io.write_word(2,0x1000); expect(!(io.read_word(1)&0x1000),"P02 also acknowledges pending");
 			break;
 		case 6:
+			expect(subdevice<tms320c54x_device>("external:cpu")->state_int(tms320c54x_device::STATE_IFR)&1,
+				"external data-available asserts INT0 without P03 forcing");
 			expect(m_events==2,"sentinel cancels later matches");
 			io.write_word(4,100); m_backend->reset_line_w(0); break;
 		case 7:
@@ -159,7 +181,7 @@ private:
 		case 11:
 			expect(m_adc_source==m_disabled_adc_source && m_adc_blocks==m_disabled_adc_blocks,"disabled MFI does not clock or notify");
 			m_mfi->reset(); expect(!m_mfi->produced() && !m_mfi->consumed(),"MFI reset clears state");
-			osd_printf_info("C54x compare boundary: PASS replacement=1 armed_restore=1 exact_time=1 ack_ports=1,2 periodic=1 raw_zero=1 cancellation=1 reset_abort=1 hagar_restore=1 mfi_clock_restore=1 physical_latch_claim=0\n");
+			osd_printf_info("C54x compare boundary: PASS replacement=1 armed_restore=1 exact_time=1 ack_ports=1,2 periodic=1 raw_zero=1 cancellation=1 reset_abort=1 hagar_restore=1 mfi_clock_restore=1 mfi_irq_owner=1 physical_latch_claim=0\n");
 			fatalerror("C54x compare boundary tests complete");
 		}
 		++m_stage;

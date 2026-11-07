@@ -3,6 +3,14 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "nsm3_laboratory_mfi_exclusive_interrupt_and_word_ownership",
+      "owner": "nokia_dsp_c54x_lab_receiver",
+      "status": "satisfied",
+      "predicate": "The explicit external-receiver composition does not also inject frame INT0 and every native laboratory P27 read consumes an actual clock-produced word",
+      "current": "An independent second-backend component control enables the same CCONT frame clock: the default backend latches frame INT0, the external backend does not while P03 is zero, and its external data-available input positively latches INT0. Native six-second tone and zero trials first read P27 at2.537874286s in the discard loop(bus context2446), with all40320 reads reconciled to queue consumption across activation counter resets and2752 prefix values checked independently. Native initialization still passes, but the64-word prototype overruns at2.548358769s and2.680070769s; no physical cadence/capacity, losslessness, RSSI, FCCH, SCH, BCCH or camping qualification follows. This corrects laboratory ownership only; existing non-laboratory frame-source policy is unchanged.",
+      "evidence": ["driver/nokia_dsp_c54x.cpp", "driver/nokia_dsp_c54x.h", "tests/devices/nokia_dsp_serial_test.cpp", "tools/run_c54x_serial_compare.py", "tools/rom6_adc_lab.lua", "tools/rom6_adc_lab_check.py", "tools/test_rom6_adc_lab_check.py", "docs/rom6_rf_interface.md"]
+    },
+    {
       "id": "dct3_firmware_probe_build_separation",
       "owner": "nokia_dct3_board",
       "status": "satisfied",

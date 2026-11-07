@@ -429,9 +429,10 @@ make check-c54x-serial-compare
 
 The candidate clocks scalar words at 13MHz/6, not from P27 demand. Its two
 32-word banks are an explicit unmeasured capacity policy. Words, transfer ticks,
-queue state and the next clock deadline are saved. Block notifications drive
-INT0 instead of the inherited frame pulse during the port3 receive window;
-the inactive baseline is retained. Experimental enable wiring requires
+queue state and the next clock deadline are saved. Block notifications
+exclusively own INT0 throughout these laboratory compositions, including
+inactive capture periods. The non-laboratory compositions retain their existing
+frame source. Experimental enable wiring requires
 P03.bit0, P21.bit10 and clear P21.bit12. This is a hypothesis, **not a recovered
 truth table**; P09/P0a/P0b capture boundaries are not implemented here.
 
@@ -441,37 +442,33 @@ timestamp**, not necessarily analogue conversion time. The independent checker
 evaluates sine/cosine from these timestamps and rejects skipped or future words.
 Periodicity is intrinsic to the analytic source, not finite-capture fallback.
 
-The result is **negative**: both six-second inputs preserve native initialization
-and deliver 2,752 checked prefix words across three activations, but overrun at
-2.548358769s and 2.680066615s. The always-on P21-only candidate had instead
-overrun at 0.803263846s, before RF work. These combinations are not qualified
-receive models. The result does not isolate the wrong clock, capacity, IRQ or
-capture gate; do not increase capacity simply to hide the failure. The runner
-rejects any fault record, including earlier activations with reset counters.
+Exclusive ownership removes pre-capture warm-up reads caused by synthetic
+frame interrupts. Both six-second laboratory inputs first read P27 at
+2.537874286s (bus context `2446`, in the native discard loop). All **40,320**
+P27 reads reconcile with consumed clock-produced words across activation
+counter resets; none is an inactive retained-register read. The checker also
+qualifies 2,752 actual word values across three activation prefixes.
 
-A separate counter-timed candidate armed on P03, started at the next P09
-position and used a one-shot P0b stop (replacement and out-of-range defuse
-followed the existing counter model). It also failed: both inputs started at
-2.538393231s and overran at 2.548362462s, with 21,600 produced and 21,536
-consumed words. Each independently checked 1,024 prefix words; INT0 remained
-enabled/pending while global INTM was set (bus context `b572`, ST1=`c903`,
-IMR=`035f`, IFR=`0021`). Binary SHA256:
-`9ab1193cbc569076b78dc97f144443868a5aa3816cfca7a54c59b9633f5ba657`.
-This rejects the sufficiency of that exact timed-gate/64-word/13MHz-div6
-combination, not the physical P09/P0b roles. Its implementation was removed;
-the laboratory compositions retain the prior explicitly unqualified P03 model.
+The transport result remains **negative**. Matched tone/silence trials reject
+the sufficiency of each exact combination below, not its individual physical
+rate, comparator or capacity hypothesis:
 
-A cadence-only two-complex-samples/symbol trial (scalar divider 12) kept the
-64-word buffer, P03 gate and physical 67.708333kHz tone unchanged. Both inputs
-still overran: first at 2.548639385s (11,680 produced/11,616 consumed), then
-at 2.680332923s (8,736/8,672). Both independently match 2,752 delivered words
-and preserve initialization. The fault contexts again have INT0 enabled and
-pending with global INTM set. This does not select either physical sample rate;
-the trial divider was restored to 6. Its binary SHA256 is
-`fef83d8866c11e692d227ccd48e28159b46341ea474390eee68058ddc2b42172`.
-The source header now distinguishes the oscillator phase divisor from the
-MFI scalar divisor, and the checker rejects disagreement with the device's
-summary. Sampling-rate comparisons must not retime the laboratory oscillator.
+| Scoped trial, all with 64-word buffering | Scalar divider | First overrun |
+| --- | ---: | --- |
+| P21-only enable | 6 | 0.803263846s, before RF work |
+| P03 gating, frame INT0 outside capture | 6 | 2.548358769s |
+| P03-armed one-shot P09 start / P0b stop | 6 | 2.548362462s (21,600 produced / 21,536 consumed) |
+| P03 gating, cadence-only comparison | 12 | 2.548639385s (11,680 / 11,616) |
+| Current P03 gating, exclusive MFI INT0 | 6 | 2.548358769s (22,752 / 22,688) |
+
+The timed-gate implementation and slower trial divider were removed. Exact
+binary hashes, fault contexts and retained raw-capture locations for those
+rejections are in [the falsification ledger](../evidence/falsifications.json).
+These failures do not establish physical buffer capacity or justify increasing
+it until a run passes. The runner rejects every fault across counter resets.
+The header distinguishes oscillator phase divisor from MFI scalar divisor;
+the checker rejects disagreement with the device summary. Cadence comparisons
+must not retime the laboratory oscillator.
 
 At both overflows the passive fault observer sees IMR=`035f`, IFR=`0021` and
 ST1=`c903`/`4903`: INT0 is enabled and pending, but global INTM is set. This
@@ -481,6 +478,11 @@ IRQ request. It does not establish the physical buffer capacity or clock gate.
 Logical tests cover ordering, provenance, peeks, partial blocks, overrun,
 underrun and reset. The MAME component gate saves a partial buffer and checks
 its exact first restored block, transfer ticks and completion time. An
+independent second backend provides an interrupt-ownership control: with the
+same enabled CCONT frame clock, the default backend receives frame INT0, the
+external backend receives none while idle, and its explicit data-available
+input does assert INT0 without a P03 write. This is composition conformance,
+not a claim about the fitted MAD2 interrupt multiplexer. An
 in-callback stream load does not rewind the test timer's scheduler-local
 relative deadline; its later callback is not an equal-time endpoint. Neither
 this component test nor the good source prefix qualifies a native ADC session.
