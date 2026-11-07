@@ -1012,6 +1012,31 @@ entirely zero ADC transaction. The uploaded `18a4` preprocessing reader,
 resident `2439` discard path and `2592` sample-storage path all participate;
 the initial RSSI FIR-prefix test alone does not qualify this whole path.
 
+### Isolated native control-channel bit decoding
+
+`tools/run_rom6_xcch_kernel.py --entry-dir <passive-entry-directory>`
+reuses the acquired resident program/DROM and runs native `924c`, followed
+by the actual caller's normalizer at `4d06..4d12`. Low live RAM is cleared;
+456 independently encoded signed soft words are the declared input.
+The fixture stops **before** `3a26`, not after a fabricated FIRE verdict.
+Known SI3 bytes and an all-ones control block both reproduce all 184 payload
+bits and 40 parity bits exactly, including save/restore replay. The caller
+complements the 40 FIRE bits before its hardware transaction, which is
+included in the expected packed output.
+
+`tools/gsm_xcch_vector.cpp` reuses the existing channel encoder. Its output
+is independently checked by `tools/gsm_xcch_signal.py` against the FIRE
+polynomial, convolutional code, four-burst interleaving, training and radio
+octet bit order specified by [GSM 05.03 sections 4.1 and 4.4](https://www.etsi.org/deliver/etsi_gts/05/0503/05.00.00_60/gsmts_0503v050000p.pdf).
+Radio octets are LSB-first; the existing library's packed-control helper is
+a different, MSB-first internal representation and is deliberately not used.
+
+Remaining boundary: native `3a26` writes 14 packed words to port `39` under
+port `3c` control, and `3a81/3ade` consume status bits `60` from port `38`.
+The backend's opaque storage is **not** evidence of a working FIRE engine.
+No hardware CRC acceptance, native burst deinterleaving, normal-burst sample
+frontend, organic BCCH reception or camping is qualified by this fixture.
+
 ### Isolated positive SCH filtered-sample frontend
 
 ```sh
