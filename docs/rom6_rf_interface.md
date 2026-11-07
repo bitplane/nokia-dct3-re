@@ -136,11 +136,70 @@ and `M=N*64+A`. Printed 25 names MAD2's SCU and MFI separately. These primary
 constraints do not decode the DSP port packet or prove which block owns each
 edge. Source/hash: [hardware atlas](hardware_atlas.md#cobba-part-identity-does-not-select-pcm-timing).
 
+## Qualified RX word arithmetic
+
+`tools/run_rom6_native.py --scenario tuning` adds bounded, read-only Execute
+observations to the same UI/radio fixture. It checks the resident formatter and
+key normalizer at `388c..3937`, SHA256
+`37dc843e29d036630964d06e8d310074afd2734095f1036d9dc39d2e9243e22b`.
+All **2,743 formatter calls and actual P31/P32 pairs** match an independent
+numeric reference; the run covers all **548 scan keys** (`0..124`, `512..885`,
+`975..1023`). Thirty-nine selected paths additionally check normalized input,
+addend, conditional doubling, quotient, remainder, return and destination.
+This is producer/word qualification, not received-sample or RF-delivery proof.
+The complete timestamped342,473-write stream is byte-identical to the plain
+radio observer's capture on the same binary/input composition; the added
+Execute observations do not change that checked output stream.
+
+For the observed RX branch (`3e7e & 0x6 == 0x4`, `3ec8 & 0xa2 == 0xa0`,
+`051f.bit7 == 1`), define a neutral **formatter scalar** `s`:
+
+```text
+GSM/E-GSM: k' = k for 0..124, otherwise k - 1024 for 975..1023
+           s = 2 * (k' + 4675)
+DCS:       s = k + 8514, for 512..885
+q, r = divmod(s - 38, 64)
+P31/P32 combined = 0x44000000 + ((q << 7) | r) + 38
+```
+
+The live GSM addend is `1243` (4675); DCS selects `2142` (8514). The direct
+GSM addend `1162` (4450) belongs to the alternate constructor and is not TX
+qualification here. E-GSM normalization is signed: key975 enters the adder as
+-49, not the unsigned word `ffcf`.
+
+For inverse arithmetic, subtract 38 **before** checking the packing gap or
+extracting fields. For `u = P31 - 38`, require `u >= 0`, `u & 0x40 == 0` and
+exact re-packing, then `s = 64*(u >> 7) + (u & 0x3f) + 38`. Applying the ROM4
+gap test directly to the biased P31 word would reject valid ROM6 words.
+`tools/rom6_tuning_contract.py` admits this positive `4400` branch only;
+`6000` and unrelated control formats remain unsupported, not invalid silicon.
+
+| Pair | Scalar | Numeric RX interpretations |
+| --- | ---: | --- |
+| `48c8/4400` | 9352 | GSM1 at 935.2MHz **or** DCS838 at 1870.4MHz |
+| `48ce/4400` | 9358 | GSM4 at 935.8MHz **or** DCS844 at 1871.6MHz |
+| `47e4/4400` | 9252 | E-GSM975 at 925.2MHz **or** DCS738 at 1850.4MHz |
+| `9044/4400` | 18500 | Canonical arithmetic, no matching finite RX scan key |
+
+There are 74 GSM/DCS collisions across the observed domain. The inverse returns
+all candidates and leaves a valid unmatched word unmatched; it never chooses
+the laboratory carrier. The Nokia frequency plan is numerically consistent
+with `f_RX = s*100kHz` in GSM, `s*200kHz` in DCS and `f_VCO = s*400kHz` in
+both. Relative to the manual's 200kHz reference, that implies `M = 2*s`;
+**it does not establish that the DSP word's bit fields directly encode M**.
+Port-to-wire serialization, reference-divider controls and settling remain open.
+
+The own run issues `4a80` payloads `0402` and `0208`, not the sibling's
+documented whole-word families. Their presence alone is not a validated band
+selector. Trace the own configuration producer and delivered order before
+attaching a band interpretation; do not whitelist imported words or arbitrary
+payloads sharing their low bits.
+
 ## Next implementation boundary
 
-Do not add a second descriptor queue. The next useful software target is
-decoding the observed HAGAR serial-word producers against the documented
-frequency plan, with unknown modes left explicit. Before attaching that decoder
+Do not add a second descriptor queue. RX formatter arithmetic is now qualified;
+the next software target is the own `4a80` configuration producer and its
+relation to the colliding channel words. Before attaching a physical decoder
 to a timed output, independently resolve its trigger/latch edge (P32, P04 or
 compare), replacement and serial-completion meaning. The present stable-payload
 prefix does not choose between those models. A clocked sample source with
