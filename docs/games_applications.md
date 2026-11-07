@@ -53,6 +53,39 @@ scheduler tick is therefore about 2.9 % shorter than the firmware's own
 constant implies. This is recorded as an observation about the timer model,
 not corrected here.
 
+## Snake buzzer sounds
+
+Snake's sounds use the PUP buzzer, not the DSP tone voices: a 3210 v6.00 run
+wrote nothing to the tone cells while they played. Each tone writes
+volume `0x16` to `0x1e` and the divider to `0x1c/0x1d`, with PUP control bit 5
+as the enable, so frequency = 13 MHz / divider. The driver models this as a
+square wave. Durations are emulated time, under the same timer caveat as
+[Timing](#timing), and no real handset has been measured.
+
+| Event | Divider | Frequency | Pitch | Pattern |
+|---|---|---|---|---|
+| Eat | `0x1342` | 2636.9 Hz | E7 | one tone, 7.14 ms |
+| Death, no record | `0x7369` | 440.0 Hz | A4 | 12.8 ms on, then 15.1 ms off/on/off/on |
+
+A new top score replaces the death tones with this fanfare:
+
+| Note | Divider | Frequency | Pitch | On (ms) | Gap after (ms) |
+|---:|---|---|---|---:|---:|
+| 1 | `0x5683` | 587.0 Hz | D5 | 140.3 | 143.7 |
+| 2 | `0x5683` | 587.0 Hz | D5 | 113.4 | 22.7 |
+| 3 | `0x5683` | 587.0 Hz | D5 | 113.4 | 22.7 |
+| 4 | `0x39b5` | 880.0 Hz | A5 | 400.9 | 22.7 |
+| 5 | `0x5683` | 587.0 Hz | D5 | 113.4 | 22.7 |
+| 6 | `0x39b5` | 880.0 Hz | A5 | 431.1 | |
+
+`tools/snake_buzzer_trace.lua` reproduces this. It is a test harness rather than
+an observer: it writes food in front of the head for three meals, then lets the
+snake hit the wall. Setting the stored top score to 100 before the crash selects
+the death tones; leaving it at zero selects the fanfare. Run it as the autoboot
+script with `REPO` set to this checkout, a provisioned EEPROM from
+`make_eeprom_profile.py --provisioned-imei-prefix`, and keys
+`menu,wait2000,6,wait1500,2,wait2000,2`. Set `TOP_SCORE` to choose the case.
+
 ## Assets
 
 All game graphics live in `0x2d9484..0x2d9a80` and are drawn through
