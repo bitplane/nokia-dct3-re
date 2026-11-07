@@ -94,6 +94,11 @@ same captured-ROM loader runs on the documented 45.5 MHz 8210 composition.
 The NPE-3 RFIclk table alone does not establish its DSP multiplier or custom
 PLL/wait-state interpretation. Do not sweep rates or change the policy byte
 to conceal this boundary.
+The retained System Module manual, issue 1 (09/00), page 15, separately lists
+a 26 MHz VCTCXO RFC path to MAD2WD1 through a divider. It does not give that
+divider's DSP-domain ratio; the 13 MHz RFIclk row describes the output to
+COBBA_GJP, not a measured DSP CLKIN. These are distinct signals, so neither
+row licenses substituting 13 MHz into the generic TI PLL formula.
 
 `tools/rom6_counter_trace_check.py` validates the retained observations as
 diagnostics, never handset acceptance. The 13 MHz capture has 63 unequal
