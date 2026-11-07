@@ -121,6 +121,7 @@ public:
 	void noki6210(machine_config &config);
 	void npe3stage(machine_config &config);
 	void npe3r6(machine_config &config);
+	void npe3ref(machine_config &config);
 	void npe3hle(machine_config &config);
 	void npe3mbus(machine_config &config);
 	void nmp5stage(machine_config &config);

@@ -88,7 +88,7 @@ not prove that physical GENSIO or CCONT has zero latency.
 | `0x3` | ADC result MSB/status | Proven role; upper returned bits are inferred. |
 | `0x4` | unidentified control | Compatibility storage. All five boot traces write `0x20`; 3310 also writes `0x00`. |
 | `0x5` | watchdog and power control | Proven role; reload command semantics inferred from firmware. |
-| `0x6` | unidentified control | Compatibility storage. Every supported ROM writes the same `0x54,0x56` sequence, but no device-side effect is established. |
+| `0x6` | unidentified control | Compatibility storage; `0x54/0x56` writes are observed. The native DSP backend uses bit 1 to gate its frame-driven INT0, but this inherited interpretation is not an established silicon contract. The 6210 clears it where the 8210 retains it; see [native comparison](6210_bringup.md#reference-clock-experiment-and-adc-interrupt-boundary). |
 | `0x7..0xa` | RTC second/minute/hour/day read surface | The reader at `0x2b068c` weights these fields by 1, 60, 3,600 and 86,400 respectively. Firmware polls the seconds field and separately writes zero to the day/epoch field during its software-date lifecycle. |
 | `0xb..0xc` | Shared RTC clock-load/alarm minute/hour latches | Hour bit 7 loads the running clock and self-clears after settling. An ordinary hour write arms the one-shot comparator. |
 | `0xd` | unidentified control | Compatibility storage; organically read as zero during boot. Effects are not recovered. |

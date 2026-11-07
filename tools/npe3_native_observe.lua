@@ -2,11 +2,15 @@
 local directory=assert(debug.getinfo(1,'S').source:sub(2):match('^(.*[/])'))
 dofile(directory..'dct3_model_scout.lua')
 local machine=manager.machine
-assert(machine.system.name=='npe3r6')
+local reference=machine.system.name=='npe3ref'
+assert(reference or machine.system.name=='npe3r6')
 assert(not machine.devices[':dsp_hle'] and not machine.devices[':dsp_staged'])
 local arm=assert(machine.devices[':maincpu'])
 local dsp=assert(machine.devices[':dsp_c54x:cpu'])
-machine:logerror('npe3_native_composition: hle=0 staged=0 clock_policy=13000000 fitted_mask_claim=0 observer_writes=0\n')
+machine:logerror(string.format('npe3_native_composition: hle=0 staged=0 clock_policy=%d fitted_mask_claim=0 observer_writes=0\n',reference and 45500000 or 13000000))
+if reference then
+    machine:logerror('npe3_native_reference_clock: source=8210_documented_rate fitted_clock_claim=0 experiment=1 observer_writes=0\n')
+end
 machine:logerror('npe3_native_control_contract: status=10 release=04 execution=01 readback=05 observer_writes=0\n')
 machine.debugger:command('temp6=0')
 machine.debugger:command('temp7=0')

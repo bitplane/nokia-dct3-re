@@ -1,7 +1,7 @@
 -- Own-ROM reset-policy comparison; physical keys and observation only.
 local directory=assert(debug.getinfo(1,'S').source:sub(2):match('^(.*[/])'))
 local machine=manager.machine
-local npe3=machine.system.name=='npe3r6'
+local npe3=machine.system.name=='npe3r6' or machine.system.name=='npe3ref'
 assert(npe3 or machine.system.name=='nsm3r6')
 dofile(directory..(npe3 and 'npe3_native_observe.lua' or 'rom6_native_ui.lua'))
 local arm=assert(machine.devices[':maincpu'])
@@ -35,6 +35,21 @@ if npe3 then
     end)
 end
 local dsp=assert(machine.devices[':dsp_c54x:cpu'])
+local ccont_regs=emu.item(assert(machine.devices[':ccont'].items['0/m_regs']))
+local backend=assert(machine.devices[':dsp_c54x'])
+local frames=emu.item(assert(backend.items['0/m_frame_timer_expiries']))
+_G.rom6_policy_samples=coroutine.create(function()
+    for second=1,120 do
+        if not emu.wait(1) then return end
+        if second<=10 or second%10==0 then
+            machine:logerror(string.format('rom6_reset_policy_state: t=%d ccont6=%02x frames=%d pc=%06x imr=%04x ifr=%04x st1=%04x producer=%04x consumer=%04x observer_writes=0\n',
+                second,ccont_regs:read(6),frames:read(0),dsp.state.GENPC.value,
+                dsp.state.IMR.value,dsp.state.IFR.value,dsp.state.ST1.value,
+                dsp.spaces.data:read_u16(0x518),dsp.spaces.data:read_u16(0x519)))
+        end
+    end
+end)
+assert(coroutine.resume(_G.rom6_policy_samples))
 for _,address in ipairs({0x28,0x58}) do
     handles[#handles+1]=dsp.spaces.data:install_write_tap(address,address,'rom6_policy_mmr',function(_,value)
         machine:logerror(string.format('rom6_reset_policy_mmr: t=%.9f address=%04x value=%04x pc=%06x observer_writes=0\n',

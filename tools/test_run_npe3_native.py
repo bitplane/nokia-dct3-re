@@ -22,6 +22,7 @@ class Native6210EvidenceTest(unittest.TestCase):
             'npe3_native_entry: kind=resident ordinal=1 observer_writes=0',
             'npe3_native_selftest: command=0d faults=00 flag=c4 observer_writes=0',
             'npe3_native_terminal: t=30.016667 arm=005078a8 dsp=003999 illegal=0 idle=1 pmst=07ac observer_writes=0',
+            'native_dsp_terminal_timing: released=1 clock=13000000',
             'npe3_native_coverage: missing_program_reads=0 observer_writes=0',
         ))
 
@@ -32,6 +33,22 @@ class Native6210EvidenceTest(unittest.TestCase):
 
     def test_complete_own_uploads(self):
         self.check()
+
+    def test_reference_clock_requires_explicit_experiment_identity(self):
+        text = self.text.replace('clock_policy=13000000', 'clock_policy=45500000').replace(
+            'released=1 clock=13000000', 'released=1 clock=45500000')
+        with self.assertRaises(ValueError):
+            check_execution(text, self.loader, self.program, self.flash, reference=True)
+        text += '\nnpe3_native_reference_clock: source=8210_documented_rate fitted_clock_claim=0 experiment=1 observer_writes=0'
+        check_execution(text, self.loader, self.program, self.flash, reference=True)
+        with self.assertRaises(ValueError):
+            self.check(text=text)
+
+    def test_horizon_and_actual_terminal_clock_are_required(self):
+        with self.assertRaisesRegex(ValueError, 'horizon'):
+            check_execution(self.text, self.loader, self.program, self.flash, minimum_seconds=65)
+        with self.assertRaisesRegex(ValueError, 'clock'):
+            self.check(text=self.text.replace('released=1 clock=13000000', 'released=1 clock=45500000'))
 
     def test_restarts_missing_terminal_and_failed_contracts_reject(self):
         cases = [self.text + '\nnpe3_native_entry: kind=reset ordinal=3',

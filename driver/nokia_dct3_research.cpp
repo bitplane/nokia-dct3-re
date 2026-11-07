@@ -951,6 +951,15 @@ void nokia_dct3_state::npe3r6(machine_config &config)
 	m_dsp_c54x->tone_update_cb().set(FUNC(nokia_dct3_state::dsp_tone_update_w));
 }
 
+void nokia_dct3_state::npe3ref(machine_config &config)
+{
+	npe3r6(config);
+	// Controlled compatibility experiment with the acquired reference DSP's
+	// documented rate. This does not identify the fitted NPE-3 DSP clock.
+	m_dsp_c54x->set_clock(45'500'000);
+	subdevice<tms320c54x_device>("dsp_c54x:cpu")->set_clock(45'500'000);
+}
+
 void nokia_dct3_state::npe3hle(machine_config &config)
 {
 	npe3stage(config);

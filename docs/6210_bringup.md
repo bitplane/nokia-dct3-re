@@ -114,6 +114,40 @@ would interpret `51ee` in PLL mode as multiplier 6. Applying an assumed
 This discrepancy leaves the Lead clock-input/register interpretation open;
 enabling the generic TI PLL-follow mode is not an evidenced Nokia clock fix.
 
+### Reference-clock experiment and ADC interrupt boundary
+
+`npe3ref` is an explicitly diagnostic clone of `npe3r6` with both the backend
+and C54x CPU set to the 8210 reference rate of 45.5 MHz. It makes no fitted
+6210 clock claim and changes neither firmware, provisioning nor reset policy.
+Reproduce the extended negative control with:
+
+```sh
+.venv/bin/python tools/run_npe3_native.py --reference-clock --seconds 34 --reset-policy
+```
+
+The reference rate gets past the stable-counter retry but does **not** resolve
+the reset: the same four initial ring publications appear, the reviewed
+Messages menu renders, and the MCU still selects reason `68` and resets near
+31.96 seconds. The runner correctly rejects the repeated initialization.
+Do not promote this clock to the normal product configuration.
+
+Read-only seven-second comparisons identify the next peripheral boundary.
+On 6210, CCONT register 6 is `56` at second 1 and `54` from seconds 2 through
+7. Native DSP code `4146..4161` reaches the ADC FIFO wait at `415c..415f`;
+producer `0518` and consumer `0519` both remain `0080` from seconds 3 through
+7. On 8210, register 6 stays `56`, the producer reaches `0088`, and the
+native `028a 0004` publication occurs at 2.792270703 seconds.
+
+The inherited backend gates its frame-driven INT0 on CCONT register-6 bit 1.
+Thus the observed `56 -> 54` transition disables that modeled interrupt while
+the frame timer continues expiring. This localizes a model dependency, not a
+recovered silicon contract: CCONT register 6 is otherwise compatibility
+storage with unidentified control semantics. Determine the writer's intended
+clock lifecycle and the actual ADC/INT0 source before removing the gate,
+adding sample interrupts or interpreting the missing packet as a heartbeat.
+The samples use saved-state items, not side-effecting CCONT reads; no observer
+writes firmware state or publishes packets.
+
 The literal census covers the complete `3a0000`-byte own MCU image in
 halfword steps with `tools/find_literal_loads.py --encoding big`: state-base
 `17fd30` has 12 literal occurrences/19 load candidates, `17fda3` has 4/12,

@@ -14,10 +14,11 @@ if __package__ in (None, ''):
     sys.path.insert(0, str(ROOT))
 
 
-def check_execution(text, loader, program, flash):
+def check_execution(text, loader, program, flash, *, reference=False, minimum_seconds=0):
     """Reject incomplete initialization, restarts and unacquired low ROM reads."""
+    clock = 45_500_000 if reference else 13_000_000
     required = {
-        'npe3_native_composition: hle=0 staged=0 clock_policy=13000000 fitted_mask_claim=0 observer_writes=0': 1,
+        f'npe3_native_composition: hle=0 staged=0 clock_policy={clock} fitted_mask_claim=0 observer_writes=0': 1,
         'npe3_native_control_contract: status=10 release=04 execution=01 readback=05 observer_writes=0': 1,
         'npe3_native_verifier: result0=0000 result1=0006': 1,
         'npe3_native_entry: kind=reset': 2,
@@ -26,6 +27,8 @@ def check_execution(text, loader, program, flash):
         'npe3_native_selftest: command=0d faults=00 flag=c4': 1,
         'npe3_native_coverage: missing_program_reads=0 observer_writes=0': 1,
     }
+    if reference:
+        required['npe3_native_reference_clock: source=8210_documented_rate fitted_clock_claim=0 experiment=1 observer_writes=0'] = 1
     for marker, count in required.items():
         if text.count(marker) != count:
             raise ValueError(f'native 6210 marker count changed: {marker}')
@@ -33,6 +36,11 @@ def check_execution(text, loader, program, flash):
     if (len(terminals) != 1 or terminals[0][1] != '0' or 'Lua error' in text
             or re.search(r'staged.*unsupported|unsupported.*staged', text)):
         raise ValueError('native 6210 terminal execution is incomplete or illegal')
+    if float(terminals[0][0]) < minimum_seconds:
+        raise ValueError('native 6210 ended before the required horizon')
+    clocks = re.findall(r'native_dsp_terminal_timing: released=1 clock=(\d+)', text)
+    if clocks != [str(clock)]:
+        raise ValueError('native 6210 terminal clock or reset-release state changed')
     if (loader != flash[0x24b7c:0x24b7c + 1258]
             or len(program) != 0x20000
             or program[0x590 * 2:0x736 * 2] != flash[0x1eac4:0x1eac4 + 844]):
@@ -43,11 +51,13 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--seconds', type=int, default=30)
     parser.add_argument('--scenario', choices=('menu', 'phonebook'), default='menu')
+    parser.add_argument('--reference-clock', action='store_true',
+                        help='select the separate 45.5MHz reference-DSP experiment, not a fitted 6210 clock')
     parser.add_argument('--reset-policy', action='store_true',
                         help='add passive reset-policy and native ring observations')
     args = parser.parse_args()
-    if not 24 <= args.seconds <= 60:
-        parser.error('Menu check duration must be 24..60 seconds')
+    if not 24 <= args.seconds <= 120:
+        parser.error('Menu check duration must be 24..120 seconds')
     flash = (ROOT / 'roms/noki6210/6210_556c.fls').read_bytes()
     pmm = (ROOT / 'roms/noki6210/6210 virgin eeprom 005fa000.fls').read_bytes()
     if (hashlib.sha1(flash).hexdigest() != '3d9ea319503e78ec69b60d72cda23e461e118ea9'
@@ -55,14 +65,15 @@ def main():
         raise ValueError('NPE-3 scout requires pinned own MCU/PMM inputs')
     run = Path(tempfile.mkdtemp(prefix='npe3-native-', dir=ROOT / 'tmp'))
     print(f'Native6210 evidence: {run}', flush=True)
-    storage = run / 'nvram/npe3r6'
+    model = 'npe3ref' if args.reference_clock else 'npe3r6'
+    storage = run / 'nvram' / model
     storage.mkdir(parents=True)
     (storage / 'flash').write_bytes(flash.ljust(0x3fa000, b'\xff') + pmm)
     roms = run / 'roms'
     roms.mkdir()
-    (roms / 'npe3r6').symlink_to(ROOT / 'roms/nsm3r6', target_is_directory=True)
+    (roms / model).symlink_to(ROOT / 'roms/nsm3r6', target_is_directory=True)
     observer = 'rom6_reset_policy_observe.lua' if args.reset_policy else 'npe3_native_observe.lua'
-    command=[str(ROOT/'mame/mame'),'npe3r6','-rompath',str(roms)+';'+str(ROOT/'roms'),
+    command=[str(ROOT/'mame/mame'),model,'-rompath',str(roms)+';'+str(ROOT/'roms'),
         '-nvram_directory',str(run/'nvram'),'-cfg_directory','cfg','-snapshot_directory','snap',
         '-noreadconfig','-joystickprovider','none','-midiprovider','none','-keyboardprovider','none',
         '-mouseprovider','none','-lightgunprovider','none','-video','none','-sound','none','-nothrottle',
@@ -85,7 +96,8 @@ def main():
                            stderr=subprocess.STDOUT, check=True, timeout=600)
         text = (directory / 'error.log').read_text(errors='replace')
         check_execution(text, (directory/'npe3_loader2.be16').read_bytes(),
-                        (directory/'npe3_terminal_program.be16').read_bytes(), flash)
+                        (directory/'npe3_terminal_program.be16').read_bytes(), flash,
+                        reference=args.reference_clock, minimum_seconds=seconds)
         for line in text.splitlines():
             if 'npe3_native_' in line:
                 print(line)
