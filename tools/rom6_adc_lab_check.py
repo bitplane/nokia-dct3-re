@@ -49,19 +49,24 @@ def queued_read_count(text):
     return total
 
 
-def reference_word(sequence,tick,tone,word_divider=6):
+def reference_word(sequence,tick,tone,word_divider=6,burst=False):
     if not tone: return 0
     component=(sequence-1)&1
     conversion_tick=tick-word_divider*component # Q is latched with the preceding I.
+    if burst and not ((conversion_tick//60000)%51 in (0,10,20,30,40) and conversion_tick%60000<7104):
+        return 0
     phase=2*math.pi*((conversion_tick//12)%16)/16
     return round(1024*(math.sin(phase) if component else math.cos(phase)))&0xffff
 
 
-def check(text,tone):
+def check(text,tone,burst=False):
     headers=re.findall(r'rf_adc_lab: direct_adc=1 tuned_air_source=0 tone=([01]) reference=13000000 source_phase_divider=12 word_divider=(6|12) amplitude=1024 physical_clock_claim=0',text)
     if len(headers)!=1 or text.count('rf_adc_lab:')!=1 or headers[0][0]!=str(int(tone)):
         raise ValueError('missing explicit ADC-pin laboratory source')
     divider=int(headers[0][1])
+    burst_header='rf_adc_burst: frame_ticks=60000 multiframe=51 frames=0,10,20,30,40 active_ticks=7104 epoch=0 envelope=rectangular other_slots=zero tuned_air_source=0'
+    if text.count('rf_adc_burst:')!=int(burst) or burst and text.count(burst_header)!=1:
+        raise ValueError('finite-burst ADC source declaration differs')
     summaries=re.findall(r'mfi_rx_summary: [^\r\n]*\bdivider=(\d+) physical_clock_claim=0',text)
     if summaries!=[str(divider)]: raise ValueError('MFI word clock differs from declared fixture')
     totals=re.findall(r'rom6_adc_lab_complete: result_words=(\d+) cap=32768 reads=(\d+) observer_writes=0',text)
@@ -98,7 +103,7 @@ def check(text,tone):
             raise ValueError('delivered waveform epoch is missing its first word')
         if (last_sequence is not None and (sequence!=last_sequence+1 or tick!=last_tick+divider)):
             raise ValueError('delivered waveform prefix skips a source clock')
-        if int(value,16)!=reference_word(sequence,tick,tone,divider):
+        if int(value,16)!=reference_word(sequence,tick,tone,divider,burst):
             raise ValueError('ADC waveform differs from independent oscillator reference')
         # Log timestamps have nanosecond precision; the component gate checks
         # exact attoseconds independently. This is only a formatting allowance.
@@ -112,7 +117,7 @@ def check(text,tone):
     fault_times=re.findall(r'mfi_rx_fault: [^\r\n]*\bt=(\d+\.\d{9})',text)
     if len(fault_times)!=len(faults) or [row[-1] for row in contexts]!=fault_times:
         raise ValueError('fault context is not on the matching transport event')
-    return dict(direct_adc_only=True,tone=tone,word_divider=divider,
+    return dict(direct_adc_only=True,tone=tone,finite_fcch_bursts=burst,word_divider=divider,
                 provisional_staging_words=capacity,peak_queued_words=peak,physical_buffer_capacity_qualified=False,
                 checked_prefix_words=len(words),
                 total_p27_reads=int(native[0]),independent_read_count_matches=True,

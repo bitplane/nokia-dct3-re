@@ -18,7 +18,7 @@ from tools.rom6_adc_detect_check import check as check_detect
 
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--machine',choices=('nsm3adc','nsm3ad0'),required=True)
+    parser.add_argument('--machine',choices=('nsm3adc','nsm3ad0','nsm3afb'),required=True)
     parser.add_argument('--seconds',type=int,default=6)
     parser.add_argument('--measure',action='store_true',help='Check the bounded native raw log-power/RSSI prefix')
     parser.add_argument('--detect',action='store_true',help='Observe the bounded native search complex products')
@@ -26,6 +26,8 @@ def main():
     if not 3<=args.seconds<=30: parser.error('ADC-pin trials are bounded to 3..30 seconds')
     if args.measure and args.seconds<4: parser.error('measurement prefix needs at least four seconds')
     if args.measure and args.detect: parser.error('measurement and detection observers use separate bounded runs')
+    if args.machine=='nsm3afb' and (args.measure or args.detect):
+        parser.error('finite bursts use their own observer, not steady-tone prefix expectations')
     root=ROOT/'tmp/rom6-adc-lab'
     root.mkdir(exist_ok=True)
     run=Path(tempfile.mkdtemp(prefix=args.machine+'-',dir=root))
@@ -33,14 +35,16 @@ def main():
     try:
         prepare(run,(ROOT/'roms/noki8210/8210_5.31ppm_c.fls').read_bytes(),
                 (ROOT/'roms/noki8210/8210 virgin eeprom 003d0000.fls').read_bytes(),machine=args.machine)
-        script='rom6_adc_detect.lua' if args.detect else 'rom6_adc_measure.lua' if args.measure else 'rom6_adc_lab.lua'
+        script='rom6_adc_burst.lua' if args.machine=='nsm3afb' else 'rom6_adc_detect.lua' if args.detect else 'rom6_adc_measure.lua' if args.measure else 'rom6_adc_lab.lua'
         directory,text=execute(run,'primary',script,args.seconds,ROOT/'mame/mame',machine=args.machine)
-        report=check(text,args.machine=='nsm3adc')
+        report=check(text,args.machine!='nsm3ad0',args.machine=='nsm3afb')
         report['native_filter']=check_filter(text,
             (directory/'rom6_adc_processing_program.be16').read_bytes(),
             (ROOT/'roms/noki8210/8210_5.31ppm_c.fls').read_bytes(),
             (ROOT/'roms/nsm3r6/nsm3_rom6_program.be16').read_bytes())
         report['native_mixer']=check_mixer(text)
+        if args.machine=='nsm3afb':
+            report['native_rx_publications']=check_rx_publications(text)
         if args.detect:
             report['native_detector_products']=check_detect(text,
                 (directory/'rom6_adc_processing_program.be16').read_bytes(),
@@ -59,6 +63,8 @@ def main():
             report['native_measurement']['post_correction_qualified']=True
             report['native_rx_publications']=check_rx_publications(text)
     except (OSError,ValueError,subprocess.SubprocessError) as error:
+        (run/'failure.json').write_text(json.dumps(dict(accepted=False,machine=args.machine,
+            seconds=args.seconds,error=str(error),camping_qualified=False),indent=2)+'\n')
         parser.exit(1,f'ADC lab rejected: {error}\n')
     report.update(machine=args.machine,seconds=args.seconds,native_initialization_verified=True,
                   mame_sha256=hashlib.sha256((ROOT/'mame/mame').read_bytes()).hexdigest())

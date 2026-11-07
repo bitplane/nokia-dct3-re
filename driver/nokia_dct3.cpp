@@ -3203,8 +3203,10 @@ SYST( 1999, nsm3stage, noki8210, 0, nsm3stage, noki3310, nokia_dct3_state, empty
 SYST( 1999, nsm3r6, noki8210, 0, nsm3r6, noki8210, nokia_dct3_state, empty_init, "Nokia", "8210 acquired ROM6 native DSP (research fixture)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 #define rom_nsm3adc rom_nsm3r6
 #define rom_nsm3ad0 rom_nsm3r6
+#define rom_nsm3afb rom_nsm3r6
 SYST( 1999, nsm3adc, nsm3r6, 0, nsm3adc, noki8210, dct3_rf_adc_fixture_state, empty_init, "Nokia", "8210 ROM6 ADC tone experiment", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 1999, nsm3ad0, nsm3r6, 0, nsm3ad0, noki8210, dct3_rf_adc_fixture_state, empty_init, "Nokia", "8210 ROM6 ADC silence experiment", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
+SYST( 1999, nsm3afb, nsm3r6, 0, nsm3afb, noki8210, dct3_rf_adc_fixture_state, empty_init, "Nokia", "8210 ROM6 finite FCCH ADC experiment", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 1999, nsm3hle, noki8210, 0, nsm3hle, noki8210, nokia_dct3_state, empty_init, "Nokia", "8210 native uploads with runtime HLE (research fixture)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2000, noki8290, 0,      0,      noki8290, noki8290, nokia_dct3_state, empty_init, "Nokia", "Nokia 8290 (NSB-7 research, no DSP completion)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2000, nsb7stage, noki8290, 0, nsb7stage, noki8290, nokia_dct3_state, empty_init, "Research", "NSB-7 own identity-6 staged uploads (resident DSP undumped)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )

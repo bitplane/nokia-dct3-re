@@ -46,7 +46,8 @@ MAME_PATCHES := patches/mame-nokia-dct3-driver-name.patch \
 	patches/mame-c54x-test-compositions.patch \
 	patches/mame-c54x-firmware-registration.patch \
 	patches/mame-c54x-serial-test.patch \
-	patches/mame-nsm3-adc-fixtures.patch
+	patches/mame-nsm3-adc-fixtures.patch \
+	patches/mame-nsm3-fcch-fixture.patch
 LIB_COMPONENTS := lib/util/gsmfr.cpp lib/util/gsmfr.h
 CPU_COMPONENTS := cpu/tms320c54x/tms320c54x.cpp \
 	cpu/tms320c54x/tms320c54x.h cpu/tms320c54x/tms320c54x_decode.h \
@@ -56,6 +57,7 @@ DRIVER_COMPONENTS := $(filter-out driver/nokia_dct3_trace_config.h,$(wildcard dr
 	driver/nokia_cobba.cpp driver/nokia_cobba.h \
 	driver/nokia_hagar.cpp driver/nokia_hagar.h driver/nokia_hagar_command_state.h \
 	driver/nokia_mfi_rx.cpp driver/nokia_mfi_rx.h driver/nokia_mfi_rx_state.h \
+	driver/nokia_rf_lab_signal.h \
 	driver/nokia_dsp_backend.h \
 	driver/gsm_subscription_storage.h \
 	driver/nokia_dsp_c54x.cpp driver/nokia_dsp_c54x.h \

@@ -3,6 +3,14 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "nsm3_finite_fcch_adc_stimulus",
+      "owner": "nokia_rf_laboratory",
+      "status": "unresolved",
+      "predicate": "A standards-timed finite FCCH ADC-pin stimulus progresses through native detection without unsupported CPU execution or transport faults",
+      "current": "Separate nsm3afb uses absolute13MHz epoch0,60000-tick frames,7104 active ticks in TS0 at frames0/10/20/30/40 per51. Other slots are zero; rectangular envelope, no tuning/gain/noise/SCH/BCCH or carrier fallback. C++ timing/edge/period tests and independent Python provenance including latched Q are implemented. Initial native progression exposed RETD with absolute DST; the generic24-case/save-state fix is banked separately. The rerun now reaches resident43b3 repeated logical shiftf0ff and rejects unsupported execution before a secondary MFI overrun; tmp/rom6-adc-lab/nsm3afb-2jk4l12a retains that precise stop. Continuous tone, native UI/storage/state and default acceptance are regression controls, not evidence of finite-burst detection. Implement the generic repeated-shift composition with independent tests before accepting any decoder result.",
+      "evidence": ["driver/nokia_rf_lab_signal.h", "driver/nokia_dct3_research.cpp", "tests/unit/test_rf_lab_signal.cpp", "tools/test_rf_lab_signal_cpp.py", "tools/rom6_adc_burst.lua", "tools/rom6_adc_lab_check.py", "tools/test_rom6_adc_lab_check.py", "docs/rom6_rf_interface.md"]
+    },
+    {
       "id": "nsm3_uploaded_search_metric_threshold_consumption",
       "owner": "nsm3_uploaded_fcch_search",
       "status": "satisfied",

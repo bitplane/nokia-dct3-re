@@ -54,6 +54,7 @@ public:
 	using nokia_dct3_state::nokia_dct3_state;
 	void nsm3adc(machine_config &config);
 	void nsm3ad0(machine_config &config);
+	void nsm3afb(machine_config &config);
 protected:
 	void machine_start() override;
 private:
@@ -61,6 +62,7 @@ private:
 	u16 sample_r(offs_t component);
 	void fault_observe_w(int state);
 	bool m_tone = true;
+	bool m_burst = false;
 	s16 m_q_latch = 0;
 	u16 m_adc_receive_control = 0, m_adc_mfi_control = 0;
 };

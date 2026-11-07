@@ -9,6 +9,7 @@
 #include "nokia_dsp_staged.h"
 #include "nokia_hagar.h"
 #include "nokia_mfi_rx.h"
+#include "nokia_rf_lab_signal.h"
 
 namespace nokia_dct3 {
 
@@ -34,6 +35,12 @@ void dct3_rf_adc_fixture_state::nsm3ad0(machine_config &config)
 	m_tone = false;
 }
 
+void dct3_rf_adc_fixture_state::nsm3afb(machine_config &config)
+{
+	nsm3adc(config);
+	m_burst = true;
+}
+
 void dct3_rf_adc_fixture_state::machine_start()
 {
 	nokia_dct3_state::machine_start();
@@ -41,6 +48,8 @@ void dct3_rf_adc_fixture_state::machine_start()
 	save_item(NAME(m_adc_receive_control)); save_item(NAME(m_adc_mfi_control));
 	machine().logerror("rf_adc_lab: direct_adc=1 tuned_air_source=0 tone=%u reference=13000000 source_phase_divider=12 word_divider=%u amplitude=1024 physical_clock_claim=0\n",
 		m_tone,subdevice<nokia_mfi_rx_device>("mfi_rx")->word_divider());
+	if (m_burst)
+		machine().logerror("rf_adc_burst: frame_ticks=60000 multiframe=51 frames=0,10,20,30,40 active_ticks=7104 epoch=0 envelope=rectangular other_slots=zero tuned_air_source=0\n");
 }
 
 void dct3_rf_adc_fixture_state::control_w(offs_t port, u16 data)
@@ -71,9 +80,11 @@ u16 dct3_rf_adc_fixture_state::sample_r(offs_t component)
 	static constexpr s16 q[16] = {0,392,724,946,1024,946,724,392,0,-392,-724,-946,-1024,-946,-724,-392};
 	if (!m_tone) return 0;
 	if (component) return u16(m_q_latch);
-	unsigned const index = (machine().time().as_ticks(13'000'000) / 12) % 16;
-	m_q_latch = q[index];
-	return u16(i[index]);
+	u64 const tick = machine().time().as_ticks(13'000'000);
+	unsigned const index = (tick / 12) % 16;
+	bool const active = !m_burst || nokia_rf_lab::fcch_active(tick);
+	m_q_latch = active ? q[index] : 0;
+	return active ? u16(i[index]) : 0;
 }
 
 void nokia_dct3_state::dct3_nsm1_research_map(address_map &map)

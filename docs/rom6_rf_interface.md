@@ -752,3 +752,34 @@ changing thresholds or injecting a success result. The bounded first-32-read
 capture does not claim that every later metric was individually recorded;
 the guard interpretation combines the pinned uploaded code with total read
 counts and the observed native negative packets.
+
+### Finite FCCH ADC-pin fixture
+
+`nsm3afb` is a separate **laboratory** composition, not another supported
+handset or a tuned RF source. Its ideal rectangular tone follows
+[GSM 05.02 v5.1.0 section 5.2.4 and table 3](https://www.etsi.org/deliver/etsi_gts/05/0502/05.01.00_60/gsmts_0502v050100p.pdf):
+148 zero bits including tails, equivalent to a +1625/24-kHz offset, in TS0
+of frames 0/10/20/30/40 of each 51-frame multiframe. With the declared 13-MHz
+reference, a frame is 60000 ticks and the active interval is 7104 ticks.
+The waveform's epoch is absolute zero, independent of firmware requests,
+capture enable and FIFO reads. Q remains latched from the preceding I
+conversion even across an envelope boundary.
+
+```sh
+.venv/bin/python tools/run_rom6_adc_lab.py --machine nsm3afb --seconds 6
+```
+
+Other slots contain zeros: no SCH, BCCH, BTS power envelope, RF gain/noise or
+HAGAR-selected carrier is implied. An isolated C++ test checks all five
+bursts, 296 complex samples per active interval, exact edges and multiframe
+periodicity. The independent Python trigonometric reference checks delivered
+sample provenance, including the latched-Q boundary. Existing continuous
+tone and silence compositions are unchanged.
+
+The finite waveform advances beyond the continuous-tone path. Current native
+execution reaches resident `43b3` (`RPT *AR2` followed by logical shift
+`f0ff`) and stops at an explicit unsupported CPU repeat composition. The
+later MFI overrun follows that stop and does not justify enlarging staging.
+The run remains **rejected**, not an FCCH or camping acceptance result.
+The next boundary is generic repeated logical-shift execution with independent
+CPU tests, then a rerun of this unchanged external stimulus.
