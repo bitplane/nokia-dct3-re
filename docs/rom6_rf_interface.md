@@ -18,6 +18,13 @@ decoding fails. Mode-1 product/history and mixer checks do not expose an
 arithmetic defect; the P03 bit-8 poll does not prove a missing hardware clear.
 SCH, BCCH decoding and camping remain unqualified.
 
+The original [NSM-3 System Module manual, Issue 1 12/1999](https://www.eserviceinfo.com/preview_html.php?fileid=5456&previewid=3011)
+identifies the 13MHz COBBA clock and separate IData/QData connections
+(p.31), and specifies direct conversion without an intermediate frequency
+(p.37). It describes serial high-speed baseband signalling (p.9), not the
+older handset's parallel data/strobe interface. These facts constrain a
+future physical trace but do not establish the DSP receive-register edges.
+
 The missing independent anchor is a receive-register specification or a
 hardware trace joining a programmed receive window to its first sample/data
 availability and interrupt. Register-value formulas and decoder success are
@@ -759,8 +766,7 @@ mode-1 calls against the same signed dot/cross equations, including varied
 SCH inputs. Both arithmetic delay slots at `4235..4236` execute before the
 branch to `4238`; mode 1 does not omit either term. The two delayed `MVDD`
 instructions leave `(x1,y1,x1,y1)` in `2f52..2f55`, independently checked
-alongside the products. This qualifies products/history only, not the mode-1
-normalized metric or SCH decoding.
+alongside the products. This qualifies products/history, not SCH decoding.
 The same observer also retains sixteen consecutive later mode-1 mixer
 blocks, starting at the first nonzero FIR block. All 256 observed FIR words
 at `00c8..00d7` produce exactly the 32 published words under the independent
@@ -769,6 +775,11 @@ context `24d7` also match. The bounded filter observation has zero overflow.
 This joins actual FIR outputs to mixer outputs, not an independent check of
 these later FIR inputs against the waveform. It excludes a mode-1 summation
 or output-pointer error in that window, not a capture-timing error.
+Sixteen nonzero-correlation mode-1 metric returns also match the independent
+integer ratio below, with numerator multiplier **256** rather than **1024**.
+Both delayed branches at `41ca`/`41d1` execute their shift/square slots;
+mode 1 skips only the following two-bit scale. The checker covers the
+observed nonsaturating input domain, not all later search metrics.
 Sixteen subsequent normalized-metric returns per input also match an
 independent integer ratio of the observed correlation sums and energy. For
 the observed nonnegative-energy, nonsaturating mode-0 domain, normalize all
@@ -787,8 +798,8 @@ The tone has correlation `(74706704,0)`, energy `19775304`, denominator
 **7541**, above both stored thresholds `0405` (**1029**). Silence returns
 zero through the denominator-one guard. This validates ratio arithmetic for
 these actual inputs, not independent generation of the entire energy window.
-Mode-1 normalized metrics and physical FCCH timing remain unqualified;
-finite-burst control acceptance is qualified separately below. A continuous
+Physical FCCH timing remains unqualified; finite-burst control acceptance
+is qualified separately below. A continuous
 tone alone is not a complete GSM FCCH/SCH waveform and cannot establish
 decoder success.
 

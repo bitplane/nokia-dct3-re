@@ -219,8 +219,9 @@ def check_mode1_products(text):
                 normalized_metric_qualified=False,sch_qualified=False,camping_qualified=False)
 
 
-def normalized_metric(correlation,energy):
-    """Independent integer ratio for the observed nonsaturating mode0 domain."""
+def normalized_metric(correlation,energy,mode=0):
+    """Independent integer ratio for the observed nonsaturating domain."""
+    if mode not in (0,1): raise ValueError('unsupported detector mode')
     if not 0<=energy<0x80000000: raise ValueError('unsupported metric energy domain')
     shift=31-energy.bit_length() if energy else 0
     def high17(value):
@@ -229,12 +230,34 @@ def normalized_metric(correlation,energy):
     denominator=(high17(energy)**2)&0xffff
     denominator=max(1,denominator)
     if denominator>=0x8000: raise ValueError('unsupported signed metric divisor')
-    numerator=sum(high17(value)**2 for value in correlation)<<10
+    # Both delayed branches execute their shift/square slots. Mode 1 skips
+    # only each following two-bit scale, not the squaring operation.
+    numerator=sum(high17(value)**2 for value in correlation)<<(8 if mode else 10)
     quotient,remainder=divmod(numerator,2*denominator)
     if quotient>=0x8000: raise ValueError('unsupported metric quotient range')
     # Fifteen conditional division steps retain a scaled remainder above the
     # low-word quotient. Compare the full native accumulator, not just Q.
     return (remainder<<15)|quotient
+
+
+def check_mode1_metrics(text):
+    expression=re.compile(r'rom6_mode1_metric: sequence=(\d+) a=([0-9a-f]{10}) corr=([0-9a-f]{4}(?:,[0-9a-f]{4}){3}) energy=([0-9a-f]{4},[0-9a-f]{4}) mode=0001 st1=([0-9a-f]{4}) observer_writes=0')
+    rows=list(expression.finditer(text))
+    if (len(rows)!=16 or text.count('rom6_mode1_metric:')!=16 or
+            re.findall(r'rom6_mode1_metric_complete: calls=(\d+) cap=16 observer_writes=0',text)!=['16']):
+        raise ValueError('incomplete mode-1 metric observations')
+    def long_words(words):
+        high,low=(int(word,16) for word in words)
+        value=(high<<16)|low
+        return value-(1<<32) if value&0x80000000 else value
+    for number,row in enumerate(rows,1):
+        sequence,a,corr,energy,st1=row.groups()
+        words=corr.split(',')
+        expected=normalized_metric((long_words(words[:2]),long_words(words[2:])),
+                                   long_words(energy.split(',')),1)
+        if int(sequence)!=number or int(st1,16)&0x340!=0x100 or int(a,16)!=expected:
+            raise ValueError('native mode-1 metric arithmetic/order differs')
+    return dict(normalized_metrics=len(rows),mode=1,sch_qualified=False,camping_qualified=False)
 
 
 def check(text,program,mcu,resident):

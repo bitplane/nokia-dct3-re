@@ -3,10 +3,32 @@ from unittest.mock import patch
 
 from tools.rom6_adc_detect_check import (check,complex_products,normalized_metric,
     check_finite_search_acceptance,check_finite_peak_accumulation,check_peak_clock,
-    check_mode1_products)
+    check_mode1_products,check_mode1_metrics)
 
 
 class NativeComplexProductsTest(unittest.TestCase):
+    def metric1_fixture(self):
+        lines=[]
+        for number in range(1,17):
+            # With energy=2^20, normalized energy is32 and real is2*n.
+            # 15 restoring-division steps retain remainder above quotient.
+            quotient,remainder=divmod(number*number,2)
+            a=(remainder*1024<<15)|quotient
+            lines.append(f'rom6_mode1_metric: sequence={number} a={a:010x} corr={number:04x},0000,0000,0000 energy=0010,0000 mode=0001 st1=6103 observer_writes=0')
+        return '\n'.join(lines+['rom6_mode1_metric_complete: calls=16 cap=16 observer_writes=0'])
+
+    def test_mode1_metric_scale(self):
+        self.assertEqual(normalized_metric((65536,0),65536,1),128)
+        self.assertEqual(normalized_metric((65536,0),65536),512)
+        self.assertEqual(check_mode1_metrics(self.metric1_fixture())['normalized_metrics'],16)
+
+    def test_mode1_metric_rejects_scale_and_status_drift(self):
+        text=self.metric1_fixture()
+        for old,new in [('a=0002000000','a=0000000002'),('mode=0001','mode=0000'),
+                        ('st1=6103','st1=6003'),('calls=16','calls=15')]:
+            with self.subTest(old=old),self.assertRaises(ValueError):
+                check_mode1_metrics(text.replace(old,new,1))
+
     def mode1_fixture(self):
         lines=[]
         for number in range(50):

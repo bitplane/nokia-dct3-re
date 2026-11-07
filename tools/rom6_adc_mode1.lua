@@ -40,7 +40,7 @@ _G.rom6_mode1_mixer=cpu.spaces.data:install_write_tap(0x518,0x518,'rom6_mode1_mi
     filtered={}
 end)
 machine.debugger.visible_cpu=cpu
-machine.debugger:command('temp5=0')
+machine.debugger:command('temp5=0;temp6=0')
 -- Debugger integer literals are hexadecimal; keep the 100-phase cap explicit.
 cpu.debug:bpset(0x422b,'temp5<0x64 && dw@56e==1 && (dw@2f52|dw@2f53|dw@2f54|dw@2f55)!=0',
     'temp5=temp5+1;logerror "rom6_mode1_product_input: phase=%d values=%04x,%04x,%04x,%04x st1=%04x observer_writes=0\\n",temp5,dw@2f52,dw@2f53,dw@2f54,dw@2f55,st1;g')
@@ -48,9 +48,12 @@ for _,address in ipairs({0x41a0,0x41fc}) do
     cpu.debug:bpset(address,'(temp5&1)==1',
         'logerror "rom6_mode1_product_output: phase=%d a=%010x b=%010x ar2=%04x ar3=%04x word2f51=%04x words=%04x,%04x,%04x,%04x st1=%04x observer_writes=0\\n",temp5,a,b,ar2,ar3,dw@2f51,dw@2f52,dw@2f53,dw@2f54,dw@2f55,st1;temp5=temp5+1;g')
 end
+cpu.debug:bpset(0x41da,'temp6<0x10 && dw@56e==1 && (dw@2f4a|dw@2f4b|dw@2f4c|dw@2f4d)!=0',
+    'temp6=temp6+1;logerror "rom6_mode1_metric: sequence=%d a=%010x corr=%04x,%04x,%04x,%04x energy=%04x,%04x mode=%04x st1=%04x observer_writes=0\\n",temp6,a,dw@2f4a,dw@2f4b,dw@2f4c,dw@2f4d,dw@2f4e,dw@2f4f,dw@56e,st1;g')
 _G.rom6_mode1_stop=emu.add_machine_stop_notifier(function()
     machine.debugger.visible_cpu=cpu
     machine.debugger:command('logerror "rom6_mode1_complete: phases=%d cap=100 observer_writes=0\\n",temp5')
+    machine.debugger:command('logerror "rom6_mode1_metric_complete: calls=%d cap=16 observer_writes=0\\n",temp6')
     machine:logerror(string.format('rom6_mode1_mixer_complete: blocks=%d cap=16 observer_writes=0\n',mixed))
     machine:logerror(string.format('rom6_mode1_filter_complete: overflow=%d observer_writes=0\n',filter_overflow))
 end)
