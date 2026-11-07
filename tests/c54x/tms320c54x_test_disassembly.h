@@ -904,6 +904,13 @@ void check_disassembly(util::disasm_interface &decoder, Expect expect, Report re
 				expect(decoder.disassemble(text, pc, buffer, buffer) == (length | dasm::SUPPORTED) && buffer.seen() == (length == 2 ? 3 : 1),
 					"Memory repeat and register-store decoders bound address extensions");
 			}
+	vector const xmem_bit_forms[] = {
+		{0x9630, 1 | dasm::SUPPORTED, "BIT     *AR5, #0"},
+		{0x965f, 1 | dasm::SUPPORTED, "BIT     *AR3-, #15"},
+		{0x96a8, 1 | dasm::SUPPORTED, "BIT     *AR4+, #8"},
+	};
+	check_syntax(xmem_bit_forms, {0x010100,0x01ffff}, false,
+		"Xmem BIT decoder preserves bit number and one-word operand mode");
 	vector const repeat_store_forms[] = {
 		{0x47f8, 2 | dasm::SUPPORTED, "RPT     *($2345)"},
 		{0x4792, 1 | dasm::SUPPORTED, "RPT     *AR2+"},

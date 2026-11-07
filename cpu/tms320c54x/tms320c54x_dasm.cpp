@@ -164,6 +164,12 @@ offs_t tms320c54x_disassembler::disassemble(std::ostream &stream, offs_t pc,
 		util::stream_format(stream, ", %s", predicate_name(0x40 | (op & 15)));
 		return 1 | SUPPORTED;
 	}
+	if ((op & 0xff00) == 0x9600)
+	{
+		stream << "BIT     "; dual(op >> 4);
+		util::stream_format(stream, ", #%u", op & 15);
+		return 1 | SUPPORTED;
+	}
 	if ((op & 0xfc00) == 0x9800)
 	{
 		util::stream_format(stream, "%-8s%c, %u, ", BIT(op, 9) ? "STH" : "STL", BIT(op, 8) ? 'B' : 'A', op & 15);

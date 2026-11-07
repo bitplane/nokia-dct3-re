@@ -3386,6 +3386,21 @@ The original `9008` at `03:838b` executes inside the firmware's block-repeat
 loop and advances to the current unsupported form; this is a bounded original
 composition observation, not general block-repeat arithmetic acceptance.
 
+Nonmodifying Xmem BIT can read the mapped AL/AH/AG/BL/BH/BG fields
+(`08..0d`) through the same Access-address/Read-operand/Execute-TC path as
+RAM. Bit index zero names the source word's MSB. AG/BG expose eight bits
+with the unused upper word bits clear; they are not sign-extended fields.
+`xmem_accumulator_bit` has 72 positive cases/replays across six fields,
+indices 0/8/15 and four patterns. Poisoning both accumulators and the pointer
+after the single Read must not change TC; unrelated status remains intact.
+Six negative cases preserve rejection without a read or pointer change for
+other mapped endpoints, modifying operands, non-BIT Xmem families and single
+repeat. Four save points are distributed. The RAM `xmem_bit` section retains
+the wider mode/index/TC-visibility contract; this addition does not qualify
+new interrupt/control compositions. Disassembly now names the one-word BIT
+encoding and preserves its operand mode and MSB-first index. The NSM-3
+witness is `9630` at `76be`, reading AL through AR5=`0008`.
+
 Compact shifted Xmem stores (`9800..9bff`) now present the retained write
 address on EAB in Read and write EB in Execute, following SPRU131G section
 7.1 and SPRU172C Class 10A. Source shifting and SST saturation use the

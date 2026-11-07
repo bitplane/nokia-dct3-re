@@ -3078,7 +3078,9 @@ void tms320c54x_device::pipeline_step()
 	{
 		u8 const xmem = m_pipeline_word[3] >> 4;
 		m_pipeline_operand_address[3] = m_ar[2 + (xmem & 3)];
-		if (m_pipeline_operand_address[3] < 0x60)
+		bool const accumulator_bit = staged_xmem_bit(m_pipeline_word[3]) && !(xmem & 12) &&
+			m_pipeline_operand_address[3] >= 8 && m_pipeline_operand_address[3] <= 13;
+		if (m_pipeline_operand_address[3] < 0x60 && !accumulator_bit)
 		{
 			logerror("%s: staged Xmem register/peripheral source is unsupported\n", machine().describe_context());
 			m_illegal = true; return;
