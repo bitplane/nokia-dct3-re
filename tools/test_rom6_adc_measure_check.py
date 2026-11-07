@@ -3,7 +3,8 @@ import struct
 import unittest
 from unittest.mock import patch
 
-from tools.rom6_adc_measure_check import MASK40,check,check_measure_program,log_power_q16,tone_power
+from tools.rom6_adc_measure_check import (MASK40,check,check_measure_program,
+    check_frequency_correction,frequency_correction,log_power_q16,tone_power)
 
 
 class AdcMeasurementTest(unittest.TestCase):
@@ -73,6 +74,45 @@ class AdcMeasurementTest(unittest.TestCase):
         changed=bytearray(data); changed[0xb09e*2+7]^=1
         with self.assertRaises(ValueError): self.checked(text,bytes(changed))
         with self.assertRaises(ValueError): check_measure_program(b'',b'',b'')
+
+    def test_frequency_descriptor_branches(self):
+        main=(10,90,472,722)
+        other=(575,783,364,160)
+        for key,flags,expected,wrote in (
+                (0,0x80,0xfdeb,True),(10,0x80,0xfdd9,True),
+                (11,0x80,0xfdd9,False),(90,0x80,0xfdd9,True),
+                (91,0x80,0xfddc,True),(512,0x80,0xfe33,True),
+                (600,0x80,0xfdd9,False),(784,0x80,0xfdda,True),
+                (1023,0x80,0xfded,True)):
+            with self.subTest(key=key):
+                self.assertEqual(frequency_correction(0xfdd9,key,flags,main,other),(expected,wrote))
+        with self.assertRaises(ValueError): frequency_correction(0,1024,0,main,other)
+
+    def correction_fixture(self):
+        lines=[]
+        for number in range(1,17):
+            key=number-1
+            value=0xfdd9+((max(0,10-key)*472+128)>>8)
+            lines.extend((
+                f'rom6_measure_rssi_return: sequence={number} b=fffdd90000 observer_writes=0',
+                f'rom6_adc_result_word: sequence={number} t=1.000000000 value=fdd9 mode022c=0004 work022a=0000 cpu_pc=002432 mask=ffff observer_writes=0',
+                f'rom6_measure_correct_input: sequence={number} key={key:04x} pointer=022b raw=fdd9 flags=0080 main=000a,005a,01d8,02d2 other=023f,030f,016c,00a0 st1=6103 observer_writes=0'))
+            if key<=10:
+                lines.append(f'rom6_adc_result_word: sequence={number} t=1.000000000 value={value:04x} mode022c=0004 work022a=0000 cpu_pc=0071d7 mask=ffff observer_writes=0')
+            lines.append(f'rom6_measure_correct_output: sequence={number} pointer=022b value={value:04x} st1=6103 observer_writes=0')
+        lines.append('rom6_measure_correct_complete: calls=16 pending=0 cap=16 observer_writes=0')
+        return '\n'.join(lines)
+
+    def test_frequency_correction_join_and_rejections(self):
+        text=self.correction_fixture()
+        result=check_frequency_correction(text)
+        self.assertEqual((result['calls'],result['stores'],result['no_store_returns'],
+                          result['joined_raw_measurements']),(16,11,5,16))
+        for old,new in (('value=fdeb','value=fdea'),('pointer=022b','pointer=022c'),
+                        ('st1=6103','st1=6143'),('pending=0 cap=16','pending=1 cap=16'),
+                        ('cpu_pc=0071d7','cpu_pc=002432')):
+            with self.subTest(old=old),self.assertRaises(ValueError):
+                check_frequency_correction(text.replace(old,new,1))
 
 
 if __name__=='__main__': unittest.main()

@@ -3,11 +3,19 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "nsm3_native_frequency_correction_prefix",
+      "owner": "native_rom6_receive_measurement",
+      "status": "satisfied",
+      "predicate": "Observed native channel-dependent RSSI correction matches independent signed descriptor arithmetic and joins the qualified raw measurements without modifying firmware state",
+      "current": "Paired six-second tone/silence laboratory runs validate16 correction calls each over keys0..15, eleven stores and five interior no-store returns. All15 qualified raw measurements per run join to corrected022b values. Main descriptor10/90/472/722, boundary zero-delta stores, arithmetic mode, return ownership and resident71a3..71d7 code are checked. Alternate-band, extended-channel and right-slope paths have logical vectors only. Fresh manifests:tmp/rom6-adc-lab/nsm3adc-i2wujosf and nsm3ad0-3d4ebuta. Both runs remain fault-free with provisional96-word laboratory staging and peak69. This is not physical dBm, measured MFI capacity, a tuned RF source, an MCU response packet, FCCH or camping qualification.",
+      "evidence": ["tools/rom6_adc_measure.lua", "tools/rom6_adc_measure_check.py", "tools/test_rom6_adc_measure_check.py", "tools/run_rom6_adc_lab.py", "docs/rom6_rf_interface.md"]
+    },
+    {
       "id": "nsm3_native_raw_log_power_rssi_prefix",
       "owner": "native_rom6_receive_measurement",
       "status": "satisfied",
       "predicate": "Native raw logarithmic measurement values match phased analytic ADC inputs, the independent log approximation and observed calibration before the later frequency correction",
-      "current": "Paired fault-free six-second96-word-staging runs validate32 native40-bit conversions each and15 joined raw022b stores each. For selected RSSI returns, actual ADC epoch ticks predict exact steady FIR powers274576/274657/275282 for tone,0 for zero. Native raw words are signed-551/-7020. All64 DROM lookup entries equal the independent logarithm formula; live resident converter/caller/store bytes and own entry hook are checked. The native0474 calibration branch is observed;049c/direct branches have logical tests only. The later71a3..71d7 correction, MCU response packet, physical dBm, tuned carrier, MFI capacity and camping are not qualified. Fresh manifests and raw evidence:tmp/rom6-adc-lab/nsm3adc-qzwox3fp and nsm3ad0-6_b03p7o. Observer uses bounded Execute breakpoints only, never routine calls, firmware writes or verdict injection.",
+      "current": "Paired fault-free six-second96-word-staging runs validate32 native40-bit conversions each and15 joined raw022b stores each. For selected RSSI returns, actual ADC epoch ticks predict exact steady FIR powers274576/274657/275282 for tone,0 for zero. Native raw words are signed-551/-7020. All64 DROM lookup entries equal the independent logarithm formula; live resident converter/caller/store bytes and own entry hook are checked. The native0474 calibration branch is observed;049c/direct branches have logical tests only. The later correction has its separate bounded predicate; MCU response packets, physical dBm, tuned carrier, MFI capacity and camping remain unqualified. Fresh manifests and raw evidence:tmp/rom6-adc-lab/nsm3adc-qzwox3fp and nsm3ad0-6_b03p7o. Observer uses bounded Execute breakpoints only, never routine calls, firmware writes or verdict injection.",
       "evidence": ["driver/nokia_mfi_rx.cpp", "tools/rom6_adc_measure.lua", "tools/rom6_adc_measure_check.py", "tools/test_rom6_adc_measure_check.py", "tools/run_rom6_adc_lab.py", "docs/rom6_rf_interface.md"]
     },
     {

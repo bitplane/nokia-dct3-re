@@ -11,6 +11,8 @@ OUTPUT=re.compile(r'rom6_measure_output: sequence=(\d+) a=([0-9a-f]{10}) b=([0-9
 RETURN=re.compile(r'rom6_measure_rssi_return: sequence=(\d+) b=([0-9a-f]{10}) observer_writes=0')
 EPOCH=re.compile(r'mfi_rx_epoch: first_tick=(\d+) divider=12 physical_clock_claim=0')
 RESULT=re.compile(r'rom6_adc_result_word: sequence=(\d+) t=\d+\.\d{9} value=([0-9a-f]{4}) mode022c=([0-9a-f]{4}) work022a=([0-9a-f]{4}) cpu_pc=([0-9a-f]{6}) mask=ffff observer_writes=0')
+CORRECT_INPUT=re.compile(r'rom6_measure_correct_input: sequence=(\d+) key=([0-9a-f]{4}) pointer=([0-9a-f]{4}) raw=([0-9a-f]{4}) flags=([0-9a-f]{4}) main=([0-9a-f]{4}(?:,[0-9a-f]{4}){3}) other=([0-9a-f]{4}(?:,[0-9a-f]{4}){3}) st1=([0-9a-f]{4}) observer_writes=0')
+CORRECT_OUTPUT=re.compile(r'rom6_measure_correct_output: sequence=(\d+) pointer=([0-9a-f]{4}) value=([0-9a-f]{4}) st1=([0-9a-f]{4}) observer_writes=0')
 
 
 def signed40(value):
@@ -41,6 +43,7 @@ def check_measure_program(program,mcu,resident):
     check_filter_program(program,mcu,resident)
     if (program[0x4315*2:0x4348*2]!=resident[0x4315*2:0x4348*2] or
             program[0x242c*2:0x2437*2]!=resident[0x242c*2:0x2437*2] or
+            program[0x71a3*2:0x71d8*2]!=resident[0x71a3*2:0x71d8*2] or
             program[0x0606*2:0x0607*2]!=bytes.fromhex('fc00')):
         raise ValueError('native log-power routine/entry hook differs')
 
@@ -124,3 +127,69 @@ def check(text,program,mcu,resident,data,tone):
                 units='1/64 dB relative to firmware calibration',
                 physical_dbm_qualified=False,post_correction_qualified=False,
                 rssi_response_packet_qualified=False,fcch_qualified=False,camping_qualified=False)
+
+
+def frequency_correction(raw,key,flags,main,other):
+    if not 0<=key<=1023 or len(main)!=4 or len(other)!=4:
+        raise ValueError('unsupported native correction channel/descriptor')
+    descriptor=main
+    extended=bool(flags&0x80) and key>=975
+    if extended: key-=1024
+    elif flags&0x80 and key>124: descriptor=other
+    low,high,left,right=map(signed,descriptor)
+    if extended or key<=low: delta,slope=low-key,left
+    elif key>=high: delta,slope=key-high,right
+    else: return raw,False
+    # NORM with T=16 followed by signed MPYA uses the resulting high word.
+    delta=signed(delta&0xffff)
+    return (signed(raw)+((delta*slope+128)>>8))&0xffff,True
+
+
+def check_frequency_correction(text):
+    totals=re.findall(r'rom6_measure_correct_complete: calls=(\d+) pending=(\d+) cap=16 observer_writes=0',text)
+    if totals!=[('16','0')]: raise ValueError('incomplete native correction prefix')
+    events=[]
+    for expression,kind in ((CORRECT_INPUT,'input'),(CORRECT_OUTPUT,'output'),(RESULT,'store'),(RETURN,'raw_return')):
+        rows=list(expression.finditer(text))
+        if len(rows)!=text.count(expression.pattern.split(':',1)[0]+':'):
+            raise ValueError('malformed native correction '+kind)
+        if kind in ('input','output') and len(rows)!=16:
+            raise ValueError('missing native correction '+kind)
+        events.extend((row.start(),kind,row) for row in rows)
+    events.sort()
+    pending_return=last_raw=active=None
+    count=stores=joined=unchanged=0
+    channels=[]
+    for _,kind,row in events:
+        if kind=='raw_return':
+            if pending_return is not None: raise ValueError('unconsumed raw correction return')
+            pending_return=int(row[1])
+        elif kind=='store':
+            value,pc=int(row[2],16),row[5]
+            if pc=='002432':
+                last_raw=(value,pending_return)
+                pending_return=None
+            elif active is not None:
+                if pc!='0071d7' or not active['write'] or active['stored'] or value!=active['value']:
+                    raise ValueError('native frequency correction store differs')
+                active['stored']=True; stores+=1
+        elif kind=='input':
+            number,key,pointer,raw,flags,main,other,st1=row.groups()
+            number,key,pointer,raw,flags,st1=(int(value,base) for value,base in zip((number,key,pointer,raw,flags,st1),(10,16,16,16,16,16)))
+            if active is not None or number!=count+1 or pointer!=0x22b or st1&0x340!=0x100:
+                raise ValueError('native correction input order/ownership differs')
+            if last_raw is None or raw!=last_raw[0]: raise ValueError('native correction lacks its raw store')
+            value,write=frequency_correction(raw,key,flags,
+                [int(word,16) for word in main.split(',')],[int(word,16) for word in other.split(',')])
+            active=dict(number=number,value=value,write=write,stored=False,joined=last_raw[1] is not None)
+            last_raw=None; channels.append(key)
+        else:
+            number,pointer,value,st1=(int(value,base) for value,base in zip(row.groups(),(10,16,16,16)))
+            if (active is None or number!=active['number'] or pointer!=0x22b or
+                    value!=active['value'] or st1&0x340!=0x100 or active['stored']!=active['write']):
+                raise ValueError('native correction output/arithmetic differs')
+            count+=1; joined+=active['joined']; unchanged+=not active['write']; active=None
+    if active is not None or count!=16: raise ValueError('native correction did not finish')
+    return dict(calls=count,stores=stores,no_store_returns=unchanged,joined_raw_measurements=joined,
+                channels=channels,scope='first16 correction calls; only observed channel branches are native-qualified',
+                mcu_response_packet_qualified=False,physical_dbm_qualified=False,camping_qualified=False)

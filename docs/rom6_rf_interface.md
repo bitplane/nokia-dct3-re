@@ -644,10 +644,26 @@ nonzero result. The observed table-calibrated raw words are signed **-551**
 for the tone and **-7020** for zero. Only the `0474` calibration branch is
 native-qualified by these captures; the other branches have logical vectors.
 
-This qualifies the **raw log-power/RSSI-field prefix**, not its final response.
-The native routine at `71a3..71d7` subsequently changes `022b`; the first tone
-example changes `fdd9` to `fdeb`. That later frequency-dependent correction
-and the MCU-bound measurement reply are the next unresolved joins. The report
-keeps post-correction, response-packet, physical-dBm, FCCH and camping flags
-false. The direct-ADC source still does not establish a tuned RF carrier or
-physical MFI capacity.
+### Qualified frequency-correction prefix
+
+The same observer captures 16 calls to resident `71a3..71d7`, joining all
+15 qualified raw RSSI stores to their subsequent correction. Each paired
+tone/silence run covers channel keys 0..15: eleven stores (including the
+zero-delta boundary at key 10) and five interior no-store returns.
+
+The signed descriptor at `3ea1..3ea4` contains lower/upper channel boundaries
+and left/right slopes: `(10, 90, 472, 722)` in these runs. Outside the strict
+interior, the routine adds `(signed_delta * signed_slope + 128) >> 8` to the
+signed raw word, wrapping the result to 16 bits. The first tone value changes
+`fdd9` to `fdeb`. Flags `051f.bit7` select alternate-band handling: keys
+125..974 use descriptor `3ed6..3ed9`; keys 975..1023 are interpreted as
+negative extended channels relative to 1024 and use the main left slope.
+Those alternate/right branches have logical vectors, not native coverage in
+this bounded prefix. The checker pins the correction code, checks arithmetic
+mode, and requires the predicted write or no-write behavior at each return.
+
+This qualifies the **observed corrected RSSI-field prefix**, not its final
+response. The MCU-bound measurement reply is the next unresolved join.
+Response-packet, physical-dBm, FCCH and camping flags remain false. The
+direct-ADC source still does not establish a tuned RF carrier or physical
+MFI capacity.

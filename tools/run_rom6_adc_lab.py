@@ -12,7 +12,7 @@ if __package__ in (None,''): sys.path.insert(0,str(ROOT))
 from tools.run_rom6_native import prepare,execute
 from tools.rom6_adc_lab_check import check
 from tools.rom6_adc_filter_check import check as check_filter,check_mixer
-from tools.rom6_adc_measure_check import check as check_measure
+from tools.rom6_adc_measure_check import check as check_measure,check_frequency_correction
 
 
 def main():
@@ -44,6 +44,11 @@ def main():
                 (ROOT/'roms/noki8210/8210_5.31ppm_c.fls').read_bytes(),
                 (ROOT/'roms/nsm3r6/nsm3_rom6_program.be16').read_bytes(),
                 (ROOT/'roms/nsm3r6/nsm3_rom6_data.be16').read_bytes(),args.machine=='nsm3adc')
+            correction=check_frequency_correction(text)
+            if correction['joined_raw_measurements']!=report['native_measurement']['raw_rssi_stores']:
+                raise ValueError('frequency correction does not cover the qualified raw measurements')
+            report['native_measurement']['frequency_correction']=correction
+            report['native_measurement']['post_correction_qualified']=True
     except (OSError,ValueError,subprocess.SubprocessError) as error:
         parser.exit(1,f'ADC lab rejected: {error}\n')
     report.update(machine=args.machine,seconds=args.seconds,native_initialization_verified=True,
