@@ -1363,6 +1363,25 @@ and increments that copy through `425f`, so current/next records must not
 be conflated. A pre-SCH software frame count is not itself a decoded GSM
 FN: its preparation-versus-sampling convention remains to be established.
 
+`tools/rom6_frame_schedule.lua` adds a bounded read-only join after 3.2s,
+stopping at the first class-40 reset (132 events of a 256-event cap in
+`tmp/rom6-receive-kernel/frame-2by95i1x/primary`). Incoming write values
+are logged separately from pre-write RAM snapshots. At `3.341945824s`,
+instruction `463f` publishes class `40` with **current frame 11 and next
+frame 12**; these records are not aliases. P09 receives `1221` at
+`3.341941495s`, and P03 enables receive at `3.341942747s`, before that
+class publication. Thus observing `2f02=40` is too late to identify the
+physical capture-start edge by itself.
+
+The frame adjustment writes P0e=`186f` (6255) at `3.298860945s`, then
+updates the current frame from 1 to 2. The next normal increment is at
+`3.304613934s`, followed by ordinary 5000-quarter periods. Class-40's
+start lies in independent source frame 724 (FCCH), not 725 (SCH).
+The next question is the capture compare's relationship to these frame
+records and the one-frame reload adjustment, not another decoder payload
+guess. This observation neither establishes a physical epoch nor warrants
+delaying capture or shifting the source by a frame.
+
 There is also a distinct timing-tuple interrupt path. The resident
 dispatcher at `281d..281f` tests P01 bit `0080` and branches to `2afc`.
 That handler acknowledges `0080`, reads P13/P14/P15 into a ring selected
