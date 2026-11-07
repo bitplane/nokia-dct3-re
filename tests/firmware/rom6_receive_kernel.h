@@ -27,7 +27,7 @@ inline std::vector<clocked_register_case> section_cases()
     initial.data.erase(initial.data.begin(),initial.data.begin()+0x60);
     // The kernel needs acquired DROM tables, not the phone's live RAM state.
     for (auto &word:initial.data) if (word.address<0xb000) word.value=0;
-    // The zero-waveform frontend supplies +1 soft words, not zero metrics.
+    // The captured zero-correlator frontend supplies +1 soft words, not zeros.
     for (unsigned i=0;i<78;++i) initial.data.push_back({0x2f80+i,1});
     // Stop at the original caller's CRC return, without executing its MDI formatter.
     initial.program[0x4bc5].value=0xf4e1;

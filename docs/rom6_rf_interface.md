@@ -975,8 +975,8 @@ Acquired program/data files remain private inputs, not embedded source arrays.
 The native class-40 path copies 78 soft words into `2f80..2fcd`, calls
 Viterbi routine `9268`, normalizes its packed output at `4d9d` and checks
 the SCH polynomial at `4f3a`. The decoder pads its terminal history with
-positive `127`; positive soft input represents encoded zero. The zero-waveform
-frontend actually supplies 78 **+1** words. This uniform-input negative control
+positive `127`; positive soft input represents encoded zero. The captured
+failed-SCH frontend actually supplies 78 **+1** words. This uniform-input negative control
 reproduces three zero decoded words and CRC status 1; zero-valued soft inputs
 would instead introduce metric ties and are not the captured contract.
 
@@ -1000,6 +1000,17 @@ This qualifies the soft-input Viterbi/packing/CRC path, **not** the raw-sample
 training/equalizer frontend, organic receive timing, BCCH or camping. The next
 step is to recover the preceding sample-buffer contract and drive it from
 the independent GMSK source without touching the booting phone's state.
+
+`--capture-frontend` adds passive class-40 snapshots at `743a` (sample-stage
+entry), `7937` (first filter builder), `76a7` (training correlation) and
+`7790` (equalizer), plus up to 1,024 actual P27 read values. All eight entry
+stages are observed in `sch-zg5wqe7t`. Its complete 960-word SCH transaction
+matches the independent source at ticks `43445256..43456764` with zero
+differences; 116 words are nonzero, all within its initial FCCH tail ending
+at word154. The later zero correlator window must not be described as an
+entirely zero ADC transaction. The uploaded `18a4` preprocessing reader,
+resident `2439` discard path and `2592` sample-storage path all participate;
+the initial RSSI FIR-prefix test alone does not qualify this whole path.
 
 ### Correlator input and capture timing
 

@@ -20,6 +20,7 @@ def main():
     parser.add_argument('--entry-dir',type=Path,help='reuse a passive entry capture instead of making a fresh one')
     parser.add_argument('--frame',type=int,default=1)
     parser.add_argument('--bsic',type=int,default=42)
+    parser.add_argument('--capture-frontend',action='store_true',help='also retain the preceding native SCH sample-stage entries')
     args=parser.parse_args()
     information=sch_information_bits(args.frame,args.bsic)
     coded=sch_coded_bits(information)
@@ -33,10 +34,13 @@ def main():
         capture=run/'capture';capture.mkdir()
         prepare(capture,(ROOT/'roms/noki8210/8210_5.31ppm_c.fls').read_bytes(),
                 (ROOT/'roms/noki8210/8210 virgin eeprom 003d0000.fls').read_bytes(),machine='nsm3afs')
-        entry,_=execute(capture,'primary','rom6_receive_entry.lua',4,ROOT/'mame/mame',machine='nsm3afs')
+        script='rom6_receive_frontend.lua' if args.capture_frontend else 'rom6_receive_entry.lua'
+        entry,_=execute(capture,'primary',script,4,ROOT/'mame/mame',machine='nsm3afs')
     text=(entry/'error.log').read_text()
     if text.count('rom6_receive_entries_complete: stages=f expected=f observer_writes=0')!=1:
         parser.error('missing complete passive native entry capture')
+    if args.capture_frontend and text.count('rom6_receive_frontend_complete: stages=ff expected=ff observer_writes=0')!=1:
+        parser.error('missing complete passive SCH frontend capture')
     program=(entry/'rom6_sch_decode_program.le16').read_bytes()
     data=(entry/'rom6_sch_decode_data.le16').read_bytes()
     if len(program)!=131072 or len(data)!=131072:
