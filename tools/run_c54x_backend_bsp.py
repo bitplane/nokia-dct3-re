@@ -8,6 +8,7 @@ import tempfile
 MARKER = 'C54x native backend BSP: PASS cases=3 save_replay=3 reset_cases=3 handset_audio_claim=0'
 OBSERVATION = 'C54x native backend BSP observation: PASS receive_cases=2 debugger_reads=8 overrun_restore=2 normal_acks=4 handset_audio_claim=0'
 RF_OBSERVATION = 'C54x native backend RF observation: PASS debugger_reads=8 ordinary_reads=3 source_restore=1 reset=1 physical_rf_claim=0'
+FIRE_CHECK = 'C54x native backend FIRE check: PASS valid=2 corrupted=1 partial_restore=1 stream_reset=1 latency_claim=0 correction_claim=0'
 RECEIVE_PINS = 'C54x native backend BSP receive pins: PASS words=3 partial_restore=1 reset_abort=1 vectors=3 handset_audio_claim=0'
 TRANSMIT_PINS = 'C54x native backend BSP transmit pins: PASS words=5 partial_restore=1 queued_word=1 underrun_no_irq=1 shift_status=1 reset_abort=1 reset_irq=1 vectors=4 handset_audio_claim=0'
 CLOCK_INPUTS = 'C54x native backend BSP clock inputs: PASS levels=4 save_replay=4 reset_inputs=1 handset_clock_claim=0'
@@ -38,6 +39,8 @@ def check_result(text, returncode, *, verbose_teardown=False, host_requests=Fals
         raise ValueError('missing unique nondestructive BDRR/overrun result')
     if lines.count(RF_OBSERVATION) != 1:
         raise ValueError('missing unique nondestructive RF input/restoration result')
+    if lines.count(FIRE_CHECK) != 1:
+        raise ValueError('missing unique FIRE check/restoration result')
     if lines.count(RECEIVE_PINS) != 1:
         raise ValueError('missing unique native receive-pin/partial-restore result')
     if lines.count(TRANSMIT_PINS) != 1:

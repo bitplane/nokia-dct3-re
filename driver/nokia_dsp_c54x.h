@@ -10,6 +10,7 @@
 #include "nokia_dsp_backend.h"
 #include "nokia_dspif.h"
 #include "nokia_dsp_control_state.h"
+#include "nokia_dsp_fire_state.h"
 #include "tms320c54x_bsp_state.h"
 
 #include <array>
@@ -117,6 +118,7 @@ private:
 	std::array<u16, 0x100> m_io{};
 	tms320c54x_bsp_state m_bsp;
 	nokia_dsp_control_state m_port36;
+	nokia_dsp_fire_state m_fire;
 	bool m_port36_handshake = false;
 	emu_timer *m_port36_timer = nullptr;
 	bool m_host_command_line = false;

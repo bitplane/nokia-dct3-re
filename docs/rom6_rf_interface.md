@@ -76,8 +76,8 @@ peak staging 69. It still publishes class-40 error status 1 with zero decoded
 words. This closes decoder qualification separately from the timing question:
 neither moving the source nor choosing a compare delay merely to obtain a
 successful CRC would recover the missing physical contract. The separate
-FIRE accelerator's result/correction semantics also remain unimplemented;
-its request-format fixture is not an acceptance substitute.
+FIRE accelerator's physical timing and correction modes remain unimplemented;
+the functional check subset below does not establish those hardware behaviors.
 
 ## Reproduction and coverage
 
@@ -1075,7 +1075,8 @@ a different, MSB-first internal representation and is deliberately not used.
 
 Remaining boundary: native `3a26` writes 14 packed words to port `39` under
 port `3c` control, and `3a81/3ade` consume status bits `60` from port `38`.
-The backend's opaque storage is **not** evidence of a working FIRE engine.
+The backend implements the functional224-bit check subset below; the
+request-only fixture still does not exercise a completed peripheral check.
 The fixture's `--fire-transaction` option verifies the complete observed
 request and save/restore replay, halting at `3ade` before status polling:
 `3c <- 3,5`; fourteen LSB-first packed words to `39`; `3c <- fffc,2`;
@@ -1084,8 +1085,35 @@ Its declared zero initial I/O bank supplies no status-success bits.
 This establishes the request format, not the meaning or latency of the
 accelerator's status. The consumer accepts status `20` directly and uses
 status `40` for a correction path reading ports `3a/3b`; other results
-produce the failure flag. A future model must compute the polynomial and
-must not interpret the request's `5` as a completed, successful check.
+produce the failure flag. The request's `5` is not itself a successful check.
+
+### Functional FIRE check subset
+
+`nokia_dsp_fire_state` owns the observed input grammar at P3c/P39 and the
+computed check result at P38. The supported sequence is `3,5`, exactly14
+input words, `fffc,2`, then P38 command `5` (optionally retaining bit4).
+Words are consumed LSB-first. The caller has complemented the transmitted
+40 parity bits, so polynomial division of the resulting224-bit block by
+`(x^23+1)(x^17+x^3+1)` must leave zero. Only then is status `20` published.
+Incomplete/overflowed inputs, invalid sequencing, nonzero syndrome and
+unsupported operations cannot publish success. Result bits written by
+software are masked out. P3c=`3` restarts the input stream without inventing
+a reset of unrelated P38 command fields; cold device reset clears the state.
+
+This is synchronous **functional** completion, with no busy interval,
+interrupt latency, encoder, cipher result or error-correction claim. Status
+`40` and its P3a/P3b correction data are not fabricated. A corrupted block
+is rejected even if real silicon might correct it. Other operation contracts
+remain unresolved, not successful no-ops.
+
+`tools/test_dsp_fire_cpp.py` checks independently generated zero, all-ones
+and SI3 codewords and all224 single-bit corruptions of each, plus partial
+input, overflow, unsupported command, reset and state-copy replay. The
+native-backend BSP gate separately exercises the actual MMIO binding and
+MAME save/load midway through an input block. This qualifies the functional
+peripheral subset, not organic BCCH reception or physical accelerator timing.
+### Isolated normal-burst receive chain
+
 The `--bursts` option instead supplies the four independent normal bursts'
 114 soft nibbles, excluding tails/training/stealing flags, to native
 `5905/58e0`. Their interleaver writes are checked against every one of the

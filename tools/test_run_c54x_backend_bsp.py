@@ -1,6 +1,7 @@
 import unittest
 from tools.run_c54x_backend_bsp import MARKER, OBSERVATION, RF_OBSERVATION, RECEIVE_PINS, TRANSMIT_PINS, CLOCK_INPUTS, CONTINUOUS_RX, CONTINUOUS_TX, FRAME_IGNORE, JOINED_PINS, CLOCKED_STORE, COMPLETION, check_result
 from tools.run_c54x_backend_bsp import REQUESTS, REQUEST_COMPLETION
+from tools.run_c54x_backend_bsp import FIRE_CHECK
 
 
 class BackendBspResultTest(unittest.TestCase):
@@ -28,7 +29,12 @@ class BackendBspResultTest(unittest.TestCase):
             check_result(original, 0, host_requests=True)
 
     def output(self):
-        return '\n'.join((MARKER, OBSERVATION, RF_OBSERVATION, RECEIVE_PINS, TRANSMIT_PINS, CLOCK_INPUTS, CONTINUOUS_RX, CONTINUOUS_TX, FRAME_IGNORE, JOINED_PINS, CLOCKED_STORE, COMPLETION)) + '\n'
+        return '\n'.join((MARKER, OBSERVATION, RF_OBSERVATION, FIRE_CHECK, RECEIVE_PINS, TRANSMIT_PINS, CLOCK_INPUTS, CONTINUOUS_RX, CONTINUOUS_TX, FRAME_IGNORE, JOINED_PINS, CLOCKED_STORE, COMPLETION)) + '\n'
+
+    def test_fire_check_is_mandatory_and_exact(self):
+        for alternative in ('',FIRE_CHECK+'\n'+FIRE_CHECK,FIRE_CHECK.replace('corrupted=1','corrupted=0')):
+            with self.subTest(marker=alternative),self.assertRaisesRegex(ValueError,'FIRE'):
+                check_result(self.output().replace(FIRE_CHECK,alternative),3)
 
     def test_clocked_store_is_mandatory_and_exact(self):
         alternatives = ['', CLOCKED_STORE + '\n' + CLOCKED_STORE]

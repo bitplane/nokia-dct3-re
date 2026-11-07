@@ -54,6 +54,11 @@ void nokia_dsp_c54x_device::device_start()
 	save_item(NAME(m_port36.busy));
 	save_item(NAME(m_port36.done));
 	save_item(NAME(m_port36.strobe));
+	save_item(NAME(m_fire.input));
+	save_item(NAME(m_fire.command));
+	save_item(NAME(m_fire.status));
+	save_item(NAME(m_fire.count));
+	save_item(NAME(m_fire.phase));
 	save_item(NAME(m_program));
 	save_item(NAME(m_data));
 	save_item(NAME(m_io));
@@ -108,6 +113,7 @@ void nokia_dsp_c54x_device::device_start()
 
 void nokia_dsp_c54x_device::device_reset()
 {
+	m_fire.reset();
 	std::fill(m_io.begin(), m_io.end(), 0);
 	m_bsp.reset();
 	m_port36.reset();
@@ -563,7 +569,7 @@ u16 nokia_dsp_c54x_device::io_r(offs_t offset)
 		return m_external_rf_receive ? m_rf_receive_cb() : m_cobba->rf_receive_sample();
 	case 0x38:
 		++m_rf_port38_reads;
-		return m_io[0x38];
+		return m_fire.status_r();
 	case 0x39:
 		++m_rf_port39_reads;
 		return m_io[0x39];
@@ -594,6 +600,9 @@ void nokia_dsp_c54x_device::io_w(offs_t offset, u16 data)
 		return; // Selected control state owns this word, not the opaque bank.
 	}
 	m_io[port] = data;
+	if (port == 0x38) m_fire.command_w(data);
+	else if (port == 0x39) m_fire.data_w(data);
+	else if (port == 0x3c) m_fire.control_w(data);
 	if (m_external_rf_receive && (port == 3 || port == 0x21)) m_rf_control_cb(port, data);
 	if (m_port36_handshake && port == 0 && m_port36.strobe_w(BIT(data, 4)))
 		// Deferred completion, not a read-triggered answer. One backend clock

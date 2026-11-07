@@ -63,6 +63,7 @@ DRIVER_COMPONENTS := $(filter-out driver/nokia_dct3_trace_config.h,$(wildcard dr
 	driver/gsm_subscription_storage.h \
 	driver/nokia_dsp_c54x.cpp driver/nokia_dsp_c54x.h \
 	driver/nokia_dsp_control_state.h \
+	driver/nokia_dsp_fire_state.h \
 	driver/nokia_dsp_compare_clock.h \
 	driver/tms320c54x_bsp_state.h \
 	driver/nokia_dsp_hle.cpp driver/nokia_dsp_hle.h \
