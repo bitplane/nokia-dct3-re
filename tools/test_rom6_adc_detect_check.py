@@ -2,10 +2,35 @@ import unittest
 from unittest.mock import patch
 
 from tools.rom6_adc_detect_check import (check,complex_products,normalized_metric,
-    check_finite_search_acceptance,check_finite_peak_accumulation,check_peak_clock)
+    check_finite_search_acceptance,check_finite_peak_accumulation,check_peak_clock,
+    check_mode1_products)
 
 
 class NativeComplexProductsTest(unittest.TestCase):
+    def mode1_fixture(self):
+        lines=[]
+        for number in range(50):
+            words=[number,0xffff,number+1,2]
+            a,b=complex_products(words)
+            values=','.join(f'{word:04x}' for word in words)
+            history=','.join(f'{word:04x}' for word in words[2:]*2)
+            phase=2*number+1
+            lines.append(f'rom6_mode1_product_input: phase={phase} values={values} st1=6103 observer_writes=0')
+            lines.append(f'rom6_mode1_product_output: phase={phase} a={a:010x} b={b:010x} ar2=3000 ar3=2f54 word2f51=0100 words={history} st1=6103 observer_writes=0')
+        return '\n'.join(lines+['rom6_mode1_complete: phases=100 cap=100 observer_writes=0'])
+
+    def test_mode1_products_and_history(self):
+        self.assertEqual(check_mode1_products(self.mode1_fixture())['products'],50)
+
+    def test_mode1_rejects_arithmetic_history_status_and_truncation(self):
+        text=self.mode1_fixture()
+        for old,new in [('a=fffffffffe','a=ffffffffff'),
+                        ('words=0001,0002,0001,0002','words=0000,0002,0001,0002'),
+                        ('ar3=2f54','ar3=2f53'),('st1=6103','st1=6003'),
+                        ('phases=100','phases=98'),('cap=100','cap=64')]:
+            with self.subTest(old=old),self.assertRaises(ValueError):
+                check_mode1_products(text.replace(old,new,1))
+
     def peak_fixture(self,closed=False):
         prefix=('mfi_rx_enable: state=1 produced=0 consumed=0 overrun=0 underrun=0 t=0.001000000\n'
                 'mfi_rx_epoch: first_tick=13008 divider=12 physical_clock_claim=0\n'

@@ -704,6 +704,13 @@ B = x1*y0 - y1*x0
 The tone supplies `(804,-1936,804,-1936)`, yielding `(4394512,0)` every
 time; silence yields `(0,0)`. This extends the qualified FIR/mixer prefix
 into the native search computation without substituting a detector verdict.
+The separate read-only `rom6_adc_mode1.lua` observer checks fifty nonzero-input
+mode-1 calls against the same signed dot/cross equations, including varied
+SCH inputs. Both arithmetic delay slots at `4235..4236` execute before the
+branch to `4238`; mode 1 does not omit either term. The two delayed `MVDD`
+instructions leave `(x1,y1,x1,y1)` in `2f52..2f55`, independently checked
+alongside the products. This qualifies products/history only, not the mode-1
+normalized metric or SCH decoding.
 Sixteen subsequent normalized-metric returns per input also match an
 independent integer ratio of the observed correlation sums and energy. For
 the observed nonnegative-energy, nonsaturating mode-0 domain, normalize all
@@ -995,7 +1002,7 @@ P10 is still opaque in the backend. In the four-second
 issuing instruction `56ec`, ten at `a2e1`. The passive trace's total is
 below its cap of 32. The latter routine stores its read into `265a` and
 then overwrites A with unrelated initialization constants. Both saved
-values have identifiable consumers: `0557` is compared with a P13-derived
+values have identifiable consumers: `0557` is compared with a P15-derived
 tuple field at `2b29`, and `265a` is compared with a fresh P10 read at
 `a49a` behind the `262c`/`2615` gates. **Neither saved value is read in
 this bounded run before the failed SCH operation.** Therefore its zero
@@ -1101,8 +1108,9 @@ FN: its preparation-versus-sampling convention remains to be established.
 There is also a distinct timing-tuple interrupt path. The resident
 dispatcher at `281d..281f` tests P01 bit `0080` and branches to `2afc`.
 That handler acknowledges `0080`, reads P13/P14/P15 into a ring selected
-by `0553`, masks the middle word to 14 bits, and compares the first tuple
-word with saved P10 at `0557`. On equality it adjusts the saved `053a`
+by `0553`, masks the middle word to 14 bits, and compares the third tuple
+word (P15) with saved P10 at `0557`. The postmodified pointer reaches the
+third word before the load at `2b26`; it is not comparing P13. On equality it adjusts the saved `053a`
 correction by `4999 - P0e`. The current backend's P01 projection produces
 only slot `0008`, transfer `1000` and host-ring `0002`; it cannot reach
 this handler. Passive counts confirm zero P01-bit-80 observations and zero

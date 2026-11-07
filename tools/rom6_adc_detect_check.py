@@ -181,6 +181,44 @@ def complex_products(words):
     return (x0*x1+y0*y1)&mask,(x1*y0-y1*x0)&mask
 
 
+def check_mode1_products(text):
+    """Check paired mode-1 products and delayed history copies, not SCH success."""
+    inputs=re.compile(r'rom6_mode1_product_input: phase=(\d+) values=([0-9a-f]{4}(?:,[0-9a-f]{4}){3}) st1=([0-9a-f]{4}) observer_writes=0')
+    outputs=re.compile(r'rom6_mode1_product_output: phase=(\d+) a=([0-9a-f]{10}) b=([0-9a-f]{10}) ar2=([0-9a-f]{4}) ar3=([0-9a-f]{4}) word2f51=([0-9a-f]{4}) words=([0-9a-f]{4}(?:,[0-9a-f]{4}){3}) st1=([0-9a-f]{4}) observer_writes=0')
+    events=[]
+    for expression,kind in ((inputs,'input'),(outputs,'output')):
+        rows=list(expression.finditer(text))
+        if len(rows)!=50 or len(rows)!=text.count('rom6_mode1_product_'+kind+':'):
+            raise ValueError('incomplete mode-1 product observations')
+        events.extend((row.start(),kind,row) for row in rows)
+    if re.findall(r'rom6_mode1_complete: phases=(\d+) cap=100 observer_writes=0',text)!=['100']:
+        raise ValueError('incomplete mode-1 product window')
+    active=None
+    count=0
+    distinct=set()
+    for _,kind,row in sorted(events):
+        if kind=='input':
+            phase,words,st1=row.groups()
+            if active is not None or int(phase)!=2*count+1 or int(st1,16)&0x340!=0x100:
+                raise ValueError('mode-1 product ownership/status differs')
+            active=[int(word,16) for word in words.split(',')]
+        else:
+            phase,a,b,ar2,ar3,pointer,words,st1=row.groups()
+            history=[int(word,16) for word in words.split(',')]
+            actual=int(a,16),int(b,16)
+            if (active is None or int(phase)!=2*count+1 or
+                    actual!=complex_products(active) or history!=active[2:]*2 or
+                    ar3!='2f54' or int(st1,16)&0x340!=0x100):
+                raise ValueError('mode-1 complex arithmetic/history differs')
+            distinct.add(actual)
+            count+=1
+            active=None
+    if active is not None or len(distinct)<4:
+        raise ValueError('unfinished or insufficiently varied mode-1 window')
+    return dict(products=count,distinct_products=len(distinct),history_copy_qualified=True,
+                normalized_metric_qualified=False,sch_qualified=False,camping_qualified=False)
+
+
 def normalized_metric(correlation,energy):
     """Independent integer ratio for the observed nonsaturating mode0 domain."""
     if not 0<=energy<0x80000000: raise ValueError('unsupported metric energy domain')
