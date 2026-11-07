@@ -1,11 +1,11 @@
 import unittest
 from unittest.mock import patch
 
-from tools.rom6_adc_filter_check import COEFFICIENTS,check,check_filter_program,fir_word
+from tools.rom6_adc_filter_check import COEFFICIENTS,check,check_filter_program,fir_word,quarter_rate_mix,check_mixer
 
 
 class AdcFilterCheckTest(unittest.TestCase):
-    def fixture(self):
+    def fixture(self,mixer_mode=0,mixer_pointer=0x80):
         lines=['rom6_adc_processing_initial: history='+','.join(['0000']*16)+
                ' coefficients='+','.join(f'{word:04x}' for word in COEFFICIENTS)+' observer_writes=0']
         output=0
@@ -20,7 +20,14 @@ class AdcFilterCheckTest(unittest.TestCase):
                     output+=1
                     if output<=128:
                         lines.append(f'rom6_adc_filter: write={output} read={read} address={0xc8+(output-1)%16:04x} value={value} cpu_pc={pc} st1=c900 observer_writes=0')
+            if read%32==0 and 64<=read<=288:
+                count=2 if mixer_mode else 4
+                pointer=0x80+(mixer_pointer-0x80+count)%0x48
+                values=','.join(['0000']*count)
+                lines.append(f'rom6_adc_mixer: write={(read-32)//32} read={read} previous={mixer_pointer:04x} pointer={pointer:04x} mode={mixer_mode:04x} values={values} cpu_pc=0024d7 observer_writes=0')
+                mixer_pointer=pointer
         lines.append('rom6_adc_processing_complete: history_writes=1024 filter_writes=496 input_cap=1024 output_cap=128 observer_writes=0')
+        lines.append('rom6_adc_mixer_complete: writes=31 cap=8 observer_writes=0')
         return '\n'.join(lines)
 
     def checked(self,text):
@@ -62,6 +69,25 @@ class AdcFilterCheckTest(unittest.TestCase):
 
     def test_requires_actual_code_provenance(self):
         with self.assertRaises(ValueError): check_filter_program(bytes(0x20000),b'',bytes(0x20000))
+
+    def test_quarter_rate_tone_becomes_constant(self):
+        # Analytic +Fs/4 phasor, in native Q,I order.
+        tone=[0,1000,1000,0,0,(-1000)&0xffff,(-1000)&0xffff,0]*2
+        self.assertEqual(quarter_rate_mix(tone,4),[4000,0,4000,0])
+        self.assertEqual(quarter_rate_mix(tone,8),[8000,0])
+
+    def test_mixer_accounting_modes_and_wrap(self):
+        for mode in (0,1):
+            result=check_mixer(self.fixture(mode,0xc4))
+            self.assertEqual(result['checked_output_words'],16 if mode else 32)
+            self.assertEqual(result['modes'],[mode])
+            self.assertFalse(result['fcch_detection_qualified'])
+        text=self.fixture()
+        for old,new in (('previous=0080','previous=0081'),('pointer=0084','pointer=0085'),
+                        ('mode=0000','mode=0001'),('values=0000','values=0001'),
+                        ('writes=31','writes=30'),('cpu_pc=0024d7','cpu_pc=0024d6')):
+            with self.subTest(old=old),self.assertRaises(ValueError):
+                check_mixer(text.replace(old,new,1))
 
 
 if __name__=='__main__': unittest.main()

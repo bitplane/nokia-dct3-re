@@ -5,6 +5,7 @@ local machine=manager.machine
 local cpu=assert(machine.devices[':dsp_c54x:cpu'])
 local results,reads=0,0
 local history_writes,filter_writes=0,0
+local mixer_writes,mixer_pointer=0,nil
 local handles={}
 local function words(first,last)
     local result={}
@@ -16,6 +17,7 @@ handles[#handles+1]=cpu.spaces.io:install_read_tap(0x27,0x27,'rom6_adc_reads',fu
     if reads==1 then
         machine:logerror(string.format('rom6_adc_first_read: t=%.9f cpu_pc=%06x observer_writes=0\n',machine.time:as_double(),cpu.state.GENPC.value))
         machine:logerror('rom6_adc_processing_initial: history='..words(0x200,0x20f)..' coefficients='..words(0x3ebd,0x3ec4)..' observer_writes=0\n')
+        mixer_pointer=cpu.spaces.data:read_u16(0x518)
         local file=assert(io.open('rom6_adc_processing_program.be16','wb'))
         for address=0,0xffff do file:write(string.pack('>I2',cpu.spaces.program:read_u16(address))) end
         file:close()
@@ -33,6 +35,22 @@ handles[#handles+1]=cpu.spaces.data:install_write_tap(0xc8,0xd7,'rom6_adc_filter
     machine:logerror(string.format('rom6_adc_filter: write=%d read=%d address=%04x value=%04x cpu_pc=%06x st1=%04x observer_writes=0\n',
         filter_writes,reads,address,value,cpu.state.GENPC.value,cpu.state.ST1.value))
 end)
+handles[#handles+1]=cpu.spaces.data:install_write_tap(0x518,0x518,'rom6_adc_mixer',function(_,value)
+    if reads==0 or reads>1024 then return end
+    mixer_writes=mixer_writes+1
+    if mixer_writes<=8 then
+        local produced={}
+        local count=(value-mixer_pointer+0x48)%0x48
+        if count==2 or count==4 then
+            for index=0,count-1 do
+                produced[#produced+1]=string.format('%04x',cpu.spaces.data:read_u16(0x80+(mixer_pointer-0x80+index)%0x48))
+            end
+        end
+        machine:logerror(string.format('rom6_adc_mixer: write=%d read=%d previous=%04x pointer=%04x mode=%04x values=%s cpu_pc=%06x observer_writes=0\n',
+            mixer_writes,reads,mixer_pointer,value,cpu.spaces.data:read_u16(0x56e),table.concat(produced,','),cpu.state.GENPC.value))
+    end
+    mixer_pointer=value
+end)
 handles[#handles+1]=cpu.spaces.data:install_write_tap(0x022b,0x022b,'rom6_adc_result',function(_,value,mask)
     results=results+1
     if results>32768 then return end
@@ -41,6 +59,7 @@ handles[#handles+1]=cpu.spaces.data:install_write_tap(0x022b,0x022b,'rom6_adc_re
         cpu.spaces.data:read_u16(0x022a),cpu.state.GENPC.value,mask))
 end)
 handles[#handles+1]=emu.add_machine_stop_notifier(function()
+    machine:logerror(string.format('rom6_adc_mixer_complete: writes=%d cap=8 observer_writes=0\n',mixer_writes))
     machine:logerror(string.format('rom6_adc_processing_complete: history_writes=%d filter_writes=%d input_cap=1024 output_cap=128 observer_writes=0\n',history_writes,filter_writes))
     machine:logerror(string.format('rom6_adc_lab_complete: result_words=%d cap=32768 reads=%d observer_writes=0\n',results,reads))
 end)

@@ -11,7 +11,7 @@ ROOT=Path(__file__).resolve().parents[1]
 if __package__ in (None,''): sys.path.insert(0,str(ROOT))
 from tools.run_rom6_native import prepare,execute
 from tools.rom6_adc_lab_check import check
-from tools.rom6_adc_filter_check import check as check_filter
+from tools.rom6_adc_filter_check import check as check_filter,check_mixer
 
 
 def main():
@@ -33,6 +33,7 @@ def main():
             (directory/'rom6_adc_processing_program.be16').read_bytes(),
             (ROOT/'roms/noki8210/8210_5.31ppm_c.fls').read_bytes(),
             (ROOT/'roms/nsm3r6/nsm3_rom6_program.be16').read_bytes())
+        report['native_mixer']=check_mixer(text)
     except (OSError,ValueError,subprocess.SubprocessError) as error:
         parser.exit(1,f'ADC lab rejected: {error}\n')
     report.update(machine=args.machine,seconds=args.seconds,native_initialization_verified=True,

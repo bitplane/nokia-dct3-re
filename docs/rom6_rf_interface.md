@@ -427,7 +427,9 @@ direct ADC-pin stimulation, **not a tuned over-the-air signal**.
 make check-c54x-serial-compare
 ```
 
-The candidate clocks scalar words at 13MHz/6, not from P27 demand. Its two
+The candidate clocks scalar words at 13MHz/12, not from P27 demand. This is
+the two-complex-samples/symbol composition matched to the native accumulator
+below, not a measured silicon clock. Its two
 32-word banks are an explicit unmeasured capacity policy. Words, transfer ticks,
 queue state and the next clock deadline are saved. Block notifications
 exclusively own INT0 throughout these laboratory compositions, including
@@ -436,14 +438,14 @@ frame source. Experimental enable wiring requires
 P03.bit0, P21.bit10 and clear P21.bit12. This is a hypothesis, **not a recovered
 truth table**; P09/P0a/P0b capture boundaries are not implemented here.
 
-The oscillator latches simultaneous I/Q at the I transfer and serializes Q six
+The oscillator latches simultaneous I/Q at the I transfer and serializes Q twelve
 reference ticks later. Logged `source_tick` is the **scalar interface-transfer
 timestamp**, not necessarily analogue conversion time. The independent checker
 evaluates sine/cosine from these timestamps and rejects skipped or future words.
 Periodicity is intrinsic to the analytic source, not finite-capture fallback.
 
 Exclusive ownership removes pre-capture warm-up reads caused by synthetic
-frame interrupts. Both six-second laboratory inputs first read P27 at
+frame interrupts. In the divider-6 qualification, both laboratory inputs first read P27 at
 2.537874286s (bus context `2446`, in the native discard loop). All **40,320**
 P27 reads reconcile with consumed clock-produced words across activation
 counter resets; none is an inactive retained-register read. The checker also
@@ -459,9 +461,12 @@ rate, comparator or capacity hypothesis:
 | P03 gating, frame INT0 outside capture | 6 | 2.548358769s |
 | P03-armed one-shot P09 start / P0b stop | 6 | 2.548362462s (21,600 produced / 21,536 consumed) |
 | P03 gating, cadence-only comparison | 12 | 2.548639385s (11,680 / 11,616) |
-| Current P03 gating, exclusive MFI INT0 | 6 | 2.548358769s (22,752 / 22,688) |
+| P03 gating, exclusive MFI INT0 | 6 | 2.548358769s (22,752 / 22,688) |
+| Current P03 gating, exclusive MFI INT0 | 12 | 2.548639385s (11,680 / 11,616) |
 
-The timed-gate implementation and slower trial divider were removed. Exact
+The timed-gate implementation was removed. The slower divider was initially
+restored after its transport-only test, then selected by the independent
+post-filter signal test below; it still does not qualify losslessness. Exact
 binary hashes, fault contexts and retained raw-capture locations for those
 rejections are in [the falsification ledger](../evidence/falsifications.json).
 These failures do not establish physical buffer capacity or justify increasing
@@ -469,6 +474,11 @@ it until a run passes. The runner rejects every fault across counter resets.
 The header distinguishes oscillator phase divisor from MFI scalar divisor;
 the checker rejects disagreement with the device summary. Cadence comparisons
 must not retime the laboratory oscillator.
+Word/block diagnostics have per-process budgets of 4,096/128, independent of
+the number of capture activations. Reset and save/load do not replenish these
+host-only budgets. The checker joins every P27 read to full queue accounting
+while explicitly bounding value qualification to logged prefixes; it does not
+equate a small trace with a complete value census.
 
 At both overflows the passive fault observer sees IMR=`035f`, IFR=`0021` and
 ST1=`c903`/`4903`: INT0 is enabled and pending, but global INTM is set. This
@@ -504,18 +514,48 @@ test uses the coefficients' unity DC gain as its oracle rather than generating
 expected values with the convolution under test. Actual native runs agree
 word-for-word; no CPU arithmetic change was needed.
 
-The checker pins the resident image, live `2468..2499` filter bytes, own uploaded
+The checker pins the resident image, live `2468..24d3` filter/mixer bytes, own uploaded
 entry and the complete own `0590..0735` payload. The capture is intentionally
 bounded: its counter sees 496 filter stores within the first 1,024 inputs, but
 only the first 128 output **values** are qualified. It does not validate RF
 timing, an RSSI result, FCCH detection or later data after an overrun.
 
-The next software discriminator is the **post-filter** accumulator at
-`249f..24d2`, which adds/subtracts I/Q with a quarter-rate rotation. Combined
-with the proved decimation, this offers a way to test input cadence using the
-known physical tone rather than transport greenness. Two-complex-samples per
-symbol remains a live hypothesis: the earlier negative trial disproved
-losslessness of that complete prototype, not its rate in isolation. MFI
-bank/acknowledgement semantics (notably P21), COBBA control gating, capture
-edges and P11=`01fe` remain unqualified. Retire the direct-ADC compositions and
-field probes when a focused clocked-air gate covers the recovered contract.
+### Qualified quarter-rate accumulator prefix
+
+The resident `249f..24d2` accumulator multiplies successive complex samples
+by `1,-j,-1,+j`, then sums groups of four (observed mode 0), or eight (static
+mode-1 branch). Eight live mode-0 blocks, all 32 output words, match an
+independent complex rotation and the native 72-word ring-pointer updates.
+Mode 1 has a logical reference test, not a native execution qualification.
+
+For the same physical +67.708333kHz tone:
+
+| Scalar divider | First adjacent native accumulator outputs (signed A,B) | Adjacent-group dot product |
+| --- | --- | ---: |
+| 6 (four complex samples/symbol) | `(444,-2232)`, `(-444,2232)` | -5,178,960 |
+| 12 (two complex samples/symbol) | `(804,-1936)`, `(804,-1936)` | +4,394,512 |
+| 12, zero input | `(0,0)`, `(0,0)` | 0 |
+
+This selects divider 12 for the **laboratory baseband** on signal evidence,
+not because it hides an overrun. With the proved decimation by two, a quarter-
+rate FCCH tone becomes stationary at the native quarter-rate mixer only when
+its output runs at the GSM symbol rate. The known FCCH relationship is also
+described in the primary [FCCH detector patent US7590419B2](https://patents.google.com/patent/US7590419B2/en).
+The inference assumes unshifted complex baseband at the ADC fixture; it does
+not identify an actual MFI wire clock or exclude an undiscovered hardware NCO.
+
+The paired six-second divider-12 runs reconcile 975,264 tone and 1,340,800 zero
+P27 reads to clocked queue consumption; each independently checks a bounded
+4,096-word prefix. Both retain the initial overrun at 2.548639385s, so the
+receiver gate remains red. Changed measurement activity is not an accepted
+RSSI/FCCH result after that transport fault. MFI bank/acknowledgement semantics
+(notably P21), COBBA control gating, capture edges and P11=`01fe` remain the
+next boundary. Retire the direct-ADC compositions and field probes when a
+focused clocked-air gate covers the recovered contract.
+
+The native read-side control sequence sets P21 bits 10/11 at uploaded
+`1863..186a` and clears bit 11 at resident `25bc..25c3` on exit. These live
+bytes are checked against the own upload and resident image. Bit 11 therefore
+brackets the software read interval; its physical meaning (bank ownership,
+acknowledgement, clock control or something else) is not established. Do not
+treat the current opaque P21 latch as a recovered MFI handshake.

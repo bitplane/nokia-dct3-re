@@ -16,7 +16,7 @@ void dct3_rf_adc_fixture_state::nsm3adc(machine_config &config)
 {
 	nsm3r6(config);
 	auto &mfi = NOKIA_MFI_RX(config, "mfi_rx", 13'000'000);
-	mfi.set_word_divider(6); // Candidate 4 complex samples/symbol; unmeasured.
+	mfi.set_word_divider(12); // Candidate matched to native post-FIR quarter-rate mixing, not measured silicon.
 	mfi.adc_cb().set("cobba", FUNC(nokia_cobba_device::rf_receive_sample));
 	mfi.data_available_cb().set("dsp_c54x", FUNC(nokia_dsp_c54x_device::rf_data_available_w));
 	mfi.fault_observer_cb().set(FUNC(dct3_rf_adc_fixture_state::fault_observe_w));

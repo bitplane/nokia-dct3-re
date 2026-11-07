@@ -3,6 +3,14 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "nsm3_native_quarter_rate_accumulator_prefix",
+      "owner": "native_rom6_receive_processing",
+      "status": "satisfied",
+      "predicate": "Eight native mode-0 post-FIR accumulator blocks agree exactly with an independent quarter-rate complex rotation, and distinguish the two tested ADC cadences for the same physical tone",
+      "current": "All32 output values and72-word ring-pointer updates match the decoded1,-j,-1,+j rotation. Divider6 produces adjacent(444,-2232),(-444,2232), dot product-5178960; divider12 gives repeated(804,-1936), dot product4394512; zero gives zero. Mode1 is logically tested only. Given the already qualified complex decimation2 and unshifted FCCH baseband assumption, this selects scalar divider12 for the laboratory, not as a measured physical clock. Fresh paired six-second runs reconcile975264/1340800 P27 reads to clocked queues and check4096 waveform values each under process-wide trace budgets. Both still overrun at2.548639385s; no full RSSI, FCCH detector, SCH, BCCH or camping acceptance. Raw divider6 comparison: tmp/rom6-adc-lab/nsm3adc-d8jjqg03; current divider12 pair: nsm3adc-35s_yngj and nsm3ad0-u49vshjv under the same root.",
+      "evidence": ["driver/nokia_dct3_research.cpp", "driver/nokia_mfi_rx.cpp", "tools/rom6_adc_lab.lua", "tools/rom6_adc_filter_check.py", "tools/test_rom6_adc_filter_check.py", "tools/rom6_adc_lab_check.py", "tools/test_rom6_adc_lab_check.py", "docs/rom6_rf_interface.md"]
+    },
+    {
       "id": "nsm3_native_adc_signed_fir_prefix",
       "owner": "native_rom6_receive_processing",
       "status": "satisfied",
@@ -15,7 +23,7 @@
       "owner": "nokia_dsp_c54x_lab_receiver",
       "status": "satisfied",
       "predicate": "The explicit external-receiver composition does not also inject frame INT0 and every native laboratory P27 read consumes an actual clock-produced word",
-      "current": "An independent second-backend component control enables the same CCONT frame clock: the default backend latches frame INT0, the external backend does not while P03 is zero, and its external data-available input positively latches INT0. Native six-second tone and zero trials first read P27 at2.537874286s in the discard loop(bus context2446), with all40320 reads reconciled to queue consumption across activation counter resets and2752 prefix values checked independently. Native initialization still passes, but the64-word prototype overruns at2.548358769s and2.680070769s; no physical cadence/capacity, losslessness, RSSI, FCCH, SCH, BCCH or camping qualification follows. This corrects laboratory ownership only; existing non-laboratory frame-source policy is unchanged.",
+      "current": "An independent second-backend component control enables the same CCONT frame clock: the default backend latches frame INT0, the external backend does not while P03 is zero, and its external data-available input positively latches INT0. The divider6 native qualification first reads P27 at2.537874286s in the discard loop(bus context2446), with all40320 reads reconciled to queue consumption across activation counter resets and2752 prefix values checked independently. Native initialization passes, but that64-word prototype overruns at2.548358769s and2.680070769s; no physical cadence/capacity, losslessness, RSSI, FCCH, SCH, BCCH or camping qualification follows. Later divider12 observations have their own signal-processing predicate. This corrects laboratory ownership only; existing non-laboratory frame-source policy is unchanged.",
       "evidence": ["driver/nokia_dsp_c54x.cpp", "driver/nokia_dsp_c54x.h", "tests/devices/nokia_dsp_serial_test.cpp", "tools/run_c54x_serial_compare.py", "tools/rom6_adc_lab.lua", "tools/rom6_adc_lab_check.py", "tools/test_rom6_adc_lab_check.py", "docs/rom6_rf_interface.md"]
     },
     {

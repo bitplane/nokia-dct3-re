@@ -58,8 +58,11 @@ TIMER_CALLBACK_MEMBER(nokia_mfi_rx_device::word_tick)
 	}
 	if (ready)
 	{
-		if (produced() <= 1024)
+		if (produced() <= 1024 && m_block_trace_count < 128)
+		{
+			++m_block_trace_count;
 			machine().logerror("mfi_rx_block: block=%llu source_tick=%llu count=%u t=%.9f\n",produced()/32,m_next_tick,m_state.count,machine().time().as_double());
+		}
 		m_data_available_cb(1); m_data_available_cb(0);
 	}
 	m_next_tick += m_divider;
@@ -69,9 +72,12 @@ TIMER_CALLBACK_MEMBER(nokia_mfi_rx_device::word_tick)
 u16 nokia_mfi_rx_device::read()
 {
 	bool const side_effects = !machine().side_effects_disabled();
-	if (side_effects && m_state.count && consumed() < 1024)
+	if (side_effects && m_state.count && consumed() < 1024 && m_word_trace_count < 4096)
+	{
+		++m_word_trace_count;
 		machine().logerror("mfi_rx_word: sequence=%llu value=%04x source_tick=%llu t=%.9f\n",consumed()+1,
 			m_state.words[m_state.head],m_state.source_ticks[m_state.head],machine().time().as_double());
+	}
 	u64 const before = underruns();
 	u16 const result = m_state.read(side_effects);
 	if (underruns() != before && underruns() <= 16)
@@ -84,6 +90,7 @@ u16 nokia_mfi_rx_device::read()
 
 void nokia_mfi_rx_device::device_stop()
 {
+	machine().logerror("mfi_rx_trace_complete: words=%u blocks=%u word_cap=4096 block_cap=128\n",m_word_trace_count,m_block_trace_count);
 	machine().logerror("mfi_rx_summary: produced=%llu consumed=%llu queued=%u overrun=%llu underrun=%llu fault=%u divider=%u physical_clock_claim=0\n",
 		produced(),consumed(),m_state.count,overruns(),underruns(),m_state.fault,m_divider);
 }

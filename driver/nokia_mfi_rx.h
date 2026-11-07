@@ -37,6 +37,8 @@ private:
 	emu_timer *m_timer = nullptr;
 	unsigned m_divider = 6;
 	u64 m_next_tick = 0;
+	// Host diagnostics, not emulated state: reset/load must not refill budgets.
+	u32 m_word_trace_count = 0, m_block_trace_count = 0;
 };
 DECLARE_DEVICE_TYPE(NOKIA_MFI_RX, nokia_mfi_rx_device)
 #endif // MAME_NOKIA_NOKIA_MFI_RX_H

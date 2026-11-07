@@ -63,6 +63,10 @@ def check(text,tone):
     words=list(WORD.finditer(text))
     if len(words)<32 or len(words)!=text.count('mfi_rx_word:'):
         raise ValueError('missing or malformed delivered waveform prefix')
+    trace_totals=re.findall(r'mfi_rx_trace_complete: words=(\d+) blocks=(\d+) word_cap=4096 block_cap=128',text)
+    if (len(trace_totals)!=1 or trace_totals[0][0]!=str(len(words)) or len(words)>4096 or
+            int(trace_totals[0][1])!=text.count('mfi_rx_block:') or int(trace_totals[0][1])>128):
+        raise ValueError('MFI bounded trace accounting differs')
     first_reads=re.findall(r'rom6_adc_first_read: t=(\d+\.\d{9}) cpu_pc=[0-9a-f]{6} observer_writes=0',text)
     if len(first_reads)!=1 or text.count('rom6_adc_first_read:')!=1 or first_reads[0]!=words[0].group(4):
         raise ValueError('first P27 read is not the first clocked MFI word')
