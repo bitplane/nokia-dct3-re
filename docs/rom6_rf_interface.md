@@ -16,7 +16,20 @@ events relate to the DSP I/O counter/reload epoch. Under the current declared
 P03-level laboratory gate, the first SCH window contains zeros and native
 decoding fails. Mode-1 product/history and mixer checks do not expose an
 arithmetic defect; the P03 bit-8 poll does not prove a missing hardware clear.
-SCH, BCCH decoding and camping remain unqualified.
+Organic SCH/BCCH reception and camping remain unqualified. This is now
+distinct from decoder execution: isolated native SCH and BCCH paths recover
+independently generated payloads from filtered I/Q samples.
+
+| Receive scope | Current evidence | Not established |
+| --- | --- | --- |
+| Isolated SCH | Native frontend, Viterbi and CRC recover exact FN/BSIC for three boundary cases; zero-input control rejects | Raw ADC timing, organic synchronization |
+| Isolated BCCH | Four independent GMSK bursts traverse native frontend, deinterleaving, weighting and Viterbi to exact SI3/parity; another payload passes, zero samples reject | Hardware FIRE completion, RF tuning/camping |
+| Organic ADC laboratory boot | Native FCCH control acceptance; independently checked raw samples and fault-free provisional staging; first SCH aperture misses its source burst | Physical capture/compare epoch and first-valid-sample ownership |
+
+The CPU additions needed by the normal-burst frontend have generic focused
+tests. The rebuilt native ROM6 menu/storage/save-state scenarios, ROM4
+coherent boot/RF gate and HLE coherent frontier pass. These regressions guard
+existing behavior; they do not turn a laboratory waveform into received RF.
 
 The original [NSM-3 System Module manual, Issue 1 12/1999](https://www.eserviceinfo.com/preview_html.php?fileid=5456&previewid=3011)
 identifies the 13MHz COBBA clock and separate IData/QData connections
@@ -55,6 +68,16 @@ or a RAM snapshot without sample timestamps, is insufficient. Another
 emulator's calibrated scheduling policy is not an independent measurement.
 The P03-level, P09-start and P09-completed-block experiments below constrain
 specific candidates but do not select a physical implementation.
+
+The unchanged-source post-decoder-check run
+`tmp/rom6-adc-lab/nsm3afs-3a_ocphy` checks 4096 source words across five
+capture epochs and observes 903584 total P27 reads, no transport faults and
+peak staging 69. It still publishes class-40 error status 1 with zero decoded
+words. This closes decoder qualification separately from the timing question:
+neither moving the source nor choosing a compare delay merely to obtain a
+successful CRC would recover the missing physical contract. The separate
+FIRE accelerator's result/correction semantics also remain unimplemented;
+its request-format fixture is not an acceptance substitute.
 
 ## Reproduction and coverage
 
