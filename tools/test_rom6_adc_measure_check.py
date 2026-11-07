@@ -4,10 +4,48 @@ import unittest
 from unittest.mock import patch
 
 from tools.rom6_adc_measure_check import (MASK40,check,check_measure_program,
-    check_frequency_correction,check_rx_publications,frequency_correction,log_power_q16,tone_power)
+    check_frequency_correction,check_rx_publications,check_fcch_only_sch_failure,frequency_correction,log_power_q16,tone_power)
 
 
 class AdcMeasurementTest(unittest.TestCase):
+    def sch_negative_fixture(self):
+        program=bytearray(0xa000)
+        for address,words in {
+                0x4bcd:(0x7715,0xe,0x7714,0x80,0xf274,0x2c88,0x7713,0x2f5b),
+                0x4efb:(0x6ff8,0x2f20,0xc48,0x1a93),
+                0x4f53:(0xf030,0x3ff,0x60f8,8,0x3ff,0x7711,0,0xfd20,0x6d91,0xfe00,0x7311,0x2f20)}.items():
+            program[address*2:address*2+len(words)*2]=struct.pack('>'+str(len(words))+'H',*words)
+        words=[0x4000,0x100,0xb,4,0,0,0]
+        lines=['rom6_burst_crc: sequence=1 t=1.000000000 status=0001 remainder=0000 input=0000,0000,0000 pc=004bc8 observer_writes=0',
+               'rom6_burst_block_sources: sequence=1 channel=0040 selection=0000 crc=0001 bsic=0000 frame=0000,000b arfcn=0004 shift=0000 decoded=0000,0000,0000 observer_writes=0']
+        for index,word in enumerate(words):
+            lines.append(f'rom6_burst_block_field: sequence={index+1} t=2.00000000{index} address={0x2f5b+index:04x} value={word:04x} pc=004f39 observer_writes=0')
+        packed=','.join(f'{word:04x}' for word in [0xe80,*words])
+        lines.extend([f'rom6_measure_rx_commit: sequence=1 t=3.000000000 previous=0080 producer=0088 consumer=0080 words={packed} mask=ffff cpu_pc=002d08 observer_writes=0',
+                      'rom6_measure_rx_complete: commits=1 cap=64 observer_writes=0'])
+        return '\n'.join(lines),program
+
+    def test_sch_absent_input_joins_native_crc_to_wire_flag(self):
+        text,program=self.sch_negative_fixture()
+        report=check_fcch_only_sch_failure(text,program)
+        self.assertEqual(report['error_flag'],1)
+        self.assertEqual(report['payload'],'40000100000b0004000000000000')
+        self.assertTrue(report['frame_fields_are_metadata'])
+        self.assertFalse(report['decoded_frame_number_qualified'])
+        self.assertFalse(report['sch_qualified'])
+
+    def test_sch_negative_rejects_missing_status_and_serialization_drift(self):
+        text,program=self.sch_negative_fixture()
+        for old,new in [('remainder=0000','remainder=03ff'),('crc=0001','crc=0000'),
+                        ('decoded=0000,0000,0000','decoded=0001,0000,0000'),
+                        ('address=2f5c value=0100','address=2f5c value=0000'),
+                        ('0e80,4000,0100','0e80,4000,0000'),
+                        ('t=1.000000000','t=4.000000000')]:
+            with self.subTest(old=old),self.assertRaises(ValueError):
+                check_fcch_only_sch_failure(text.replace(old,new,1),program)
+        program[0x4f53*2]^=1
+        with self.assertRaises(ValueError): check_fcch_only_sch_failure(text,program)
+
     def fixture(self,tone=True,base=0x474):
         data=bytearray(0x20000)
         data[0xb09e*2:0xb0de*2]=struct.pack('>64H',0,*[math.floor(640*math.log10(i)) for i in range(1,64)])

@@ -3,6 +3,14 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "nsm3_native_sch_crc_failure_publication",
+      "owner": "native_rom6_receive_search",
+      "status": "satisfied",
+      "predicate": "The finite FCCH-only stimulus produces a native failed-SCH block whose error byte joins the own-ROM check result and exact formatter writes",
+      "current": "Run nsm3afb-xqpil8w6 has three zero decoded words, remainder0 and2f20=1 at3.344658769s. Own routine4f3a compares the ten-bit remainder with03ff and returns status through MVMD at4f5d; displayed4bc8 is its caller context. Formatter4ee0 serializes status into byte2; all seven2f5b..2f61 writes and source metadata join the native type80/length0e packet40000100000b0004000000000000 at3.344663736s. Frame0912/0913,BSIC250a,ARFCN250e and shift2615 are metadata,not valid decoded content. Relevant instruction fragments are pinned and checker mutations cover status,ordering,serialization and program drift. This is a zero-codeword negative control,not arbitrary-word CRC,successful SCH,MCU consumption or camping qualification.",
+      "evidence": ["tools/rom6_adc_burst.lua", "tools/rom6_adc_measure_check.py", "tools/test_rom6_adc_measure_check.py", "tools/run_rom6_adc_lab.py", "docs/rom6_rf_interface.md"]
+    },
+    {
       "id": "nsm3_native_sch_training_correlator_identification",
       "owner": "native_rom6_receive_search",
       "status": "satisfied",
@@ -14,8 +22,8 @@
       "id": "nsm3_finite_fcch_adc_stimulus",
       "owner": "nokia_rf_laboratory",
       "status": "satisfied",
-      "predicate": "A standards-timed finite FCCH ADC-pin stimulus progresses through native detection without unsupported CPU execution or transport faults",
-      "current": "Separate nsm3afb uses absolute13MHz epoch0,60000-tick frames,7104 active ticks in TS0 at frames0/10/20/30/40 per51. Other slots are zero; rectangular envelope, no tuning/gain/noise/SCH/BCCH or carrier fallback. Accepted six-second run nsm3afb-qa8mlp5u has1464672 native reads,4096 independently checked source words,peak69,no unsupported CPU execution or transport fault,and terminal idle PC3999. Generic instruction fixes including Read-owned CMPS have independent tests/replays. Fifth RX publication at3.344663736s is type80,payload40000100000b0004000000000000. The recovered layout suggests SCH/error1, but its own producer/consumer/status join and FCCH-to-SCH timing remain unqualified. Continuous-tone control nsm3adc-e2gbzpod passes independent metric checks. This predicate establishes bounded native execution of the laboratory input, not FCCH/SCH decode, physical MFI capacity, tuning, frame number or camping.",
+      "predicate": "A standards-timed finite FCCH ADC-pin stimulus traverses native receive processing for six seconds without unsupported CPU execution or transport faults",
+      "current": "Separate nsm3afb uses absolute13MHz epoch0,60000-tick frames,7104 active ticks in TS0 at frames0/10/20/30/40 per51. Other slots are zero; rectangular envelope,no tuning/gain/noise/SCH/BCCH or carrier fallback. Accepted run nsm3afb-xqpil8w6 has1464672 native reads,4096 checked prefix words,peak69,no unsupported CPU execution or transport fault,and terminal idle PC3999. A separate raw window joins reads655..1678 to ticks33000000..33012276:592 active words then432 off-slot words,one source epoch. Generic instruction fixes have independent tests/replays. The native failed-SCH status/publication now has its own satisfied negative-control predicate. FCCH-to-SCH timing remains unqualified. Continuous-tone control nsm3adc-e2gbzpod passes metric checks. This establishes bounded native execution and delivered waveform provenance,not FCCH/SCH decode,physical MFI capacity,tuning,decoded frame number or camping.",
       "evidence": ["driver/nokia_rf_lab_signal.h", "driver/nokia_dct3_research.cpp", "tests/unit/test_rf_lab_signal.cpp", "tools/test_rf_lab_signal_cpp.py", "tools/rom6_adc_burst.lua", "tools/rom6_adc_lab_check.py", "tools/test_rom6_adc_lab_check.py", "docs/rom6_rf_interface.md"]
     },
     {

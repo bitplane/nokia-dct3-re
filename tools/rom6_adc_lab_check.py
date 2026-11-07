@@ -6,6 +6,8 @@ from tools.rom6_timed_output_check import nanoseconds
 WORD=re.compile(r'mfi_rx_word: sequence=(\d+) value=([0-9a-f]{4}) source_tick=(\d+) t=(\d+\.\d{9})')
 ENABLE=re.compile(r'mfi_rx_enable: state=([01]) produced=(\d+) consumed=(\d+) overrun=(\d+) underrun=(\d+) t=\d+\.\d{9}')
 SUMMARY=re.compile(r'mfi_rx_summary: produced=(\d+) consumed=(\d+) queued=(\d+) overrun=(\d+) underrun=(\d+) fault=([01]) divider=(\d+) physical_clock_claim=0')
+EPOCH=re.compile(r'mfi_rx_epoch: first_tick=(\d+) divider=(\d+) physical_clock_claim=0')
+ACTIVE_WORD=re.compile(r'rom6_burst_active_word: sequence=(\d+) read=(\d+) value=([0-9a-f]{4}) t=(\d+\.\d{9}) observer_writes=0')
 
 
 def continuous_queue_bound(first_tick,divider,consumed,next_read_ns):
@@ -57,6 +59,67 @@ def reference_word(sequence,tick,tone,word_divider=6,burst=False):
         return 0
     phase=2*math.pi*((conversion_tick//12)%16)/16
     return round(1024*(math.sin(phase) if component else math.cos(phase)))&0xffff
+
+
+def check_active_burst_window(text):
+    """Join a later raw-read window to clock epochs, not read-time phase."""
+    rows=list(ACTIVE_WORD.finditer(text))
+    complete=re.findall(r'rom6_burst_active_complete: words=(\d+) cap=1024 reads=(\d+) observer_writes=0',text)
+    totals=re.findall(r'rom6_adc_lab_complete: result_words=\d+ cap=32768 reads=(\d+) observer_writes=0',text)
+    if (len(rows)!=1024 or len(rows)!=text.count('rom6_burst_active_word:') or len(complete)!=1 or
+            complete[0][0]!='1024' or len(totals)!=1 or complete[0][1]!=totals[0]):
+        raise ValueError('incomplete active-burst raw-read window')
+    active=False
+    first_tick=None
+    closed=0
+    last_read=None
+    active_words=inactive_words=epochs=0
+    observed_epochs=set()
+    ticks=[]
+    events=sorted([(m.start(),'enable',m) for m in ENABLE.finditer(text)]+
+                  [(m.start(),'epoch',m) for m in EPOCH.finditer(text)]+
+                  [(m.start(),'word',m) for m in rows])
+    for _,kind,event in events:
+        if kind=='enable':
+            state,produced,consumed,overrun,underrun=map(int,event.groups())
+            if bool(state)==active or consumed>produced or overrun or underrun:
+                raise ValueError('invalid active-window capture accounting')
+            active=bool(state)
+            first_tick=None
+            if not active: closed+=consumed
+            elif produced or consumed: raise ValueError('capture did not start with empty counters')
+        elif kind=='epoch':
+            if not active or first_tick is not None or event.group(2)!='12':
+                raise ValueError('active-window source epoch differs')
+            first_tick=int(event.group(1))
+            epochs+=1
+        else:
+            sequence,read,value,stamp=event.groups()
+            sequence,read,value=int(sequence),int(read),int(value,16)
+            if not active or first_tick is None or read<=closed or sequence!=len(ticks)+1:
+                raise ValueError('raw burst read has no owning capture epoch')
+            if last_read is not None and read!=last_read+1:
+                raise ValueError('active-burst raw window skips a read')
+            local=read-closed
+            tick=first_tick+(local-1)*12
+            if value!=reference_word(local,tick,True,12,True):
+                raise ValueError('active burst differs from independent clocked waveform')
+            if tick*1_000_000_000>(nanoseconds(stamp)+1)*13_000_000:
+                raise ValueError('active burst consumed before its conversion clock')
+            if not ticks and not value: raise ValueError('active window did not begin on a nonzero word')
+            conversion=tick-12*((local-1)&1)
+            on=(conversion//60000)%51 in (0,10,20,30,40) and conversion%60000<7104
+            active_words+=int(on)
+            inactive_words+=int(not on)
+            ticks.append(tick)
+            observed_epochs.add(epochs)
+            last_read=read
+    if not active_words or not inactive_words or last_read>int(totals[0]):
+        raise ValueError('active window does not cover both tone and off-slot samples')
+    return dict(checked_words=len(rows),first_read=int(rows[0].group(2)),last_read=last_read,
+                first_source_tick=ticks[0],last_source_tick=ticks[-1],
+                tone_words=active_words,off_slot_words=inactive_words,
+                source_epochs=len(observed_epochs),fcch_detection_qualified=False,sch_qualified=False)
 
 
 def check(text,tone,burst=False):

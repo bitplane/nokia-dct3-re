@@ -1,8 +1,42 @@
 import unittest
-from tools.rom6_adc_lab_check import check,reference_word,continuous_queue_bound
+from tools.rom6_adc_lab_check import check,reference_word,continuous_queue_bound,check_active_burst_window
 
 
 class AdcLabCheckTest(unittest.TestCase):
+    def active_fixture(self):
+        lines=['mfi_rx_enable: state=1 produced=0 consumed=0 overrun=0 underrun=0 t=0.000000000',
+               'mfi_rx_epoch: first_tick=0 divider=12 physical_clock_claim=0',
+               'mfi_rx_enable: state=0 produced=40 consumed=32 overrun=0 underrun=0 t=0.001000000',
+               'mfi_rx_enable: state=1 produced=0 consumed=0 overrun=0 underrun=0 t=0.046000000',
+               'mfi_rx_epoch: first_tick=607080 divider=12 physical_clock_claim=0']
+        for sequence in range(1,1025):
+            tick=607080+(sequence-1)*12
+            stamp=(tick+48)*1_000_000_000//13_000_000
+            seconds,fraction=divmod(stamp,1_000_000_000)
+            value=reference_word(sequence,tick,True,12,True)
+            lines.append(f'rom6_burst_active_word: sequence={sequence} read={sequence+32} value={value:04x} t={seconds}.{fraction:09d} observer_writes=0')
+        lines.extend(['rom6_burst_active_complete: words=1024 cap=1024 reads=1056 observer_writes=0',
+                      'rom6_adc_lab_complete: result_words=0 cap=32768 reads=1056 observer_writes=0'])
+        return '\n'.join(lines)
+
+    def test_active_window_uses_source_epoch_and_closed_capture_counts(self):
+        report=check_active_burst_window(self.active_fixture())
+        self.assertEqual((report['first_read'],report['last_read']),(33,1056))
+        self.assertEqual(report['tone_words'],2)
+        self.assertEqual(report['off_slot_words'],1022)
+        self.assertEqual(report['source_epochs'],1)
+        self.assertFalse(report['fcch_detection_qualified'])
+        self.assertFalse(report['sch_qualified'])
+
+    def test_active_window_rejects_phase_read_and_capture_drift(self):
+        text=self.active_fixture()
+        for old,new in [('first_tick=607080','first_tick=607104'),
+                        ('read=34 ','read=35 '),('value=02d4','value=02d5'),
+                        ('consumed=32','consumed=31'),('words=1024 cap=1024','words=1023 cap=1024')]:
+            self.assertIn(old,text)
+            with self.subTest(old=old),self.assertRaises(ValueError):
+                check_active_burst_window(text.replace(old,new,1))
+
     def fixture(self,tone=True,divider=6,burst=False):
         header=f'rf_adc_lab: direct_adc=1 tuned_air_source=0 tone={int(tone)} reference=13000000 source_phase_divider=12 word_divider={divider} amplitude=1024 physical_clock_claim=0'
         lines=[header,'mfi_rx_enable: state=1 produced=0 consumed=0 overrun=0 underrun=0 t=0.010000000']

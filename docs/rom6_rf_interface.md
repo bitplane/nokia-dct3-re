@@ -765,6 +765,15 @@ The waveform's epoch is absolute zero, independent of firmware requests,
 capture enable and FIFO reads. Q remains latched from the preceding I
 conversion even across an envelope boundary.
 
+A second, bounded raw-read window starts at the first nonzero P27 word,
+not at a request or a chosen detector result. Independent epoch/counter
+joins validate reads 655..1678 at source ticks 33000000..33012276:
+592 active words (296 complex samples) followed by 432 off-slot words.
+This is the scheduled frame-40 FCCH at source frame 550. The earlier
+128-output FIR window is silent because it precedes the burst; the full
+4096-word raw prefix is not all silence. This qualifies delivered waveform
+provenance, not FCCH detection or physical receive timing.
+
 ```sh
 .venv/bin/python tools/run_rom6_adc_lab.py --machine nsm3afb --seconds 6
 ```
@@ -823,15 +832,37 @@ type-`8a` negative packet. Raw accepted trial:
 `tmp/rom6-adc-lab/nsm3afb-qa8mlp5u`; continuous-tone control
 `nsm3adc-e2gbzpod` remains fault-free with independent metric checks.
 
-The recovered received-block layout interprets channel byte `40` as SCH
-and byte 2 (`01`) as a failed-block flag. This interpretation still needs
-a join to this ROM's own producer/consumer; the candidate frame/channel
-fields and packet do not prove valid SCH. The input contains no SCH
-waveform, so a valid decoded SCH is not expected.
+### Native failed-SCH publication
+
+The own-ROM producer now establishes the failed-block status, rather than
+borrowing a sibling's packet label. The `4ba8` class-`40` branch calls
+decoder `9268`, normalizer `4d9d` and check routine `4f3a`. The latter
+masks its remainder to ten bits, compares it with `03ff`, and writes
+`2f20=1` on mismatch through the return-delay MVMD at `4f5d`. In the
+SCH-absent trial all three decoded words are zero, the remainder is zero,
+and the captured status write is one at `3.344658769s`. Its displayed
+context `4bc8` is the caller, not the owning instruction.
+
+Formatter `4ee0` packs `2f20 << 8` into word `2f5c`: this is byte 2 of
+the received-block payload. All seven observed `2f5b..2f61` writes join
+the source metadata and the exact fourteen published bytes. The branch
+at `4bcd..4bd3` supplies type `80`, length `0e` and source `2f5b` to
+publisher `2c88`; its ring commit writes through `2d03` before PORTW1.
+The packet's frame words come from `0912/0913`, BSIC from `250a`, ARFCN
+from `250e` and shift from `2615` on the observed selector-zero branch.
+They are metadata, **not decoded-frame or valid-BSIC evidence** in a
+failed block.
+
+`check_fcch_only_sch_failure` pins the relevant own-ROM instruction
+fragments and joins zero-codeword/remainder/status, formatter sources,
+seven writes and the actual packet. It deliberately qualifies only this
+negative control, not the CRC algorithm for arbitrary words or a valid
+SCH decode. Fresh evidence: `tmp/rom6-adc-lab/nsm3afb-xqpil8w6`.
 
 Reaching this standard-pattern correlator and its later processing does
 not prove FCCH acquisition, SCH synchronization, decoded frame number or
 camping, particularly because the stimulus contains no SCH burst. Next:
-join the native type-80 producer/status to this ROM's receive path and
-qualify FCCH-to-SCH timing before adding an independently encoded SCH
-waveform. No firmware result or decoded radio message is synthesized.
+qualify FCCH-to-SCH capture timing, then add an independently encoded SCH
+waveform using GSM 05.02 burst timing and
+[GSM 05.03 channel coding](https://www.etsi.org/deliver/etsi_gts/05/0503/05.00.00_60/gsmts_0503v050000p.pdf).
+No firmware result or decoded radio message is synthesized.

@@ -229,3 +229,50 @@ def check_rx_publications(text):
                 rssi_reply_observed=any(packet['type'] in (0x83,0x8b) for packet in packets),
                 scope='all captured native ring commits within this bounded laboratory run',
                 mcu_consumption_qualified=False,camping_qualified=False)
+
+
+def check_fcch_only_sch_failure(text,program):
+    """Join this finite, SCH-absent fixture's CRC status to its actual packet."""
+    fragments={
+        0x4bcd:(0x7715,0x000e,0x7714,0x0080,0xf274,0x2c88,0x7713,0x2f5b),
+        0x4efb:(0x6ff8,0x2f20,0x0c48,0x1a93),
+        0x4f53:(0xf030,0x03ff,0x60f8,0x0008,0x03ff,0x7711,0,0xfd20,0x6d91,0xfe00,0x7311,0x2f20)}
+    for address,words in fragments.items():
+        size=len(words)*2
+        if program[address*2:address*2+size]!=struct.pack('>'+str(len(words))+'H',*words):
+            raise ValueError('SCH failure formatter/CRC program differs')
+    sources=re.findall(r'rom6_burst_block_sources: sequence=(\d+) channel=([0-9a-f]{4}) selection=([0-9a-f]{4}) crc=([0-9a-f]{4}) bsic=([0-9a-f]{4}) frame=([0-9a-f]{4}),([0-9a-f]{4}) arfcn=([0-9a-f]{4}) shift=([0-9a-f]{4}) decoded=([0-9a-f]{4}),([0-9a-f]{4}),([0-9a-f]{4}) observer_writes=0',text)
+    crc=re.findall(r'rom6_burst_crc: sequence=(\d+) t=(\d+\.\d{9}) status=([0-9a-f]{4}) remainder=([0-9a-f]{4}) input=([0-9a-f]{4}),([0-9a-f]{4}),([0-9a-f]{4}) pc=([0-9a-f]{6}) observer_writes=0',text)
+    fields=re.findall(r'rom6_burst_block_field: sequence=(\d+) t=(\d+\.\d{9}) address=([0-9a-f]{4}) value=([0-9a-f]{4}) pc=([0-9a-f]{6}) observer_writes=0',text)
+    packets=[packet for packet in check_rx_publications(text)['packets']
+             if packet['type']==0x80 and packet['payload'].startswith('40')]
+    if (len(sources)!=1 or len(crc)!=1 or len(fields)!=7 or len(packets)!=1 or
+            text.count('rom6_burst_block_sources:')!=1 or text.count('rom6_burst_crc:')!=1 or
+            text.count('rom6_burst_block_field:')!=7):
+        raise ValueError('bounded SCH failure chain is incomplete')
+    sequence=int(sources[0][0])
+    channel,selection,status,bsic,frame0,frame1,arfcn,shift,*decoded=(int(word,16) for word in sources[0][1:])
+    if sequence!=1 or channel!=0x40 or selection!=0 or status!=1:
+        raise ValueError('FCCH-only fixture did not take its failed SCH formatter')
+    _,crc_time,crc_status,remainder,*rest=crc[0]
+    if crc[0][0]!='1' or int(crc_status,16)!=status or int(remainder,16)==0x3ff:
+        raise ValueError('SCH status is not the failing native CRC decision')
+    if any(int(word,16) for word in rest[:3]) or decoded!=[0,0,0] or int(remainder,16)!=0:
+        raise ValueError('zero SCH input no longer gives the qualified zero-codeword CRC negative')
+    swap=lambda word: ((word&255)<<8)|(word>>8)
+    expected=[(channel<<8)|(bsic&255),(status<<8)|(frame0&255),frame1,arfcn,shift,
+              swap(decoded[0]),swap(decoded[1])]
+    previous_time=float(crc_time)
+    for index,row in enumerate(fields):
+        ordinal,stamp,address,value,_=row
+        if (int(ordinal)!=index+1 or int(address,16)!=0x2f5b+index or int(value,16)!=expected[index] or
+                not previous_time<=float(stamp)<float(packets[0]['time'])):
+            raise ValueError('SCH formatter field does not join CRC and ring publication')
+        previous_time=float(stamp)
+    body=b''.join(word.to_bytes(2,'big') for word in expected).hex()
+    if packets[0]['payload']!=body:
+        raise ValueError('published SCH body differs from native formatter sources')
+    return dict(channel=channel,error_flag=status,crc_remainder=0,zero_codeword=True,
+                serialized_words=7,publication_time=packets[0]['time'],payload=body,
+                frame_fields_are_metadata=True,decoded_frame_number_qualified=False,
+                sch_qualified=False,camping_qualified=False)

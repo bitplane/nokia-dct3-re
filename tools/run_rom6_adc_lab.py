@@ -10,9 +10,9 @@ import subprocess
 ROOT=Path(__file__).resolve().parents[1]
 if __package__ in (None,''): sys.path.insert(0,str(ROOT))
 from tools.run_rom6_native import prepare,execute
-from tools.rom6_adc_lab_check import check
+from tools.rom6_adc_lab_check import check,check_active_burst_window
 from tools.rom6_adc_filter_check import check as check_filter,check_mixer
-from tools.rom6_adc_measure_check import check as check_measure,check_frequency_correction,check_rx_publications
+from tools.rom6_adc_measure_check import check as check_measure,check_frequency_correction,check_rx_publications,check_fcch_only_sch_failure
 from tools.rom6_adc_detect_check import check as check_detect
 
 
@@ -45,6 +45,10 @@ def main():
         report['native_mixer']=check_mixer(text)
         if args.machine=='nsm3afb':
             report['native_rx_publications']=check_rx_publications(text)
+            report['active_burst_window']=check_active_burst_window(text)
+            if args.seconds>=4:
+                report['native_sch_negative']=check_fcch_only_sch_failure(text,
+                    (directory/'rom6_adc_processing_program.be16').read_bytes())
         if args.detect:
             report['native_detector_products']=check_detect(text,
                 (directory/'rom6_adc_processing_program.be16').read_bytes(),
