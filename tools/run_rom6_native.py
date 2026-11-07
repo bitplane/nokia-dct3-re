@@ -49,7 +49,7 @@ def execute(run,phase,script,seconds,binary,*,persist=False,verbose=False):
 
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--scenario',choices=('all','menu','state','phonebook','radio','tuning','config'),default='all')
+    parser.add_argument('--scenario',choices=('all','menu','state','phonebook','radio','tuning','config','serial'),default='all')
     parser.add_argument('--output-root',type=Path,default=ROOT/'tmp/native-rom6-acceptance')
     parser.add_argument('--mame',type=Path,default=ROOT/'mame/mame')
     args=parser.parse_args()
@@ -72,30 +72,31 @@ def main():
             script,seconds={'menu':('rom6_native_ui.lua',60),'radio':('rom6_native_radio.lua',60),
                             'tuning':('rom6_native_tuning.lua',60),'state':('rom6_native_state.lua',30),
                             'config':('rom6_native_config.lua',60),
+                            'serial':('rom6_native_config.lua',60),
                             'phonebook':('noki8210_phonebook_input.lua',32)}[scenario]
             phase,text=execute(run,'primary',script,seconds,args.mame.resolve(),
-                               persist=scenario=='phonebook',verbose=scenario=='phonebook')
+                               persist=scenario=='phonebook',verbose=scenario in ('phonebook','serial'))
             check_uploads(mcu,(phase/'rom6_native_loader2.be16').read_bytes(),
                           (phase/'rom6_native_installed.be16').read_bytes())
-            if scenario in ('menu','radio','tuning','config'):
+            if scenario in ('menu','radio','tuning','config','serial'):
                 with Image.open(phase/'snap/rom6_native_menu.png') as frame: check_menu(frame)
                 with Image.open(phase/'snap/rom6_native_late_menu.png') as frame: check_menu(frame,CALL_REGISTER_TEXT_SHA256)
                 position=text.find('rom6_native_physical: key=Scroll Down t=54.500000')
                 if position<0 or text.find('rom6_native_key: decoded=18 observer_writes=0',position)<0:
                     raise ValueError('sustained native run lacks late physical Down/decode')
-                if scenario in ('radio','tuning','config'):
+                if scenario in ('radio','tuning','config','serial'):
                     from tools.rom6_radio_census import census, check_output_overlay
                     with (phase/'rom6_radio_writes.tsv').open('rb') as stream:
                         report=census(text,stream)
                     report['own_upload_writer']=check_output_overlay(mcu,(phase/'rom6_radio_first_output.be16').read_bytes())
                     from tools.rom6_timed_output_check import check as check_timed_output
                     with (phase/'rom6_radio_writes.tsv').open('rb') as stream:
-                        report['compare_prefix']=check_timed_output(text,stream)
-                    if scenario in ('tuning','config'):
+                        report['compare_boundary' if scenario=='serial' else 'compare_prefix']=check_timed_output(text,stream,full_boundary=scenario=='serial')
+                    if scenario in ('tuning','config','serial'):
                         from tools.rom6_tuning_contract import check as check_tuning
                         with (phase/'rom6_radio_writes.tsv').open('rb') as stream:
                             report['tuning']=check_tuning(text,stream,(ROOT/'roms/nsm3r6/nsm3_rom6_program.be16').read_bytes())
-                    if scenario=='config':
+                    if scenario in ('config','serial'):
                         from tools.rom6_config_contract import check as check_config
                         with (phase/'rom6_radio_writes.tsv').open('rb') as stream:
                             report['configuration']=check_config(text,stream,
@@ -116,7 +117,7 @@ def main():
                 with Image.open(cold/'snap/8210_phonebook_read_contact.png') as frame: check_contact(frame)
             (run/'acceptance.json').write_text(json.dumps(dict(machine='nsm3r6',scenario=scenario,
                 passed=True,provisioning='acquired base record; later journal omitted',
-                dsp_hle=False,sustained_ui=scenario in ('menu','radio','tuning','config'),dsp_clock_hz=45_500_000,
+                dsp_hle=False,sustained_ui=scenario in ('menu','radio','tuning','config','serial'),dsp_clock_hz=45_500_000,
                 partial_port36_handshake=True,
                 native_registration=False,native_speech=False),indent=2)+'\n')
             print(f'Native ROM6 {scenario}: PASS',flush=True)

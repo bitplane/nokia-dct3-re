@@ -93,14 +93,28 @@ target stops future matches without acknowledging an already-pending request.
 P01/P02 bit `1000` acknowledges that independent pending bit; reset cancels it.
 These are the existing modeled contract, not a complete SCU specification.
 
-`tools/rom6_timed_output_check.py` correlates every write with the first 256
-logged compare callbacks (24,914 total model expiries). All 256 use the latest
-in-range target and read the counter at exactly that target. There are 75 target
-reprograms before observed callbacks. Payload values at arm and edge agree in
-all 256 cases, so **these observations cannot distinguish write-time latching
-from live-register sampling**. All 255 consecutive observed-edge intervals have
-a firmware `1000` acknowledgment. No one-ACK-per-packet hardware FIFO follows
-from this; pending bits can coalesce when service is delayed.
+`tools/run_rom6_native.py --scenario serial` captures all **24,914** modeled
+compare callbacks, correlated with the complete write stream by
+`rom6_timed_output_check.py`. Every callback uses the latest in-range target,
+reads the counter at that target and projects the live P30/P31/P32/P04 tuple.
+There are 10,995 preceding target reprograms. Arm/edge payloads agree throughout,
+so **even this complete run cannot distinguish write-time latching from
+live-register sampling**. All24,913 intervening intervals contain a firmware
+`1000` acknowledgement; every callback observes pending clear beforehand.
+No one-ACK-per-packet hardware FIFO follows from this; delayed service can
+coalesce pending bits.
+
+All observed compare-edge controls are `0100`; raw `0000` writes do not reach
+a compare in this run. At the edge, tags `4400`, `4100`, `4a80` occur2,750,
+5,506 and2,749 times respectively. The raw callback does not interpret these
+families, declare a physical serial completion or supply an RF response.
+Its bounded verbose capture rejects truncation rather than weakening coverage.
+
+`make check-c54x-serial-compare` independently exercises the backend without a
+handset ROM: target replacement, live-register projection, an armed save/restore
+with exact callback time and tuple, both acknowledgement ports, periodic matches,
+out-of-range cancellation, pending retention, raw zero control and reset abort.
+These are executable **model conformance** tests, not a silicon latch proof.
 
 ## Counter-phase contract
 
@@ -254,7 +268,7 @@ Do not add a second descriptor queue. RX arithmetic and configuration-class
 selection are qualified. The next boundary is timed delivery of the co-varying
 `4100`/`4a80` words and PLL programming: recover their trigger/latch edge
 (P32, P04 or compare), physical roles and completion meaning before attaching
-a live RF decoder. The current stable-payload compare prefix does not choose
+a live RF decoder. The complete stable-payload compare capture does not choose
 between those models. A clocked sample source with
 provenance follows the programming contract; no carrier fallback is permitted.
 Native FCCH/SCH/BCCH, camp and registration come after those boundaries.

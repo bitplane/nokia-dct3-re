@@ -21,6 +21,10 @@ public:
 			device_t *owner, u32 clock = 0);
 	void set_overlay_end(u16 end) { m_overlay_end = end; }
 	void set_port36_handshake(bool enabled) { m_port36_handshake = enabled; }
+	// Raw live-register observation at the modeled P04 compare edge. Packing:
+	// P30:P31:P32:P04, high to low16-bit words. This is not a claim about
+	// physical SCU payload latching or serial-shift completion.
+	auto transfer_compare_cb() { return m_transfer_compare_cb.bind(); }
 	// An attached clock owns every codec transfer, including boot loopback;
 	// do not also complete a word synchronously from the BDXR write.
 	void set_external_codec_clock(bool enabled) { m_external_codec_clock = enabled; }
@@ -97,6 +101,7 @@ private:
 	required_device<nokia_ccont_device> m_ccont;
 	required_region_ptr<u16> m_program_rom;
 	required_region_ptr<u16> m_data_rom;
+	devcb_write64 m_transfer_compare_cb;
 	std::array<u16, 0x10000> m_program{};
 	std::array<u16, 0x10000> m_data{};
 	std::array<u16, 0x100> m_io{};

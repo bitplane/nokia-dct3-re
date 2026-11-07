@@ -44,7 +44,8 @@ MAME_PATCHES := patches/mame-nokia-dct3-driver-name.patch \
 	patches/mame-nse2-native-model.patch \
 	patches/mame-c54x-isa-test.patch \
 	patches/mame-c54x-test-compositions.patch \
-	patches/mame-c54x-firmware-registration.patch
+	patches/mame-c54x-firmware-registration.patch \
+	patches/mame-c54x-serial-test.patch
 LIB_COMPONENTS := lib/util/gsmfr.cpp lib/util/gsmfr.h
 CPU_COMPONENTS := cpu/tms320c54x/tms320c54x.cpp \
 	cpu/tms320c54x/tms320c54x.h cpu/tms320c54x/tms320c54x_decode.h \
@@ -404,6 +405,7 @@ help:
 	@echo "make check-c54x-rom4-staged verify the reset-free ten-second staged DSP checkpoint"
 	@echo "make check-c54x-backend-bsp verify native BSP frames, serial pins and save/load (no handset clock/audio claim)"
 	@echo "make check-c54x-backend-requests verify slot pending storage and save/load (no physical request-map claim)"
+	@echo "make check-c54x-serial-compare verify raw compare callbacks, cancellation and exact restoration"
 	@echo "make check-c54x-rom4-transfers verify native timed descriptor consumption (no physical RF timing claim)"
 	@echo "make verify-gsm-a3a8 verify the explicitly profiled laboratory A3/A8 example"
 	@echo "make verify-radio-authentication-boundary reproduce organic 3210 authenticated registration"
@@ -1361,6 +1363,10 @@ check-c54x-backend-bsp: build
 .PHONY: check-c54x-backend-requests
 check-c54x-backend-requests: build
 	$(PYTHON) tools/run_c54x_backend_bsp.py --mame $(MAME_DIR)/mame --output-root tmp --host-requests
+
+.PHONY: check-c54x-serial-compare
+check-c54x-serial-compare: build
+	$(PYTHON) tools/run_c54x_serial_compare.py --mame $(MAME_DIR)/mame --output-root tmp
 
 .PHONY: check-c54x-rom4-transfers
 check-c54x-rom4-transfers: build

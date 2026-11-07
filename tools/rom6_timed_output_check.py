@@ -1,4 +1,4 @@
-"""Correlate a complete I/O stream with the bounded native compare prefix.
+"""Correlate a complete I/O stream with native compare observations.
 
 This checks the current comparator/firmware contract, not silicon latch timing.
 """
@@ -8,6 +8,7 @@ from tools.rom6_radio_census import WRITE
 
 
 EDGE=re.compile(r'rom4_transfer_timer: expiry=(\d+) target=([0-9a-f]{4}) counter=([0-9a-f]{4}) delay=(\d+) t=(\d+\.\d{9})')
+OUTPUT=re.compile(r'dsp_compare_output: sequence=(\d+) control=([0-9a-f]{4}) low=([0-9a-f]{4}) high=([0-9a-f]{4}) target=([0-9a-f]{4}) counter=([0-9a-f]{4}) pending_before=([01]) t=(\d+\.\d{9})')
 
 
 def nanoseconds(value):
@@ -15,17 +16,25 @@ def nanoseconds(value):
     return int(seconds)*1_000_000_000+int(fraction)
 
 
-def check(text, stream):
-    edges=list(EDGE.finditer(text))
+def check(text, stream, *, full_boundary=False):
+    edges=list((OUTPUT if full_boundary else EDGE).finditer(text))
     totals=re.findall(r'\btransfer_expiries=(\d+)\b',text)
-    if len(totals)!=1 or len(edges)!=min(int(totals[0]),256) or len(edges)<2:
+    expected_count=int(totals[0]) if len(totals)==1 else 0
+    if not full_boundary: expected_count=min(expected_count,256)
+    if len(totals)!=1 or len(edges)!=expected_count or len(edges)<2 or (full_boundary and len(edges)>=65536):
         raise ValueError('missing or truncated compare prefix accounting')
-    if len(edges)!=text.count('rom4_transfer_timer:'):
+    if len(edges)!=text.count('dsp_compare_output:' if full_boundary else 'rom4_transfer_timer:'):
         raise ValueError('malformed compare prefix record')
     events=[]
+    boundary={}
     for ordinal,edge in enumerate(edges,1):
-        sequence,target,counter,delay,time=edge.groups()
-        if int(sequence)!=ordinal or target!=counter or not 0<int(delay)<=65536:
+        if full_boundary:
+            sequence,control,low,high,target,counter,pending,time=edge.groups()
+            delay=None
+            boundary[ordinal]=(tuple(int(word,16) for word in (control,low,high)),int(pending))
+        else:
+            sequence,target,counter,delay,time=edge.groups()
+        if int(sequence)!=ordinal or target!=counter or (delay is not None and not 0<int(delay)<=65536):
             raise ValueError('unordered or mismatched compare event')
         events.append((nanoseconds(time),'edge',int(target,16),ordinal))
     last=-1
@@ -48,6 +57,9 @@ def check(text, stream):
     armed_at=None
     owners=Counter()
     stable=0
+    pending=False
+    pending_counts=Counter()
+    families=Counter()
     matched=[]
     interval_ack=False
     previous_edge=None
@@ -64,23 +76,33 @@ def check(text, stream):
                 target=value; armed_payload=payload.copy(); armed_at=stamp
             elif address==0x0e:
                 period=value+1 if value else 5000
-            elif address in (1,2) and value&0x1000 and previous_edge is not None:
-                interval_ack=True
+            elif address in (1,2) and value&0x1000:
+                pending=False
+                if previous_edge is not None: interval_ack=True
         else:
             if previous_edge is not None:
                 acknowledgement_intervals['with_ack' if interval_ack else 'without_ack']+=1
             if address!=target or not 0<=address<period or armed_at is None or stamp<=armed_at:
                 raise ValueError('compare did not use the latest in-range target')
             stable+=int(payload==armed_payload)
+            if full_boundary:
+                observed,prior_pending=boundary[value]
+                if observed!=tuple(payload[port] for port in (0x30,0x31,0x32)) or prior_pending!=int(pending):
+                    raise ValueError('raw compare callback differs from live registers or pending latch')
+            pending_counts[int(pending)]+=1
+            pending=True
+            families[f'{payload[0x32]:04x}']+=1
             owners[f'{payload[0x30]:04x}']+=1
             matched.append(dict(sequence=value,target=f'{address:04x}',
                 words=[f'{payload[port]:04x}' for port in (0x30,0x31,0x32)]))
             previous_edge=stamp; interval_ack=False; writes_since_edge=0
-            if value==len(edges): break # Never infer events beyond the logged cap.
+            if value==len(edges): break # Never infer events beyond the captured scope.
     if len(matched)!=len(edges):
         raise ValueError('incomplete compare correlation')
     return dict(captured_edges=len(edges),total_model_expiries=int(totals[0]),
         payload_equal_at_arm_and_edge=stable,control_at_edge=dict(owners),
         reprograms_before_observed_edge=replacements,
         consecutive_edge_intervals=dict(acknowledgement_intervals),
+        complete_callback_capture=full_boundary,word_families=dict(families),
+        pending_before=dict(pending_counts),
         physical_latch_timing_proved=False,hardware_fifo_proved=False)

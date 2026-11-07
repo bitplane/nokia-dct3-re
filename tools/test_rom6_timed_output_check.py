@@ -39,5 +39,18 @@ class TimedOutputTest(unittest.TestCase):
                 check(text.replace(old,new,1),io.BytesIO(stream))
         with self.assertRaises(ValueError): check(text,io.BytesIO(stream[:-1]))
 
+    def test_complete_raw_callback_and_pending_latch(self):
+        text,stream=self.fixture()
+        outputs='\n'.join(f'dsp_compare_output: sequence={i} control=0100 low=48ce high=4400 target=0010 counter=0010 pending_before={pending} t={i}.000000000'
+                          for i,pending in ((1,0),(2,0),(3,1)))
+        full=outputs+'\nrom4_interface_summary: transfer_expiries=3'
+        result=check(full,io.BytesIO(stream),full_boundary=True)
+        self.assertTrue(result['complete_callback_capture'])
+        self.assertEqual(result['pending_before'],{0:2,1:1})
+        for old,new in (('low=48ce','low=48cf'),('pending_before=1','pending_before=0'),
+                        ('control=0100','control=0000'),('transfer_expiries=3','transfer_expiries=4')):
+            with self.subTest(old=old),self.assertRaises(ValueError):
+                check(full.replace(old,new,1),io.BytesIO(stream),full_boundary=True)
+
 
 if __name__=='__main__': unittest.main()

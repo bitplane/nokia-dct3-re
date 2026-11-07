@@ -2,6 +2,7 @@
 // copyright-holders:Gaz
 
 #include "emu.h"
+#include "emuopts.h"
 #include "nokia_dsp_c54x.h"
 #include "nokia_dsp_compare_clock.h"
 
@@ -17,7 +18,8 @@ nokia_dsp_c54x_device::nokia_dsp_c54x_device(const machine_config &mconfig,
 	m_cobba(*this, finder_base::DUMMY_TAG),
 	m_ccont(*this, finder_base::DUMMY_TAG),
 	m_program_rom(*this, finder_base::DUMMY_TAG),
-	m_data_rom(*this, finder_base::DUMMY_TAG)
+	m_data_rom(*this, finder_base::DUMMY_TAG),
+	m_transfer_compare_cb(*this)
 {
 }
 
@@ -238,6 +240,16 @@ TIMER_CALLBACK_MEMBER(nokia_dsp_c54x_device::transfer_timer_expired)
 	u16 unused_delay;
 	arm_compare_timer(m_transfer_timer, m_io[4], unused_delay);
 	++m_transfer_timer_expiries;
+	u64 const tuple = (u64(m_io[0x30]) << 48) | (u64(m_io[0x31]) << 32)
+		| (u64(m_io[0x32]) << 16) | m_io[4];
+	bool const was_pending = m_transfer_request_pending;
+	m_transfer_compare_cb(tuple);
+	if (machine().options().verbose() && m_transfer_timer_expiries <= 65536)
+		machine().logerror("dsp_compare_output: sequence=%llu control=%04x low=%04x high=%04x target=%04x counter=%04x pending_before=%u t=%.9f\n",
+			m_transfer_timer_expiries, m_io[0x30], m_io[0x31], m_io[0x32], m_io[4],
+			frame_counter(), was_pending, machine().time().as_double());
+	else if (machine().options().verbose() && m_transfer_timer_expiries == 65537)
+		machine().logerror("dsp_compare_output: overflow=1\n");
 	if (m_transfer_timer_expiries <= 256)
 		machine().logerror("rom4_transfer_timer: expiry=%llu target=%04x counter=%04x delay=%u t=%.9f\n",
 			m_transfer_timer_expiries, m_io[4], frame_counter(), m_transfer_delay, machine().time().as_double());
