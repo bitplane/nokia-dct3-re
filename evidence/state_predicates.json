@@ -3,6 +3,14 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "nsm3_native_raw_log_power_rssi_prefix",
+      "owner": "native_rom6_receive_measurement",
+      "status": "satisfied",
+      "predicate": "Native raw logarithmic measurement values match phased analytic ADC inputs, the independent log approximation and observed calibration before the later frequency correction",
+      "current": "Paired fault-free six-second96-word-staging runs validate32 native40-bit conversions each and15 joined raw022b stores each. For selected RSSI returns, actual ADC epoch ticks predict exact steady FIR powers274576/274657/275282 for tone,0 for zero. Native raw words are signed-551/-7020. All64 DROM lookup entries equal the independent logarithm formula; live resident converter/caller/store bytes and own entry hook are checked. The native0474 calibration branch is observed;049c/direct branches have logical tests only. The later71a3..71d7 correction, MCU response packet, physical dBm, tuned carrier, MFI capacity and camping are not qualified. Fresh manifests and raw evidence:tmp/rom6-adc-lab/nsm3adc-qzwox3fp and nsm3ad0-6_b03p7o. Observer uses bounded Execute breakpoints only, never routine calls, firmware writes or verdict injection.",
+      "evidence": ["driver/nokia_mfi_rx.cpp", "tools/rom6_adc_measure.lua", "tools/rom6_adc_measure_check.py", "tools/test_rom6_adc_measure_check.py", "tools/run_rom6_adc_lab.py", "docs/rom6_rf_interface.md"]
+    },
+    {
       "id": "nsm3_adc_lab_service_gap_staging_bound",
       "owner": "nokia_mfi_lab_staging",
       "status": "satisfied",

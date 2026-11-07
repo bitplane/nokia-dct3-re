@@ -39,6 +39,7 @@ void nokia_mfi_rx_device::enable_w(int state)
 	m_state.enable(state);
 	if (!state) { m_timer->adjust(attotime::never); return; }
 	m_next_tick = (machine().time().as_ticks(clock()) / m_divider + 1) * m_divider;
+	machine().logerror("mfi_rx_epoch: first_tick=%llu divider=%u physical_clock_claim=0\n",m_next_tick,m_divider);
 	arm();
 }
 

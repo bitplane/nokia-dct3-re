@@ -606,3 +606,48 @@ contract question, not permission to keep increasing storage. Current MFI
 bank/acknowledgement and capture gating remain open. The raw first-window
 trace and its read-only observer are retained at
 `tmp/rom6-adc-lab/window-nuza6oxg`.
+
+### Qualified raw logarithmic measurement
+
+The optional read-only measurement observer joins Execute entries in resident
+`4315..4347`, the return to `242f` and the subsequent raw `022b` store at
+`2431` (bus context `2432`). The live code and own return hook are pinned;
+the observer neither calls the routine nor changes any firmware value.
+
+```sh
+.venv/bin/python tools/run_rom6_adc_lab.py --machine nsm3adc --measure
+.venv/bin/python tools/run_rom6_adc_lab.py --machine nsm3ad0 --measure
+```
+
+The 64-word data-ROM table at `b09e` independently equals
+`floor(640 * log10(index))` for indices 1..63, with zero at index 0. For a
+positive 40-bit input `P`, the routine uses its six leading significant bits:
+
+```text
+e = max(0, bit_length(P) - 6)
+m = P >> e
+log_q16 = (floor(640*log10(m)) << 16) + e*(1541 << 13)
+```
+
+Nonpositive input follows the decoded passthrough branch, not a logarithm of
+zero. Calibration either subtracts a signed direct value scaled by 64, or
+selects a signed Q16 correction from `0474`/`049c` plus the caller's index.
+The native arithmetic is therefore in **1/64-dB units relative to firmware
+calibration**, not independently established physical dBm.
+
+In paired fault-free six-second runs, all 32 captured conversions per input
+match the full 40-bit results. Each run also has **15** joined raw measurement
+stores. For those calls, ADC epoch ticks determine the analytic tone phase;
+independent convolution predicts exactly the native input powers
+`274576`, `274657` or `275282` (zero for silence), not merely a range or a
+nonzero result. The observed table-calibrated raw words are signed **-551**
+for the tone and **-7020** for zero. Only the `0474` calibration branch is
+native-qualified by these captures; the other branches have logical vectors.
+
+This qualifies the **raw log-power/RSSI-field prefix**, not its final response.
+The native routine at `71a3..71d7` subsequently changes `022b`; the first tone
+example changes `fdd9` to `fdeb`. That later frequency-dependent correction
+and the MCU-bound measurement reply are the next unresolved joins. The report
+keeps post-correction, response-packet, physical-dBm, FCCH and camping flags
+false. The direct-ADC source still does not establish a tuned RF carrier or
+physical MFI capacity.
