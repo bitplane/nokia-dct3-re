@@ -3,6 +3,7 @@
   "repeated_double_add": 72,
   "block_zero_repeat": 18,
   "brc_to_ar": 37,
+  "compare_select_store": 195,
   "basic_memory": 18,
   "stack": 141,
   "dagen": 292,

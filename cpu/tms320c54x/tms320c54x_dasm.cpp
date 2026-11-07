@@ -258,6 +258,13 @@ offs_t tms320c54x_disassembler::disassemble(std::ostream &stream, offs_t pc,
 		smem(extended ? next_word() : 0);
 		return (1 + extended) | SUPPORTED;
 	}
+	if (family == 0x8e00 || family == 0x8f00)
+	{
+		bool const extended = mode >= 0xe0;
+		util::stream_format(stream, "CMPS    %c, ", BIT(op, 8) ? 'B' : 'A');
+		smem(extended ? next_word() : 0);
+		return (1 + extended) | SUPPORTED;
+	}
 	if (family == 0x4700 || family == 0x8c00 || family == 0x8d00)
 	{
 		bool const extended = mode >= 0xe0;

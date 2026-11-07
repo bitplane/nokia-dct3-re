@@ -7,6 +7,11 @@
 
 namespace c54x_decode {
 
+constexpr bool staged_cmps(u16 word)
+{
+	return (word & 0xfe00) == 0x8e00 && (u8(word) < 0x98 || (u8(word) >= 0xc0 && u8(word) < 0xe0));
+}
+
 constexpr bool staged_xmem_bit(u16 word)
 {
 	return (word & 0xff00) == 0x9600;
@@ -960,7 +965,7 @@ inline bool decode_staged_supported(u16 word, bool extended_program)
 	bool const immediate_t = word == 0x770e;
 	bool const immediate_control = staged_ram_stm(word) || staged_accumulator_stm(word) || word == 0x7707 || word == 0x771d || word == 0x771e ||
 		word == 0x7700 || ((word >= 0x7724 && word <= 0x7726) || (word == 0x7721 || word == 0x7722) || (word == 0x7758));
-	return software_intr || staged_port_write(word) || staged_absolute_add(word) || staged_memory_repeat(word) ||
+	return staged_cmps(word) || software_intr || staged_port_write(word) || staged_absolute_add(word) || staged_memory_repeat(word) ||
 		staged_immediate_arp(word) || staged_immediate_asm(word) || staged_immediate_repeat(word) || word == 0xf495 ||
 		staged_idle(word) || (word & 0xfcf8) == 0xf4a8 || staged_memory_logic(word) || staged_mar(word) || staged_xc(word) ||
 		fast_return || plain_return || delayed_return || far_return || status_bit || immediate_dp || immediate_alu || branch ||
@@ -976,7 +981,7 @@ inline bool decode_staged_supported(u16 word, bool extended_program)
 
 inline bool decode_staged_access_sp(u16 word)
 {
-	return staged_coefficient_mac(word) || staged_data_copy(word) || staged_delay_copy(word) || staged_long_arithmetic(word) ||
+	return staged_cmps(word) || staged_coefficient_mac(word) || staged_data_copy(word) || staged_delay_copy(word) || staged_long_arithmetic(word) ||
 		staged_memory_repeat(word) || staged_memory_load(word) || staged_memory_immediate_multiply(word) ||
 		(word & 0xff00) == 0x7600 || staged_bitfield(word) || staged_smem_arithmetic(word) ||
 		staged_smem_special(word) || staged_shifted_smem(word) || staged_port_read(word) || staged_port_write(word) ||

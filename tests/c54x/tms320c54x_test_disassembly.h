@@ -911,6 +911,13 @@ void check_disassembly(util::disasm_interface &decoder, Expect expect, Report re
 	};
 	check_syntax(xmem_bit_forms, {0x010100,0x01ffff}, false,
 		"Xmem BIT decoder preserves bit number and one-word operand mode");
+	vector const cmps_forms[] = {
+		{0x8e93, 1 | dasm::SUPPORTED, "CMPS    A, *AR3+"},
+		{0x8f94, 1 | dasm::SUPPORTED, "CMPS    B, *AR4+"},
+		{0x8ef8, 2 | dasm::SUPPORTED, "CMPS    A, *($2345)"},
+	};
+	check_syntax(cmps_forms, {0x010100,0x01ffff}, false,
+		"CMPS decoder preserves selected accumulator and memory addressing");
 	vector const repeat_store_forms[] = {
 		{0x47f8, 2 | dasm::SUPPORTED, "RPT     *($2345)"},
 		{0x4792, 1 | dasm::SUPPORTED, "RPT     *AR2+"},

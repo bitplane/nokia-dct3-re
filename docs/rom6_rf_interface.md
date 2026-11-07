@@ -799,19 +799,10 @@ each mask through READA into AL, then tests its high bit and shifts it to
 choose the sign of successive complex sample components over four groups
 of sixteen iterations.
 
-The mapped AL BIT read and subsequent single-repeat paired addition now
-use independently tested generic CPU paths. The unchanged six-second
-waveform also passes `RPTZ A,#9` at `77b0`, inside block `77b0..77ba`,
-preceding `MAC *AR3+,*AR2+,A,A` at `77b2`. Eighteen generic nested-repeat
-cases check re-zeroing and independent outer/inner counts with replay;
-192 existing block/single-repeat controls pass.
-
-The mapped BRC-to-AR copy at `9007` (`7212 001a`) now follows the generic
-retained Read path, before the routine replaces BRC with 6 and stacks AR2.
-The current waveform remains **rejected** at `9018`, opcode `8e93`:
-`CMPS A,*AR3+`. Displayed `901a` is not the rejected instruction.
-The trace still has 702272 native input reads, peak queue 69 and no
-transport fault. Terminal AR3 is `3218`, A is `fffffffe00`, B is zero.
+The routine and its later processing use generic, independently tested CPU
+paths: mapped accumulator BIT, repeated paired addition, block-interior
+RPTZ, BRC-to-AR copies and CMPS. Their operand/admission contracts and
+focused save/replay tests live in `c54x_execution_contracts.md`.
 
 [TI SPRU172C](https://www.ti.com/lit/ug/spru172c/spru172c.pdf),
 CMPS description (4-35), identifies `8e/8f` as compare,
@@ -819,15 +810,28 @@ select and store maximum: compare the signed high/low sixteen-bit halves
 in **Read**, retain the larger half for the memory store, and update
 TRN/TC in Execute (low wins ties). This timing rule is explicit in the
 manual, not inferred from this firmware. The paired `8e93`/`8f94` calls
-are after dual-lane arithmetic in the routine; this alone is not proof
-of a decoded SCH payload.
-The corresponding short/extended-immediate and RAM-count DADD tests check
-every intermediate result and paired read across 72 save/replay cases;
-the 8192 ordinary paired-arithmetic controls also pass.
+and circular counterparts follow dual-lane arithmetic at `9015..902a`;
+this alone is not proof of a decoded SCH payload.
+
+The unchanged six-second finite trial completes without unsupported CPU
+execution or transport faults: **1464672** native input words, all 4096
+retained source words independently checked, terminal idle PC `3999`,
+and provisional queue peak 69. Its fifth native RX-ring publication at
+`3.344663736s` is type `80`, payload
+**`40000100000b0004000000000000`**, instead of the continuous-tone/silence
+type-`8a` negative packet. Raw accepted trial:
+`tmp/rom6-adc-lab/nsm3afb-qa8mlp5u`; continuous-tone control
+`nsm3adc-e2gbzpod` remains fault-free with independent metric checks.
+
+The recovered received-block layout interprets channel byte `40` as SCH
+and byte 2 (`01`) as a failed-block flag. This interpretation still needs
+a join to this ROM's own producer/consumer; the candidate frame/channel
+fields and packet do not prove valid SCH. The input contains no SCH
+waveform, so a valid decoded SCH is not expected.
 
 Reaching this standard-pattern correlator and its later processing does
 not prove FCCH acquisition, SCH synchronization, decoded frame number or
 camping, particularly because the stimulus contains no SCH burst. Next:
-implement and independently qualify CMPS with Read-owned accumulator
-comparison, signed halves/ties, memory addressing, TRN/TC publication
-and save/replay, then rerun the unchanged waveform.
+join the native type-80 producer/status to this ROM's receive path and
+qualify FCCH-to-SCH timing before adding an independently encoded SCH
+waveform. No firmware result or decoded radio message is synthesized.

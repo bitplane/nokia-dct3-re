@@ -2279,7 +2279,7 @@ void tms320c54x_device::pipeline_step()
 			m_pipeline_bk[2] = m_bk;
 			// Basic direct operands sample CPL/DP in Decode, before a preceding
 			// RSBX/SSBX retires (SPRU131G tables 7-18 and 7-19).
-			if (staged_memory_repeat(word) || staged_bitfield(word) || staged_memory_immediate_multiply(word) || smem_arithmetic || immediate_store || staged_port_read(word) || staged_port_write(word) || rmw || staged_memory_logic(word) || short_load || direct_store || direct_long_load || direct_long_store || long_arithmetic || memory_dp || direct_move || data_copy || program_move || read_a || data_push || data_pop)
+			if (staged_cmps(word) || staged_memory_repeat(word) || staged_bitfield(word) || staged_memory_immediate_multiply(word) || smem_arithmetic || immediate_store || staged_port_read(word) || staged_port_write(word) || rmw || staged_memory_logic(word) || short_load || direct_store || direct_long_load || direct_long_store || long_arithmetic || memory_dp || direct_move || data_copy || program_move || read_a || data_push || data_pop)
 			{
 				m_pipeline_direct_status[2] = (m_st0 & 0x1ff) | (m_st1 & 0x4000);
 				// Table 7-17 gives LD #k,DP zero latency. Forward the nearest
@@ -2786,6 +2786,25 @@ void tms320c54x_device::pipeline_step()
 			m_illegal = true;
 			return;
 		}
+	}
+	if (m_pipeline_valid[3] && staged_cmps(m_pipeline_word[3]))
+	{
+		u8 const mode = m_pipeline_word[3];
+		m_pipeline_operand_address[3] = basic_address(3, mode);
+		if (m_pipeline_operand_address[3] < 0x60)
+		{
+			logerror("%s: staged CMPS mapped/peripheral destination is unsupported\n", machine().describe_context());
+			m_illegal = true; return;
+		}
+		if (BIT(mode, 7)) indirect_modify(mode, false, 3);
+	}
+	if (m_pipeline_valid[4] && staged_cmps(m_pipeline_word[4]))
+	{
+		// SPRU172C 4-35 explicitly places comparison in Read, not Execute.
+		u64 const source = accumulator(BIT(m_pipeline_word[4], 8));
+		s16 const high = u16(source >> 16), low = u16(source);
+		m_pipeline_immediate[4] = high <= low;
+		m_pipeline_operand[4] = high > low ? u16(high) : u16(low);
 	}
 	// Load DAGEN and short AR modifications belong to Access (SPRU131G 7.1),
 	// not retirement. Retain that address even if the AR changes before Read.
@@ -4117,6 +4136,12 @@ bool tms320c54x_device::pipeline_execute()
 		}
 		if (signed_mac && BIT(m_op, 10)) product = (product + 0x8000) & ~s64(0xffff);
 		accumulator(destination_b) = multiply_result(product, destination_b);
+	}
+	else if (staged_cmps(m_op))
+	{
+		m_trn = u16((m_trn << 1) | m_pipeline_immediate[5]);
+		m_st0 = (m_st0 & ~u16(0x1000)) | (m_pipeline_immediate[5] ? 0x1000 : 0);
+		data_write(m_pipeline_operand_address[5], m_pipeline_operand[5]);
 	}
 	else if (staged_xmem_store(m_op))
 	{

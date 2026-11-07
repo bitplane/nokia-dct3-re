@@ -5015,6 +5015,33 @@ save points are distributed. Interrupt and nested-control composition are not
 newly qualified. The native ROM6 witness is `RPT *AR2` at `43b2` followed by
 `SFTL A,-1,A` at `43b3`.
 
+## Compare, select and store maximum
+
+CMPS compares the signed sixteen-bit high and low accumulator halves in
+Read, as explicitly specified by TI SPRU172C 4-35. The selected word and
+low-wins-ties decision are retained in existing pipeline operands. Execute
+stores that word, shifts the current TRN left with the decision bit, and
+updates TC; neither accumulator changes. Short direct, ordinary indirect and
+circular RAM destinations use existing Decode DP/CPL/BK and Access SP/AR samples.
+Mapped destinations, extended addressing and single-repeat bodies remain
+excluded by this admission, not modeled as silicon traps.
+
+`compare_select_store` checks 120 positive cases/restores: both accumulators,
+signed extrema and ties, DP/SP/plain/postincrement/postdecrement addressing,
+and two initial TRN patterns. It checks pointer updates at Access, no early
+TC/TRN publication, and exact Execute stores after poisoning both accumulator
+values, TRN and pointer following Read. Four save points are distributed.
+Three negative cases check no side effects for mapped destinations,
+extended addressing and repeated bodies. The disassembler identifies the
+full CMPS memory syntax independently of this execution subset. Interrupt,
+physical stage timing and block-endpoint composition are not newly qualified.
+
+Another 72 cases/restores cover circular +/-1 and +/-AR0 modes, positive
+and negative indices and positions at either end or inside an eight-word
+buffer, for both source accumulators. An independent modulo reference checks
+Access updates and the original store address. Bit-reversed and other
+indexed forms are not newly admitted.
+
 ## Repeated paired-word addition
 
 Short-address DADD participates in the existing pipelined single-repeat
