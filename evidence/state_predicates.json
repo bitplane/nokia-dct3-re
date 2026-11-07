@@ -3,6 +3,14 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "npe3_native_dsp_control_readback",
+      "owner": "mad2_dsp_control_partial_contract",
+      "status": "satisfied",
+      "predicate": "The native research projection retains execution and release controls across the own firmware's ready-state read/modify/write",
+      "current": "Legacy CTSI+2 ready projection10 loses control bits: own4dc050..4dc058 ORs2 and writes12 at3.897701s, asserting backend execution reset. The native-only readback mask05 instead retains controls0/2 and writes17. Six executable MMIO cases pass on unchanged legacy noki6210 and native npe3r6, including ready deassertion despite a copied status bit. Native reviewed Messages pixels and physical A/123 SIM save/cold readback remain exact. This is a partial firmware-derived control contract, not measured silicon or normal-machine promotion. At the unchanged provisional13MHz rate, native counter-read samples remain14cycles apart and all64 consecutive values differ under the13MHz/12 counter model; the later reason68 reset persists. No clock, policy, packet, or guest RAM value is tuned.",
+      "evidence": ["driver/nokia_mad2.h", "driver/nokia_mad2.cpp", "driver/nokia_dct3_research.cpp", "tools/mad2_dsp_readback_conformance.lua", "tools/rom6_reset_policy_observe.lua", "tools/run_npe3_native.py", "docs/6210_bringup.md"]
+    },
+    {
       "id": "rom6_isolated_raw_adc_native_receive",
       "owner": "native_rom6_receive_kernel",
       "status": "satisfied",
@@ -23,7 +31,7 @@
       "owner": "npe3_native_rom6_research_composition",
       "status": "satisfied",
       "predicate": "The candidate ROM6 executes own 6210 uploads and bounded physical Menu and persistent SIM-contact interaction without HLE takeover",
-      "current": "The npe3r6 research composition uses own v5.56 PPM C MCU and unchanged own PMM, nominal ADC2=230 and a provisional 13MHz DSP clock. Exact own second-loader629/resident-prefix422 words, verifier0000/0006, self-test0d/00/c4, two reset/loader entries, one resident entry, zero illegal instructions and zero unacquired low-ROM reads pass. Physical Menu renders reviewed Messages pixels. Physical A/123 saves via UPDATE RECORD and survives an independent cold read with exact card/protocol/contact pixels. Runs end at30s/27s. The34s negative stability control rejects repeated initialization: own monitor requests software reset reason68 via3059a2->50096a near31.97s, not watchdog expiry. This bounded result does not identify the fitted mask or multiplier, prove sustained DSP activity, or qualify native radio/speech/normal-machine promotion.",
+      "current": "The npe3r6 research composition uses own v5.56 PPM C MCU and unchanged own PMM, nominal ADC2=230 and a provisional 13MHz DSP clock. Exact own second-loader629/resident-prefix422 words, verifier0000/0006, self-test0d/00/c4, two reset/loader entries, one resident entry, zero illegal instructions and zero unacquired low-ROM reads pass. Physical Menu renders reviewed Messages pixels. Physical A/123 saves via UPDATE RECORD and survives an independent cold read with exact card/protocol/contact pixels. Runs end at30s/27s. The34s negative stability control rejects repeated initialization: timer inputdc selects305876..3058d8 and jumps to the shared3059a2->50096a reset tail with stored reason68 near31.97s. The adjacent15-miss monitor is not the observed entrance; watchdog expiry is also excluded. This bounded result does not identify the fitted mask or multiplier, prove sustained DSP activity, or qualify native radio/speech/normal-machine promotion.",
       "evidence": ["driver/nokia_dct3_research.cpp", "tools/run_npe3_native.py", "tools/npe3_native_observe.lua", "tools/test_run_npe3_native.py", "tools/run_noki6210_acceptance.py", "docs/6210_bringup.md", "docs/rom6_dsp_bringup.md"]
     },
     {

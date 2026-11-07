@@ -3,6 +3,13 @@
   "kind": "falsifications",
   "entries": [
     {
+      "id": "npe3_reason68_is_adjacent_idle_miss_threshold",
+      "status": "disproven",
+      "hypothesis": "The native 6210 reason68 reset proves that service byte17fda3 represents DSP activity and the adjacent counter17fd9e reached15 consecutive misses",
+      "conclusion": "The same reset-call tail3059a2 has another direct predecessor: unconditional branch3058d8 from timer-inputdc handler305876. Live capture observes that handler, reason setter4b0424 called from4ba528, and delayed reset timer1c/delay7d armed at4b048a. The idle counter remains zero in most one-second samples, and the15-miss fault entry is not observed. Byte17fda3 also controls service-command progression. Caller LR3059a7 alone does not identify which predecessor reached the shared tail. The own packet-window policy at4ba486 is entered with selector1 from4f6038; it selects/stores68. This does not justify a heartbeat injection, reset suppression or policy-byte change.",
+      "evidence": ["docs/6210_bringup.md", "tools/rom6_reset_policy_observe.lua", "tools/run_npe3_native.py"]
+    },
+    {
       "id": "nsm3_p09_completed_block_deadline_is_sufficient_for_sch",
       "status": "disproven",
       "hypothesis": "With corrected native peak arithmetic,aligning the first completed32-word block to the next P09 match is sufficient to acquire the independently timed coded SCH source",

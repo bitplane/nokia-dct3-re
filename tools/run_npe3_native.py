@@ -18,6 +18,7 @@ def check_execution(text, loader, program, flash):
     """Reject incomplete initialization, restarts and unacquired low ROM reads."""
     required = {
         'npe3_native_composition: hle=0 staged=0 clock_policy=13000000 fitted_mask_claim=0 observer_writes=0': 1,
+        'npe3_native_control_contract: status=10 release=04 execution=01 readback=05 observer_writes=0': 1,
         'npe3_native_verifier: result0=0000 result1=0006': 1,
         'npe3_native_entry: kind=reset': 2,
         'npe3_native_entry: kind=loader': 2,
@@ -42,6 +43,8 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--seconds', type=int, default=30)
     parser.add_argument('--scenario', choices=('menu', 'phonebook'), default='menu')
+    parser.add_argument('--reset-policy', action='store_true',
+                        help='add passive reset-policy and native ring observations')
     args = parser.parse_args()
     if not 24 <= args.seconds <= 60:
         parser.error('Menu check duration must be 24..60 seconds')
@@ -58,12 +61,13 @@ def main():
     roms = run / 'roms'
     roms.mkdir()
     (roms / 'npe3r6').symlink_to(ROOT / 'roms/nsm3r6', target_is_directory=True)
+    observer = 'rom6_reset_policy_observe.lua' if args.reset_policy else 'npe3_native_observe.lua'
     command=[str(ROOT/'mame/mame'),'npe3r6','-rompath',str(roms)+';'+str(ROOT/'roms'),
         '-nvram_directory',str(run/'nvram'),'-cfg_directory','cfg','-snapshot_directory','snap',
         '-noreadconfig','-joystickprovider','none','-midiprovider','none','-keyboardprovider','none',
         '-mouseprovider','none','-lightgunprovider','none','-video','none','-sound','none','-nothrottle',
         '-debug','-debugger','none','-log','-autoboot_delay','0',
-        '-autoboot_script',str(ROOT/'tools/npe3_native_observe.lua'),'-seconds_to_run',str(args.seconds)]
+        '-autoboot_script',str(ROOT/'tools'/observer),'-seconds_to_run',str(args.seconds)]
     (run/'command.json').write_text(json.dumps(command,indent=2)+'\n')
     def execute(phase, scenario, seconds, persist=False):
         directory = run / phase

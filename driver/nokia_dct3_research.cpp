@@ -930,6 +930,9 @@ void nokia_dct3_state::npe3r6(machine_config &config)
 {
 	noki6210(config);
 	nokia_product_config native = m_product;
+	// Own 4dc050..4dc058 ORs bit 1 after the bootstrap handshake. Retain
+	// the independent release/execution controls across that read/modify/write.
+	native.dsp_reset_wiring.readback_mask = 0x05;
 	// Own 3d71f8 battery conversion: nominal input, not measured ADC units.
 	native.ccont_board.channel_defaults[2] = 0x230;
 	native.simi_controller = true;

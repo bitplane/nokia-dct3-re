@@ -15,6 +15,8 @@ public:
 		u8 release_mask = 0;
 		// Zero retains the chip-release coupling used by existing profiles.
 		u8 execution_mask = 0;
+		// Control bits with firmware-observed read/modify/write ownership.
+		u8 readback_mask = 0;
 
 		constexpr bool enabled() const
 		{
@@ -24,7 +26,8 @@ public:
 		constexpr bool valid() const
 		{
 			return (running_status == 0) == (release_mask == 0) &&
-					(!execution_mask || running_status != 0);
+					(!execution_mask || running_status != 0) &&
+					(!readback_mask || running_status != 0);
 		}
 	};
 

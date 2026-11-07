@@ -33,12 +33,16 @@ the retained record without rewriting it. The bounded runs finish before
 This is compatibility evidence, not identification of the fitted DSP mask.
 The explicit 13 MHz DSP clock is provisional (the manual establishes RFIclk,
 not the DSP multiplier). A longer run requests MCU software reset near
-32 seconds, despite successful initial port-36 request completion. Own monitor
-`305924..3059a6` increments missing-activity byte `17fd9e` when activity byte
-`17fda3` is zero; at 15 misses it calls reset `50096a` from `3059a2` with reason
-`68`. The observed MAD2 reset-bit write is `5009a2` at 31.971824 seconds, not
-watchdog expiry. This establishes a sustained-activity frontier; it does not
-identify a legitimate DSP packet or justify injecting a heartbeat. Long-run stability,
+32 seconds, despite successful initial port-36 request completion. Timer input
+`dc` selects `305876..3058d8`, which loads stored reason `17fe48` and jumps
+directly to the common reset call at `3059a2`. The observed reason is `68`;
+the MAD2 reset-bit write is `5009a2` at 31.971824 seconds, not watchdog expiry.
+The adjacent `305924..3059a6` 15-miss branch is a different entrance to that
+tail, not the observed cause: its counter `17fd9e` remains zero in most
+one-second samples. Byte `17fda3` also belongs to service-command progression
+and must not be named a DSP-activity counter. The packet-window policy and
+native packet-publisher divergence, not a manufactured heartbeat, are the
+next boundary. Long-run stability,
 native radio service and speech remain unqualified. The normal machine and
 HLE acceptance are unchanged. Reproduce with:
 
@@ -47,7 +51,59 @@ HLE acceptance are unchanged. Reproduce with:
 .venv/bin/python tools/run_npe3_native.py --scenario phonebook
 # Extended stability control: currently rejects the extra reset/loader entries.
 .venv/bin/python tools/run_npe3_native.py --seconds 34
+# Passive policy/ring comparison; the extended 6210 check still rejects reset.
+.venv/bin/python tools/run_npe3_native.py --seconds 34 --reset-policy
+.venv/bin/python tools/run_rom6_native.py --scenario reset-policy
 ```
+
+The live packet-window task calls policy `4ba486` with selector 1 from
+`4f6038`. It stores reason `68` through `4ba528 -> 4b0424`, then `4b047c`
+posts task-1 input `1b` and arms timer `1c` for `7d` ticks. Policy reads NV
+descriptor `0607` and a separately obtained status byte. The live local bytes
+are `ff / 05`; selector 1 tests the first byte's bit 0. Prefetch-window field
+snapshots are not evidence that an untaken policy tail executes; the actual
+reason setter and timer-arm entries establish this selected reset path.
+Their field meanings and authentic provisioning must be established before
+changing either.
+The corresponding own 8210 selector is `2f604a`; its 65-second comparison
+does not enter this policy. Native ring capture records four initial type-74
+entries on both products, but only 8210 emits `028a 0004` at 2.792270703 s.
+Its native publisher stack returns to `221d` from `2cb5..2d08`. This is a
+specific native packet difference, not an established generic heartbeat.
+
+### Native control readback and timing boundary
+
+The native research composition retains CTSI+2 control bits 0 and 2 when
+reporting ready bit 4. The legacy projection returned only `10` while ready:
+own `4dc050..4dc058` reads this byte and ORs bit 1, inadvertently writing
+`12` and asserting the emulated execution reset at 3.897701 s. Retaining
+the two controls makes that operation write `17`, without changing firmware
+or provisioning. `mad2_dsp_readback_conformance.lua` executes six MMIO cases
+on both the unchanged legacy projection and native readback mask `05`;
+these are controller tests, not organic boot fixtures. Native Menu and SIM
+contact save/cold readback remain unchanged. The normal profile is not promoted.
+
+The correction keeps native execution running but does not remove the delayed
+reset at the provisional 13 MHz rate. The `3ee1..3ef2` stable-counter loop then
+reads P0d every 14 DSP cycles (1.076923 us); the modeled 13 MHz/12 counter
+advances between every pair. All 64 retained consecutive readings differ.
+Under those two timing assumptions, a stable pair requires a DSP rate above
+15.166667 MHz. This is a conditional model-consistency bound, not a measured
+6210 clock. The acquired loader writes SWWSR `2000` and CLKMD `51ee`; the
+same captured-ROM loader runs on the documented 45.5 MHz 8210 composition.
+The NPE-3 RFIclk table alone does not establish its DSP multiplier or custom
+PLL/wait-state interpretation. Do not sweep rates or change the policy byte
+to conceal this boundary.
+
+The literal census covers the complete `3a0000`-byte own MCU image in
+halfword steps with `tools/find_literal_loads.py --encoding big`: state-base
+`17fd30` has 12 literal occurrences/19 load candidates, `17fda3` has 4/12,
+and counter `17fd9e` has 1/2. These are syntactic candidates, not a whole-ROM
+alias proof. The observed context-byte writers are bulk initialization at
+`508046` and explicit initialization at `302770`; service progression has
+scalar stores at `367f94`, `367fd4`, `36823a`, `368248` and `369396`.
+Computed aliases and generic copy/write callers are not closed by literal
+absence. None of this turns the byte into a missing-heartbeat contract.
 
 [ROM6 native bring-up](rom6_dsp_bringup.md) owns the cross-product qualification
 and unresolved physical-interface boundaries.

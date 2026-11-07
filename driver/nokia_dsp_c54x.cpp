@@ -150,6 +150,10 @@ void nokia_dsp_c54x_device::device_reset()
 
 void nokia_dsp_c54x_device::device_stop()
 {
+	machine().logerror("native_dsp_terminal_timing: released=%u clock=%u cycles=%llu frame_enabled=%u frame_remaining=%.9f slot_enabled=%u transfer_enabled=%u\n",
+			m_reset_released, m_cpu->clock(), (unsigned long long)m_cpu->total_cycles(),
+			m_frame_timer->enabled(), m_frame_timer->remaining().as_double(),
+			m_slot_timer->enabled(), m_transfer_timer->enabled());
 	machine().logerror("rom4_interface_summary: completion_strobes=%u mailbox_writes=%u "
 			"slot_expiries=%llu frame_expiries=%llu rf_reads=%u rf_port32_writes=%u "
 			"rf_port38_reads=%u rf_port39_reads=%u "
@@ -287,6 +291,9 @@ TIMER_CALLBACK_MEMBER(nokia_dsp_c54x_device::slot_timer_expired)
 
 void nokia_dsp_c54x_device::reset_line_w(int released)
 {
+	if (bool(released) != m_reset_released)
+		machine().logerror("native_dsp_reset_line: released=%u t=%.9f context=%s\n",
+				bool(released), machine().time().as_double(), machine().describe_context());
 	// MAD2 holds the DSP core in reset while leaving its shared/on-chip DARAM
 	// intact. Releasing the line restarts at the mask-ROM reset vector.
 	m_frame_counter_base = frame_counter();

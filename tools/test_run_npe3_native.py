@@ -13,6 +13,7 @@ class Native6210EvidenceTest(unittest.TestCase):
         self.program[0x590 * 2:0x736 * 2] = self.flash[0x1eac4:0x1eac4 + 844]
         self.text = '\n'.join((
             'npe3_native_composition: hle=0 staged=0 clock_policy=13000000 fitted_mask_claim=0 observer_writes=0',
+            'npe3_native_control_contract: status=10 release=04 execution=01 readback=05 observer_writes=0',
             'npe3_native_verifier: result0=0000 result1=0006 observer_writes=0',
             'npe3_native_entry: kind=reset ordinal=1 observer_writes=0',
             'npe3_native_entry: kind=reset ordinal=2 observer_writes=0',
@@ -39,6 +40,7 @@ class Native6210EvidenceTest(unittest.TestCase):
                  self.text.replace('faults=00', 'faults=01'),
                  self.text.replace('missing_program_reads=0', 'missing_program_reads=1'),
                  self.text.replace('hle=0', 'hle=1'),
+                 self.text.replace('readback=05', 'readback=00'),
                  self.text.replace('npe3_native_terminal:', 'missing_terminal:'),
                  self.text + '\nLua error: observer failed']
         for text in cases:

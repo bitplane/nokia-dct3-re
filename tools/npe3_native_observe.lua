@@ -7,6 +7,7 @@ assert(not machine.devices[':dsp_hle'] and not machine.devices[':dsp_staged'])
 local arm=assert(machine.devices[':maincpu'])
 local dsp=assert(machine.devices[':dsp_c54x:cpu'])
 machine:logerror('npe3_native_composition: hle=0 staged=0 clock_policy=13000000 fitted_mask_claim=0 observer_writes=0\n')
+machine:logerror('npe3_native_control_contract: status=10 release=04 execution=01 readback=05 observer_writes=0\n')
 machine.debugger:command('temp6=0')
 machine.debugger:command('temp7=0')
 arm.debug:bpset(0x4fad30,'temp7<28 && (temp8=r0)>=0',

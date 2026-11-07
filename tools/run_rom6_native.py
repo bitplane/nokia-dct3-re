@@ -55,7 +55,7 @@ def execute(run,phase,script,seconds,binary,*,persist=False,verbose=False,machin
 
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--scenario',choices=('all','menu','state','phonebook','radio','tuning','config','serial','receive'),default='all')
+    parser.add_argument('--scenario',choices=('all','menu','state','phonebook','radio','tuning','config','serial','receive','reset-policy'),default='all')
     parser.add_argument('--output-root',type=Path,default=ROOT/'tmp/native-rom6-acceptance')
     parser.add_argument('--mame',type=Path,default=ROOT/'mame/mame')
     args=parser.parse_args()
@@ -76,6 +76,7 @@ def main():
             run=output/scenario
             prepare(run,mcu,pmm)
             script,seconds={'menu':('rom6_native_ui.lua',60),'radio':('rom6_native_radio.lua',60),
+                            'reset-policy':('rom6_reset_policy_observe.lua',65),
                             'tuning':('rom6_native_tuning.lua',60),'state':('rom6_native_state.lua',30),
                             'config':('rom6_native_config.lua',60),
                             'serial':('rom6_native_config.lua',60),
@@ -85,7 +86,7 @@ def main():
                                persist=scenario=='phonebook',verbose=scenario in ('phonebook','serial','receive'))
             check_uploads(mcu,(phase/'rom6_native_loader2.be16').read_bytes(),
                           (phase/'rom6_native_installed.be16').read_bytes())
-            if scenario in ('menu','radio','tuning','config','serial','receive'):
+            if scenario in ('menu','radio','tuning','config','serial','receive','reset-policy'):
                 with Image.open(phase/'snap/rom6_native_menu.png') as frame: check_menu(frame)
                 with Image.open(phase/'snap/rom6_native_late_menu.png') as frame: check_menu(frame,CALL_REGISTER_TEXT_SHA256)
                 position=text.find('rom6_native_physical: key=Scroll Down t=54.500000')

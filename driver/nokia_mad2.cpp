@@ -112,7 +112,8 @@ u8 nokia_mad2_device::read(offs_t offset)
 		if (m_dsp_reset_wiring.enabled())
 		{
 			if (m_regs[offset] & m_dsp_reset_wiring.release_mask)
-				return m_dsp_reset_wiring.running_status;
+				return m_dsp_reset_wiring.running_status |
+						(m_regs[offset] & m_dsp_reset_wiring.readback_mask);
 			return m_regs[offset] & ~0x10;
 		}
 		return m_regs[offset];
