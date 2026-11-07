@@ -4923,6 +4923,23 @@ Both initial carry values and program pages are represented, but not a full
 cross-product of those axes. Memory count sources, IRQ/NMI and nested-block
 composition are not newly qualified for SFTA.
 
+## Repeated logical accumulator shifts
+
+Single-repeat SFTL uses the ordinary 32-bit logical-shift effect on each
+Execute publication, with a live source accumulator and one retained opcode.
+It participates in the existing pipelined repeat issue/retirement path;
+no alternate arithmetic implementation or saved state is added.
+
+`repeated_logical_shift` owns 180 independent cases/restores: short-immediate,
+extended-immediate and RAM-count headers, all four source/destination choices,
+shifts -16/-1/0/1/15 and counts 0/3/17. A bit-copy reference validates every
+intermediate accumulator/carry publication, 32-bit truncation of guard bits,
+preserved unrelated flags, one body fetch despite opcode poisoning, a single
+count read where applicable and the completed continuation. SXM/OVM and four
+save points are distributed. Interrupt and nested-control composition are not
+newly qualified. The native ROM6 witness is `RPT *AR2` at `43b2` followed by
+`SFTL A,-1,A` at `43b3`.
+
 ## Memory SQUR
 
 `SQUR Smem,A/B` (`26xx/27xx`) squares the signed sixteen-bit memory word,

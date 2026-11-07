@@ -186,7 +186,9 @@ constexpr bool decode_staged_pipelined_repeat(u16 word)
 	bool const short_add = (word & 0xfe00) == 0 && u8(word) < 0x98;
 	bool const short_logic = ((word & 0xfe00) == 0x1800 || (word & 0xfe00) == 0x1a00 || (word & 0xfe00) == 0x1c00) && u8(word) < 0x98;
 	bool const coefficient_repeat = staged_firs(word) || (staged_coefficient_mac(word) && !BIT(word, 9) && u8(word) < 0xe0);
-	return coefficient_repeat || short_add || short_logic || short_mar || staged_repeat_data_copy(word) || staged_repeat_destination_copy(word) || staged_repeat_accumulator_store(word) || staged_poly(word) || decode_staged_parallel_load(word) || staged_parallel_alu(word) || ((square_accumulate(word) || (word & 0xf800) == 0x2800) && u8(word) < 0x98) || (word & 0xf000) == 0xb000 || staged_mvdd(word) || (((word & 0xff00) == 0x4b00 || (word & 0xff00) == 0x8b00) && u8(word) < 0x98);
+	// SFTL consumes the live accumulator in Execute, once per retained issue.
+	bool const logical_shift = (word & 0xfce0) == 0xf0e0;
+	return logical_shift || coefficient_repeat || short_add || short_logic || short_mar || staged_repeat_data_copy(word) || staged_repeat_destination_copy(word) || staged_repeat_accumulator_store(word) || staged_poly(word) || decode_staged_parallel_load(word) || staged_parallel_alu(word) || ((square_accumulate(word) || (word & 0xf800) == 0x2800) && u8(word) < 0x98) || (word & 0xf000) == 0xb000 || staged_mvdd(word) || (((word & 0xff00) == 0x4b00 || (word & 0xff00) == 0x8b00) && u8(word) < 0x98);
 }
 
 constexpr bool staged_repeat_accumulator_load(u16 word)
