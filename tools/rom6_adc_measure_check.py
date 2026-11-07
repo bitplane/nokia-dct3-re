@@ -13,6 +13,7 @@ EPOCH=re.compile(r'mfi_rx_epoch: first_tick=(\d+) divider=12 physical_clock_clai
 RESULT=re.compile(r'rom6_adc_result_word: sequence=(\d+) t=\d+\.\d{9} value=([0-9a-f]{4}) mode022c=([0-9a-f]{4}) work022a=([0-9a-f]{4}) cpu_pc=([0-9a-f]{6}) mask=ffff observer_writes=0')
 CORRECT_INPUT=re.compile(r'rom6_measure_correct_input: sequence=(\d+) key=([0-9a-f]{4}) pointer=([0-9a-f]{4}) raw=([0-9a-f]{4}) flags=([0-9a-f]{4}) main=([0-9a-f]{4}(?:,[0-9a-f]{4}){3}) other=([0-9a-f]{4}(?:,[0-9a-f]{4}){3}) st1=([0-9a-f]{4}) observer_writes=0')
 CORRECT_OUTPUT=re.compile(r'rom6_measure_correct_output: sequence=(\d+) pointer=([0-9a-f]{4}) value=([0-9a-f]{4}) st1=([0-9a-f]{4}) observer_writes=0')
+RX_COMMIT=re.compile(r'rom6_measure_rx_commit: sequence=(\d+) t=(\d+\.\d{9}) previous=([0-9a-f]{4}) producer=([0-9a-f]{4}) consumer=([0-9a-f]{4}) words=([0-9a-f]{4}(?:,[0-9a-f]{4})*) mask=ffff cpu_pc=([0-9a-f]{6}) observer_writes=0')
 
 
 def signed40(value):
@@ -193,3 +194,38 @@ def check_frequency_correction(text):
     return dict(calls=count,stores=stores,no_store_returns=unchanged,joined_raw_measurements=joined,
                 channels=channels,scope='first16 correction calls; only observed channel branches are native-qualified',
                 mcu_response_packet_qualified=False,physical_dbm_qualified=False,camping_qualified=False)
+
+
+def check_rx_publications(text):
+    """Decode actual committed ring spans; never infer a missing reply payload."""
+    totals=re.findall(r'rom6_measure_rx_complete: commits=(\d+) cap=64 observer_writes=0',text)
+    rows=list(RX_COMMIT.finditer(text))
+    if (len(totals)!=1 or not rows or len(rows)>64 or int(totals[0])!=len(rows) or
+            len(rows)!=text.count('rom6_measure_rx_commit:')):
+        raise ValueError('incomplete or malformed native RX publication capture')
+    previous_end=None
+    previous_time=-1
+    packets=[]
+    for number,row in enumerate(rows,1):
+        sequence,time,start,end,consumer,words,pc=row.groups()
+        start,end,consumer=(int(value,16) for value in (start,end,consumer))
+        packed=[int(word,16) for word in words.split(',')]
+        if (int(sequence)!=number or float(time)<previous_time or
+                not all(0x80<=value<0xe4 for value in (start,end,consumer)) or
+                previous_end is not None and start!=previous_end or
+                (end-start)%0x64!=len(packed)):
+            raise ValueError('native RX cursor/time continuity differs')
+        offset=0
+        while offset<len(packed):
+            header=packed[offset]
+            length=header>>8
+            count=(length+3)//2
+            if offset+count>len(packed): raise ValueError('native RX packet exceeds committed words')
+            payload=b''.join(word.to_bytes(2,'big') for word in packed[offset+1:offset+count])[:length]
+            packets.append(dict(commit=number,time=time,type=header&0xff,payload=payload.hex(),cpu_pc=pc))
+            offset+=count
+        previous_end=end; previous_time=float(time)
+    return dict(commits=len(rows),packets=packets,
+                rssi_reply_observed=any(packet['type'] in (0x83,0x8b) for packet in packets),
+                scope='all captured native ring commits within this bounded laboratory run',
+                mcu_consumption_qualified=False,camping_qualified=False)

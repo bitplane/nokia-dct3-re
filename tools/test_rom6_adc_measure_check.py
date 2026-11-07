@@ -4,7 +4,7 @@ import unittest
 from unittest.mock import patch
 
 from tools.rom6_adc_measure_check import (MASK40,check,check_measure_program,
-    check_frequency_correction,frequency_correction,log_power_q16,tone_power)
+    check_frequency_correction,check_rx_publications,frequency_correction,log_power_q16,tone_power)
 
 
 class AdcMeasurementTest(unittest.TestCase):
@@ -113,6 +113,20 @@ class AdcMeasurementTest(unittest.TestCase):
                         ('cpu_pc=0071d7','cpu_pc=002432')):
             with self.subTest(old=old),self.assertRaises(ValueError):
                 check_frequency_correction(text.replace(old,new,1))
+
+    def test_committed_packet_wrap_and_continuity(self):
+        text='\n'.join((
+            'rom6_measure_rx_commit: sequence=1 t=1.000000000 previous=00e3 producer=0081 consumer=00e3 words=028a,0004 mask=ffff cpu_pc=002d08 observer_writes=0',
+            'rom6_measure_rx_commit: sequence=2 t=2.000000000 previous=0081 producer=0084 consumer=0081 words=0383,1234,5600 mask=ffff cpu_pc=002d08 observer_writes=0',
+            'rom6_measure_rx_complete: commits=2 cap=64 observer_writes=0'))
+        result=check_rx_publications(text)
+        self.assertEqual([packet['payload'] for packet in result['packets']],['0004','123456'])
+        self.assertTrue(result['rssi_reply_observed'])
+        self.assertFalse(result['mcu_consumption_qualified'])
+        for old,new in (('commits=2','commits=3'),('previous=0081','previous=0080'),
+                        ('0383','0883'),('mask=ffff','mask=00ff'),('t=2.000000000','t=0.500000000')):
+            with self.subTest(old=old),self.assertRaises(ValueError):
+                check_rx_publications(text.replace(old,new,1))
 
 
 if __name__=='__main__': unittest.main()

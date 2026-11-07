@@ -667,3 +667,22 @@ response. The MCU-bound measurement reply is the next unresolved join.
 Response-packet, physical-dBm, FCCH and camping flags remain false. The
 direct-ADC source still does not establish a tuned RF carrier or physical
 MFI capacity.
+
+### Native MCU-bound publications under ADC-pin stimulation
+
+The measurement observer also records actual DSP writes to receive-ring
+producer `08e4`, retaining the preceding cursor, consumer, and committed
+words. The checker validates cursor continuity, wrapping and packet lengths;
+it never drains or fills the ring. In the paired six-second trials there are
+five commits, all from bus context `2d08`: four type-`74` packets with payload
+prefixes `340e`, `3532`, `0d00` and `0a090006`, then type `8a` with payload
+`0004`. The last packet arrives at 2.687767604 seconds for the analytic tone
+and 3.143782044 seconds for silence. Their packet bodies are identical.
+
+There is **no type `83` or `8b` RSSI-results publication in this bounded
+capture**. Internal corrected RSSI fields must therefore not be presented as
+a qualified MCU RSSI response. Type `8a` belongs to the `NO_PSW_FOUND` family
+in the mapped MCU decoder; the observed negative result is not FCCH success.
+Whether and how the corrected fields affect the native search decision is
+the next join. The capture does not yet independently qualify MCU packet
+consumption, nor prove that RSSI replies cannot occur in another lifecycle.

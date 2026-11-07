@@ -3,6 +3,14 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "nsm3_adc_native_rx_publication_prefix",
+      "owner": "native_rom6_receive_transport",
+      "status": "satisfied",
+      "predicate": "All native receive-ring publications in the bounded ADC-pin trials are captured and packet/cursor integrity checked without fabricating an RSSI reply",
+      "current": "Paired six-second tone/silence runs have five native08e4 producer commits each, from bus context2d08. Four type74 packets precede type8a payload0004; all packet bodies match between inputs, with the last publication at2.687767604s/3.143782044s respectively. No type83/8b RSSI-results packet occurs in this window despite qualified internal corrected fields. Ring span lengths, sequence/time/cursor continuity and wrapped packet extraction are checked. This is a bounded negative observation, not global producer absence, MCU consumption qualification, FCCH success or camping. The mapped8a family is NO_PSW_FOUND. Raw initial captures:tmp/rom6-adc-lab/nsm3adc-e0uqry1r and nsm3ad0-21u70u3h. The native search consumer of the internal measurements remains open.",
+      "evidence": ["tools/rom6_adc_measure.lua", "tools/rom6_adc_measure_check.py", "tools/test_rom6_adc_measure_check.py", "tools/run_rom6_adc_lab.py", "docs/rom6_rf_interface.md", "docs/dsp_interface.md"]
+    },
+    {
       "id": "nsm3_native_frequency_correction_prefix",
       "owner": "native_rom6_receive_measurement",
       "status": "satisfied",
