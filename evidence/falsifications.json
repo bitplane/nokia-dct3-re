@@ -3,6 +3,13 @@
   "kind": "falsifications",
   "entries": [
     {
+      "id": "nsm3_two_sample_cadence_alone_resolves_mfi_overrun",
+      "status": "disproven",
+      "hypothesis": "Using two rather than four complex samples per GSM symbol, without changing the64-word buffer or P03 gating, removes the native ADC transport overrun",
+      "conclusion": "Matched six-second zero and67.708333kHz tone trials with scalar divider12 independently verify2752 delivered words across3activations and native initialization, but both overrun at2.548639385s(produced11680/consumed11616) and2.680332923s(8736/8672). Both show INT0 enabled/pending and global INTM set. Binary SHA256fef83d8866c11e692d227ccd48e28159b46341ea474390eee68058ddc2b42172; raw captures tmp/rom6-adc-lab/nsm3ad0-fkmdiafs and nsm3adc-to23mkk9. The independent oscillator retained the same absolute-time frequency; this is not a tone retiming or buffer sweep. The result rejects sufficiency of cadence alone in this prototype, not either physical ADC rate. Restore scalar divider6; retain explicit configured-divider provenance checks. No decoder or camping qualification follows.",
+      "evidence": ["docs/rom6_rf_interface.md", "driver/nokia_dct3_research.cpp", "driver/nokia_mfi_rx.h", "tools/rom6_adc_lab_check.py", "tools/test_rom6_adc_lab_check.py"]
+    },
+    {
       "id": "nsm3_p09_start_p0b_stop_two_bank_candidate_is_lossless",
       "status": "disproven",
       "hypothesis": "Replacing immediate P03 gating with a P03-armed, one-shot P09 start and P0b stop makes the 13MHz-div6,32-word-notification,64-word-buffer ADC candidate lossless",

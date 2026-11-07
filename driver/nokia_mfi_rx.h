@@ -10,6 +10,7 @@ class nokia_mfi_rx_device : public device_t
 public:
 	nokia_mfi_rx_device(machine_config const &mconfig, char const *tag, device_t *owner, u32 clock = 0);
 	void set_word_divider(unsigned divider) { m_divider = divider; }
+	unsigned word_divider() const { return m_divider; }
 	auto adc_cb() { return m_adc_cb.bind(); }
 	auto data_available_cb() { return m_data_available_cb.bind(); }
 	// Diagnostic observer, not a claimed fitted error-interrupt pin.

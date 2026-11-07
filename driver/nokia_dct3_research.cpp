@@ -38,7 +38,8 @@ void dct3_rf_adc_fixture_state::machine_start()
 	nokia_dct3_state::machine_start();
 	save_item(NAME(m_q_latch));
 	save_item(NAME(m_adc_receive_control)); save_item(NAME(m_adc_mfi_control));
-	machine().logerror("rf_adc_lab: direct_adc=1 tuned_air_source=0 tone=%u reference=13000000 complex_divider=12 amplitude=1024 physical_clock_claim=0\n",m_tone);
+	machine().logerror("rf_adc_lab: direct_adc=1 tuned_air_source=0 tone=%u reference=13000000 source_phase_divider=12 word_divider=%u amplitude=1024 physical_clock_claim=0\n",
+		m_tone,subdevice<nokia_mfi_rx_device>("mfi_rx")->word_divider());
 }
 
 void dct3_rf_adc_fixture_state::control_w(offs_t port, u16 data)

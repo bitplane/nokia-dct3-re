@@ -461,6 +461,18 @@ This rejects the sufficiency of that exact timed-gate/64-word/13MHz-div6
 combination, not the physical P09/P0b roles. Its implementation was removed;
 the laboratory compositions retain the prior explicitly unqualified P03 model.
 
+A cadence-only two-complex-samples/symbol trial (scalar divider 12) kept the
+64-word buffer, P03 gate and physical 67.708333kHz tone unchanged. Both inputs
+still overran: first at 2.548639385s (11,680 produced/11,616 consumed), then
+at 2.680332923s (8,736/8,672). Both independently match 2,752 delivered words
+and preserve initialization. The fault contexts again have INT0 enabled and
+pending with global INTM set. This does not select either physical sample rate;
+the trial divider was restored to 6. Its binary SHA256 is
+`fef83d8866c11e692d227ccd48e28159b46341ea474390eee68058ddc2b42172`.
+The source header now distinguishes the oscillator phase divisor from the
+MFI scalar divisor, and the checker rejects disagreement with the device's
+summary. Sampling-rate comparisons must not retime the laboratory oscillator.
+
 At both overflows the passive fault observer sees IMR=`035f`, IFR=`0021` and
 ST1=`c903`/`4903`: INT0 is enabled and pending, but global INTM is set. This
 identifies native critical-section backpressure at those events, not a missing
