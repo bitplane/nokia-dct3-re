@@ -784,17 +784,29 @@ The helper deliberately uses mapped AR6/AR7 addresses as scratch extrema:
 `1cc6/1cc8` initialize AR2=`0016`, AR3=`0017`; its conditional stores update
 these registers before computing their sum.
 
-The current rejection is **Xmem STL to a mapped register** at `1ce7`
-(`9911`, `STL B,1,*AR3`). Terminal read-only observations retain AR2=`0016`,
-AR3=`0017`, AR4=`0080` and AR5=`3ee0`; the displayed failure context `1ceb`
-is not the offending instruction. Its effective destination is thus AR7,
-not an arbitrary bad RAM pointer. The current four/six-second runs retain
-4096 clock-qualified source words and 702112 total native reads. A queue
-overrun at 3.343345846 seconds follows the explicit CPU stop; it is not
-evidence for increasing provisional staging capacity.
+The mapped AR7 store at `1ce7` now uses the independently tested generic
+Xmem-register path. The current six-second trace has 702272 total native
+reads, peak queued 69 and no transport fault; all 4096 retained source
+words match the independent waveform.
 
-The unchanged stimulus remains **rejected**, not a qualified FCCH or camping
-result. Next: independently qualify mapped-register ownership for this
-nonmodifying Xmem-store subset, including source/shift selection, retained
-address, self-alias and adjacent-consumer/save-state behavior. The ordinary
-RAM Xmem-store arithmetic already has independent CPU coverage.
+### SCH training-correlation identification
+
+The finite stimulus now reaches resident `76b0..76cf`. Its program words at
+`7737..773a` are **`b962 040f 2d45 761b`**, exactly the 64-bit extended
+training sequence in GSM 05.02 section 5.2.5, encoded MSB-first. This is an
+independent protocol anchor, not a sibling-emulator label. The routine reads
+each mask through READA into AL, then tests its high bit and shifts it to
+choose the sign of successive complex sample components over four groups
+of sixteen iterations.
+
+The current stop is **Xmem BIT reading mapped AL**: `9630` at `76be`, with
+terminal AR5=`0008` and A=`000000b962`. The displayed context `76c1` is not
+the offending instruction. The core supports Xmem BIT on RAM but excludes
+this mapped source; the disassembler also currently leaves the word unnamed.
+The unchanged waveform remains **rejected** until this CPU subset is tested
+and implemented. Reaching this standard-pattern correlator does not prove
+FCCH acquisition, SCH synchronization, decoded frame number or camping,
+particularly because the stimulus contains no SCH burst. Next: qualify
+nonmodifying Xmem BIT reads of accumulator fields with Read-owned operands,
+guard-word encoding, later accumulator changes and save/replay; decode the
+instruction consistently for subsequent RE.

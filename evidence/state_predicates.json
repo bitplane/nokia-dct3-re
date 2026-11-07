@@ -3,11 +3,19 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "nsm3_native_sch_training_correlator_identification",
+      "owner": "native_rom6_receive_search",
+      "status": "satisfied",
+      "predicate": "Native finite-burst execution reaches a resident routine whose program mask exactly matches the normative64-bit SCH extended training sequence",
+      "current": "Program7737..773a contains b962040f2d45761b, matching the64 bits of GSM05.02v5.1.0 section5.2.5 in MSB-first order. Resident76b0 initializes that table pointer, uses READA into AL and tests/shifts mask bits while selecting complex sample signs in four groups of sixteen iterations. The native stop at BIT9630/76be has AR5=0008 and A=000000b962; displayed76c1 is not the operand-owning instruction. This identifies the routine and the missing mapped-AL read subset, not successful FCCH/SCH acquisition, frame-number decode or camping. The stimulus intentionally supplies no SCH burst.",
+      "evidence": ["docs/rom6_rf_interface.md", "tools/rom6_adc_burst.lua", "cpu/tms320c54x/tms320c54x_decode.h", "cpu/tms320c54x/tms320c54x.cpp"]
+    },
+    {
       "id": "nsm3_finite_fcch_adc_stimulus",
       "owner": "nokia_rf_laboratory",
       "status": "unresolved",
       "predicate": "A standards-timed finite FCCH ADC-pin stimulus progresses through native detection without unsupported CPU execution or transport faults",
-      "current": "Separate nsm3afb uses absolute13MHz epoch0,60000-tick frames,7104 active ticks in TS0 at frames0/10/20/30/40 per51. Other slots are zero; rectangular envelope, no tuning/gain/noise/SCH/BCCH or carrier fallback. C++ timing/edge/period tests and independent Python provenance including latched Q are implemented. After the independently tested CPU alias fixes, current runs nsm3afb-gaetabs9 and nsm3afb-h5y24gil reject Xmem store9911 at uploaded1ce7 (displayed context1ceb). The helper initializes AR2=0016/AR3=0017 as mapped scratch registers, and terminal observations confirm those values, AR4=0080/AR5=3ee0. Its118 bytes at1cc5..1cff match own MCU11681a and pinned SHA256. Thus the STL destination is AR7. Retained4096 source words match the independent waveform; total native reads702112. A secondary queue overrun at3.343345846s follows the CPU stop and does not justify larger staging. Next: independently qualify nonmodifying Xmem stores to mapped registers with retained addresses, shifted sources, self-alias and consumers/replay. Continuous-tone, native UI/storage/state and semantic default gates pass; ROM4 EFR encoder/decoder163-frame reference/replay controls have zero mismatches. None qualifies finite-burst detection or camping.",
+      "current": "Separate nsm3afb uses absolute13MHz epoch0,60000-tick frames,7104 active ticks in TS0 at frames0/10/20/30/40 per51. Other slots are zero; rectangular envelope, no tuning/gain/noise/SCH/BCCH or carrier fallback. Independent waveform/timing tests include latched Q. After the qualified nonmodifying Xmem AR-store path, six-second run nsm3afb-wip3ovpc has702272 native reads, peak69 and no transport fault;4096 retained words match the source. It now rejects Xmem BIT9630 at resident76be with mapped AL sourceAR5=0008, A=b962, displayed76c1. The normative SCH training-mask identification has its own predicate. Next: independently qualify the mapped accumulator BIT read subset and disassembly, then rerun the unchanged stimulus. Continuous-tone, native UI/storage/state and semantic default gates pass; ROM4 EFR encoder/decoder163-frame reference/replay controls have zero mismatches. Reaching the correlator is not successful FCCH/SCH detection or camping.",
       "evidence": ["driver/nokia_rf_lab_signal.h", "driver/nokia_dct3_research.cpp", "tests/unit/test_rf_lab_signal.cpp", "tools/test_rf_lab_signal_cpp.py", "tools/rom6_adc_burst.lua", "tools/rom6_adc_lab_check.py", "tools/test_rom6_adc_lab_check.py", "docs/rom6_rf_interface.md"]
     },
     {

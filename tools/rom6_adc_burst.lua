@@ -16,5 +16,7 @@ _G.rom6_burst_stop=emu.add_machine_stop_notifier(function()
     machine:logerror(string.format('rom6_burst_terminal: pc=%06x ar2=%04x ar3=%04x ar4=%04x ar5=%04x a=%010x b=%010x observer_writes=0\n',
         cpu.state.GENPC.value,cpu.state.AR2.value,cpu.state.AR3.value,cpu.state.AR4.value,cpu.state.AR5.value,cpu.state.A.value,cpu.state.B.value))
     machine.debugger.visible_cpu=cpu
-    machine.debugger:command('dasm rom6_burst_search.asm,1c80,c0,1,:dsp_c54x:cpu')
+    local pc=cpu.state.GENPC.value
+    local first=(pc&0x7f0000)|math.max(0,(pc&0xffff)-0x40)
+    machine.debugger:command(string.format('dasm rom6_burst_search.asm,%x,c0,1,:dsp_c54x:cpu',first))
 end)
