@@ -2601,7 +2601,8 @@ void tms320c54x_device::pipeline_step()
 		u16 const source = m_pipeline_immediate[3];
 		// SP here is an explicit data source sampled in Read, not the
 		// earlier compiler-mode address base captured above (SPRU131G 7.1).
-		if (source < 0x60 && (source < 0x10 || source > 0x19))
+		bool const brc_to_ar = source == 0x1a && staged_direct_mvdm(m_pipeline_word[3]) && mode >= 0x10 && mode <= 0x17;
+		if (source < 0x60 && (source < 0x10 || source > 0x19) && !brc_to_ar)
 		{
 			logerror("%s: staged MVKD control/peripheral source is unsupported instruction=%06x word=%04x source=%04x\n", machine().describe_context(), unsigned(m_pipeline_address[3]), m_pipeline_word[3], source); m_illegal = true; return;
 		}

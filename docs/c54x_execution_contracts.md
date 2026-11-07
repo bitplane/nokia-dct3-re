@@ -4207,6 +4207,17 @@ This qualifies the declared staged ownership model, not physical bus phases.
 
 ## BRC memory moves in ordinary delayed controls
 
+MVDM may also read mapped BRC into AR0..AR7 through the ordinary retained
+Read operand and early AR-publication path. This is a read of BRC, not an
+assignment to the block owner's counter. `brc_to_ar` checks 32 cases/restores
+across all AR destinations and four words, changing BRC immediately before
+and after the prototype Read clock. It requires the captured word at the
+destination, unchanged other ARs, RSA/REA/RC, accumulators and status, and
+exact mapped bus transactions. Five negative cases preserve exclusions for
+RSA/REA/PMST sources, a genuinely repeated mapped copy and the unqualified
+BRC-to-T form, without claiming a hardware trap. Four save points are
+distributed. This does not newly qualify active-block or interrupt timing.
+
 Complete two-word MVMD/MVDK-to-BRC forms may occupy ordinary delayed
 branch/call/return spans. Their existing source sample and zero-latency BRC
 publication remain owned by Access. RPTBD's delay span and active block-body

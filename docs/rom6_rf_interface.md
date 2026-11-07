@@ -806,12 +806,21 @@ preceding `MAC *AR3+,*AR2+,A,A` at `77b2`. Eighteen generic nested-repeat
 cases check re-zeroing and independent outer/inner counts with replay;
 192 existing block/single-repeat controls pass.
 
-The current waveform remains **rejected** at `9007`: `7212 001a`,
-disassembled as `MVDM $001a,$12`, copies mapped BRC into AR2 before the
-routine replaces BRC with 6 and saves AR2 on the stack. The common MVKD
-source guard excludes this control-register read. Displayed `900b` is
-not the operand-owning instruction. The trace still has 702272 native
-input reads, peak queue 69 and no transport fault.
+The mapped BRC-to-AR copy at `9007` (`7212 001a`) now follows the generic
+retained Read path, before the routine replaces BRC with 6 and stacks AR2.
+The current waveform remains **rejected** at `9018`, opcode `8e93`:
+`CMPS A,*AR3+`. Displayed `901a` is not the rejected instruction.
+The trace still has 702272 native input reads, peak queue 69 and no
+transport fault. Terminal AR3 is `3218`, A is `fffffffe00`, B is zero.
+
+[TI SPRU172C](https://www.ti.com/lit/ug/spru172c/spru172c.pdf),
+CMPS description (4-35), identifies `8e/8f` as compare,
+select and store maximum: compare the signed high/low sixteen-bit halves
+in **Read**, retain the larger half for the memory store, and update
+TRN/TC in Execute (low wins ties). This timing rule is explicit in the
+manual, not inferred from this firmware. The paired `8e93`/`8f94` calls
+are after dual-lane arithmetic in the routine; this alone is not proof
+of a decoded SCH payload.
 The corresponding short/extended-immediate and RAM-count DADD tests check
 every intermediate result and paired read across 72 save/replay cases;
 the 8192 ordinary paired-arithmetic controls also pass.
@@ -819,6 +828,6 @@ the 8192 ordinary paired-arithmetic controls also pass.
 Reaching this standard-pattern correlator and its later processing does
 not prove FCCH acquisition, SCH synchronization, decoded frame number or
 camping, particularly because the stimulus contains no SCH burst. Next:
-qualify the mapped repeat-counter read independently before rerunning the
-unchanged waveform; preserve Read ownership, live BRC versus block-control
-state, register forwarding and save/replay.
+implement and independently qualify CMPS with Read-owned accumulator
+comparison, signed halves/ties, memory addressing, TRN/TC publication
+and save/replay, then rerun the unchanged waveform.
