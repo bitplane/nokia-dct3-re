@@ -5,9 +5,17 @@ local machine=manager.machine
 local cpu=assert(machine.devices[':dsp_c54x:cpu'])
 local consumers={}
 local reads,overflow=0,0
+local poll_count,poll_min,poll_max,poll_wrong_pointer=0,nil,nil,0
 _G.rom6_status_read=cpu.spaces.io:install_read_tap(3,3,'rom6_status_read',function(_,value)
     reads=reads+1
     local pc=cpu.state.GENPC.value
+    if pc==0x686d then
+        poll_count=poll_count+1
+        if cpu.state.AR5.value~=0x2fde then poll_wrong_pointer=poll_wrong_pointer+1 end
+        local countdown=cpu.spaces.data:read_u16(0x2fde)
+        poll_min=math.min(poll_min or countdown,countdown)
+        poll_max=math.max(poll_max or countdown,countdown)
+    end
     local item=consumers[pc]
     if not item then
         local count=0
@@ -31,4 +39,5 @@ _G.rom6_status_stop=emu.add_machine_stop_notifier(function()
             pc,item.count,item.clear,item.first,item.last,item.value))
     end
     machine:logerror(string.format('rom6_status_complete: reads=%d consumers=%d overflow=%d cap=32 observer_writes=0\n',reads,#keys,overflow))
+    machine:logerror(string.format('rom6_status_poll: calls=%d min=%04x max=%04x wrong_pointer=%d observer_writes=0\n',poll_count,poll_min or 0,poll_max or 0,poll_wrong_pointer))
 end)

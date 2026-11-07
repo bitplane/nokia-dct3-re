@@ -6,8 +6,8 @@
       "id": "nsm3_p03_status_completion",
       "owner": "native_rom6_receive_timing",
       "status": "unresolved",
-      "predicate": "P03 bit8 has evidence-backed hardware completion semantics at the firmware-owned receive lifecycle boundary",
-      "current": "The twelve-second passive status-du8pcopi census covers7060 P03 reads in7 consumer contexts with zero overflow. Poll6867..6870 executes10 times between3.298898132s and3.341567451s; every read has0100 set(value0104),so the calls return without publishing263a.bit7. Firmware4899/ac77 sets the bit and67b2 can clear it on another branch;20eb later has1548 clear-bit reads. The backend stores P03 without a hardware completion edge. The sibling P0f=0ed8 clear is not adopted: neither its physical trigger nor its necessity for this SCH failure is qualified. Native raw transport,seven FCCH confirmations,eight residual updates and128 retained peak joins still pass under the observer.",
+      "predicate": "P03 bit8 set/clear ownership and its relation to the firmware-owned receive lifecycle are established",
+      "current": "The twelve-second passive status-du8pcopi census covers7060 P03 reads in7 consumer contexts with zero overflow. Poll6867..6870 executes10 times between3.298898132s and3.341567451s; every read has0100 set(value0104),so the calls return without publishing263a.bit7. Firmware4899/ac77 sets the bit;20eb later has1548 clear-bit reads. Predecessors679f/6850 choose the poll for scheduling countdown2fde<=1;the longer-wait path explicitly clears the bit at67b8 before its P0f waits. Fresh status-goo333vx confirms all10 polls use AR5=2fde and countdown0. Thus polling does not establish a stuck hardware completion latch. The sibling P0f=0ed8 clear is not adopted: hardware-owned clear necessity and physical trigger remain unqualified. Native raw transport,seven FCCH confirmations,eight residual updates and128 retained peak joins pass under the observer.",
       "evidence": ["tools/rom6_adc_status.lua", "driver/nokia_dsp_c54x.cpp", "docs/rom6_rf_interface.md"]
     },
     {

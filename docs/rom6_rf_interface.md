@@ -412,7 +412,7 @@ capture lifecycle rather than immediate P03 level gating. It does not identify
 which compare controls ADC clocks, transfer clocks or interrupt generation.
 In particular, P11=`01fe` is not evidence for a 512-word FIFO.
 
-### P03 status completion boundary
+### P03 lifecycle status boundary
 
 P03 bit 8 is not merely an unused preserved control bit. Resident
 `6867..6870` reads P03 into AL, masks `0100`, and returns when nonzero;
@@ -421,6 +421,15 @@ flag before its initialization branch. Firmware sets P03 bit 8 at
 `4899..489f` and `ac77..ac7d`; `67b2..67b8` can explicitly clear it in a
 different branch. These are code-derived bit operations, not established
 names for the underlying hardware state.
+
+Do not infer a missing hardware clear merely from the poll. Its predecessor
+loads the scheduling countdown through AR5 (`2fde`) and takes this poll
+when the countdown is at most one (`679f..67a2`, also `6850..6853`).
+The longer-wait path explicitly clears P03 bit 8 at `67b8` **before**
+waiting on P0f at `67d7` and `680c`. In the fresh four-second
+`status-goo333vx` trace, all ten poll calls have AR5=`2fde` and countdown
+zero. Thus the observed retained bit is compatible with the immediate-work
+branch; the poll alone does not establish a stuck completion latch.
 
 The passive `rom6_adc_status.lua` census retains per-consumer counts rather
 than every read. In twelve-second `status-du8pcopi`, all 7,060 reads fit
@@ -432,8 +441,8 @@ not leave the bit set across every firmware lifecycle.
 
 The backend still treats P03 as stored state. The sibling's completion
 rule at P0f=`0ed8` is a candidate, not a hardware specification; no such
-clear is implemented here. The physical set/clear event, and whether the
-skipped publication matters to receive timing, remain unresolved. Retire
+clear is implemented here. Whether any hardware-owned clear exists, and
+whether the skipped publication matters to receive timing, remain unresolved. Retire
 this dedicated observer once that completion contract is qualified.
 
 ## ADC-pin transport experiment
