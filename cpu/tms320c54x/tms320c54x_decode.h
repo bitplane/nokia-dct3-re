@@ -209,7 +209,7 @@ constexpr bool decode_staged_pipelined_repeat(u16 word)
 	bool const short_double_add = (word & 0xfc00) == 0x5000 && u8(word) < 0x98;
 	bool const square_repeat = square_accumulate(word) &&
 		(u8(word) < 0x98 || (u8(word) >= 0xc0 && u8(word) < 0xe0));
-	return accumulator_add_sub || short_double_add || logical_shift || coefficient_repeat || short_add || shifted_circular_add || short_logic || short_mar || staged_repeat_data_copy(word) || staged_repeat_destination_copy(word) || staged_repeat_accumulator_store(word) || staged_poly(word) || decode_staged_parallel_load(word) || staged_parallel_alu(word) || square_repeat || ((word & 0xf800) == 0x2800 && u8(word) < 0x98) || (word & 0xf000) == 0xb000 || staged_mvdd(word) || (((word & 0xff00) == 0x4b00 || (word & 0xff00) == 0x8b00) && u8(word) < 0x98);
+	return accumulator_add_sub || short_double_add || logical_shift || coefficient_repeat || short_add || shifted_circular_add || short_logic || short_mar || staged_repeat_data_copy(word) || staged_repeat_destination_copy(word) || staged_repeat_accumulator_store(word) || staged_poly(word) || decode_staged_parallel_load(word) || staged_parallel_alu(word) || staged_parallel_mpy(word) || square_repeat || ((word & 0xf800) == 0x2800 && u8(word) < 0x98) || (word & 0xf000) == 0xb000 || staged_mvdd(word) || (((word & 0xff00) == 0x4b00 || (word & 0xff00) == 0x8b00) && u8(word) < 0x98);
 }
 
 constexpr bool staged_repeat_accumulator_load(u16 word)

@@ -4961,6 +4961,24 @@ arbitrary circular strides and mapped/peripheral operands are not qualified here
 Interrupt/control composition, inter-copy same-address forwarding and
 physical bank phases remain unqualified.
 
+## Repeated parallel store/MPY
+
+RPT admits the parallel MPY/store familycc00..cfff through the ordinary
+Access/Read/Execute path. X/T are retained in Read;Execute stores the old live
+source accumulator before replacing the result accumulator. Each issue uses
+fresh X/Y addresses,and an aliased pointer is modified only once. The existing
+mapped-source/destination guards remain before DAGEN or bus effects.
+
+`repeated_parallel_multiply` passes26 save/replay cases:A/B source/result
+combinations,FRCT off/on,linear/circular and shared-pointer layouts,short and
+immediate counts,and the native128-copy circular shape. An integer reference
+checks exact read/store ordering,old-source feedback,all results and pointers.
+T changes after every Read,testing retention and fresh acquisition on the next
+copy;two negatives preserve mapped operand boundaries. Numeric shift/clamp/
+overflow coverage belongs to the existing14336-case single-MPY section,which
+also passes. Inter-copy overlapping circular X/Y ranges,IRQ/control composition
+and physical bus timing are not established by this bounded repeat test.
+
 ## Repeated parallel store/load
 
 Short RPT can retain the one-word `ST src,Ymem || LD Xmem,dst/T` body and
