@@ -2697,9 +2697,9 @@ void tms320c54x_device::pipeline_step()
 		u8 const mode = m_pipeline_word[3];
 		if (staged_long_mar(m_pipeline_word[3]))
 		{
-			m_ar[indirect_ar(mode, 3)] += s16(m_pipeline_immediate[3]);
-			if (indirect_compatibility(3) && (mode & 7))
-				m_st0 = (m_st0 & ~u16(0xe000)) | u16((mode & 7) << 13);
+			// SPRU131G table5-4: long preoffset is linear for MOD13,
+			// circular for MOD14; both publish the updated auxiliary register.
+			long_offset_address(mode,indirect_ar(mode,3),s16(m_pipeline_immediate[3]),3);
 		}
 		else indirect_modify(mode, false, 3);
 	}

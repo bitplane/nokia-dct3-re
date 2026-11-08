@@ -79,6 +79,17 @@ cases: eight copied-block/count checks over two program pages and counts
 0/1/7/31,plus three rejection boundaries. No firmware-specific exception is
 part of the CPU implementation.
 
+### Long circular MAR
+
+MAR modesf0..f7 implement signed long preoffset with circular update through
+the existing stage-owned address operation;linear e8..ef behavior is unchanged.
+[SPRU131G table5-4](https://e2e.ti.com/cfs-file/__key/communityserver-discussions-components-files/81/6114.spru131g.pdf)
+defines MOD14 as `ARx = circ(ARx + lk)`. The64-case `long_circular_mar`
+section reproduces the former decoder rejection and checks signed/zero offsets,
+wraps,BK1/13/16,all auxiliary registers,CMPT/ARP selection,two program pages,
+Access publication,absence of data-bus accesses and save/replay. It does not
+resolve the pre-existing BK0 convention or qualify physical issue timing.
+
 ### Host execution cost
 
 The staged frontend shares immutable opcode-property and compact descriptor

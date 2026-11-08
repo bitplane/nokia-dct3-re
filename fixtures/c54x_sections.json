@@ -5,6 +5,7 @@
   "repeated_circular_add": 64,
   "repeated_circular_store": 32,
   "mvdm_brc": 11,
+  "long_circular_mar": 64,
   "circular_mvkd": 64,
   "repeated_shifted_circular_add": 64,
   "mvdd_accumulator_destination": 152,

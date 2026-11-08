@@ -572,12 +572,13 @@ constexpr bool decode_staged_port_read(u16 word)
 constexpr bool decode_staged_mar(u16 word)
 {
 	return (word & 0xff00) == 0x6d00 &&
-		((u8(word) >= 0x80 && u8(word) < 0x98) || (u8(word) >= 0xa0 && u8(word) < 0xe0) || (word & 0xf8) == 0xe8);
+		((u8(word) >= 0x80 && u8(word) < 0x98) || (u8(word) >= 0xa0 && u8(word) < 0xe0) ||
+		 (word & 0xf8) == 0xe8 || (word & 0xf8) == 0xf0);
 }
 
 constexpr bool staged_long_mar(u16 word)
 {
-	return (word & 0xfff8) == 0x6de8;
+	return (word & 0xfff8) == 0x6de8 || (word & 0xfff8) == 0x6df0;
 }
 
 constexpr bool decode_staged_block_repeat(u16 word)
