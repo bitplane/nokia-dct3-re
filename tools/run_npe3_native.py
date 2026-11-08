@@ -313,6 +313,10 @@ def main():
                         from tools.npe3_raw_ua_check import check_paging_fill
                         report['paging_fill']=check_paging_fill(text,report['raw_release']['common_configuration_time'])
                         print(f"Native6210 PCH fill: PASS native_blocks={report['paging_fill']['blocks']} last_time={report['paging_fill']['last_time']:.9f}; stable_camping=0")
+                        from tools.rom6_idle_contract import check as check_idle
+                        report['idle_contract']=check_idle(text,(first/'npe3_terminal_program.be16').read_bytes(),
+                            (ROOT/'roms/nsm3r6/nsm3_rom6_data.be16').read_bytes())
+                        print(f"Native6210 idle contract: PASS adjustments={report['idle_contract']['frame_adjustments']} filtered_fill={report['idle_contract']['filtered_valid_fill']} scalar_commands={report['idle_contract']['scalar_commands']}; stable_camping=0")
                     print(f"Native6210 raw AGCH: PASS native_decodes={report['raw_agch']['responses']}; tuned_air_source=0 registration=0")
                     print('Native6210 assigned SDCCH: PASS MCU SABM/Location Updating submission; native_transmission=0 registration=0')
                 elif 'npe3_raw_agch:' in text:

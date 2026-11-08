@@ -7,8 +7,16 @@
       "owner": "native_rom6_reference_adc_laboratory",
       "status": "unresolved",
       "predicate": "The native CCCH completion frame identifies its actual source block and idle reception sustains stable camping",
-      "current": "The60s untuned ADC run has25 exact paging-fill decodes,but reception is sparse and stops at37.931345934s within that horizon. Six successful publications precede the nominal time of their reported block-ending FN,including1386 at6.389976857s and8220 at37.931345934s. Repeated identical fill cannot identify a unique source block,so the checker records all disagreements and explicitly does not qualify source-frame binding. The metadata may identify the requested/scheduled block rather than decoded source. Reported receiver keys include35 and46 despite the single declared source;this is not physical carrier-selection evidence. Later MCU type4a/body011b repeats. Stable camping is not inferred from updated EF_LOCI,a SIM-name frame,or legal execution. Resolve the native metadata and idle receive/wake contract;do not tune clocks/tolerances or inject a missing completion.",
-      "evidence": ["tools/npe3_raw_ua_check.py", "tools/test_npe3_raw_ua_check.py", "tools/run_npe3_native.py", "docs/rom6_rf_interface.md"]
+      "current": "The60s untuned ADC run has25 exact paging-fill publications through37.931345934s. The bounded24s formatter audit explains early frame fields by the conditional native low-frame +2 operation and explains sparse MCU publications by the native paging-pattern filter:61 formatted blocks yield56 publications and5 filtered valid empty fills. Repeated identical fill still cannot identify a unique air-source block. Reported receiver keys35 and46 are not physical carrier-selection evidence. MCU type4a/body011b updates scalar0578 through35c5 without a solicited reply; its physical units and indirect-writer closure remain unknown. Next establish addressed paging,DRX scheduling and unique source-frame binding. Stable camping is not inferred from updated EF_LOCI,a SIM-name frame,or legal execution;do not tune clocks/tolerances or inject a missing completion.",
+      "evidence": ["tools/npe3_raw_ua_check.py", "tools/test_npe3_raw_ua_check.py", "tools/rom6_idle_contract.py", "tools/run_npe3_native.py", "docs/rom6_rf_interface.md"]
+    },
+    {
+      "id": "npe3_native_idle_formatter_and_filter",
+      "owner": "native_rom6_reference_adc_laboratory",
+      "status": "satisfied",
+      "predicate": "Native frame formatting,paging filtering and host scalar consumption reconcile to every publication in the bounded24s observation",
+      "current": "The curated observer records71 low-frame writes for61 blocks,including10 conditional +2 adjustments. All61 native filter returns reconcile to56 actual class60 publications and5 valid empty fills filtered in idle mode with051d bit6 enabled. Both host4a commands join Read-owned35c5 stores of011b to0578;the boot clear is separately observed. Pinned resident instructions and DROM dispatcher establish6 aligned literal references,including5 readers,but do not close indirect writers or identify physical units. The full1,465,776-row radio-write journal is byte-identical with and without this observer. This qualifies metadata/filter behavior,not source-frame binding,physical tuning,DRX correctness or stable camping.",
+      "evidence": ["tools/npe3_idle_observe.lua", "tools/rom6_idle_contract.py", "tools/test_rom6_idle_contract.py", "tools/run_npe3_native.py", "docs/rom6_rf_interface.md"]
     },
     {
       "id": "npe3_native_idle_paging_decode",

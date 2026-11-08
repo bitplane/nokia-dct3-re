@@ -5,7 +5,10 @@ local npe3=machine.system.name=='npe3afs' or machine.system.name=='npe3ad0' or m
 dofile(directory..(npe3 and 'rom6_native_radio.lua' or 'rom6_native_observe.lua'))
 if npe3 then
     dofile(directory..'rom6_rx_ring_observe.lua')
-    if machine.system.name=='npe3ap5' then dofile(directory..'npe3_dedicated_observe.lua') end
+    if machine.system.name=='npe3ap5' then
+        dofile(directory..'npe3_dedicated_observe.lua')
+        dofile(directory..'npe3_idle_observe.lua')
+    end
     if machine.system.name=='npe3afs' or machine.system.name=='npe3cp9' or machine.system.name=='npe3bp9' or machine.system.name=='npe3sp9' or machine.system.name=='npe3tp5' or machine.system.name=='npe3ap5' then
         dofile(directory..'npe3_sch_provenance.lua')
         dofile(directory..'npe3_fcch_schedule.lua')

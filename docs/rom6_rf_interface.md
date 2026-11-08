@@ -446,11 +446,12 @@ identify an individual source block. Six publications precede the nominal
 time of their reported block-ending FN,including FN1386 at6.389976857s and
 FN8220 at37.931345934s. The checker preserves every discrepancy and leaves
 source-frame binding unqualified;no clock/tolerance is fitted to conceal it.
-The field may describe a requested/scheduled block rather than the decoded
-source block. Second,reception is sparse and later MCU traffic includes
-repeated type4a body011b,so stable camping is not inferred from a60s legal
-run or the SIM name. The next questions are this native CCCH metadata
-convention and the idle receive/wake request contract.
+The formatter's origin and conditional adjustment are now established below;
+that is not unique source-block provenance. Second,sparse MCU publications
+do not imply a stalled receiver:the firmware intentionally filters some
+decoded no-identity fills. The recurring host4a/body011b is a scalar update,
+not a missing-reply request. Stable camping still needs addressed paging/DRX
+evidence rather than an idle label or a count of forwarded empty pages.
 
 Extended observation covers the requested horizon,not just the first24s:
 MCU and DSP ring captures use cap2048 for longer raw-profile runs,and the
@@ -465,6 +466,45 @@ boundary,and the HLE semantic/coherent frontier controls also pass.
 ```sh
 .venv/bin/python tools/run_npe3_native.py --reference-clock --seconds 60 --adc-source fcch-sch-broadcast --capture-start p09 --tx-release p05 --raw-agch --provision-records
 ```
+
+### Native idle metadata and forwarding contract
+
+Formatter4ee0 selects primary frame0912/0913,BSIC250a and receiver250e when
+2f1e=0;otherwise it uses secondary frame2456/2457,BSIC2616 and receiver2618.
+If3eb5 bit9 and0586 bit0 are both set,4f27 copies the low frame and4f28
+adds2. Otherwise4f2c copies it unchanged. A bounded24s write-observer run
+records10 such two-instruction adjustments across61 formatted class60 blocks.
+For example,the primary low word0568 becomes published056a at6.38997s.
+This explains the nominally early reported FN without changing any emulated
+clock. It does not identify which repeated air block supplied the samples.
+
+The61 blocks pass through native gate50b2. Non-idle/acquisition modes bypass
+the paging-pattern filter. In idle mode,the filter uses051d bit6 and patterns
+2625/2626 (set by host46),with264e controls permitting an override. Its
+return is tested at4d6e;zero suppresses publication. The trace joins every
+actual gate return to its formatter and actual committed RX payload:56 are
+forwarded and5 correctly decoded no-identity fills are filtered. There is no
+unexplained publication loss in this window. Some filtered successes occur
+after the last forwarded empty fill,so MCU message silence is not a receive
+failure oracle. The next useful input is an independently addressed paging
+request,with its DRX/source-frame contract checked explicitly.
+
+Host4a uses the DROM table atb041+4a=b08b,which selects35c5. That handler
+copies one word to0578,acknowledges the host ring through2e2f,and returns.
+The captured two-byte011b commands produce exactly two matching scalar
+stores. All six aligned resident literal references are enumerated:one store
+operand and five read operands. Readers use0578 with0579/057a or0585/3eb8
+in optional signal-processing corrections and shadow-change handling. This
+establishes a calibration-scalar path,not its physical quantity or units,and
+does not close indirect writers. No reply-generating path is established by
+this handler;do not invent one to satisfy an idle-wake hypothesis.
+
+`rom6_idle_contract.py` pins the relevant dispatcher,handler,formatter and
+gate instruction fragments and checks the bounded observations against both
+native rings. The actual MVMD/MVDK writes expose Read-slot5168/35c5 while
+EXECPC can be invalid;generic bus-time context PCs are not instruction-owner
+proof. The curated passive observer ends at24s even in longer runs,retains
+no frame-history flood,and never selects firmware work or writes state.
 
 ```sh
 .venv/bin/python tools/run_npe3_native.py --reference-clock --seconds 24 --adc-source fcch-sch-broadcast --capture-start p09 --tx-release p05 --raw-agch --provision-records
