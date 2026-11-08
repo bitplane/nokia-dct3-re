@@ -3,6 +3,14 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "c54x_conditional_forward_exit_at_repeat_endpoint",
+      "owner": "tms320c54x_generic_cpu",
+      "status": "satisfied",
+      "predicate": "A nondelayed conditional forward branch ending at REA retains the endpoint decrement and correctly selects its exit or repeat continuation",
+      "current": "The20 independent block_terminal_exit cases and restores fail before admission and pass afterward: zero/nonzero BRC, first/last/never exits without duplicate zero-count patterns, A/B predicates and two program pages. Final pointer, selected marker, BRC, RSA/REA, explicit software BRAF clear and continuation are checked. Existing392 internal-branch,144 forward-exit and14 remaining exclusion cases/restores pass. TI SPRU131G6.8 defines the final instruction word and Decode decrement; acquired ROM6 uses this form at6238 with extension6239. No handset address is special-cased in the CPU. This qualifies the generic branch composition, not native radio completion, interrupts at the endpoint or measured silicon pipeline timing.",
+      "evidence": ["cpu/tms320c54x/tms320c54x.cpp", "tests/c54x/sections/block_terminal_exit.h", "tests/c54x/sections/block_branch_limits.h", "fixtures/c54x_sections.json", "docs/c54x_execution_contracts.md"]
+    },
+    {
       "id": "native_dsp_reload_preserves_fractional_counter_phase",
       "owner": "native_dsp_declared_counter_model",
       "status": "satisfied",

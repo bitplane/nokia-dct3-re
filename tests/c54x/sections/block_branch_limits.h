@@ -6,6 +6,8 @@ inline std::vector<clocked_register_case> section_cases()
 {
 	std::vector<clocked_register_case> cases;
 	for(unsigned kind=0;kind<8;++kind)for(u32 base : {0U,0x20000U}){
+		// A conditional forward exit at the endpoint has positive coverage.
+		if(kind==4)continue;
 		u16 const end=kind==1 || kind==4 ? 0x604 : kind==2 ? 0x606 : 0x60d;
 		auto initial=initial_case("block-branch-unqualified-control-fails-closed",{0xf072,end,0x1092,
 			std::array<u16,8>{0xf073,0xf073,0xf273,0xf845,0xf845,0xf945,0xf072,0xf880}[kind],

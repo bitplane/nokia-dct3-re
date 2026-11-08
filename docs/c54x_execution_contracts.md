@@ -394,7 +394,7 @@ longer coverage claims. Supported delay-slot arithmetic, addressing, control
 and restoration tests remain separate. Older revision-bound checkpoints below
 may name retired diagnostics; they are not the current test inventory.
 
-Block-control admission similarly retains the 16-case `block_branch_limits` and
+Block-control admission similarly retains the 14-case `block_branch_limits` and
 28 delayed-block boundary cases in `composition_limits` rather than a separate exclusion profile
 for every unsupported composition. The near-call, far-call and inner-repeat
 exclusion matrices are retired: 108 rejected case/restore pairs, their precise
@@ -1795,7 +1795,7 @@ before replay. Eight snapshots are distributed. Physical interrupts are
 asserted on the first selected store; the former four crossed arrival-clock
 values are no longer a coverage claim. Depending on the selected arm, the
 next source Read and an issued store can precede the hardware frame.
-`block_branch_limits` independently owns eight unsupported control shapes
+`block_branch_limits` independently owns seven unsupported control shapes
 on both pages, with no data transactions and no speculative body/frame write.
 These are implementation-limit tests, not silicon rejection requirements.
 
@@ -1813,7 +1813,7 @@ saved state was added.
 `0,1,2,7`, four source patterns, both accumulator delay consumers, one
 two-word or two single-word delay instructions and two pages; four snapshots are distributed.
 It checks ordered source reads, selected writes, exact iterations and delay
-effects. `block_branch_limits` retains 16 exclusions, with its delayed-control case
+effects. `block_branch_limits` retains 14 exclusions, with its delayed-control case
 now testing a BD delay span at REA rather than an admitted internal BD.
 The original recorder passes this branch and stops at extended BANZ
 `02:a4cb`. Interrupt composition and measured physical phases remain outside
@@ -2991,10 +2991,11 @@ balanced interrupt frames and restored held words. Interrupts arrive after
 the first copy, not at every clock. On the unconditional route with another
 inner copy pending, its Read precedes IACK and its Write drains before the
 hardware frame; the complete ordered trace checks that model interaction.
-An off-by-one inner count fails on an extra source Read. The 16-case `block_branch_limits` control
+An off-by-one inner count fails on an extra source Read. The 14-case `block_branch_limits` control
 tests below/above-block targets and a conditional call instead of treating
-ordinary backward branches as unsupported. Outside-block branches, delayed back edges and
-measured physical phase timing remain unvalidated.
+ordinary backward branches as unsupported. Forward exits have their separate
+`block_exit`/`block_delayed_exit` coverage; delayed back edges and measured
+physical phase timing remain unvalidated here.
 
 FCALL is admitted from inside a block when the complete call precedes the
 endpoint; FCALLD additionally requires both delay words inside the block.
@@ -5118,6 +5119,28 @@ Both sections observe the whole data bus: endpoint layouts permit the next
 iteration's Read before the previous tail Write. Delayed conditional and
 unconditional forms also differ in delay-load/store bus ordering, which is
 checked as implementation behavior, not a measured silicon phase claim.
+
+## Conditional exit at the block endpoint
+
+A nondelayed conditional forward branch may have its extension word at REA.
+The endpoint retains its ordinary Decode-owned BRC decrement even when the
+branch is taken; the existing branch redirect handles the transfer. No hidden
+loop stack or unconditional BRAF clear is added. The admission remains limited
+to conditional forward exits; unconditional/inside-target endpoint branches
+and endpoint-overlapping delayed branches retain their existing exclusions.
+
+`block_terminal_exit` checks 20 independent cases plus replay: counts 0/2,
+first/last/never exits without duplicate zero-count patterns, A/B conditions
+and two program pages. It checks exact read-pointer advancement, one selected
+marker write, post-endpoint BRC, RSA/REA, explicit software BRAF clear and the
+ordinary continuation. The test fails before this admission. The two former
+conditional-endpoint exclusions move from `block_branch_limits` into this
+positive coverage rather than being described as hardware-invalid forms.
+
+[TI SPRU131G section 6.8](https://www.ti.com/lit/ug/spru131g/spru131g.pdf)
+defines REA as the last instruction word and the Decode-time decrement.
+The acquired ROM6 instruction at `6238` supplies a concrete consumer with
+extension at `6239`; it is not a firmware-specific CPU exception.
 
 ## RPTBD delay-owned T load
 
