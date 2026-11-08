@@ -3,6 +3,13 @@
   "kind": "falsifications",
   "entries": [
     {
+      "id": "npe3_upper_escape_is_mmr_instruction_gap",
+      "status": "disproven",
+      "hypothesis": "The traffic run's final MMR/repeated-transfer rejection at010065 identifies the next legitimate CPU instruction to implement",
+      "conclusion": "The first divergence is an explicit FCALLD fb81/a50d at8fba. Its first unbacked program read01a50d occurs19.726205429s with Read-owned PC8fba,XPC1 and SP02b3. Only page0 is acquired/mapped;23283 unbacked program reads precede the final illegal word. The terminal opcode therefore cannot be treated as captured ROM code. First-escape provenance and upper-page coverage must precede further ISA work. Generic TI ROM mapping does not justify a page0 mirror;MAD2-specific decode or page-aware capture is required. This does not prove that the physical phone lacks code or that no capture exists elsewhere.",
+      "evidence": ["tools/npe3_native_observe.lua", "tools/run_npe3_native.py", "tools/test_run_npe3_native.py", "docs/rom6_rf_interface.md"]
+    },
+    {
       "id": "npe3_result4_implies_missing_or_unsuitable_candidate",
       "status": "disproven",
       "hypothesis": "Native result4 proves that the general candidate chooser has no usable cached cell,so2d314c must have been reached through2d3104's earlier null-return path",

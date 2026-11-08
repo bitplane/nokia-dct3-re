@@ -202,6 +202,8 @@ Some recurring mistakes need stronger checks than ordinary source review:
   and the preceding executed transfer before extending the ISA. Debugger
   history may disassemble current raw memory rather than the bytes executed
   through an overlay; retain PCs and recover instruction bytes independently.
+  Executable-input coverage must include unbacked program pages,not just low
+  overlay holes:zero ILLEGAL does not prove that every fetch was backed.
   Admission guards must also distinguish a completed opcode slot from retained
   extension words. Test opcode-shaped address/literal values inside legal
   multiword instructions and loops; matching raw bits alone is insufficient.

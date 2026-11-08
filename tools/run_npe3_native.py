@@ -90,7 +90,7 @@ def check_execution(text, loader, program, flash, *, reference=False, minimum_se
             raise ValueError(f'native 6210 marker count changed: {marker}')
     terminals = re.findall(r'npe3_native_terminal: t=([\d.]+) arm=[\da-f]+ dsp=[\da-f]+ illegal=(\d+) idle=[01] pmst=[\da-f]+ observer_writes=0', text)
     if (len(terminals) != 1 or terminals[0][1] != '0' or 'Lua error' in text
-            or re.search(r'staged.*unsupported|unsupported.*staged', text)):
+            or re.search(r'staged.*unsupported|unsupported.*staged|unmapped program memory read|npe3_native_program_escape:', text)):
         raise ValueError('native 6210 terminal execution is incomplete or illegal')
     if float(terminals[0][0]) < minimum_seconds:
         raise ValueError('native 6210 ended before the required horizon')

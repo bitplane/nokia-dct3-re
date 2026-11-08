@@ -25,6 +25,9 @@ multiplier unresolved.
 `nsm3r6` selects the C54x backend without `dsp_hle` or `dsp_staged`, separate
 program/data regions, the `0080..1fff` executable overlay and the extended
 program instruction grammar. Only page zero has an acquired program map.
+The6210 raw traffic experiment now executes FCALLD to1:a50d,which is outside
+that input;see the [page/mapping boundary](rom6_rf_interface.md#native-traffic-program-page-boundary).
+Do not confuse page0 completion with acquisition of the full extended ROM.
 Its initial IMR is zero, not the backend's ROM4-specific bit-0 seed; fitted
 reset state remains unmeasured. The product's Nokia System Module manual,
 issue 1, 12/1999, printed page 25, specifies a 13 MHz reference multiplied by

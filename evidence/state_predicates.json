@@ -3,11 +3,19 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "npe3_native_traffic_program_backing",
+      "owner": "native_rom6_reference_adc_laboratory",
+      "status": "unresolved",
+      "predicate": "Native traffic processing has captured or independently evidenced backing for every program-space access",
+      "current": "At19.726205429s,FCALLD fb81/a50d at8fba requests01a50d,with Read-owned PC8fba,XPC1,SP02b3. Current input and device map provide only page0. The later MMR rejection follows23283 unbacked reads;it is not evidence for adding an opcode. A bounded history and a no-history control produce identical first-escape address/time/count. No higher-page input or preceding unmapped upper-program writes were found in the retained collection/run;this is not a global absence proof or a hardware identity claim. Generic TI ROM is page0-only and common OVLY RAM is below8000,so it does not establish an alias at1:a50d. Need a page-aware program capture there paired with0:a50d and mapping/control state,or an evidenced MAD2 decode contract. Do not mirror page0,ignore XPC or synthesize code. Checker now counts/rejects upper-page reads even if they decode legally. The39dBm control retains full DSP journal e6f4b9c05d50f08663cc7cbc7fc1c5166a51b1d84c805dd43573c0dbd9118074;native8210 Menu and ROM4 descriptor-transfer controls pass.",
+      "evidence": ["driver/nokia_dsp_c54x.cpp", "tools/npe3_native_observe.lua", "tools/run_npe3_native.py", "tools/test_run_npe3_native.py", "docs/rom6_rf_interface.md", "docs/rom6_dsp_bringup.md", "roms/README.md"]
+    },
+    {
       "id": "npe3_native_traffic_assignment_decode",
       "owner": "native_rom6_reference_adc_laboratory",
       "status": "satisfied",
       "predicate": "The raw network Assignment Command is decoded natively after actual Call Confirmed",
-      "current": "Separate traffic-assignment input sends N(S)=1/N(R)=1,acknowledging actual Call Confirmed4219 and assigning TCH/F slot1 on35 with TSC2/speech-v1. Independent four-burst source reconstruction and60 timed release checks pass. Native successful Assignment Command4255 decode is19.654480198s. MCU requests packet02 traffic config042a02000271012fc1000023000000040000000000000000 and submits00b0 empty SABM. The overall24s gate remains red at repeated MVDK7195/0011,c634..c635,reported atc637. Own setup sets AR5=b5ff and RPT count4;ordinary RAM contains2223/222f/222b/0016/126a. Mapped destination begins atAR1;repeat_source0013 denotes the engine's progressing literal,not a source address. Recover generic destination progression and AR5 source/destination alias ordering before admitting this form. Completed CPU circular/repeat/delay contracts have focused save/replay tests. Actual TCH RF serialization,Assignment Complete,Alerting,connected call and speech remain unqualified. Do not infer traffic success from MCU configuration or weaken terminal illegal-instruction checks.",
+      "current": "Separate traffic-assignment input sends N(S)=1/N(R)=1,acknowledging actual Call Confirmed4219 and assigning TCH/F slot1 on35 with TSC2/speech-v1. Independent four-burst source reconstruction and60 timed release checks pass. Native successful Assignment Command4255 decode is19.654480198s. MCU requests packet02 traffic config042a02000271012fc1000023000000040000000000000000 and submits00b0 empty SABM. This proves decode and MCU configuration,not completed traffic setup. The full24s gate remains red at the separate npe3_native_traffic_program_backing boundary. Actual TCH RF serialization,Assignment Complete,Alerting,connected call and speech remain unqualified.",
       "evidence": ["driver/nokia_dct3_research.cpp", "tools/npe3_raw_call_setup_check.py", "tools/test_npe3_raw_call_setup_check.py", "tools/run_npe3_native.py", "docs/rom6_rf_interface.md", "docs/c54x_execution_contracts.md"]
     },
     {

@@ -152,6 +152,8 @@ class Native6210EvidenceTest(unittest.TestCase):
                  self.text.replace('illegal=0', 'illegal=1'),
                  self.text.replace('faults=00', 'faults=01'),
                  self.text.replace('missing_program_reads=0', 'missing_program_reads=1'),
+                 self.text+'\n[:dsp_c54x:cpu] unmapped program memory read from 01A50D',
+                 self.text+'\nnpe3_native_program_escape: address=01a50d',
                  self.text.replace('hle=0', 'hle=1'),
                  self.text.replace('readback=05', 'readback=00'),
                  self.text.replace('npe3_native_terminal:', 'missing_terminal:'),

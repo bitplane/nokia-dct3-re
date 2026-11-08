@@ -610,6 +610,8 @@ RAM snapshots. The full DSP journal remains unchanged. Zero-hit interior-PC
 probes are retired;do not replace this selection policy with a fabricated
 hardware completion or overwrite the list/current key.
 
+### Native paging and call signalling:33dBm cell
+
 The39dBm control above is not the only external-cell policy. Own-ROM helper
 4a70b8 computes C1 = received level - RXLEV_ACCESS_MIN -
 max(BTS maximum power - MS maximum power,0). The initial-107dBm sample,
@@ -652,27 +654,47 @@ Call Confirmed and all60 timed P05 releases;native assignment decode succeeds
 at19.654480198s. MCU packet02/body
 `042a02000271012fc1000023000000040000000000000000` requests traffic
 configuration and packet1b/body00b0 submits empty SABM. This is not proof of
-actual TCH transmission. The complete24s acceptance deliberately fails at
-repeated MVDK7195/0011 (c634..c635),reported atc637. Own preceding code sets
-AR5=b5ff and RPT count4;the source is ordinary RAM with five observed words
-2223/222f/222b/0016/126a. The literal destination starts at mapped AR1.
-The diagnostic `repeat_source=0013` is the engine's progressing repeated
-literal,not the source address. The next CPU contract is repeated mapped
-destination progression and source-pointer alias ordering,including the last
-destination potentially reaching AR5. Do not remove the guard without generic
-ordered-access/save-replay tests. Completed circular/repeat/delay instruction
-contracts live in `c54x_execution_contracts.md`;no firmware opcode or return
-value is replaced. Actual TCH/F serialization and RX scheduling remain open.
-Native8210 Menu acceptance remains green with these CPU extensions;this is
-a shared-core regression,not a successful6210 traffic-setup result.
-Do not
-inject083e again or clear the context byte. Broad heap watches used to locate
-the consumer are retired;bounded return/selector/context observations retain
-the contract. The fresh native capture reproduces UI,SIM,LU and raw release,
-and the3210 HLE semantic/coherent frontier also passes. The legacy6210 staged
+actual TCH transmission.
+
+### Native traffic program-page boundary
+
+The current full24s gate is red at an unbacked program
+page,not a newly unsupported opcode. Observed program words8fba..8fbd are
+`fb81 a50d 7717 2f11`:FCALLD to1:a50d with a two-word delay. First access
+to01a50d is19.726205429s,with Read-owned PC8fba,XPC1 and SP02b3. It then
+traverses23283 unbacked program words before a secondary MMR-address rejection.
+That later word is not evidence for extending the ISA. Generic CPU transfer,
+reverse-carry,parallel-repeat and control-delay contracts have focused tests in
+`c54x_execution_contracts.md`;no firmware opcode or return value is replaced.
+
+Only page0 exists in the acquired program input and current device map. No
+higher-page capture or preceding unmapped upper-program writes were found in
+the retained source collection/run. The live data view ata50d is zero;page0
+program ata50d is different code ending in near RET,not evidence of an alias.
+[TI SPRU131G 3.2.5](https://www.ti.com/lit/ug/spru131g/spru131g.pdf) makes
+enabled ROM page0-only;its common OVLY RAM is below8000,not this target.
+MAD2's fitted bank organization remains unknown:do not mirror page0,ignore
+XPC or invent page1 bytes. The next evidence is a page-aware program capture
+at1:a50d (paired with0:a50d and mapping/control state),or a reliable MAD2
+address-decode contract. A full page1 upper-half capture is preferable for
+continued execution. No fitted-mask/clock conclusion follows from this gap.
+
+The native checker now rejects every unbacked upper-program read,even if its
+returned word decodes legally. First-escape logging retains read/execute PC,
+XPC and SP;the caller's words are independently recoverable from the acquired
+program image. These observations do not substitute for execution. Actual TCH/F serialization,
+Assignment Complete and connected speech remain unqualified. Positive UI/SIM/
+LU/release checks belong to separate paging/SETUP-only controls,not this red
+traffic run. Do not inject083e or clear the context byte. The legacy6210 staged
 HLE composition does not currently reach runtime in a fresh-storage42s quiet
 control;it is not a usable positive paging oracle until its verifier/loader
 handoff is requalified.
+
+The current39dBm control passes with unchanged full DSP journal SHA256
+`e6f4b9c05d50f08663cc7cbc7fc1c5166a51b1d84c805dd43573c0dbd9118074`.
+Native8210 Menu and the8s ROM4 descriptor-transfer regression also pass with
+the CPU extensions. The no-history-probe traffic control reproduces the exact
+first-escape address/time and missing-read count above.
 
 ```sh
 .venv/bin/python tools/run_npe3_native.py --reference-clock --seconds 24 --adc-source fcch-sch-broadcast --capture-start p09 --tx-release p05 --raw-agch --provision-records --page-at 18

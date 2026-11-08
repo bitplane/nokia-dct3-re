@@ -346,7 +346,7 @@ roms/research/nsm3-rom6/{manifest.json,SHA256SUMS}
 
 | Input | Bytes | SHA-256 |
 | --- | ---: | --- |
-| Reconstructed program address space | 131,072 | `b450413a3b29a83f691533584f5c923f475e0a720c85acc1ec50097c63eee4cf` |
+| Reconstructed page-0 program address space | 131,072 | `b450413a3b29a83f691533584f5c923f475e0a720c85acc1ec50097c63eee4cf` |
 | Acquired upper-program image | 40,960 | `fcb9d987110c3288b93b448f2ad5d639399793afff662aa76c20f826de3ed15f` |
 | Separate data-alias text | 430,080 | `0e64f8b15ccc46dd17eb72995cd3079432af7afe69e284237d7f962f534d8e1b` |
 | Low-program sweep text | 159,756 | `f88d3fe8c108c540235fa6d86356e9b9da00fe7e7ead4a952d8f4ed3e78963f1` |
@@ -358,6 +358,9 @@ The block/subprobe captures cover `0000..007f` and `2000..7fff`; their thirty
 overlapping words agree. Reassembly from the acquired upper-program base and
 ordered sweeps matches the working image byte-for-byte. `0080..1fff` is zero
 padding, not dumped immutable ROM or a cold-RAM snapshot.
+No higher XPC page is present in these inputs. The6210 native traffic path
+executes FCALLD to1:a50d;further acquisition or a proven MAD2 bank-decode
+contract is needed there. See the [native radio boundary](../docs/rom6_rf_interface.md).
 
 The 20,480-word `b000..ffff` data alias differs from the program view at 12,277
 addresses (`b4f8`: data `fa60`, program `f074`). Keep the views separate: using

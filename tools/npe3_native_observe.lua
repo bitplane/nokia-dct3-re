@@ -43,6 +43,17 @@ local missing_program=0
 _G.npe3_native_coverage=dsp.spaces.program:install_read_tap(0x80,0x1fff,'npe3_native_coverage',function()
     if dsp.state.PMST.value&0x20==0 then missing_program=missing_program+1 end
 end)
+local upper_reads=0
+_G.npe3_native_upper_coverage=dsp.spaces.program:install_read_tap(0x10000,0x7fffff,'npe3_native_upper_coverage',function(address,value)
+    -- This composition maps only page0. Count escapes even if unbacked words
+    -- happen to decode legally; terminal ILLEGAL alone is insufficient.
+    missing_program=missing_program+1;upper_reads=upper_reads+1
+    if upper_reads==1 then
+        machine:logerror(string.format('npe3_native_program_escape: t=%.9f address=%06x value=%04x pc=%06x readpc=%06x execpc=%06x xpc=%02x sp=%04x observer_writes=0\n',
+            machine.time:as_double(),address,value,dsp.state.GENPC.value,dsp.state.READPC.value,
+            dsp.state.EXECPC.value,dsp.state.XPC.value,dsp.state.SP.value))
+    end
+end)
 _G.npe3_native_loader=dsp.spaces.program:install_read_tap(0x0a00,0x0a00,'npe3_native_loader',function()
     if captures.loader then return end
     captures.loader=true
