@@ -2855,8 +2855,19 @@ After SCH, native class-50 reports identify frame fields 719, 770 and 821, each
 so these are a receive frontier, not registered cells. The next source-side
 step is to confirm that request's channel/allocation contract before supplying
 standards-derived normal bursts at the corresponding BCCH schedule;
-the zero-source transport defect remains a separate required fidelity item.
+the physical request/acknowledgement contract remains a separate fidelity item.
 Independent normal-reference SIM save and cold readback still pass.
+
+The bounded whole-phone class-write observer confirms three four-burst
+allocations: frames 716..719, 767..770 and 818..821. Each is multiframe
+positions 2..5, with 51 frames between blocks. At the native `463f` class
+publication, live mode `250f` is `0051`, training selector `250b` is 2,
+`2616` is still zero and buffer-completion cursor `0231` is `2667`.
+Do not import the isolated fixture's mode `0030` or preinitialized `2616=2`
+as the whole-phone entry contract. The zero normal-burst source still yields
+error reports; allocation alone proves neither frontend completion nor BCCH
+decoding. `tools/npe3_normal_receive.lua` retains bounded passive class
+observations and up to four correlator snapshots for the raw-source work.
 
 `verify-6210-alarm-off-snooze-no` combines the independently validated
 powered-off and Snooze lifecycles: two natural RTC wakes, separately checked

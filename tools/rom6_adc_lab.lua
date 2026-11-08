@@ -8,6 +8,7 @@ if npe3 then
     if machine.system.name=='npe3afs' or machine.system.name=='npe3cp9' then
         dofile(directory..'npe3_sch_provenance.lua')
         dofile(directory..'npe3_fcch_schedule.lua')
+        dofile(directory..'npe3_normal_receive.lua')
     end
 end
 local output_cap=npe3 and 496 or 128

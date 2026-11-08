@@ -3,6 +3,14 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "npe3_native_bcch_four_burst_allocation",
+      "owner": "native_rom6_reference_adc_laboratory",
+      "status": "satisfied",
+      "predicate": "Own whole-phone firmware allocates four class50 receive bursts at multiframe positions2..5 after native SCH",
+      "current": "The bounded3.2..4s RAM-write observer records native463f class50 publications for716..719,767..770 and818..821,three complete four-frame blocks51 frames apart. Every entry has live250f=0051,250b=2,2616=0 and0231=2667. This distinguishes the whole-phone allocation from the isolated fixture's mode0030 and preinitialized2616=2. The source has no normal bursts and reports remain errors. No frontend completion,decoded BCCH,camping,physical tuning or fitted timing is inferred from allocation.",
+      "evidence": ["tools/npe3_normal_receive.lua", "tools/rom6_adc_lab.lua", "docs/6210_bringup.md", "tests/firmware/rom6_xcch_kernel.h"]
+    },
+    {
       "id": "npe3_p09_laboratory_native_sch_decode",
       "owner": "native_rom6_reference_adc_laboratory",
       "status": "satisfied",
