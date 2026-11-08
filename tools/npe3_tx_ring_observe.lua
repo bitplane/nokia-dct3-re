@@ -5,6 +5,11 @@ local space=cpu.spaces.program
 local commits,invalid=0,0
 local finish=machine.system.name=='npe3ap5' and 24 or 12
 local cap=machine.system.name=='npe3ap5' and 256 or 128
+if machine.system.name=='npe3ap5' then
+    finish=tonumber(os.getenv('NPE3_NATIVE_SECONDS') or '24')
+    assert(finish and finish>=24 and finish<=120 and finish%1==0)
+    if finish>24 then cap=2048 end
+end
 local begin=machine.system.name=='npe3ap5' and 0 or 2
 local tap=space:install_write_tap(0x100a4,0x100a7,'npe3_mcu_tx_ring',function(address,data,mask)
     local now=machine.time:as_double()

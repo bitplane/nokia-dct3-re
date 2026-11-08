@@ -178,6 +178,16 @@ void dct3_rf_adc_fixture_state::machine_reset()
 	cell.bsic=42;
 	network.use_single_cell();
 	network.set_cell(0,cell);
+	if (m_raw_agch)
+	{
+		auto const fill=network.paging_fill();
+		gsm::tch_f::packed_control_block octets{};
+		std::copy_n(fill.begin(),octets.size(),octets.begin());
+		auto const bursts=nokia_rf_lab::bcch_bits(octets,2);
+		for (unsigned at=0;at<4;++at) m_paging_samples[at]=nokia_rf_lab::gmsk_samples(bursts[at]);
+		std::string packed;for (auto byte:octets) packed+=util::string_format("%02x",byte);
+		machine().logerror("npe3_bts_pch: starts=6,12,16 octets=%s tsc=2 no_identity=1 raw_adc_only=1 physical_claim=0\n",packed);
+	}
 	for (unsigned kind=0; kind<4; ++kind)
 	{
 		auto const information=network.system_information(kind,35);
@@ -479,6 +489,13 @@ u16 dct3_rf_adc_fixture_state::sample_r(offs_t component)
 	if (m_raw_agch && frame>=m_agch_start_frame && frame-m_agch_start_frame<4 && tick%60'000<148*48)
 	{
 		auto const &sample=m_agch_samples[frame-m_agch_start_frame][(tick%60'000)/12];
+		m_q_latch=sample[1];
+		return u16(sample[0]);
+	}
+	auto const pch=nokia::radio::combined_ccch_burst(frame);
+	if (m_raw_agch && pch && tick%60'000<148*48)
+	{
+		auto const &sample=m_paging_samples[*pch][(tick%60'000)/12];
 		m_q_latch=sample[1];
 		return u16(sample[0]);
 	}

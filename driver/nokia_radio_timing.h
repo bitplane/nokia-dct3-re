@@ -42,5 +42,15 @@ constexpr std::uint32_t common_control_block_end(std::uint32_t minimum, bool com
 	return minimum + 51 - position + endings[0];
 }
 
+// Combined CCCH with BS_AG_BLKS_RES=0: all three blocks may carry PCH.
+constexpr std::optional<unsigned> combined_ccch_burst(std::uint64_t frame)
+{
+	unsigned const position=frame%51;
+	constexpr unsigned starts[]={6,12,16};
+	for (unsigned start : starts)
+		if (position>=start && position<start+4) return position-start;
+	return std::nullopt;
+}
+
 } // namespace nokia::radio
 #endif // MAME_NOKIA_NOKIA_RADIO_TIMING_H

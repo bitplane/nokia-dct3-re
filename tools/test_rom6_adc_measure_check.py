@@ -168,11 +168,15 @@ class AdcMeasurementTest(unittest.TestCase):
 
     def test_full_broadcast_capture_bound_keeps_completeness_requirement(self):
         rows=[]
-        for i in range(150):
+        for i in range(300):
             start=0x80+(2*i)%100
             end=0x80+(2*i+2)%100
             rows.append(f'rom6_measure_rx_commit: sequence={i+1} t={i+1}.000000000 previous={start:04x} producer={end:04x} consumer={start:04x} words=028a,0004 mask=ffff cpu_pc=002d08 observer_writes=0')
         summary='rom6_measure_rx_complete: commits=150 cap=256 observer_writes=0'
+        extended='rom6_measure_rx_complete: commits=300 cap=2048 observer_writes=0'
+        self.assertEqual(check_rx_publications('\n'.join(rows+[extended]))['commits'],300)
+        with self.assertRaises(ValueError):check_rx_publications('\n'.join(rows+[extended.replace('2048','256')]))
+        rows=rows[:150]
         self.assertEqual(check_rx_publications('\n'.join(rows+[summary]))['commits'],150)
         for bad in ('\n'.join(rows[:64]+[summary]),
                     '\n'.join(rows+[summary.replace('cap=256','cap=64')]),

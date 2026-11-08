@@ -132,3 +132,39 @@ def check_release(text,blocks):
                 disconnect_frame=disc,closing_ua_start=ua_start,
                 native_decode_times=times,common_configuration_time=common[0]['time'],
                 stable_camping_qualified=False,physical_transmission_qualified=False)
+
+
+def check_paging_fill(text,common_configuration_time):
+    """Qualify native no-identity PCH decoding without inferring camping."""
+    from tools.gsm_xcch_signal import paging_fill_octets
+    fill=paging_fill_octets()
+    marker='npe3_bts_pch: starts=6,12,16 octets='+fill.hex()+' tsc=2 no_identity=1 raw_adc_only=1 physical_claim=0'
+    if text.count(marker)!=1 or text.count('npe3_bts_pch:')!=1:
+        raise ValueError('missing exact no-identity paging source')
+    assignments={bytes.fromhex(row[1]) for row in re.finditer(r'npe3_raw_agch: [^\n]*octets=([0-9a-f]{46}) ',text)}
+    hits=[];failures=0;early_reports=[]
+    for packet in check_rx_publications(text)['packets']:
+        body=bytes.fromhex(packet['payload'])
+        if packet['type']!=128 or not body or body[0]!=0x60:continue
+        if len(body)!=33 or body[1]!=42:raise ValueError('malformed native common-channel block')
+        if body[2]:
+            failures+=1;continue
+        frame=int.from_bytes(body[3:6],'big')
+        if frame>=2715648 or frame%51 not in (9,15,19):
+            raise ValueError('successful common block differs from combined source schedule')
+        if body[10:] in assignments:continue
+        if body[10:]!=fill:raise ValueError('native common block differs from transmitted no-identity fill')
+        # Repeated identical fills cannot uniquely bind an output to one air
+        # block. Preserve reported-FN/time disagreements rather than fitting a
+        # clock/tolerance or relabelling an early report as source-correlated.
+        if float(packet['time'])<=frame*60000/13000000:
+            early_reports.append(dict(reported_frame=frame,time=packet['time']))
+        hits.append((float(packet['time']),int.from_bytes(body[6:8],'big')))
+    if not hits or not any(stamp>common_configuration_time for stamp,_ in hits):
+        raise ValueError('no native paging-fill decode after normal release')
+    return dict(native_paging_fill_qualified=True,blocks=len(hits),
+                first_time=hits[0][0],last_time=hits[-1][0],
+                reported_receiver_arfcns=sorted({key for _,key in hits}),
+                early_reported_frames=early_reports,source_frame_binding_qualified=False,
+                failed_common_blocks=failures,stable_camping_qualified=False,
+                physical_carrier_selection_qualified=False)

@@ -54,7 +54,10 @@ raw dedicated I/Q,and the native class80 receiver publishes the exact UA
 successfully. Raw Location Updating Accept is decoded and acknowledged by
 native uplink RR;the fresh SIM persists updated test-cell EF_LOCI.
 Raw RR Channel Release,native acknowledgement/DISC,closing UA and the MCU
-return to common RX are also qualified. Stable camping/registered presentation remain open;
+return to common RX are also qualified. No-identity idle paging reaches native
+class60 after release,and a complete60s run retains legal execution and updated
+EF_LOCI. Sparse idle reception and reported-FN/source timing remain unresolved;
+stable camping/registered presentation remains open;
 see the [native MM boundary](rom6_rf_interface.md#native-location-updating-acceptance).
 The explicit 13 MHz DSP clock is provisional (the manual establishes RFIclk,
 not the DSP multiplier). A longer run requests MCU software reset near

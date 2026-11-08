@@ -7,6 +7,12 @@ local cpu=assert(machine.devices[':dsp_c54x:cpu'])
 local stream=assert(io.open('rom6_radio_writes.tsv','wb'))
 local stats,handles={},{}
 local writes,overflow=0,false
+local write_cap=2097152
+if machine.system.name=='npe3ap5' then
+    local seconds=tonumber(os.getenv('NPE3_NATIVE_SECONDS') or '24')
+    assert(seconds and seconds>=24 and seconds<=120)
+    write_cap=write_cap*math.ceil(seconds/24)
+end
 local captured_output_overlay=false
 local function observe(direction,address,value,mask)
     local now=machine.time:as_double()
@@ -29,7 +35,7 @@ local function observe(direction,address,value,mask)
         else item.pcs_capped=true end
     end
     if direction=='W' then
-        if writes>=2097152 then overflow=true; return end
+        if writes>=write_cap then overflow=true; return end
         writes=writes+1
         assert(stream:write(string.format('%.9f\t%06x\t%04x\t%04x\t%04x\n',now,pc,address,value,mask)))
         if address==0x31 and not captured_output_overlay then

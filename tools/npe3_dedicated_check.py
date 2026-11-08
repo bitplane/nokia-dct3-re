@@ -5,13 +5,16 @@ import re
 from tools.npe3_rach_transmit_check import check_agch
 
 COMMIT=re.compile(r'npe3_mcu_tx_commit: sequence=(\d+) t=([\d.]+) previous=([0-9a-f]{4}) producer=([0-9a-f]{4}) words=([0-9a-f,]+) pc_context=([0-9a-f]{8}) observer_writes=0')
-COMPLETE=re.compile(r'npe3_mcu_tx_complete: commits=(\d+) cap=256 invalid=0 begin=0 end=24 observer_writes=0')
+COMPLETE=re.compile(r'npe3_mcu_tx_complete: commits=(\d+) cap=(\d+) invalid=0 begin=0 end=(\d+) observer_writes=0')
 
 
 def packets(text):
     rows=list(COMMIT.finditer(text))
     complete=COMPLETE.findall(text)
-    if (len(complete)!=1 or len(rows)!=int(complete[0]) or not 0<len(rows)<=256 or
+    if (len(complete)!=1 or
+            not 24<=int(complete[0][2])<=120 or
+            int(complete[0][1])!=(256 if int(complete[0][2])==24 else 2048) or
+            len(rows)!=int(complete[0][0]) or not 0<len(rows)<=int(complete[0][1]) or
             len(rows)!=text.count('npe3_mcu_tx_commit:') or 'npe3_mcu_tx_invalid:' in text):
         raise ValueError('missing complete early-through-dedicated MCU publication window')
     previous=0
@@ -21,7 +24,7 @@ def packets(text):
         sequence,stamp,start,end,words,_=row.groups()
         stamp=float(stamp);start=int(start,16);end=int(end,16)
         words=[int(word,16) for word in words.split(',')]
-        if (int(sequence)!=index or not math.isfinite(stamp) or not previous_time<=stamp<=24 or
+        if (int(sequence)!=index or not math.isfinite(stamp) or not previous_time<=stamp<=int(complete[0][2]) or
                 not 0<=start<82 or not 0<=end<82 or start!=previous or
                 (end-start)%82!=len(words) or not words or any(word>65535 for word in words)):
             raise ValueError('inconsistent MCU ring publication')

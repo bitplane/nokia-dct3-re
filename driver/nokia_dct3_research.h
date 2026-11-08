@@ -97,6 +97,8 @@ private:
 	bool m_lu_acknowledged=false;
 	u64 m_release_start_frame=~u64(0);
 	std::array<std::array<std::array<s16,2>,148*4>,4> m_release_samples{};
+	// Immutable waveform derived from the configured no-identity paging fill.
+	std::array<std::array<std::array<s16,2>,148*4>,4> m_paging_samples{};
 	bool m_compare_start=false, m_candidate_active=false;
 	u16 m_candidate_target=0;
 	bool m_tone = true;

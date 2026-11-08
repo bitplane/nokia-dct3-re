@@ -198,7 +198,7 @@ def check_frequency_correction(text):
 
 def check_rx_publications(text):
     """Decode actual committed ring spans; never infer a missing reply payload."""
-    totals=re.findall(r'rom6_measure_rx_complete: commits=(\d+) cap=(64|256) observer_writes=0',text)
+    totals=re.findall(r'rom6_measure_rx_complete: commits=(\d+) cap=(64|256|2048) observer_writes=0',text)
     rows=list(RX_COMMIT.finditer(text))
     if (len(totals)!=1 or text.count('rom6_measure_rx_complete:')!=1 or
             not rows or len(rows)>int(totals[0][1]) or int(totals[0][0])!=len(rows) or

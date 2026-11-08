@@ -3,6 +3,30 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "npe3_idle_ccch_metadata_and_camping",
+      "owner": "native_rom6_reference_adc_laboratory",
+      "status": "unresolved",
+      "predicate": "The native CCCH completion frame identifies its actual source block and idle reception sustains stable camping",
+      "current": "The60s untuned ADC run has25 exact paging-fill decodes,but reception is sparse and stops at37.931345934s within that horizon. Six successful publications precede the nominal time of their reported block-ending FN,including1386 at6.389976857s and8220 at37.931345934s. Repeated identical fill cannot identify a unique source block,so the checker records all disagreements and explicitly does not qualify source-frame binding. The metadata may identify the requested/scheduled block rather than decoded source. Reported receiver keys include35 and46 despite the single declared source;this is not physical carrier-selection evidence. Later MCU type4a/body011b repeats. Stable camping is not inferred from updated EF_LOCI,a SIM-name frame,or legal execution. Resolve the native metadata and idle receive/wake contract;do not tune clocks/tolerances or inject a missing completion.",
+      "evidence": ["tools/npe3_raw_ua_check.py", "tools/test_npe3_raw_ua_check.py", "tools/run_npe3_native.py", "docs/rom6_rf_interface.md"]
+    },
+    {
+      "id": "npe3_native_idle_paging_decode",
+      "owner": "native_rom6_reference_adc_laboratory",
+      "status": "satisfied",
+      "predicate": "Standards-derived no-identity paging fill on the combined CCCH reaches exact successful native class60 publications after normal release",
+      "current": "The external BTS uses network paging_fill(),23 octets1506210001f0 followed by17 padding octets,at combined starts6,12,16 with TSC2. Actual AGCH overrides its selected common block. Independent Python/C++ timing and waveform checks cover all block positions,latched I/Q and off-window silence. The checker requires the exact source declaration,full native ring,BSIC42,legal combined frame positions,canonical fill or independently checked assignment,and post-release reception. The24s run has24 paging decodes;the60s run has25 through37.931345934s and33 failed common blocks. Access2708 receives AGCH2709;UA2776,LU2827,Release2878 and closingUA2980 complete with updated EF_LOCI and unchanged Menu. No MCU/RAM-derived samples or decoded messages are injected. This qualifies payload/CRC reception,not source-frame binding,stable camping or physical tuning.",
+      "evidence": ["driver/nokia_dct3_research.cpp", "driver/nokia_radio_timing.h", "tools/gsm_xcch_signal.py", "tools/rom6_adc_lab_check.py", "tools/test_rom6_adc_lab_check.py", "tools/npe3_raw_ua_check.py", "docs/rom6_rf_interface.md"]
+    },
+    {
+      "id": "npe3_extended_native_rf_observation",
+      "owner": "native_rom6_reference_adc_laboratory",
+      "status": "satisfied",
+      "predicate": "A complete60s native reference run preserves execution,record validation,MM storage,normal release and exact UI without truncating the bus or publication captures",
+      "current": "The requested60s run terminates at60.016667 with illegal0 and no uncovered program reads. One access/registration exchange and32 normal port bursts pass exact coding and all native protocol gates. EF_LOCI remains ffffffff00f1100001ff00;the reviewed Menu image is unchanged. MCU and DSP ring observers cover the whole horizon with cap2048;the full write journal has2,199,755 rows and overflow0. The initial2M producer cap and independent2M analysis limit were corrected;the existing complete uncapped capture was reassessed through the production analysis branches rather than rerunning firmware for an analysis-only change. Every footer count and complete-row check remains enforced. The native8210 Menu,state and cold phonebook controls pass. This is bounded compatibility,not long-term camping,late keypad response,physical RF or fitted mask/clock qualification.",
+      "evidence": ["tools/run_npe3_native.py", "tools/npe3_tx_ring_observe.lua", "tools/rom6_rx_ring_observe.lua", "tools/rom6_native_radio.lua", "tools/rom6_radio_census.py", "tools/npe3_dedicated_check.py", "tools/test_npe3_dedicated_check.py", "tools/test_rom6_adc_measure_check.py", "docs/rom6_rf_interface.md"]
+    },
+    {
       "id": "c54x_circular_memory_logic",
       "owner": "tms320c54x_generic_cpu",
       "status": "satisfied",

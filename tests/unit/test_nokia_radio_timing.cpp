@@ -24,6 +24,14 @@ int main()
 	static_assert(common_control_block_end(2396) == 2406);
 	static_assert(common_control_block_end(2'715'647 + 4) == 2'715'648 + 9);
 	static_assert(common_control_block_end(19, true) == 19);
+	for (unsigned frame=0;frame<204;++frame)
+	{
+		auto burst=combined_ccch_burst(frame);
+		unsigned const position=frame%51;
+		bool const active=(position>=6 && position<=9) || (position>=12 && position<=19);
+		assert(bool(burst)==active);
+		if (burst) assert(*burst==position-(position<10 ? 6 : position<16 ? 12 : 16));
+	}
 	static_assert(common_control_block_end(20, true) == 60);
 	static_assert(common_control_block_end(50, true) == 60);
 	static_assert(common_control_block_end(2'715'648, true) == 2'715'648 + 9);

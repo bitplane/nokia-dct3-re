@@ -2,6 +2,11 @@
 TSC2='01000011101110100100001110'
 
 
+def paging_fill_octets():
+    """TS44.018 type1 with one-octet no-identity Mobile Identity."""
+    return bytes([0x15,6,0x21,0,1,0xf0])+b'\x2b'*17
+
+
 def broadcast_si_index(frame):
     if frame<0: raise ValueError('negative TDMA frame')
     return (0,1,2,3,1,1,2,3)[(frame//51)%8]

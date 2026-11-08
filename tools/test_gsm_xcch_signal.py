@@ -1,8 +1,17 @@
 import unittest
-from tools.gsm_xcch_signal import control_bits,coded_control,check_vector,TSC2,broadcast_octets,broadcast_si_index
+from tools.gsm_xcch_signal import control_bits,coded_control,check_vector,TSC2,broadcast_octets,broadcast_si_index,paging_fill_octets
 
 
 class XcchSourceTest(unittest.TestCase):
+    def test_idle_paging_has_no_subscriber_identity_and_full_mac_padding(self):
+        block=paging_fill_octets()
+        self.assertEqual(len(block),23)
+        self.assertEqual(block[:6],bytes.fromhex('1506210001f0'))
+        self.assertEqual(block[0]>>2,len(block[:6])-1)
+        self.assertEqual(block[4],1)
+        self.assertEqual(block[5]&7,0)
+        self.assertEqual(block[6:],b'\x2b'*17)
+
     def test_combined_layout_changes_only_si3_ccch_configuration(self):
         for kind in range(4):
             plain=broadcast_octets(kind)

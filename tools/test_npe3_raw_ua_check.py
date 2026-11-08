@@ -1,9 +1,33 @@
 import unittest
 from unittest.mock import patch
-from tools.npe3_raw_ua_check import check,check_location_update,check_release
+from tools.npe3_raw_ua_check import check,check_location_update,check_release,check_paging_fill
 
 
 class RawUaCheckTest(unittest.TestCase):
+    def test_paging_fill_requires_native_post_release_reception_but_not_fitted_carrier(self):
+        fill='1506210001f0'+'2b'*17
+        text=f'npe3_bts_pch: starts=6,12,16 octets={fill} tsc=2 no_identity=1 raw_adc_only=1 physical_claim=0'
+        packets=[dict(type=128,payload='602a00'+frame.to_bytes(3,'big').hex()+'002e0001'+fill,time=str(stamp))
+                 for frame,stamp in ((219,1.02),(519,2.4))]
+        with patch('tools.npe3_raw_ua_check.check_rx_publications',return_value=dict(packets=packets)):
+            report=check_paging_fill(text,1.5)
+            self.assertEqual(report['blocks'],2)
+            self.assertEqual(report['reported_receiver_arfcns'],[46])
+            self.assertFalse(report['stable_camping_qualified'])
+            self.assertFalse(report['source_frame_binding_qualified'])
+            for bad in ('',text+text,text.replace('starts=6,12,16','starts=6,12,22')):
+                with self.assertRaises(ValueError):check_paging_fill(bad,1.5)
+            with self.assertRaises(ValueError):check_paging_fill(text,2.5)
+        with patch('tools.npe3_raw_ua_check.check_rx_publications',return_value=dict(packets=[dict(packets[1],time='2.3')])):
+            report=check_paging_fill(text,1.5)
+            self.assertEqual(report['early_reported_frames'],[dict(reported_frame=519,time='2.3')])
+            self.assertFalse(report['source_frame_binding_qualified'])
+        for bad in ([],[dict(packets[1],payload=packets[1]['payload'].replace('150621','140621'))],
+                    [dict(packets[1],payload=packets[1]['payload'].replace('602a00','602a01'))],
+                    [dict(packets[1],time='1.0')]):
+            with patch('tools.npe3_raw_ua_check.check_rx_publications',return_value=dict(packets=bad)):
+                with self.assertRaises(ValueError):check_paging_fill(text,1.5)
+
     def test_release_requires_two_decodes_ack_disc_and_immediate_common_reconfiguration(self):
         release='03020d060d00'+'2b'*17
         ua='017301'+'2b'*20

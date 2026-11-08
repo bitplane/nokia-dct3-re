@@ -35,5 +35,13 @@ class DedicatedSubmissionTest(unittest.TestCase):
                     self.text().replace('invalid=0','invalid=1')):
             with self.assertRaises(ValueError):packets(bad)
 
+    def test_long_observation_checks_declared_horizon_and_full_ring(self):
+        long=self.text().replace('cap=256','cap=2048').replace('end=24','end=60').replace('12.156672231','59.999000000')
+        self.assertEqual(len(packets(long)),2)
+        for bad in (long.replace('end=60','end=24'),long.replace('cap=2048','cap=256'),
+                    long.replace('59.999000000','60.001000000'),long.replace('end=60','end=121'),
+                    long.replace('commits=2','commits=2049')):
+            with self.assertRaises(ValueError):packets(bad)
+
 
 if __name__=='__main__':unittest.main()

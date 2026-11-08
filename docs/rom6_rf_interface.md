@@ -49,7 +49,9 @@ returns contention-resolution UA as raw I/Q;the native dedicated receiver
 publishes the matching successful class80 result. Raw Location Updating
 Accept also reaches the native receiver;the MCU acknowledges it and persists
 updated test-cell EF_LOCI. A raw Channel Release/DISC/UA exchange returns
-the MCU to common control. Stable camping remains open. The acquired PMM still parks at the validation
+the MCU to common control. Native no-identity paging also decodes after release,
+and a complete60s run retains updated EF_LOCI and legal execution. Stable
+camping/source-frame binding remain open. The acquired PMM still parks at the validation
 gate,described below. These laboratory
 results do not retire the physical request/acknowledgement or tuning contract.
 
@@ -64,6 +66,7 @@ results do not retire the physical request/acknowledgement or tuning contract.
 | Own 6210 P05-start candidate | Complete native buffers clocked at the projected P05 matches; same receive/UI checks and exact port-word preservation | Physical pin/timing identity, external network decode/AGCH, camping and registration |
 | Own 6210 raw-AGCH candidate | Exact successful native assignment decode; MCU assigned-SDCCH configuration and SABM containing Location Updating Request | Native dedicated transmission, validation-gate completion, camping/registration and physical timing/tuning |
 | Synthetic-record raw-AGCH run | Ten-slot validation cycle;combined CCCH;32 normal bursts/8 exact xCCH blocks;native UA/LU Accept and RR acknowledgement;updated SIM EF_LOCI;raw normal release back to common RX | Stable camping/registered presentation and physical timing/tuning |
+| Idle-paging source | All three combined CCCH blocks carry exact no-identity fill;25 native CRC-success publications in a complete60s capture;MM storage and Menu retained | Continuous idle reception,source-FN binding and physical carrier selection |
 
 The CPU additions needed by the normal-burst frontend have generic focused
 tests. The rebuilt native ROM6 menu/storage/save-state scenarios, ROM4
@@ -341,7 +344,7 @@ The reply is encoded with assigned TSC0 and scheduled at the next TS0
 SDCCH/4 downlink22..25,not an AGCH block. Only raw ADC I/Q is supplied;
 neither private memory nor decoded MCU/DSP messages feed the BTS request.
 
-The coherent24s run decodes SABM at uplink3454..3457 and schedules UA at
+The no-idle-paging24s control decodes SABM at uplink3454..3457 and schedules UA at
 3490..3493. Native type80/class80 successfully publishes the exact UA
 `01734905087000f000fffe330809101010325476982b2b` at16.123703494s,
 with frame3493,BSIC42 and ARFCN35. The acceptance checker independently
@@ -364,7 +367,7 @@ PLMN001-01/LAC1. This follows
 LAPDm is a BS command,I-frame N(S)=0/N(R)=0;the first next SDCCH/4 block
 after UA carries
 `030045050200f1100001170809101010325476982b2b2b`
-at3541..3544. Native class80 publishes the exact block at16.359095143s;
+at3541..3544 in the no-idle-paging control. Native class80 publishes the exact block at16.359095143s;
 the MCU submits RR `032101` at16.393637846s and the timed native uplink
 3556..3559 independently decodes to that acknowledgement.
 
@@ -387,7 +390,7 @@ pixels25..48,33..39. Ordinary native and no-reply profile hashes are unchanged.
 
 The external BTS waits for exact timed `RR N(R)=1` after LU Accept before
 transmitting RR Channel Release,cause0,in network I-frame N(S)=1/N(R)=0.
-At uplink3556..3559,the native port supplies that acknowledgement. The raw
+In the no-idle-paging control,uplink3556..3559 supplies that acknowledgement. The raw
 reply `03020d060d002b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b`
 occupies downlink3592..3595 and native class80 publishes exact success at
 16.594479846s. Native uplink3607..3610 acknowledges N(R)=2;uplink3658..3661
@@ -405,8 +408,63 @@ starts a new single-MS laboratory connection;it does not modify handset
 registration state. Physical Menu retains the LU-phase exact hash,EF_LOCI
 remains updated,and all32 normal bursts form8 exact xCCH blocks. The idle
 frame displays `DCT3 LAB`,but the UA-only control also displays that SIM name:
-the label alone is not a registration/camping oracle. Valid idle paging,
-longer registered operation and fitted RF tuning remain separate contracts.
+the label alone is not a registration/camping oracle. Idle paging and the
+longer compatibility run are qualified below;stable camping and fitted RF
+tuning remain separate contracts.
+
+### Native idle paging and extended observation
+
+The raw laboratory BTS now fills each combined common-control block
+(6..9,12..15,16..19) with Paging Request Type1 containing a one-octet
+"no identity" Mobile Identity
+([TS44.018 9.1.22](https://www.etsi.org/deliver/etsi_ts/144000_144099/144018/05.21.00_60/ts_144018v052100p.pdf),
+[TS24.008 10.5.1.4](https://www.etsi.org/deliver/etsi_ts/124000_124099/124008/03.20.00_60/ts_124008v032000p.pdf)). The23-octet source is
+`1506210001f02b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b`.
+This is the existing network `paging_fill()` grammar,not a request addressed
+to the emulated subscriber. TSC2/FIRE/convolution/interleaving/GMSK use the
+same source path as BCCH;an actual access grant overrides its scheduled
+common-control block. No samples are selected from MCU messages or RAM.
+The independent reference checks all three block positions,latched I/Q and
+off-window silence;native class60 publications must carry the exact fill or
+the independently checked actual assignment. Failed common blocks are counted,
+not treated as successful paging.
+
+The60s capture retains the exact Messages Menu oracle,all ten record slots,
+SCH715/BSIC42,the complete SI set,one native access,raw LU/normal release,
+and updated EF_LOCI. Its later traffic is not another registration attempt.
+Adding valid common traffic changes acquisition chronology without changing
+clock/sample knobs:access2708 gets AGCH2709..2712;SABM2740 gets UA2776;
+LU Accept starts2827,RR acknowledgement2842 triggers Release2878,DISC2944
+gets closing UA2980,and the MCU returns to common RX at13.771456385s.
+The source produces25 CRC-successful paging-fill publications from6.389976857s
+through37.931345934s;reported receiver keys include35 and46. There are33
+failed common-block publications. This is an untuned ADC composition,not
+evidence that one physical carrier is received on both channels.
+
+Two limits are explicit. First,the repeated identical fill cannot uniquely
+identify an individual source block. Six publications precede the nominal
+time of their reported block-ending FN,including FN1386 at6.389976857s and
+FN8220 at37.931345934s. The checker preserves every discrepancy and leaves
+source-frame binding unqualified;no clock/tolerance is fitted to conceal it.
+The field may describe a requested/scheduled block rather than the decoded
+source block. Second,reception is sparse and later MCU traffic includes
+repeated type4a body011b,so stable camping is not inferred from a60s legal
+run or the SIM name. The next questions are this native CCCH metadata
+convention and the idle receive/wake request contract.
+
+Extended observation covers the requested horizon,not just the first24s:
+MCU and DSP ring captures use cap2048 for longer raw-profile runs,and the
+passive write journal scales its bounded24s budget (maximum120s). Both
+footer and complete-row checks still reject truncation. The complete60s
+journal has2,199,755 writes. An initial capped capture was rejected;after
+correcting both producer and analysis bounds,the completed uncapped capture
+was reassessed through the production checks without re-executing firmware.
+The native8210 Menu,state and cold phonebook controls,the ROM4 coherent/RF
+boundary,and the HLE semantic/coherent frontier controls also pass.
+
+```sh
+.venv/bin/python tools/run_npe3_native.py --reference-clock --seconds 60 --adc-source fcch-sch-broadcast --capture-start p09 --tx-release p05 --raw-agch --provision-records
+```
 
 ```sh
 .venv/bin/python tools/run_npe3_native.py --reference-clock --seconds 24 --adc-source fcch-sch-broadcast --capture-start p09 --tx-release p05 --raw-agch --provision-records

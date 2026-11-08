@@ -3,7 +3,7 @@ import math
 import re
 from functools import lru_cache
 from tools.gsm_sch_signal import HYPERFRAME, sch_information_bits, sch_burst_bits, gmsk_burst_samples
-from tools.gsm_xcch_signal import normal_control_bursts,broadcast_octets,broadcast_si_index
+from tools.gsm_xcch_signal import normal_control_bursts,broadcast_octets,broadcast_si_index,paging_fill_octets
 from tools.rom6_timed_output_check import nanoseconds
 
 WORD=re.compile(r'mfi_rx_word: sequence=(\d+) value=([0-9a-f]{4}) source_tick=(\d+) t=(\d+\.\d{9})')
@@ -65,10 +65,26 @@ def bcch_reference(burst,kind=2,combined_ccch=False):
     return gmsk_burst_samples(normal_control_bursts(octets)[burst])
 
 
-def reference_word(sequence,tick,tone,word_divider=6,burst=False,sch=False,bcch=False,broadcast=False,combined_ccch=False):
+@lru_cache(maxsize=4)
+def paging_reference(burst):
+    return gmsk_burst_samples(normal_control_bursts(paging_fill_octets())[burst])
+
+
+def paging_burst(frame):
+    position=frame%51
+    for start in (6,12,16):
+        if start<=position<start+4:return position-start
+    return None
+
+
+def reference_word(sequence,tick,tone,word_divider=6,burst=False,sch=False,bcch=False,broadcast=False,combined_ccch=False,paging=False):
     if not tone: return 0
     component=(sequence-1)&1
     conversion_tick=tick-word_divider*component # Q is latched with the preceding I.
+    pch=paging_burst(conversion_tick//60000) if paging else None
+    if pch is not None and conversion_tick%60000<7104:
+        if word_divider!=12:raise ValueError('paging source requires twelve-tick word clock')
+        return paging_reference(pch)[(conversion_tick%60000)//12][component]&0xffff
     if bcch and 2<=(conversion_tick//60000)%51<=5 and conversion_tick%60000<7104:
         if word_divider!=12:
             raise ValueError('BCCH fixture requires the declared twelve-tick word clock')
@@ -131,7 +147,8 @@ def check_active_burst_window(text,sch=False,window='active',bcch=False,broadcas
             local=read-closed
             tick=first_tick+(local-1)*12
             if value!=reference_word(local,tick,True,12,True,sch,bcch,broadcast,
-                                     combined_ccch='npe3_bts_layout: combined_ccch=1 ' in text):
+                                     combined_ccch='npe3_bts_layout: combined_ccch=1 ' in text,
+                                     paging='npe3_bts_pch:' in text):
                 raise ValueError('active burst differs from independent clocked waveform')
             if tick*1_000_000_000>(nanoseconds(stamp)+1)*13_000_000:
                 raise ValueError('active burst consumed before its conversion clock')
@@ -143,6 +160,7 @@ def check_active_burst_window(text,sch=False,window='active',bcch=False,broadcas
             on=(conversion//60000)%51 in (0,10,20,30,40) and conversion%60000<7104
             on=on or (sch and (conversion//60000)%51 in (1,11,21,31,41) and conversion%60000<7104)
             on=on or (bcch and 2<=(conversion//60000)%51<=5 and conversion%60000<7104)
+            on=on or ('npe3_bts_pch:' in text and paging_burst(conversion//60000) is not None and conversion%60000<7104)
             active_words+=int(on)
             inactive_words+=int(not on)
             ticks.append(tick)
@@ -160,6 +178,11 @@ def check_active_burst_window(text,sch=False,window='active',bcch=False,broadcas
 
 def check(text,tone,burst=False,sch=False,bcch=False,broadcast=False):
     combined_ccch='npe3_bts_layout: combined_ccch=1 ' in text
+    paging='npe3_bts_pch:' in text
+    if paging:
+        header='npe3_bts_pch: starts=6,12,16 octets='+paging_fill_octets().hex()+' tsc=2 no_identity=1 raw_adc_only=1 physical_claim=0'
+        if not combined_ccch or not broadcast or text.count(header)!=1 or text.count('npe3_bts_pch:')!=1:
+            raise ValueError('idle paging source declaration differs')
     headers=re.findall(r'rf_adc_lab: direct_adc=1 tuned_air_source=0 tone=([01]) reference=13000000 source_phase_divider=12 word_divider=(6|12) amplitude=1024 physical_clock_claim=0',text)
     if len(headers)!=1 or text.count('rf_adc_lab:')!=1 or headers[0][0]!=str(int(tone)):
         raise ValueError('missing explicit ADC-pin laboratory source')
@@ -216,7 +239,7 @@ def check(text,tone,burst=False,sch=False,bcch=False,broadcast=False):
             raise ValueError('delivered waveform epoch is missing its first word')
         if (last_sequence is not None and (sequence!=last_sequence+1 or tick!=last_tick+divider)):
             raise ValueError('delivered waveform prefix skips a source clock')
-        if int(value,16)!=reference_word(sequence,tick,tone,divider,burst,sch,bcch,broadcast,combined_ccch):
+        if int(value,16)!=reference_word(sequence,tick,tone,divider,burst,sch,bcch,broadcast,combined_ccch,paging):
             raise ValueError('ADC waveform differs from independent oscillator reference')
         # Log timestamps have nanosecond precision; the component gate checks
         # exact attoseconds independently. This is only a formatting allowance.

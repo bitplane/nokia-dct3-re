@@ -3,6 +3,25 @@ from tools.rom6_adc_lab_check import check,reference_word,continuous_queue_bound
 
 
 class AdcLabCheckTest(unittest.TestCase):
+    def test_idle_paging_samples_cover_exact_combined_blocks_and_latched_q(self):
+        from tools.gsm_xcch_signal import normal_control_bursts,paging_fill_octets
+        from tools.gsm_sch_signal import gmsk_burst_samples
+        from tools.rom6_adc_lab_check import paging_burst
+        bursts=[gmsk_burst_samples(bits) for bits in normal_control_bursts(paging_fill_octets())]
+        for frame in range(102):
+            position=frame%51
+            active=6<=position<=9 or 12<=position<=19
+            self.assertEqual(paging_burst(frame) is not None,active)
+            if not active:continue
+            burst=position-(6 if position<10 else 12 if position<16 else 16)
+            for index in (0,17,295,591):
+                tick=frame*60000+index*12
+                for component in (0,1):
+                    actual=reference_word(component+1,tick+12*component,True,12,True,True,True,True,True,True)
+                    self.assertEqual(actual,bursts[burst][index][component]&65535)
+            self.assertEqual(reference_word(1,frame*60000+7104,True,12,True,True,True,True,True,True),0)
+            self.assertEqual(reference_word(1,frame*60000,True,12,True,True,True,True,True,False),0)
+
     def test_full_broadcast_reference_uses_absolute_multiframe(self):
         from tools.gsm_xcch_signal import broadcast_octets,normal_control_bursts,broadcast_si_index
         from tools.gsm_sch_signal import gmsk_burst_samples
