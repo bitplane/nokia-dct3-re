@@ -67,7 +67,7 @@ results do not retire the physical request/acknowledgement or tuning contract.
 | Own 6210 raw-AGCH candidate | Exact successful native assignment decode; MCU assigned-SDCCH configuration and SABM containing Location Updating Request | Native dedicated transmission, validation-gate completion, camping/registration and physical timing/tuning |
 | Synthetic-record raw-AGCH run | Ten-slot validation cycle;combined CCCH;32 normal bursts/8 exact xCCH blocks;native UA/LU Accept and RR acknowledgement;updated SIM EF_LOCI;raw normal release back to common RX | Stable camping/registered presentation and physical timing/tuning |
 | Idle-paging source | All three combined CCCH blocks carry exact no-identity fill;25 native CRC-success publications in a complete60s capture;MM storage and Menu retained | Continuous idle reception,source-FN binding and physical carrier selection |
-| Addressed paging | The uplink IMSI determines combined PCH phase1/block6;two raw pages decode natively and pass the MCU's paging-group admission | Native Paging Response,stable camping and physical carrier selection |
+| Addressed paging | Uplink-derived IMSI pages pass native admission;the explicit33dBm cell additionally elicits a timed-port-verified native Paging Response | New-link UA,stable camping and physical carrier selection |
 
 The CPU additions needed by the normal-burst frontend have generic focused
 tests. The rebuilt native ROM6 menu/storage/save-state scenarios, ROM4
@@ -488,9 +488,9 @@ forwarded and5 correctly decoded no-identity fills are filtered. There is no
 unexplained publication loss in this window. Some filtered successes occur
 after the last forwarded empty fill,so MCU message silence is not a receive
 failure oracle. Addressed paging has the separate receive/admission contract
-below;it does not yet qualify a native Paging Response or stable camping.
+below;receive admission alone does not qualify a response or stable camping.
 
-### Native addressed paging
+### Native addressed paging:39dBm control
 
 The research-only `Laboratory BTS page` input requests an external network
 action after the raw closing UA. The BTS retains only the IMSI decoded from
@@ -610,8 +610,27 @@ RAM snapshots. The full DSP journal remains unchanged. Zero-hit interior-PC
 probes are retired;do not replace this selection policy with a fabricated
 hardware completion or overwrite the list/current key.
 
-The next question is why mode10's current-cell-excluding selection runs after
-raw LU/release,and how its completion settles ordinary paging. Do not
+The39dBm control above is not the only external-cell policy. Own-ROM helper
+4a70b8 computes C1 = received level - RXLEV_ACCESS_MIN -
+max(BTS maximum power - MS maximum power,0). The initial-107dBm sample,
+-111dBm minimum and39dBm BTS/33dBm handset maxima yield-2;the later-87dBm
+sample yields18. Helper4b2944 then selects lower state3 when eligibility
+bit27 is clear,leading to selector mode10. Advertising33dBm (GSM900 power
+level5) in SI3/SI4 removes the6dB penalty;this is an external network policy,
+not a fitted ADC gain or firmware intervention.
+
+The fresh33dBm24s capture independently decodes a new RACH4043,AGCH4045
+and native Paging Response SABM4066:
+`013f41062707033319810809101010325476982b2b2b2b`.
+The identity matches the earlier native LU request and raw addressed page.
+`npe3_native_paging_response_check.py` joins actual timed access bits,raw
+assignment,native page decode and convolution/FIRE-valid response. The
+fresh39dBm control preserves its complete DSP journal SHA256
+`e6f4b9c05d50f08663cc7cbc7fc1c5166a51b1d84c805dd43573c0dbd9118074`.
+Neither fixture identifies fitted RF tuning or proves stable camping/calls.
+The next boundary is closing the new LAPDm link:the laboratory BTS still
+retains the previous LU contention identity after DISC and rejects the
+different Paging Response SABM. Do not
 inject083e again or clear the context byte. Broad heap watches used to locate
 the consumer are retired;bounded return/selector/context observations retain
 the contract. The fresh native capture reproduces UI,SIM,LU and raw release,
@@ -622,6 +641,8 @@ handoff is requalified.
 
 ```sh
 .venv/bin/python tools/run_npe3_native.py --reference-clock --seconds 24 --adc-source fcch-sch-broadcast --capture-start p09 --tx-release p05 --raw-agch --provision-records --page-at 18
+# Separate positive paging fixture;the default39dBm control is unchanged.
+.venv/bin/python tools/run_npe3_native.py --reference-clock --seconds 24 --adc-source fcch-sch-broadcast --capture-start p09 --tx-release p05 --raw-agch --provision-records --page-at 18 --cell-power-policy handset33
 ```
 
 Host4a uses the DROM table atb041+4a=b08b,which selects35c5. That handler

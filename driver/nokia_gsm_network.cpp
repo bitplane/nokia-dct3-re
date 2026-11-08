@@ -682,6 +682,12 @@ std::array<u8, 24> nokia_gsm_network_device::system_information(
 		else if (message_index == 3)
 			result[10] |= 0x02;
 	}
+	// TS44.018 10.5.2.4: the initial MS power-control level shares the
+	// first Cell Selection Parameters octet with CELL_RESELECT_HYSTERESIS.
+	if (message_index == 2)
+		result[14] = (result[14] & 0xe0) | (cell.ms_txpwr_max_cch & 0x1f);
+	else if (message_index == 3)
+		result[8] = (result[8] & 0xe0) | (cell.ms_txpwr_max_cch & 0x1f);
 	if (cell.rxlev_access_min != 0)
 	{
 		// TS 44.018 10.5.2.34: RXLEV_ACCESS_MIN=63 requires approximately

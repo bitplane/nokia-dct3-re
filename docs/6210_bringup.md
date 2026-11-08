@@ -59,10 +59,14 @@ EF_LOCI. Reported FN includes a firmware-owned conditional+2 adjustment;
 some valid empty pages are intentionally filtered before MCU publication.
 Two raw IMSI-addressed pages now decode and pass the MCU's paging-group
 admission;the input identity comes only from actual uplink bits. A native
-Paging Response,complete DRX listening and unique source-frame binding remain unresolved;
-the observed RR controller latches/deallocates the parsed page and repeats its
-state4 receive continuation rather than issuing access;
-stable camping/registered presentation remains open;
+Paging Response is now independently decoded in the separate33dBm cell-policy
+fixture: addressed page -> new RACH4043 -> raw AGCH4045 -> native SABM4066
+containing RR Paging Response and the transmitted IMSI. The original39dBm
+control still defers the page and retains its exact DSP journal. The own-ROM
+C1 calculation explains the distinction:39dBm advertised maximum versus the
+handset's33dBm maximum incurs a6dB penalty;the33dBm policy removes it without
+changing ADC samples,clocks or firmware state. Complete DRX,stable camping,
+registered presentation and call signalling remain open;
 see the [native MM boundary](rom6_rf_interface.md#native-location-updating-acceptance).
 The explicit 13 MHz DSP clock is provisional (the manual establishes RFIclk,
 not the DSP multiplier). A longer run requests MCU software reset near

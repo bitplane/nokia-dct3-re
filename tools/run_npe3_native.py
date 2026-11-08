@@ -8,6 +8,7 @@ import re
 import subprocess
 import sys
 import tempfile
+import xml.etree.ElementTree as ET
 
 ROOT = Path(__file__).resolve().parents[1]
 # Reviewed Messages envelope animation phase under finite ADC stimulation.
@@ -19,6 +20,31 @@ ADC_BROADCAST_MENU_SHA256 = '8c7650fdb0514ec34c85b89795e529de062e6f141268a507baf
 # Reviewed raw LU-Accept run: only envelope animation pixels25..48,33..39
 # differ from the preceding raw-UA oracle. Ordinary profiles stay unchanged.
 ADC_LU_MENU_SHA256 = '5adef93609b763a40d0e3c9dca356d388a910bb393a518e99a53eec2c7184202'
+
+
+def configure_cell_power(directory,model,policy):
+    if policy=='legacy39':return
+    if policy!='handset33':raise ValueError('unsupported cell power policy')
+    config=ET.Element('mameconfig',version='10')
+    system=ET.SubElement(config,'system',name=model)
+    ports=ET.SubElement(system,'input')
+    ET.SubElement(ports,'port',tag=':LAB_BTS',type='CONFIG',mask='2',defvalue='0',value='2')
+    destination=directory/'cfg';destination.mkdir()
+    ET.ElementTree(config).write(destination/f'{model}.cfg',encoding='utf-8',xml_declaration=True)
+
+
+def check_cell_power(text,policy):
+    level,dbm={'legacy39':(0,39),'handset33':(5,33)}[policy]
+    if text.count(f'npe3_bts_initial_ms_power: level={level} gsm900_dbm={dbm} external_cell_policy=1 firmware_writes=0')!=1:
+        raise ValueError('missing explicit external cell power policy')
+    for index,offset,message in ((2,14,0x1b),(3,8,0x1c)):
+        rows=re.findall(rf'rf_adc_broadcast_si: index={index} arfcn=35 octets=([0-9a-f]{{46}}) physical_claim=0',text)
+        if len(rows)!=1:raise ValueError('missing unique SI3/SI4 cell power broadcast')
+        octets=bytes.fromhex(rows[0])
+        if octets[2]!=message or octets[offset]&31!=level:
+            raise ValueError('SI3/SI4 initial MS power ceiling differs from the declared policy')
+    return dict(policy=policy,ms_txpwr_max_cch=level,gsm900_dbm=dbm,
+                external_network_input=True,firmware_state_writes=False)
 
 
 def expected_menu_digest(adc_source, capture_start, native_lu=False):
@@ -95,9 +121,13 @@ def main():
                         help='separate external access decoder and raw AGCH waveform experiment')
     parser.add_argument('--page-at', type=int,
                         help='bounded external BTS page at16..20 seconds in a24s raw-AGCH run')
+    parser.add_argument('--cell-power-policy',choices=('legacy39','handset33'),default='legacy39',
+                        help='separate standards-owned33dBm cell experiment; no firmware/clock/ADC change')
     parser.add_argument('--provision-records', action='store_true',
                         help='explicit synthetic record fixture; acquired PMM remains unchanged')
     args = parser.parse_args()
+    if args.cell_power_policy!='legacy39' and (not args.raw_agch or not args.provision_records or args.scenario!='menu' or args.seconds!=24):
+        parser.error('33dBm cell experiment requires the explicit24s raw-AGCH record fixture')
     if args.page_at is not None and (not args.raw_agch or not 16<=args.page_at<=20 or args.seconds!=24):
         parser.error('addressed-page observation requires raw AGCH,16..20s input and the bounded24s run')
     if args.provision_records and not args.raw_agch:
@@ -160,6 +190,7 @@ def main():
     def execute(phase, scenario, seconds, persist=False):
         directory = run / phase
         directory.mkdir()
+        configure_cell_power(directory,model,args.cell_power_policy)
         cmd = command.copy()
         cmd[-1] = str(seconds)
         if not persist:
@@ -186,6 +217,17 @@ def main():
     first, text = execute('primary', args.scenario,
                           args.input_at + 10 if args.scenario == 'phonebook' else max(args.seconds, args.input_at + 4),
                           args.scenario == 'phonebook' or args.provision_records)
+    if args.cell_power_policy!='legacy39':
+        report=check_cell_power(text,args.cell_power_policy)
+        report['boot_execution_checked']=True
+        report['native_radio_outcome_qualified']=False
+        if args.page_at is not None:
+            from tools.npe3_native_paging_response_check import check as check_native_page_response
+            report['paging_response']=check_native_page_response(text,(first/'rom6_radio_writes.tsv').read_text())
+            print('Native6210 cell33: PASS native Paging Response from timed port bits; stable_camping=0 calls=0')
+        (run/'cell-power-experiment.json').write_text(json.dumps(report,indent=2)+'\n')
+        print('Native6210 cell-power experiment captured; other radio/UI outcomes remain unqualified')
+        return
     if args.scenario == 'phonebook':
         from PIL import Image
         from tools.run_noki6210_acceptance import check_phonebook

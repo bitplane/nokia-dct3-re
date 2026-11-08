@@ -189,6 +189,12 @@ void dct3_rf_adc_fixture_state::machine_reset()
 	auto cell=*network.cell_at(0);
 	cell.arfcn=35;
 	cell.bsic=42;
+	if (m_raw_agch)
+	{
+		cell.ms_txpwr_max_cch=(ioport("LAB_BTS")->read()&2) ? 5 : 0;
+		machine().logerror("npe3_bts_initial_ms_power: level=%u gsm900_dbm=%u external_cell_policy=1 firmware_writes=0\n",
+			unsigned(cell.ms_txpwr_max_cch),cell.ms_txpwr_max_cch==5 ? 33U : 39U);
+	}
 	network.use_single_cell();
 	network.set_cell(0,cell);
 	if (m_raw_agch)

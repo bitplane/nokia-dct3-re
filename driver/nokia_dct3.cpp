@@ -1831,6 +1831,9 @@ static INPUT_PORTS_START( npe3_raw_bts )
 	PORT_START("LAB_BTS")
 	PORT_BIT( 0x01, IP_ACTIVE_HIGH, IPT_OTHER ) PORT_NAME("Laboratory BTS page")
 		PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(dct3_rf_adc_fixture_state::bts_page_w), 0)
+	PORT_CONFNAME(0x02, 0x00, "Laboratory GSM900 initial MS power ceiling")
+	PORT_CONFSETTING(0x00, "39 dBm (power-control level 0)")
+	PORT_CONFSETTING(0x02, "33 dBm (power-control level 5)")
 INPUT_PORTS_END
 
 static INPUT_PORTS_START( noki8290 )

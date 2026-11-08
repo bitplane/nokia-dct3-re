@@ -157,6 +157,7 @@ struct cell
 	std::uint16_t identity = 1;
 	std::int8_t rxlev_dbm = -60;
 	std::uint8_t rxlev_access_min = 0;
+	std::uint8_t ms_txpwr_max_cch = 0;
 	std::uint16_t access_class_barred = 0;
 	bool cell_barred = false;
 	bool available = true;
@@ -174,6 +175,7 @@ struct cell
 				identity == other.identity &&
 				rxlev_dbm == other.rxlev_dbm &&
 				rxlev_access_min == other.rxlev_access_min &&
+				ms_txpwr_max_cch == other.ms_txpwr_max_cch &&
 				access_class_barred == other.access_class_barred &&
 				cell_barred == other.cell_barred &&
 				available == other.available;

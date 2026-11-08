@@ -1,13 +1,34 @@
 import unittest
 import subprocess
 import sys
+import tempfile
+import xml.etree.ElementTree as ET
 from pathlib import Path
 
 from tools.run_npe3_native import (check_execution, check_input_start, expected_menu_digest,
-    ADC_P09_MENU_SHA256, ADC_BROADCAST_MENU_SHA256, ADC_SCH_MENU_SHA256,ADC_LU_MENU_SHA256)
+    ADC_P09_MENU_SHA256, ADC_BROADCAST_MENU_SHA256, ADC_SCH_MENU_SHA256,ADC_LU_MENU_SHA256,
+    configure_cell_power,check_cell_power)
 
 
 class Native6210EvidenceTest(unittest.TestCase):
+    def test_cell_power_experiment_is_explicit_and_broadcast_in_both_messages(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            directory=Path(tmp)
+            configure_cell_power(directory,'npe3ap5','legacy39')
+            self.assertFalse((directory/'cfg').exists())
+            configure_cell_power(directory,'npe3ap5','handset33')
+            port=ET.parse(directory/'cfg/npe3ap5.cfg').find('./system/input/port')
+            self.assertEqual(port.attrib,dict(tag=':LAB_BTS',type='CONFIG',mask='2',defvalue='0',value='2'))
+        lines=['npe3_bts_initial_ms_power: level=5 gsm900_dbm=33 external_cell_policy=1 firmware_writes=0']
+        for index,offset,message in ((2,14,0x1b),(3,8,0x1c)):
+            octets=bytearray(23);octets[2]=message;octets[offset]=5
+            lines.append(f'rf_adc_broadcast_si: index={index} arfcn=35 octets={octets.hex()} physical_claim=0')
+        text='\n'.join(lines)
+        self.assertTrue(check_cell_power(text,'handset33')['external_network_input'])
+        with self.assertRaises(ValueError):check_cell_power(text,'legacy39')
+        with self.assertRaises(ValueError):check_cell_power('\n'.join(lines[:-1]),'handset33')
+        with self.assertRaises(ValueError):check_cell_power(text.replace('gsm900_dbm=33','gsm900_dbm=39'),'handset33')
+
     def test_addressed_page_requires_bounded_explicit_raw_profile(self):
         script=Path(__file__).with_name('run_npe3_native.py')
         for args in (['--page-at','18'],['--raw-agch','--page-at','15'],

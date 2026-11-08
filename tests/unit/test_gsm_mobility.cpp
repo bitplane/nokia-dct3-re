@@ -58,6 +58,10 @@ int main()
 	static_assert(serving.arfcn == 1);
 	static_assert(serving.bsic == 0x12);
 	static_assert(serving.location.lac == 1);
+	static_assert(serving.ms_txpwr_max_cch == 0);
+	auto power_limited=serving;
+	power_limited.ms_txpwr_max_cch=5;
+	assert(!(power_limited==serving));
 
 	gsm::mobility::topology cells;
 	assert(cells.size() == 1);

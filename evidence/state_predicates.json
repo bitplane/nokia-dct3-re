@@ -3,10 +3,18 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "npe3_native_paging_response",
+      "owner": "native_rom6_reference_adc_laboratory",
+      "status": "satisfied",
+      "predicate": "The explicit33dBm test cell elicits a native Paging Response from an uplink-derived IMSI page",
+      "current": "Own-ROM C1 helper4a70b8 subtracts max(BTS maximum minus MS maximum,0). Initial level-107/minimum-111 with39dBm BTS and33dBm MS gives-2;advertising33dBm in SI3/SI4 removes that6dB penalty. One derived external-cell fixture,with unchanged ADC samples and clocks,decodes native RACH4043,raw AGCH4045 and convolution/FIRE-valid SABM4066:013f41062707033319810809101010325476982b2b2b2b. Its IMSI matches native LU and the actual page;native page reception precedes access. The39dBm control still reproduces its complete DSP journal. This supersedes absence claims only for the explicit33dBm fixture;stable camping,physical RF tuning and call signalling remain unqualified. The next boundary is releasing the lab BTS's old contention identity on DISC before accepting the new SABM.",
+      "evidence": ["tools/npe3_native_paging_response_check.py", "tools/test_npe3_native_paging_response_check.py", "tools/run_npe3_native.py", "driver/nokia_gsm_network.cpp", "docs/rom6_rf_interface.md"]
+    },
+    {
       "id": "npe3_paging_controller_deferral",
       "owner": "native_rom6_reference_adc_laboratory",
       "status": "unresolved",
-      "predicate": "The ordinary RR controller drains an admitted pending page into native paging-response access",
+      "predicate": "The legacy39dBm cell's RR controller drains an admitted pending page into native paging-response access (separate33dBm success: npe3_native_paging_response)",
       "current": "Both native addressed pages return083e through172fa8/3cd1bc to315450. Selector315472 sets context169be8 byte0b,preserves continuation169c14=4,frees the decoded object at+28,and repeats31543e. Byte+6 clears on07ef at12.046145538 and is set again at16.288393385 through07f2/result4 ->09f7 ->1580 ->09c8 ->07d4. Result4 omits cell data but does not prove a bad or missing cell:selector16839c mode10 excludes the only cached key46 because selected17251c is also46. The native null is stored at2d2c94;positive criterion16856e=18 then takes2d0898 and BLs directly to shared report tail2d314a,bypassing the previously assumed2d3104 path. Result2's paired criterion is-2. Post-report exhausted lists/fallback00ff are not the initial cause. The next boundary is the source/lifecycle of current-cell-excluding mode10 after LU/release and its ordinary paging settlement. Pinned315816 requires29fe00(1),byte+3 and byte+6 guards before3133b8;complete exit-input coverage remains unknown. No native Paging Response is qualified. Do not inject083e,change mode/current key,clear the byte or fabricate a DSP completion. Native UI/SIM/LU/raw release and the unchanged DSP write journal remain qualified.",
       "evidence": ["tools/npe3_paging_controller.lua", "tools/npe3_addressed_page_check.py", "tools/test_npe3_addressed_page_check.py", "tools/run_npe3_native.py", "docs/rom6_rf_interface.md"]
     },
@@ -30,7 +38,7 @@
       "id": "npe3_native_addressed_paging_admission",
       "owner": "native_rom6_reference_adc_laboratory",
       "status": "satisfied",
-      "predicate": "A raw paging request addressed from actual uplink IMSI bits passes native decoding and the MCU's combined-CCCH paging-group admission",
+      "predicate": "In the39dBm control,a raw paging request addressed from actual uplink IMSI bits passes native decoding and the MCU's combined-CCCH paging-group admission",
       "current": "The research-only BTS input uses the IMSI0910101032547698 decoded from the native timed SABM/LU uplink. SI3 advertises combined CCCH,reserved0 and BS_PA_MFRMS2;independent C++/Python arithmetic selects odd multiframes/block6. At18.016666667s the input requests a standards-valid page;actual sample reads encounter source starts4035 and4953. Both exact23-octet payloads produce successful class60 publications and native filter result2. MCU457db8 accepts controller state4;489c7a returns phase1/index0;the completed457e80 decision hasR6=1,and457a32 receives status0/accepted-group1. Task15 consumes0623,posts05eb to task18,and the ordinary RR parser returns083e. No new access/Paging Response occurs within24s. The inactive-input control's complete radio-write journal remains byte-identical. This is bounded receive/admission and L3 parsing,not controller settlement,complete DRX,source-FN binding,physical tuning or stable camping.",
       "evidence": ["driver/nokia_dct3_research.cpp", "driver/nokia_radio_timing.h", "tests/unit/test_nokia_radio_timing.cpp", "tools/npe3_addressed_page_check.py", "tools/test_npe3_addressed_page_check.py", "tools/npe3_paging_observe.lua", "tools/run_npe3_native.py", "docs/rom6_rf_interface.md"]
     },
