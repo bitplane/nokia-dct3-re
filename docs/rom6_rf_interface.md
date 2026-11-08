@@ -984,6 +984,29 @@ product-specific source pair,not that bit8 is harmless or that either word
 can be aliased to the NSM-3 interpretation. The next RF contract is the6210's
 own key-to-PLL/configuration relationship and receiver-state interpretation.
 
+The6210 resident388c..3937 formatter is byte-identical to the independently
+decoded ROM6 routine (SHA256
+`37dc843e29d036630964d06e8d310074afd2734095f1036d9dc39d2e9243e22b`).
+Read-stage388e/389e observations distinguish RX/TX inputs;direct instruction
+fetch taps do not provide entry coverage and are not an absence test. The
+qualified24-second capture checks3,539 RX and674 TX invocations,covering283
+observed RX keys,not all548 possible keys. All4,212 buffered invocations
+produce the exact independent low/high pair at the entry's destination;one
+RX invocation writes P31/P32 directly. The buffer-store receipt's38c7 is
+pipeline context for both writes,not separate ownership attribution.
+
+With the observed flags,the normalized key is `key-1024` for975..1023 and
+otherwise unchanged. RX scalar is twice `(key+4675)` for GSM900 or
+`key+8514` for DCS1800;TX uses4450 or8039 respectively. The unique own MCU
+prefix supplies these addends. Both directions use the same biased64/65
+numeric packing described above and tag4400. Buffered calls must not be
+mistaken for direct port writes,nor TX calls interpreted as RX tuning.
+`check_formatter` validates every captured input against its output and
+rejects missing/extra/reordered destination stores. The full DSP journal
+retains the same hash;native Menu,SIM,LU/release and addressed pages pass.
+This closes numeric formatter reuse,not physical divider-bit semantics,
+configuration-word equivalence,RF enable/gain/settling or tuned reception.
+
 ## Receive interrupt and clock boundary
 
 `tools/run_rom6_native.py --scenario receive` adds a passive 1,024-read prefix

@@ -288,9 +288,12 @@ def main():
                 report['native_access']=check_access(text,(first/'rom6_radio_writes.tsv').read_text(),
                     require_windows=True,require_releases=bool(args.tx_release),allow_normal=args.provision_records)
                 if args.raw_agch:
-                    from tools.npe3_rf_config_check import check as check_rf_config
+                    from tools.npe3_rf_config_check import check as check_rf_config,check_formatter
                     report['rf_configuration']=check_rf_config(text,
                         (first/'npe3_rf_config_prefix.be16').read_bytes(),flash,
+                        (first/'rom6_radio_writes.tsv').read_text().splitlines())
+                    report['rf_formatter']=check_formatter(text,processing_program,
+                        (first/'npe3_rf_config_prefix.be16').read_bytes(),
                         (first/'rom6_radio_writes.tsv').read_text().splitlines())
                     from tools.npe3_rach_transmit_check import check_agch
                     report['raw_agch']=check_agch(text,allow_normal=args.provision_records)
