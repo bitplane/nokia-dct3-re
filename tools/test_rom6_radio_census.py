@@ -1,9 +1,19 @@
 import io
 import unittest
-from tools.rom6_radio_census import census, check_output_overlay
+from tools.rom6_radio_census import census, check_output_overlay, find_output_source
 
 
 class RadioCensusTest(unittest.TestCase):
+    def test_output_source_requires_unique_own_bytes_and_complete_overlay(self):
+        overlay = bytearray(0x4000)
+        block = bytes(range(160))
+        overlay[0xb20 * 2:0xb70 * 2] = block
+        self.assertEqual(find_output_source(b'prefix' + block + b'suffix', overlay)['mcu_offset'], '6')
+        for image, candidate in ((b'absent', overlay), (block + block, overlay),
+                                 (block, overlay[:-1]), (block[::-1], overlay)):
+            with self.assertRaises(ValueError):
+                find_output_source(image, candidate)
+
     def test_own_upload_writer_not_a_later_overlay(self):
         image=bytearray(0x117070+160)
         overlay=bytearray(0x4000)

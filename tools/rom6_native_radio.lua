@@ -1,7 +1,8 @@
 -- Passive bus census around the qualified physical native-ROM6 UI run.
 local directory=assert(debug.getinfo(1,'S').source:sub(2):match('^(.*[/])'))
-dofile(directory..'rom6_native_ui.lua')
 local machine=manager.machine
+local npe3=machine.system.name=='npe3ref' or machine.system.name=='npe3r6'
+dofile(directory..(npe3 and 'rom6_reset_policy_observe.lua' or 'rom6_native_ui.lua'))
 local cpu=assert(machine.devices[':dsp_c54x:cpu'])
 local stream=assert(io.open('rom6_radio_writes.tsv','wb'))
 local stats,handles={},{}

@@ -11,6 +11,18 @@ PORT=re.compile(r'rom6_radio_port: direction=([RW]) address=([0-9a-f]{4}) count=
 WRITE=re.compile(rb'([0-9]+\.[0-9]{9})\t([0-9a-f]{6})\t([0-9a-f]{4})\t([0-9a-f]{4})\t([0-9a-f]{4})\n')
 
 
+def find_output_source(image, overlay):
+    """Join the bounded first-output block to a unique own-MCU source."""
+    if len(overlay) != 0x4000:
+        raise ValueError('first-output overlay size differs')
+    block = overlay[0x0b20 * 2:0x0b70 * 2]
+    offset = image.find(block)
+    if offset < 0 or image.find(block, offset + 1) >= 0:
+        raise ValueError('first radio block does not uniquely match own MCU bytes')
+    return dict(mcu_offset=f'{offset:x}', bytes=len(block),
+                sha256=hashlib.sha256(block).hexdigest())
+
+
 def check_output_overlay(image, overlay):
     """Pin the observed uploaded writer, not a later overlay at the same PC."""
     if len(overlay)!=0x2000*2:

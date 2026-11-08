@@ -2657,6 +2657,30 @@ The same staged code on another product is a comparison, not a substitute.
 
 ## Additional acceptance qualifications
 
+### Native reference-clock radio baseline
+
+```sh
+.venv/bin/python tools/run_npe3_native.py --reference-clock --seconds 65 --radio
+```
+
+The passive run retains own native initialization, physical Messages pixels
+and the strict uninterrupted horizon. Its complete DSP I/O journal contains
+341,261 writes, independently reconciled with per-port totals and protected
+against truncation. The first-output program block `0b20..0b6f` matches one
+own MCU source at byte offset `20da4` (160 bytes, SHA256
+`206cc4a2a0352fea4ff5dcfdf037bea65c7eedc15faacdc243accde5035ebb46`),
+not the 8210's source offset. This bounds the source join to that block.
+
+There are 1,278,464 P27 reads, all zero with no distinct-value overflow.
+Native type-8b scan and type-8a publications therefore are not proof of
+received air data. P01's uncapped distinct-value summary never includes
+bit `0080`; P10 and P13..P15 have no reads in this lifecycle. P09 receives
+5,495 writes, including `1368`, while P0e uses `1387/0546`; these are own
+requests, not established capture edges. The census records bus-time PCs,
+not issuing-instruction identity, and makes neither a fitted-clock nor an
+RF-acquisition claim. [The receive contract](rom6_rf_interface.md) owns the
+shared ADC/compare hypotheses and independently qualified decoder paths.
+
 `verify-6210-alarm-off-snooze-no` combines the independently validated
 powered-off and Snooze lifecycles: two natural RTC wakes, separately checked
 alarm-only uploads, silent endpoint intervals while powered off, physical

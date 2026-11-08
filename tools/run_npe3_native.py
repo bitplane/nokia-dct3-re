@@ -63,6 +63,8 @@ def main():
                         help='select the separate 45.5MHz reference-DSP experiment, not a fitted 6210 clock')
     parser.add_argument('--reset-policy', action='store_true',
                         help='add passive reset-policy and native ring observations')
+    parser.add_argument('--radio', action='store_true',
+                        help='capture complete passive DSP I/O writes and bounded read summaries')
     args = parser.parse_args()
     if not 24 <= args.seconds <= 120:
         parser.error('Menu check duration must be 24..120 seconds')
@@ -82,7 +84,8 @@ def main():
     roms = run / 'roms'
     roms.mkdir()
     (roms / model).symlink_to(ROOT / 'roms/nsm3r6', target_is_directory=True)
-    observer = 'rom6_reset_policy_observe.lua' if args.reset_policy else 'npe3_native_observe.lua'
+    observer = ('rom6_native_radio.lua' if args.radio else
+                'rom6_reset_policy_observe.lua' if args.reset_policy else 'npe3_native_observe.lua')
     command=[str(ROOT/'mame/mame'),model,'-rompath',str(roms)+';'+str(ROOT/'roms'),
         '-nvram_directory',str(run/'nvram'),'-cfg_directory','cfg','-snapshot_directory','snap',
         '-noreadconfig','-joystickprovider','none','-midiprovider','none','-keyboardprovider','none',
@@ -139,6 +142,16 @@ def main():
         with Image.open(first/'snap/npe3_after_menu.png') as frame:
             check_frame(frame, MENU_SHA256, 'native 6210 Messages menu')
         print('Native6210 Menu: PASS bounded native boot and physical input')
+    if args.radio:
+        from tools.rom6_radio_census import census, find_output_source
+        with (first / 'rom6_radio_writes.tsv').open('rb') as stream:
+            report = census(text, stream)
+        overlay = (first / 'rom6_radio_first_output.be16').read_bytes()
+        report['own_output_writer'] = find_output_source(flash, overlay)
+        report['fitted_clock_claim'] = False
+        report['rf_acquisition_claim'] = False
+        (run / 'radio-census.json').write_text(json.dumps(report, indent=2) + '\n')
+        print(f"Native6210 radio census: PASS writes={report['write_records']} own_writer={report['own_output_writer']['mcu_offset']} acquisition_claim=0")
 
 
 if __name__ == '__main__':
