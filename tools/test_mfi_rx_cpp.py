@@ -19,6 +19,7 @@ class MfiRxTest(unittest.TestCase):
             result=subprocess.run([str(binary)],check=True,capture_output=True,text=True)
             self.assertIn('provenance=256',result.stdout)
             self.assertIn('staging96=3',result.stdout)
+            self.assertIn('request_latch=1',result.stdout)
 
 
 if __name__=='__main__': unittest.main()

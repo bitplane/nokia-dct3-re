@@ -2834,13 +2834,21 @@ Its difference from immediate capture is 83 animated-icon pixels, bounds
 `(25,27)..(49,38)`; the ordinary and immediate-profile hashes are unchanged.
 
 This is native **laboratory SCH decoding**, not fitted MFI timing/capacity,
-RF tuning, BCCH, camping or registration. The zero-source `npe3zp9` control
-preserves legal execution/Menu and produces no successful SCH, but the full
-24-second receive gate correctly rejects an overrun at 20.168006769 s:
-produced 495,200, consumed 495,104, provisional queue full at 96, INTM set
-(`ST1=4903`), INT0 pending (`IFR=0021`), bus-context PC `40b2`.
-Do not enlarge staging or suppress this fault to promote the candidate.
-The finite capture/backpressure/service-gap contract remains open.
+RF tuning, BCCH, camping or registration. Both P09 profiles use an explicit
+laboratory block-request latch: one notification remains outstanding until
+32 words are consumed; if another complete block is queued, it is announced
+again. This prevents unread blocks being stranded when CPU interrupt edges
+coalesce. It does not identify a physical acknowledge register or pin.
+
+With unchanged clock, waveform epoch and 96-word staging, the zero-source
+`npe3zp9` control passes 24 seconds: 16,696,608 reads, peak 79, no transport
+fault and no successful SCH. The coded 65-second run still passes with the
+same decoded SCH, 4,655,264 reads and peak 78. The request rearms 12 and three
+times respectively. The earlier per-produced-block pulse policy overran the
+zero control; that negative result remains in the falsification ledger.
+Component acceptance saves an outstanding request with two queued blocks,
+restores it, and checks ordered reads and exactly one reannouncement.
+Physical acknowledgement, buffering and capture ownership remain open.
 
 After SCH, native class-50 reports identify frame fields 719, 770 and 821, each
 51 frames apart, with status 1. The fixture supplies no normal/BCCH bursts,

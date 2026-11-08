@@ -5,7 +5,7 @@
     {
       "id": "npe3_p09_start_96_word_staging_is_transport_complete",
       "status": "disproven",
-      "hypothesis": "Whole-sequence P09-start capture with the inherited96-word staging is sufficient for lossless native6210 receive operation for both coded and zero ADC sources",
+      "hypothesis": "Whole-sequence P09-start capture with inherited96-word staging and per-produced-block interrupt pulses is sufficient for lossless native6210 receive operation for both coded and zero ADC sources",
       "conclusion": "The coded-source65s candidate decodes exact native SCH FN704/BSIC42 and stays fault-free at peak78. The paired zero-source24s control instead overruns at20.168006769s with495200 produced,495104 consumed and full96-word staging while INTM is set and INT0 pending(ST14903,IFR0021,bus-context PC40b2). Its full transport gate correctly fails despite legal UI and no successful SCH. This rejects completeness of that exact staging/gating combination,not the native SCH result,all P09 ownership or a measured hardware buffer size. No staging sweep,capacity increase,source shift or fault suppression is adopted; finite capture/backpressure and service-gap ownership are the next hardware contract.",
       "evidence": ["docs/6210_bringup.md", "driver/nokia_dct3_research.cpp", "driver/nokia_mfi_rx.cpp", "tools/run_npe3_native.py", "tools/rom6_adc_lab_check.py"]
     },

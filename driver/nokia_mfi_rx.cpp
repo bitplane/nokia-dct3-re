@@ -22,6 +22,7 @@ void nokia_mfi_rx_device::device_start()
 	save_item(NAME(m_state.produced)); save_item(NAME(m_state.consumed));
 	save_item(NAME(m_state.overruns)); save_item(NAME(m_state.underruns));
 	save_item(NAME(m_state.enabled)); save_item(NAME(m_state.fault));
+	save_item(NAME(m_state.block_request_active)); save_item(NAME(m_state.block_request_rearmed));
 	save_item(NAME(m_next_tick));
 }
 
@@ -53,7 +54,7 @@ TIMER_CALLBACK_MEMBER(nokia_mfi_rx_device::word_tick)
 {
 	if (!m_state.enabled || m_state.fault) return;
 	u16 const sample = m_adc_cb(m_state.produced & 1);
-	bool const ready = m_state.clock(sample, m_next_tick, m_staging_limit);
+	bool const ready = m_state.clock(sample, m_next_tick, m_staging_limit, m_latched_block_requests);
 	m_peak_queued = std::max(m_peak_queued, m_state.count);
 	if (m_state.fault)
 	{
@@ -84,6 +85,11 @@ u16 nokia_mfi_rx_device::read()
 	}
 	u64 const before = underruns();
 	u16 const result = m_state.read(side_effects);
+	if (side_effects && m_state.take_rearmed_request())
+	{
+		++m_block_rearms;
+		m_data_available_cb(1); m_data_available_cb(0);
+	}
 	if (underruns() != before && underruns() <= 16)
 	{
 		machine().logerror("mfi_rx_fault: underrun=%llu retained=%04x t=%.9f\n",underruns(),result,machine().time().as_double());
@@ -94,6 +100,7 @@ u16 nokia_mfi_rx_device::read()
 
 void nokia_mfi_rx_device::device_stop()
 {
+	machine().logerror("mfi_rx_request_summary: latched=%u rearms=%llu physical_ack_claim=0\n",m_latched_block_requests,m_block_rearms);
 	machine().logerror("mfi_rx_capacity_observation: configured=%u peak=%u physical_capacity_claim=0\n",m_staging_limit,m_peak_queued);
 	machine().logerror("mfi_rx_trace_complete: words=%u blocks=%u word_cap=4096 block_cap=128\n",m_word_trace_count,m_block_trace_count);
 	machine().logerror("mfi_rx_summary: produced=%llu consumed=%llu queued=%u overrun=%llu underrun=%llu fault=%u divider=%u physical_clock_claim=0\n",

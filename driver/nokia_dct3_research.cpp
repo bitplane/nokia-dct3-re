@@ -70,6 +70,7 @@ void dct3_rf_adc_fixture_state::npe3cp9(machine_config &config)
 {
 	npe3afs(config);
 	m_compare_start=true;
+	subdevice<nokia_mfi_rx_device>("mfi_rx")->set_latched_block_requests(true);
 }
 
 void dct3_rf_adc_fixture_state::npe3zp9(machine_config &config)
@@ -84,7 +85,7 @@ void dct3_rf_adc_fixture_state::machine_start()
 	m_candidate_timer=timer_alloc(FUNC(dct3_rf_adc_fixture_state::candidate_receive_start),this);
 	save_item(NAME(m_candidate_active));
 	save_item(NAME(m_candidate_target));
-	if (m_compare_start) machine().logerror("npe3_capture_candidate: p09_start=1 all_captures=1 physical_claim=0 source_epoch_shift=0\n");
+	if (m_compare_start) machine().logerror("npe3_capture_candidate: p09_start=1 all_captures=1 block_request_latch=1 physical_claim=0 source_epoch_shift=0\n");
 	save_item(NAME(m_q_latch));
 	save_item(NAME(m_adc_receive_control)); save_item(NAME(m_adc_mfi_control));
 	machine().logerror("rf_adc_lab: direct_adc=1 tuned_air_source=0 tone=%u reference=13000000 source_phase_divider=12 word_divider=%u amplitude=1024 physical_clock_claim=0\n",

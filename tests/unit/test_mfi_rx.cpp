@@ -48,5 +48,34 @@ int main()
 	}
 	for (unsigned word=0; word<96; ++word) state.clock(word,word,96);
 	assert(!state.clock(96,96,96) && state.fault && state.produced==384);
-	std::cout << "MFI raw transport: PASS blocks=8 provenance=256 snapshot=8 staging96=3 underrun=1 overrun=1 reset=1 physical_capacity_claim=0\n";
+	for (bool latched : {false,true})
+	{
+		state.reset(); state.enable(true);
+		bool pending=false;
+		for (unsigned word=0; word<64; ++word)
+			pending=state.clock(word,word*12,96,latched) || pending;
+		auto restored=state;
+		unsigned services=0;
+		while (pending)
+		{
+			pending=false;
+			for (unsigned word=0; word<32; ++word)
+			{
+				unsigned const expected=services*32+word;
+				assert(state.read(false)==expected);
+				assert(state.read()==expected && restored.read()==expected);
+				bool const rearm=state.take_rearmed_request();
+				assert(restored.take_rearmed_request()==rearm);
+				assert(!rearm || (word==31 && services==0 && latched));
+				pending=pending || rearm;
+			}
+			++services;
+		}
+		assert(services==(latched ? 2U : 1U));
+		assert(state.count==(latched ? 0 : 32));
+		assert(!state.underruns && !state.overruns);
+		state.enable(false);
+		assert(!state.block_request_active && !state.take_rearmed_request());
+	}
+	std::cout << "MFI raw transport: PASS blocks=8 provenance=256 snapshot=8 staging96=3 request_latch=1 underrun=1 overrun=1 reset=1 physical_capacity_claim=0\n";
 }

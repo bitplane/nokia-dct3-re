@@ -25,6 +25,8 @@ public:
 		NOKIA_CCONT(config,"power",0);
 		NOKIA_HAGAR(config,m_hagar,0);
 		NOKIA_MFI_RX(config,m_mfi,13'000'000);
+		m_mfi->set_staging_limit(96);
+		m_mfi->set_latched_block_requests(true);
 		m_mfi->adc_cb().set(FUNC(c54x_serial_test_state::adc_sample));
 		m_mfi->data_available_cb().set(FUNC(c54x_serial_test_state::adc_ready));
 		NOKIA_DSP_C54X(config,m_backend,13'000'000);
@@ -45,6 +47,7 @@ protected:
 		save_item(NAME(m_adc_source)); save_item(NAME(m_adc_consumed)); save_item(NAME(m_adc_blocks));
 		save_item(NAME(m_adc_time)); save_item(NAME(m_adc_last_tick));
 		save_item(NAME(m_adc_first_time)); save_item(NAME(m_adc_first_tick)); save_item(NAME(m_adc_first_source));
+		save_item(NAME(m_defer_adc)); save_item(NAME(m_deferred_requests));
 	}
 	void machine_reset() override
 	{
@@ -69,6 +72,7 @@ private:
 	void adc_ready(int state)
 	{
 		if (!state) return;
+		if (m_defer_adc) { ++m_deferred_requests; return; }
 		++m_adc_blocks; m_adc_time=machine().time();
 		for (unsigned word=0; word<32; ++word)
 		{
@@ -209,7 +213,26 @@ private:
 			io.write_word(0x0e,1999); next_counter_phase(36); return;
 		case 15:
 			expect(io.read_word(0x0d)==3,"changed reload also preserves the running divider phase");
-			osd_printf_info("C54x compare boundary: PASS replacement=1 armed_restore=1 exact_time=1 ack_ports=1,2 periodic=1 raw_zero=1 cancellation=1 reset_abort=1 hagar_restore=1 mfi_clock_restore=1 mfi_irq_owner=1 reload_phase=1 physical_latch_claim=0\n");
+			m_defer_adc=true; m_deferred_requests=0; m_adc_source=0;
+			m_mfi->reset(); m_mfi->enable_w(1);
+			++m_stage; m_timer->adjust(attotime::from_usec(31)); return;
+		case 16:
+			expect(m_mfi->produced()>=64 && m_mfi->produced()<96 && !m_mfi->consumed()
+				&& m_deferred_requests==1,"two ready blocks retain one outstanding request");
+			expect(c54x_test::capture_snapshot(machine(),m_saved)==STATERR_NONE,"save outstanding MFI block request");
+			for (unsigned word=0;word<64;++word)
+				expect(m_mfi->read()==0x1000+word,"deferred MFI data remains ordered");
+			expect(m_deferred_requests==2,"completed read re-announces exactly one queued block");
+			m_mfi->reset();
+			m_saved.clear(); m_saved.seekg(0);
+			expect(machine().save().read_stream(m_saved)==STATERR_NONE,"restore outstanding MFI block request");
+			expect(!m_mfi->consumed() && m_deferred_requests==1,"restore unread data and request sink");
+			for (unsigned word=0;word<64;++word)
+				expect(m_mfi->read()==0x1000+word,"restored block data remains ordered");
+			expect(m_deferred_requests==2 && !m_mfi->overruns() && !m_mfi->underruns(),
+				"restored request rearms once without empty-buffer interrupt");
+			m_mfi->enable_w(0);
+			osd_printf_info("C54x compare boundary: PASS replacement=1 armed_restore=1 exact_time=1 ack_ports=1,2 periodic=1 raw_zero=1 cancellation=1 reset_abort=1 hagar_restore=1 mfi_clock_restore=1 mfi_irq_owner=1 reload_phase=1 mfi_request_restore=1 physical_latch_claim=0\n");
 			fatalerror("C54x compare boundary tests complete");
 		}
 		++m_stage;
@@ -226,6 +249,8 @@ private:
 	attotime m_time,m_reference_time;
 	attotime m_counter_anchor;
 	unsigned m_counter_events=0;
+	bool m_defer_adc=false;
+	u64 m_deferred_requests=0;
 	u64 m_adc_source=0,m_adc_consumed=0,m_adc_blocks=0,m_adc_last_tick=0;
 	u64 m_reference_adc_source=0,m_reference_adc_tick=0;
 	attotime m_adc_time,m_reference_adc_time;
