@@ -6,6 +6,7 @@ dofile(directory..(npe3 and 'rom6_native_radio.lua' or 'rom6_native_observe.lua'
 if npe3 then
     dofile(directory..'rom6_rx_ring_observe.lua')
     if machine.system.name=='npe3ap5' then
+        dofile(directory..'npe3_rf_config_observe.lua')
         dofile(directory..'npe3_bts_page_input.lua')
         dofile(directory..'npe3_paging_observe.lua')
         dofile(directory..'npe3_paging_controller.lua')

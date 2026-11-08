@@ -969,6 +969,21 @@ Native UI,SIM,raw LU/release and two addressed-page admissions still pass.
 Recovering the6210 configuration producers is required before reusing the
 NSM-3 frequency interpretation or introducing source tuning.
 
+Own6210 provenance is now established independently of that interpretation:
+the294-byte data prefix3e7e..3f10 uniquely matches MCU offset2083c. Its route
+literals3efc/3efe remain1054/082a,but3f0f/3f10 are0502/0308. The runtime
+clear writes are owned by read-stage0f14;the two upload stores by22ad.
+Selectors1990,1a5e and29b9 read this pair under their respective route/flag
+conditions. Their staging writes need not have a valid read-stage PC;an
+`ffffffff` observation does not assign instruction ownership. Across the
+24-second page run,all6,481 staged words match subsequent P31/P32 configuration
+writes from the common output routine (P32 context1a89),without changing the
+full bus journal. `npe3_rf_config_check.py` checks unique upload identity,
+producer coverage,uncapped staging and ordered port delivery. This proves a
+product-specific source pair,not that bit8 is harmless or that either word
+can be aliased to the NSM-3 interpretation. The next RF contract is the6210's
+own key-to-PLL/configuration relationship and receiver-state interpretation.
+
 ## Receive interrupt and clock boundary
 
 `tools/run_rom6_native.py --scenario receive` adds a passive 1,024-read prefix
