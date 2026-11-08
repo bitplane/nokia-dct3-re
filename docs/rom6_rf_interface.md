@@ -99,6 +99,26 @@ period; interpreting them as modulation/power comparators is a hypothesis
 to test against their writers and the existing counter, not a recovered pin
 specification. Preserve the actual control timestamps when testing it.
 
+The read-only full-SI observer now joins each P21 commit to the existing
+backend counter and independently projected P05..P08 deadlines. All four
+commits occur at counter `062c`; the first is at 12.066136505 s, before the
+projected P07/P05/P06/P08 positions at
+12.066209846/12.066360308/12.066724923/12.066817231 s. All four targets share
+one fractional counter phase. P05's absolute source-frame projections are
+`2614,2671,3726,3782`, agreeing with the separately observed RA_INFO fields.
+The gate binds the logged controls to actual I/O writes and rejects missing
+windows, changed phase, frame disagreement and partial transactions. It
+does not assert that any projected event fired, or that P05 drives TX.
+
+This supports a **separate P05-start laboratory candidate** as the next
+experiment. It must consume only complete native P21/P27 buffers, preserve
+the actual counter deadline, reject/reset/cancel partial work, decode the
+actual access bits outside the DSP and derive any response frame from that
+timed endpoint rather than RA_INFO or private descriptors. Only subsequent
+raw AGCH waveform reception may establish a native assignment. The existing
+broadcast-only composition remains the no-reply control; no physical clock,
+pin function or fitted ROM identity is promoted by the candidate.
+
 The original [NSM-3 System Module manual, Issue 1 12/1999](https://www.eserviceinfo.com/preview_html.php?fileid=5456&previewid=3011)
 identifies the 13MHz COBBA clock and separate IData/QData connections
 (p.31), and specifies direct conversion without an intermediate frequency

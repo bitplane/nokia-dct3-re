@@ -3,6 +3,14 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "npe3_native_transmit_window_projection",
+      "owner": "native_rom6_reference_adc_laboratory",
+      "status": "satisfied",
+      "predicate": "Complete native access buffers precede coherent modeled P05..P08 deadlines whose P05 source frames agree with native reports",
+      "current": "Read-only observation joins four15-word P21 commits at counter062c to actual controls071f/08aa/067c/090e. Existing backend13MHz/12 projections share one fractional phase and are orderedP07<P05<P06<P08 after commit. First commit12.066136505 precedes projectedP05 at12.066360308. P05 absolute source frames2614/2671/3726/3782 equal separate RA_INFO fields. The checker binds controls/commit/count,checks counter phase and rejects missing/duplicate/changed windows and frame disagreements. This supports a separately named P05-start experiment;it does not establish fired edges,pin ownership,physical RF emission,network reception or registration. The observer never drives a timer,packet or firmware state;ordinary products remain unbound and the broadcast-only candidate remains no-reply.",
+      "evidence": ["driver/nokia_dct3_research.cpp", "driver/nokia_dct3_research.h", "driver/nokia_dsp_c54x.cpp", "tools/npe3_rach_transmit_check.py", "tools/test_npe3_rach_transmit_check.py", "tools/run_npe3_native.py", "docs/rom6_rf_interface.md"]
+    },
+    {
       "id": "npe3_native_access_serialization",
       "owner": "native_rom6_reference_adc_laboratory",
       "status": "satisfied",

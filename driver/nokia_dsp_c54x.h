@@ -31,9 +31,9 @@ public:
 	void set_external_rf_receive(bool enabled) { m_external_rf_receive = enabled; }
 	auto rf_receive_cb() { return m_rf_receive_cb.bind(); }
 	auto rf_control_cb() { return m_rf_control_cb.bind(); }
-	// Counter-model facts for explicit lab wiring, not fitted RX semantics.
-	attotime lab_receive_deadline(u16 target) const;
-	u16 lab_receive_counter() const { return frame_counter(); }
+	// Counter-model facts for explicit lab wiring, not fitted pin semantics.
+	attotime lab_counter_deadline(u16 target) const;
+	u16 lab_counter_value() const { return frame_counter(); }
 	void rf_data_available_w(int state);
 	// An attached clock owns every codec transfer, including boot loopback;
 	// do not also complete a word synchronously from the BDXR write.

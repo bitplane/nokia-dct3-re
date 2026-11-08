@@ -248,7 +248,7 @@ void nokia_dsp_c54x_device::arm_compare_timer(emu_timer *timer, u16 quarter_symb
 	timer->adjust(m_frame_counter_epoch + absolute - machine().time());
 }
 
-attotime nokia_dsp_c54x_device::lab_receive_deadline(u16 target) const
+attotime nokia_dsp_c54x_device::lab_counter_deadline(u16 target) const
 {
 	if (!m_reset_released || target>=frame_period()) return attotime::never;
 	using namespace nokia_dsp_compare_clock;
@@ -621,7 +621,8 @@ void nokia_dsp_c54x_device::io_w(offs_t offset, u16 data)
 	if (port == 0x38) m_fire.command_w(data);
 	else if (port == 0x39) m_fire.data_w(data);
 	else if (port == 0x3c) m_fire.control_w(data);
-	if (m_external_rf_receive && (port == 3 || port == 0x21)) m_rf_control_cb(port, data);
+	if (m_external_rf_receive && (port == 3 || (port >= 5 && port <= 8) || port == 0x21))
+		m_rf_control_cb(port, data);
 	if (m_port36_handshake && port == 0 && m_port36.strobe_w(BIT(data, 4)))
 		// Deferred completion, not a read-triggered answer. One backend clock
 		// is an unmeasured latency policy, not an identified peripheral rate.

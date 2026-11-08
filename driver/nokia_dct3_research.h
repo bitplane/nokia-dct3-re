@@ -68,6 +68,7 @@ protected:
 private:
 	void configure_adc_lab(machine_config &config);
 	void control_w(offs_t port, u16 data);
+	void transmit_word_w(u16 data);
 	u16 sample_r(offs_t component);
 	void fault_observe_w(int state);
 	TIMER_CALLBACK_MEMBER(candidate_receive_start);
@@ -87,6 +88,11 @@ private:
 	std::array<std::array<s16, 2>, 148 * 4> m_sch_cache{};
 	s16 m_q_latch = 0;
 	u16 m_adc_receive_control = 0, m_adc_mfi_control = 0;
+	// Diagnostic observations, not rewound by save/load. Never used to clock
+	// RF, deliver packets or alter pins; canonical port state stays in backend.
+	std::array<u16,4> m_observed_tx_compares{};
+	unsigned m_observed_tx_words=0, m_observed_tx_windows=0;
+	bool m_observed_tx_active=false;
 };
 
 INPUT_PORTS_EXTERN(nmp5stage);

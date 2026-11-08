@@ -1,5 +1,5 @@
 import unittest
-from tools.npe3_rach_transmit_check import check,transactions
+from tools.npe3_rach_transmit_check import check,transactions,check_windows
 from tools.test_gsm_rach_signal import WORDS
 
 
@@ -35,6 +35,24 @@ class NativeAccessTransmitTest(unittest.TestCase):
                      self.text.replace('0484','0485'),self.text.replace('0a36','ffff').replace('0b00','0bff')):
             with self.assertRaises(ValueError):check(text,self.journal())
         self.assertEqual(len(transactions(self.journal())),1)
+
+    def test_counter_projection_is_bound_to_commit_and_actual_controls(self):
+        controls=(0x71f,0x8aa,0x67c,0x90e)
+        due=[2.2+((target-0x62c)%5000)*12/13000000-0.2e-6 for target in controls]
+        text=('npe3_tx_window: sequence=1 t=2.200000000 words=15 counter=062c '
+              'controls=071f,08aa,067c,090e deadlines='+','.join(f'{at:.9f}' for at in due)+
+              ' observer_writes=0 physical_claim=0')
+        bursts=[(2,2.2,WORDS,controls)]
+        result=check_windows(text,bursts,[476])
+        self.assertFalse(result['physical_release_qualified'])
+        for bad in ('',text+'\n'+text,text.replace('words=15','words=14'),
+                    text.replace('counter=062c','counter=062d'),
+                    text.replace('071f,08aa','071e,08aa'),
+                    text.replace('physical_claim=0','physical_claim=1'),
+                    text.replace(f'{due[0]:.9f}','2.200000000')):
+            with self.assertRaises(ValueError):check_windows(bad,bursts,[476])
+        with self.assertRaises(ValueError):check_windows(text,bursts,[477])
+        with self.assertRaises(ValueError):check(self.text,self.journal(),require_windows=True)
 
 
 if __name__=='__main__':unittest.main()
