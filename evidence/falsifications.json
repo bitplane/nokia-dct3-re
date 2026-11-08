@@ -3,6 +3,13 @@
   "kind": "falsifications",
   "entries": [
     {
+      "id": "npe3_result4_implies_missing_or_unsuitable_candidate",
+      "status": "disproven",
+      "hypothesis": "Native result4 proves that the general candidate chooser has no usable cached cell,so2d314c must have been reached through2d3104's earlier null-return path",
+      "conclusion": "The actual null store is2d2c94,with selector16839c=10. One cached key46/BSIC42/state4 record remains;mode10's30c998 routine increments its list cursor before excluding keys equal to selected17251c=46. Positive signed criterion16856e=18 takes2d0898,sets lower-controller word172518=4,and BLs directly to shared tail2d314a. This bypasses2d3104;the report tail is not a function-ownership boundary. Paired result2/result4 snapshots show criterion-2/+18. Exhausted lists and unmatched fallback00ff are post-report lookup obstructions,not proof of an initially missing cell or a required DSP reply. Why selector mode10 runs after LU/release and how ordinary paging settles remain open;no field or completion is forced.",
+      "evidence": ["tools/npe3_paging_controller.lua", "tools/npe3_addressed_page_check.py", "tools/test_npe3_addressed_page_check.py", "tools/run_npe3_native.py", "docs/rom6_rf_interface.md"]
+    },
+    {
       "id": "npe3_native_si3_fails_mcu_header_admission",
       "status": "disproven",
       "hypothesis": "Native status-zero SI3 blocks fail MCU channel/header admission because they never reach3ba0c0",

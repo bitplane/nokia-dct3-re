@@ -581,15 +581,37 @@ RR selector reaches the shared byte+6 setter. `check_reentry_source` joins
 these actual boundaries with pinned constructor/report instructions;the full
 DSP journal retains its baseline hash.
 
-The static path to2d314c follows candidate-return checks at2d3104..312e;
-possible choosers include30f690,30c998 and the mode8 fallback30e6e4. Which
-chooser/eligibility guard rejects the native candidate is not yet runtime
-qualified. Zero-hit interior-PC probes at these helpers were removed and do
-not establish absence. Inspect their data contracts or validated execution
-boundaries,not an invented completion or a forced controller result.
+Result4 does not imply a generally unsuitable or missing cached cell. Paired
+constructor snapshots retain one cached key46/BSIC42/state4 record. At result4,
+its signed fields+0c/+10 are-87/+18;these numeric fields alone do not qualify
+all cell eligibility. The candidate list is rebuilt with key46,then cursor
+30c9d6 advances to1. Crucially,this advance precedes the selector's final key
+test and is not evidence that the cell was accepted.
 
-The next question is why candidate selection reaches result4 at2d314c,
-restarting the lifecycle instead of settling ordinary paging. Do not
+Selector configuration16839c is mode10 in both snapshots. Its30c998 routine
+accepts a looked-up key only if it differs from selected key17251c in mode10;
+mode8 has a different acceptance rule. The only cached key46 equals17251c=46,
+so mode10 deliberately excludes it. The actual null return is stored at
+2d2c94 into168358. This path enters2d0818,not the separate chooser path at
+2d3104. Signed criterion16856e changes from-2 in the result2 snapshot to+18
+in result4;the negative branch2d0834 produces result2,while the nonnegative
+mode10 branch2d0898 sets lower-controller word172518=4 and long-branches to
+the shared2d314a report tail. A BL to that tail is not proof that its earlier
+candidate-return checks executed. Do not conflate selector mode16839c=10
+with lower-controller word172518 changing3 to4.
+
+After the report,the first list is exhausted,the alternate count1683b2 is0,
+and fallback lookup key1683a4=00ff has no cached match. The pinned guards of
+30f690,30c998 and30e6e4 consequently imply early-null returns on this captured
+post-report state without external stubs. These are postconditions,not the
+original rejection reason or an absence proof. `check_candidate_snapshot`
+pins the actual guards,joins the native null-return write,and checks paired
+RAM snapshots. The full DSP journal remains unchanged. Zero-hit interior-PC
+probes are retired;do not replace this selection policy with a fabricated
+hardware completion or overwrite the list/current key.
+
+The next question is why mode10's current-cell-excluding selection runs after
+raw LU/release,and how its completion settles ordinary paging. Do not
 inject083e again or clear the context byte. Broad heap watches used to locate
 the consumer are retired;bounded return/selector/context observations retain
 the contract. The fresh native capture reproduces UI,SIM,LU and raw release,

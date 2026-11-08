@@ -1,7 +1,7 @@
 import unittest
 from unittest.mock import patch
 
-from tools.npe3_addressed_page_check import check,check_mcu_admission,check_rr_delivery,check_controller,check_controller_lifecycle,check_reentry_source,CONTROLLER_CODE,REENTRY_CODE
+from tools.npe3_addressed_page_check import check,check_mcu_admission,check_rr_delivery,check_controller,check_controller_lifecycle,check_reentry_source,check_candidate_snapshot,CONTROLLER_CODE,REENTRY_CODE,CANDIDATE_CODE
 
 
 class AddressedPageTest(unittest.TestCase):
@@ -114,6 +114,38 @@ class AddressedPageTest(unittest.TestCase):
 
 
 class ControllerLifecycleTest(unittest.TestCase):
+    def test_snapshot_proves_lookup_obstructions_not_bad_radio_or_eligibility(self):
+        image=bytearray(0x115400);ram=bytearray(0x80000)
+        for address,code in CANDIDATE_CODE.items():
+            image[address-0x200000:address-0x200000+len(code)//2]=bytes.fromhex(code)
+        def put(address,value,size):
+            at=address-0x100000;ram[at:at+size]=value.to_bytes(size,'big')
+        for address,value,size in ((0x172518,4,4),(0x16837c,1,1),(0x16837d,1,1),
+                                   (0x16839c,10,4),(0x17251c,46,2),
+                                   (0x1683a4,255,2),(0x168348,0x101000,4),
+                                   (0x101008,46,2),(0x10100a,42,1),(0x10100b,4,1),
+                                   (0x10100c,0xffa9,2),(0x101010,18,2)):
+            put(address,value,size)
+        text=('npe3_candidate_snapshot: result=4 t=16.271368077 address=100000 bytes=524288 caller=002d3151 observer_writes=0\n'
+              'npe3_candidate_decision: sequence=1 t=16.271342231 address=00168358 value=00000000 mask=ffffffff pc=002d2c94 r0=00000000 r5=0016839c observer_writes=0\n'
+              'npe3_candidate_decision_complete: writes=1 cap=128 begin=16.26 end=16.29 observer_writes=0\n')
+        result=check_candidate_snapshot(text,ram,image)
+        self.assertEqual(result['cached_cells'][0]['signed_field_0c'],-87)
+        self.assertTrue(result['post_report_lookup_obstructions'])
+        self.assertFalse(result['cell_eligibility_qualified'])
+        for address,value,size in ((0x16837d,0,1),(0x1683b2,1,1),(0x1683a4,46,2),
+                                   (0x101004,0x101000,4)):
+            bad=ram.copy();at=address-0x100000;bad[at:at+size]=value.to_bytes(size,'big')
+            with self.subTest(address=hex(address)),self.assertRaises(ValueError):
+                check_candidate_snapshot(text,bad,image)
+        with self.assertRaises(ValueError):check_candidate_snapshot(text,ram[:-1],image)
+        previous=ram.copy();previous[0x6856e:0x68570]=bytes.fromhex('fffe')
+        ram[0x6856e:0x68570]=bytes.fromhex('0012')
+        text+='npe3_candidate_snapshot: result=2 t=15.102789154 address=100000 bytes=524288 caller=002d0843 observer_writes=0\n'
+        result=check_candidate_snapshot(text,ram,image,previous)
+        self.assertEqual(result['criterion_pair'],[-2,18])
+        with self.assertRaises(ValueError):check_candidate_snapshot(text,ram,image,ram)
+
     def test_real_result4_drives_reentry_without_assigning_rejection_semantics(self):
         image=bytearray(0x115400)
         for address,code in REENTRY_CODE.items():

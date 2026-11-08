@@ -14,6 +14,67 @@ REENTRY_CODE={
     0x30f768:'000007f2',0x314fdc:'48cc21009a032300f0b7fe02',
     0x315310:'000009f7',0x2a3458:'000009f7',0x2a3a2c:'202b01c02100f7fcfac1',
 }
+CANDIDATE_CODE={
+    0x30f6c2:'4d1e78a82800d036',0x30c9a6:'78312900d029787542a9dd26',
+    0x30c958:'2800d0058902428ad00368402800d1f9200046f7',
+    0x30e6f4:'48ce88014640f7fef92d468220445d072f00d05446502800d051',
+    0x30f73c:'001683b0',0x30cd48:'00168338',0x30ea30:'001683a4',
+    0x30c9e2:'892148c688004281d0012f0ad0082f08d0061c6806000e05783042a8dcd92400',
+    0x30cd00:'0017251c',0x2d0b8c:'0016856e',
+    0x2d0822:'68282802d001280ad11549d720005e082800d510a0cff173f8782002f03efef52003e040',
+    0x2d0898:'a0d6f173f8472004464d6028a0d6f173f841f002fc4e',
+    0x2d2c90:'f039fe82603873ee4640742868382800d101f7fdfdb9',
+}
+
+
+def check_candidate_snapshot(text,ram,image,previous=None):
+    for address,code in CANDIDATE_CODE.items():
+        if image[address-0x200000:address-0x200000+len(code)//2].hex()!=code:
+            raise ValueError('candidate lookup guard instructions changed')
+    if (len(ram)!=0x80000 or len(re.findall(r'npe3_candidate_snapshot: result=4 t=[\d.]+ address=100000 bytes=524288 caller=002d3151 observer_writes=0',text))!=1):
+        raise ValueError('missing bounded result4 RAM snapshot')
+    def read(address,size=4):
+        if not 0x100000<=address<=0x180000-size:raise ValueError('candidate pointer outside captured RAM')
+        return int.from_bytes(ram[address-0x100000:address-0x100000+size],'big')
+    count=read(0x16837c,1);cursor=read(0x16837d,1)
+    alternate=read(0x1683b2,1);fallback=read(0x1683a4,2)
+    mode=read(0x16839c);selected=read(0x17251c,2)
+    cells=[];seen=set();node=read(0x168348)
+    while node:
+        if node in seen or len(seen)>=128:raise ValueError('cyclic or unbounded candidate cache')
+        seen.add(node)
+        cells.append(dict(key=read(node+8,2),bsic=read(node+10,1),state=read(node+11,1),
+                          signed_field_0c=read(node+12,2),signed_field_10=read(node+16,2)))
+        for name in ('signed_field_0c','signed_field_10'):
+            if cells[-1][name]&0x8000:cells[-1][name]-=0x10000
+        node=read(node+4)
+    if (read(0x172518)!=4 or read(0x17254e,1)!=0 or not count or cursor<count or alternate
+            or not cells or fallback in [c['key'] for c in cells]
+            or mode!=10 or any(c['key']!=selected for c in cells)):
+        raise ValueError('captured lookup state does not establish all three early-null conditions')
+    decisions=[fields(row) for row in re.findall(r'npe3_candidate_decision: ([^\r\n]+)',text)]
+    if (not 0<len(decisions)<128 or [int(r['sequence']) for r in decisions]!=list(range(1,len(decisions)+1))
+            or text.count(f'npe3_candidate_decision_complete: writes={len(decisions)} cap=128 begin=16.26 end=16.29 observer_writes=0')!=1):
+        raise ValueError('missing or capped native candidate-return store')
+    nulls=[r for r in decisions if r['address']=='00168358' and r['pc']=='002d2c94']
+    if (len(nulls)!=1 or nulls[0]['value']!='00000000' or nulls[0]['mask']!='ffffffff'
+            or nulls[0]['r0']!='00000000' or nulls[0]['r5']!='0016839c'
+            or any(r['observer_writes']!='0' for r in decisions)):
+        raise ValueError('native chooser null-return boundary changed')
+    if previous is not None:
+        if (len(previous)!=0x80000 or len(re.findall(r'npe3_candidate_snapshot: result=2 t=[\d.]+ address=100000 bytes=524288 caller=002d0843 observer_writes=0',text))!=1):
+            raise ValueError('incomplete result2 snapshot')
+        first=int.from_bytes(previous[0x6856e:0x68570],'big',signed=True)
+        current=read(0x16856e,2)
+        if current&0x8000:current-=0x10000
+        if first>=0 or current<0 or int.from_bytes(previous[0x6839c:0x683a0],'big')!=10:
+            raise ValueError('result2/result4 criterion branch is not established')
+    return dict(first_list_count=count,first_list_cursor=cursor,alternate_list_count=alternate,
+                fallback_key=fallback,cached_cells=cells,post_report_lookup_obstructions=True,
+                selection_mode=mode,selected_key=selected,mode10_excludes_only_cached_key=True,
+                criterion_pair=[first,current] if previous is not None else None,
+                native_null_return_observed=True,cell_eligibility_qualified=False,
+                stable_camping_qualified=False)
 
 
 def check_reentry_source(text,image):
