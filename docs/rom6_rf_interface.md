@@ -77,6 +77,13 @@ Only exact noiseless codewords are accepted; no RF demodulation or error
 correction is claimed. Missing, partial, aborted and malformed transactions
 and report/data mismatches fail the full-SI gate.
 
+`gsm_rach.h` supplies an external exact decoder for the finite P27 format,
+without RA_INFO or private firmware-state inputs. Its standalone test checks
+all 256 access octets at BSIC 0, 42 and 63 against the independent Python
+encoder, the captured native RA `0b` transaction, wrong-BSIC rejection and
+every single-bit corruption of that transaction's coded payload. This helper
+is not yet connected to a network response; the no-reply profiles are unchanged.
+
 The absent serializer was a generic CPU DAGEN dependency: immediate ST
 postdecrement followed by MVDD used the old destination. Own writes at
 `7c5d/7c5f` overwrote the buffer pointer at `2657` with `00e0`, leaving
