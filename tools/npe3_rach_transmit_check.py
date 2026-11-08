@@ -14,6 +14,7 @@ AGCH=re.compile(r'npe3_raw_agch: ra=([0-9a-f]{2}) access_frame=(\d+) start_frame
 
 def check_agch(text, *, require_native=True,allow_normal=False):
     """Check external response content independently of the C++ decoder/BTS."""
+    combined='npe3_bts_layout: combined_ccch=1 sdcch4=1 timeslot=0 agch_endings=9,15,19 physical_claim=0' in text
     releases=[]
     normal=0
     for release in RELEASE.finditer(text):
@@ -38,7 +39,8 @@ def check_agch(text, *, require_native=True,allow_normal=False):
         got_ra,got_frame,start,payload=reply.groups()
         start=int(start)
         expected_end=frame+4
-        while expected_end%51 not in (9,15,19,25,29,35,39,45,49):expected_end+=1
+        endings=(9,15,19) if combined else (9,15,19,25,29,35,39,45,49)
+        while expected_end%51 not in endings:expected_end+=1
         t1=(frame//1326)&31;t2=frame%26;t3=frame%51
         expected=bytes([0x2d,6,0x3f,0,0x20,0,35,ra,(t1<<3)|(t3>>3),
                         ((t3<<5)|t2)&255,0,0]+[0x2b]*11)
@@ -62,6 +64,7 @@ def check_agch(text, *, require_native=True,allow_normal=False):
                 raise ValueError('missing unique successful native raw-AGCH publication')
             native.append(matches[0]['time'])
     return dict(external_access_decode_qualified=True,responses=len(replies),
+                combined_ccch=combined,
                 agch_start_frames=starts,native_agch_decode_qualified=require_native,
                 native_publication_times=native,
                 tuned_air_source=False,physical_release_qualified=False)

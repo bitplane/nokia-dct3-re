@@ -166,7 +166,7 @@ the P05 endpoint. It derives RA only from the released P27 bits and derives
 the reception frame from the endpoint time at the declared source epoch.
 Neither RA_INFO nor private DSP/MCU state enters the response. A valid request
 schedules a standards-derived Immediate Assignment in the next complete
-non-combined CCCH block, encoded through FIRE/convolution/interleaving,
+combined CCCH block, encoded through FIRE/convolution/interleaving,
 normal bursts and GMSK into the existing raw ADC source. No decoded packet,
 completion or interrupt is supplied directly.
 
@@ -174,7 +174,7 @@ completion or interrupt is supplied directly.
 .venv/bin/python tools/run_npe3_native.py --reference-clock --seconds 24 --adc-source fcch-sch-broadcast --capture-start p09 --tx-release p05 --raw-agch
 ```
 
-The native RA `0b` at frame2614 schedules frames2617..2620. At12.094406923s
+The earlier non-combined-source control's native RA `0b` at frame2614 schedules frames2617..2620. At12.094406923s
 the native type80/class60 publisher carries successful status00, frame2620
 and the exact23-octet assignment
 `2d063f002000230b09ae00002b2b2b2b2b2b2b2b2b2b2b`.
@@ -182,9 +182,12 @@ The independently checked response echoes RA and request reference and assigns
 SDCCH/4 subchannel0, timeslot0, non-hopping ARFCN35. Descriptor20 denotes
 SDCCH/4,not SDCCH/8,per
 [TS44.018 table10.5.2.5.1](https://www.etsi.org/deliver/etsi_ts/144000_144099/144018/05.21.00_60/ts_144018v052100p.pdf).
-The laboratory SI3 still advertises non-combined CCCH,so a coherent combined
-cell or a separate-timeslot SDCCH/8 assignment remains necessary before
-claiming a standards-coherent BTS. The24-second run retains
+The raw-AGCH profile now advertises combined CCCH (`CCCH-CONF=1`,SI3 byte10=41)
+and restricts AGCH to blocks ending at9,15,19. This matches the assigned
+SDCCH/4 on TS0;no-reply broadcast profiles retain their non-combined layout.
+The mapping follows
+[TS45.002 tables3 and5](https://www.etsi.org/deliver/etsi_ts/145000_145099/145002/18.00.00_60/ts_145002v180000p.pdf)
+and TS44.018 table10.5.2.11.1. The earlier acquired-storage24-second control retains
 legal execution and physical Menu, but produces only the first access attempt
 and no subsequent native RX packets after this assignment. The MCU accepts
 the assignment as established by the ordered submissions below, but native
@@ -294,18 +297,25 @@ The complete24s gate retains legal execution and exact physical Menu. The
 longer startup changes the first decoded SCH fromFN704 to715 and the first
 SI cycle starts withSI4,not SI3. The provisioned run therefore checks the
 actual source-correlated SCH and every successful broadcast through a complete
-four-type cycle;the original fixed-profile expectations remain unchanged.
+four-type cycle;the no-reply fixed-profile expectations remain unchanged.
 Its earliest FIR prefix is correctly zero;the later fully source-correlated
 SCH proof qualifies progress,not a claim that this initial prefix was nonzero.
 
-Native accessRA0b atFN3378 receives raw AGCH at3382..3385. After the generic
+With combined CCCH,native accessRA0b atFN3422 receives raw AGCH
+at3423..3426. After the generic
 circular-logic admission and the FIRE encoding contract below,40 normal P27
 bursts form10 independently exact xCCH blocks. The first is the MCU's SABM/LU
 byte-for-byte;later blocks include retransmissions,SACCH reports and idle UI.
 No raw UA or Location Updating Accept is emitted,so retransmission/return
 to search is expected. Port-level coding is qualified,not physical emission
-or registration. The next external peer work is a coherent channel composition
-and contention-resolution UA derived from the actual transmitted block.
+or registration. The first SCH remains fully source-correlated atFN715.
+The combined-cell run records three successful SCH attempts,including the
+initial result,and three failed attempts: the checker matches every attempt's status,
+information words and order to its actual native class40 publication;only
+successful attempts qualify acquisition. Failure rows cannot be dropped,
+promoted to success,or accepted before the initial source-qualified result.
+The next external peer work is contention-resolution UA derived from the
+actual transmitted block.
 
 ```sh
 .venv/bin/python tools/run_npe3_native.py --reference-clock --seconds 24 --adc-source fcch-sch-broadcast --capture-start p09 --tx-release p05 --raw-agch --provision-records

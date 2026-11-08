@@ -4,6 +4,18 @@ from tools.test_gsm_rach_signal import WORDS
 
 
 class NativeAccessTransmitTest(unittest.TestCase):
+    def test_combined_assignment_waits_for_next_common_control_block(self):
+        marker='npe3_bts_layout: combined_ccch=1 sdcch4=1 timeslot=0 agch_endings=9,15,19 physical_claim=0\n'
+        release=('npe3_tx_release: sequence=1 t=0.094615385 target=071f counter=071f words='+
+                 ','.join(f'{word:04x}' for word in WORDS)+' network_reply=0 physical_claim=0\n')
+        reply=('npe3_raw_agch: ra=0b access_frame=20 start_frame=57 '
+               'octets=2d063f002000230b029400002b2b2b2b2b2b2b2b2b2b2b '
+               'raw_adc_only=1 tuned_air_source=0 physical_claim=0')
+        self.assertTrue(check_agch(marker+release+reply,require_native=False)['combined_ccch'])
+        # Frame22 belongs to SDCCH/4,not AGCH,in this advertised layout.
+        for bad in (release+reply,marker+release+reply.replace('start_frame=57','start_frame=22')):
+            with self.assertRaises(ValueError):check_agch(bad,require_native=False)
+
     def test_external_assignment_uses_only_released_access_bits_and_time(self):
         release=('npe3_tx_release: sequence=1 t=12.066360308 target=071f counter=071f words='+
                  ','.join(f'{word:04x}' for word in WORDS)+' network_reply=0 physical_claim=0\n')

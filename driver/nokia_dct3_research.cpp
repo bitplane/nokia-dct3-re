@@ -121,6 +121,7 @@ void dct3_rf_adc_fixture_state::machine_start()
 	save_item(NAME(m_lab_tx.words)); save_item(NAME(m_lab_tx.count));
 	save_item(NAME(m_lab_tx.loading)); save_item(NAME(m_lab_tx.ready)); save_item(NAME(m_lab_tx.overflow));
 	if (m_p05_transmit) machine().logerror("npe3_tx_candidate: p05_start=1 port_buffer_only=1 network_reply=0 physical_claim=0\n");
+	if (m_raw_agch) machine().logerror("npe3_bts_layout: combined_ccch=1 sdcch4=1 timeslot=0 agch_endings=9,15,19 physical_claim=0\n");
 	save_item(NAME(m_candidate_active));
 	save_item(NAME(m_candidate_target));
 	if (m_compare_start) machine().logerror("npe3_capture_candidate: p09_start=1 all_captures=1 block_request_latch=1 physical_claim=0 source_epoch_shift=0\n");
@@ -170,6 +171,9 @@ void dct3_rf_adc_fixture_state::machine_reset()
 		auto const information=network.system_information(kind,35);
 		gsm::tch_f::packed_control_block octets{};
 		std::copy_n(information.begin(),octets.size(),octets.begin());
+		// TS44.018 10.5.2.11: combined CCCH on C0/TS0, matching
+		// this laboratory BTS's SDCCH/4 assignment. Other sources stay intact.
+		if (m_raw_agch && kind==2) octets[10]=(octets[10]&0xf8)|1;
 		auto const bursts=nokia_rf_lab::bcch_bits(octets,2);
 		for (unsigned burst=0; burst<4; ++burst)
 			m_broadcast_samples[kind][burst]=nokia_rf_lab::gmsk_samples(bursts[burst]);
@@ -300,7 +304,7 @@ TIMER_CALLBACK_MEMBER(dct3_rf_adc_fixture_state::candidate_transmit_start)
 				auto const bursts=nokia_rf_lab::bcch_bits(m_agch_octets,2);
 				for (unsigned burst=0; burst<4; ++burst)
 					m_agch_samples[burst]=nokia_rf_lab::gmsk_samples(bursts[burst]);
-				m_agch_start_frame=nokia::radio::common_control_block_end(frame+4)-3;
+				m_agch_start_frame=nokia::radio::common_control_block_end(frame+4,true)-3;
 				std::string octets;
 				for (auto byte:m_agch_octets) octets+=util::string_format("%02x",byte);
 				machine().logerror("npe3_raw_agch: ra=%02x access_frame=%u start_frame=%u octets=%s raw_adc_only=1 tuned_air_source=0 physical_claim=0\n",

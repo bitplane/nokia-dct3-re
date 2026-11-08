@@ -3,6 +3,14 @@ from tools.gsm_xcch_signal import control_bits,coded_control,check_vector,TSC2,b
 
 
 class XcchSourceTest(unittest.TestCase):
+    def test_combined_layout_changes_only_si3_ccch_configuration(self):
+        for kind in range(4):
+            plain=broadcast_octets(kind)
+            combined=broadcast_octets(kind,combined_ccch=True)
+            self.assertEqual([at for at in range(23) if plain[at]!=combined[at]],
+                             [10] if kind==2 else [])
+            if kind==2:self.assertEqual((plain[10],combined[10]),(0x40,0x41))
+
     def test_broadcast_cycle_and_single_cell_channel_data(self):
         for frame in range(816):
             self.assertEqual(broadcast_si_index(frame),(0,1,2,3,1,1,2,3)[(frame//51)%8])

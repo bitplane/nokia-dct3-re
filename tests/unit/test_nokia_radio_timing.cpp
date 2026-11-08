@@ -23,6 +23,18 @@ int main()
 	static_assert(common_control_block_end(2391 + 4) == 2395);
 	static_assert(common_control_block_end(2396) == 2406);
 	static_assert(common_control_block_end(2'715'647 + 4) == 2'715'648 + 9);
+	static_assert(common_control_block_end(19, true) == 19);
+	static_assert(common_control_block_end(20, true) == 60);
+	static_assert(common_control_block_end(50, true) == 60);
+	static_assert(common_control_block_end(2'715'648, true) == 2'715'648 + 9);
+	for (unsigned minimum = 0; minimum < 204; ++minimum)
+	{
+		const auto ending = common_control_block_end(minimum, true);
+		assert(ending >= minimum && ending - minimum <= 40);
+		assert(ending % 51 == 9 || ending % 51 == 15 || ending % 51 == 19);
+		for (auto earlier = minimum; earlier < ending; ++earlier)
+			assert(earlier % 51 != 9 && earlier % 51 != 15 && earlier % 51 != 19);
+	}
 	for (unsigned minimum = 0; minimum < 102; ++minimum)
 	{
 		const auto ending = common_control_block_end(minimum);

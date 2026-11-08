@@ -7,6 +7,7 @@ from tools.dsp_rom6_candidate_check import PINNED, digest
 
 
 CRC = re.compile(r'npe3_sch_crc: sequence=(\d+) t=([\d.]+) status=0000 remainder=03ff words=([0-9a-f]{4}),([0-9a-f]{4}),([0-9a-f]{4}) read_owner=004f5d class=0040 observer_writes=0')
+OBSERVATION = re.compile(r'npe3_sch_crc: sequence=(\d+) t=([\d.]+) status=([0-9a-f]{4}) remainder=([0-9a-f]{4}) words=([0-9a-f]{4}),([0-9a-f]{4}),([0-9a-f]{4}) read_owner=004f5d class=0040 observer_writes=0')
 DUE = re.compile(r'npe3_capture_due: target=([0-9a-f]{4}) counter=([0-9a-f]{4}) t=([\d.]+) physical_claim=0')
 # Derived from the audited capture; zero initialization outside B000..FFFF
 # is not a claimed hardware reset image.
@@ -50,13 +51,29 @@ def check_program(program, data, resident, drom):
 
 def check(text, source, program, data, resident, drom, *, allow_reacquisition=False):
     check_program(program, data, resident, drom)
+    observations=list(OBSERVATION.finditer(text))
     rows = list(CRC.finditer(text))
-    if (not rows or len(rows)!=text.count('npe3_sch_crc:') or
-            not allow_reacquisition and len(rows)!=1 or
-            any(int(row[1])!=index for index,row in enumerate(rows,1))):
+    if (not rows or len(observations)!=text.count('npe3_sch_crc:') or
+            not allow_reacquisition and len(observations)!=1 or
+            observations[0].groups()[2:4]!=('0000','03ff') or
+            any(int(row[1])!=index for index,row in enumerate(observations,1))):
         raise ValueError('missing complete ordered native SCH CRC observations')
-    packets = [packet for packet in check_rx_publications(text)['packets']
-               if packet['type'] == 0x80 and packet['payload'].startswith('400000')]
+    all_packets=[packet for packet in check_rx_publications(text)['packets']
+                 if packet['type']==0x80 and packet['payload'].startswith('4000')]
+    if len(all_packets)!=len(observations):
+        raise ValueError('native SCH observation/publication counts differ')
+    previous=-1
+    for row,packet in zip(observations,all_packets):
+        _,stamp,status,remainder,*values=row.groups()
+        body=bytes.fromhex(packet['payload'])
+        if ((status,remainder)!=('0000','03ff') and
+                (not allow_reacquisition or status!='0001' or remainder=='03ff') or
+                len(body)!=14 or body[2]!=int(status,16) or
+                body[10:]!=b''.join(int(value,16).to_bytes(2,'little') for value in values[:2]) or
+                not previous<float(stamp)<=float(packet['time'])):
+            raise ValueError('native SCH attempt status,words or publication differs')
+        previous=float(packet['time'])
+    packets=[packet for packet in all_packets if packet['payload'].startswith('400000')]
     if len(packets)!=len(rows):
         raise ValueError('native successful class40 publication count differs')
     previous=-1
@@ -83,6 +100,7 @@ def check(text, source, program, data, resident, drom, *, allow_reacquisition=Fa
     edges = check_compare_edges(text)
     return dict(native_sch_crc_qualified=True, decoded_frame=frame, decoded_bsic=bsic,
                 native_sch_results_checked=len(rows), initial_capture_only=True,
+                native_sch_failed_attempts_checked=len(observations)-len(rows),
                 checked_information_bits=25, checked_parity_bits=10,
                 complete_source_burst_observed=True, compare_edges_checked=edges,
                 physical_capture_qualified=False, fitted_clock_qualified=False,

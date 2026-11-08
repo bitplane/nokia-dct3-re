@@ -4,12 +4,14 @@ from tools.gsm_xcch_signal import broadcast_octets,broadcast_si_index
 
 
 class BcchReceiveCheckTest(unittest.TestCase):
-    def fixture(self,broadcast=False,frames=None):
+    def fixture(self,broadcast=False,frames=None,combined_ccch=False):
         text,writes=[],[]
         cursor=0x80
         frames=frames or ((719,770,821,872) if broadcast else (719,770,821))
         for index,frame in enumerate(frames,1):
             octets=broadcast_octets(broadcast_si_index(frame)) if broadcast else SI3
+            if combined_ccch and octets[2]==0x1b:
+                octets=octets[:10]+b'\x41'+octets[11:]
             words=expected_fire_words(octets)
             stamp=3.1+index*0.2
             values=[(0x3c,3),(0x3c,5)]+[(0x39,word) for word in words]+[(0x3c,0xfffc),(0x3c,2),(0x38,5)]
@@ -34,6 +36,12 @@ class BcchReceiveCheckTest(unittest.TestCase):
         report=check(*self.fixture())
         self.assertEqual(report['blocks'],3)
         self.assertFalse(report['camping_qualified'])
+
+    def test_combined_si3_is_checked_as_external_content_not_accepted_as_either_layout(self):
+        fixture=self.fixture(True,combined_ccch=True)
+        self.assertTrue(check_broadcast(*fixture,combined_ccch=True)['native_complete_broadcast_qualified'])
+        with self.assertRaises(ValueError):check_broadcast(*fixture)
+        with self.assertRaises(ValueError):check_broadcast(*self.fixture(True),combined_ccch=True)
 
     def test_full_broadcast_needs_all_consumers_and_acquisition_return(self):
         text,writes=self.fixture(True)

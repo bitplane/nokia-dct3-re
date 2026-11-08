@@ -55,6 +55,21 @@ class NativeSchResultTest(unittest.TestCase):
             with self.assertRaises(ValueError):
                 self.checked(packet=packet)
 
+    def test_failed_reacquisition_must_have_matching_failure_publication(self):
+        failure='\nnpe3_sch_crc: sequence=2 t=4.000000000 status=0001 remainder=0219 words=176d,663e,0002 read_owner=004f5d class=0040 observer_writes=0'
+        failed_packet=dict(self.packet,payload='400001000029002300006d173e66',time='4.000010000')
+        with patch('tools.npe3_sch_receive_check.check_rx_publications',return_value=dict(packets=[self.packet,failed_packet])), \
+                patch('tools.npe3_sch_receive_check.check_program'):
+            result=check(self.text+failure,self.source,b'',b'',b'',b'',allow_reacquisition=True)
+            self.assertEqual(result['native_sch_results_checked'],1)
+            self.assertEqual(result['native_sch_failed_attempts_checked'],1)
+            for bad in (failure.replace('status=0001','status=0000'),
+                        failure.replace('0219','03ff'),failure.replace('176d','176c'),
+                        failure.replace('sequence=2','sequence=3')):
+                with self.assertRaises(ValueError):
+                    check(self.text+bad,self.source,b'',b'',b'',b'',allow_reacquisition=True)
+            with self.assertRaises(ValueError):check(self.text+failure,self.source,b'',b'',b'',b'')
+
 
 if __name__ == '__main__':
     unittest.main()

@@ -60,12 +60,12 @@ def sch_reference(frame):
 
 
 @lru_cache(maxsize=16)
-def bcch_reference(burst,kind=2):
-    octets=broadcast_octets(kind)
+def bcch_reference(burst,kind=2,combined_ccch=False):
+    octets=broadcast_octets(kind,combined_ccch=combined_ccch)
     return gmsk_burst_samples(normal_control_bursts(octets)[burst])
 
 
-def reference_word(sequence,tick,tone,word_divider=6,burst=False,sch=False,bcch=False,broadcast=False):
+def reference_word(sequence,tick,tone,word_divider=6,burst=False,sch=False,bcch=False,broadcast=False,combined_ccch=False):
     if not tone: return 0
     component=(sequence-1)&1
     conversion_tick=tick-word_divider*component # Q is latched with the preceding I.
@@ -73,7 +73,7 @@ def reference_word(sequence,tick,tone,word_divider=6,burst=False,sch=False,bcch=
         if word_divider!=12:
             raise ValueError('BCCH fixture requires the declared twelve-tick word clock')
         kind=broadcast_si_index(conversion_tick//60000) if broadcast else 2
-        return bcch_reference((conversion_tick//60000)%51-2,kind)[(conversion_tick%60000)//12][component]&0xffff
+        return bcch_reference((conversion_tick//60000)%51-2,kind,combined_ccch)[(conversion_tick%60000)//12][component]&0xffff
     if sch and (conversion_tick//60000)%51 in (1,11,21,31,41) and conversion_tick%60000<7104:
         if word_divider!=12:
             raise ValueError('SCH fixture requires the declared twelve-tick word clock')
@@ -130,7 +130,8 @@ def check_active_burst_window(text,sch=False,window='active',bcch=False,broadcas
                 raise ValueError('active-burst raw window skips a read')
             local=read-closed
             tick=first_tick+(local-1)*12
-            if value!=reference_word(local,tick,True,12,True,sch,bcch,broadcast):
+            if value!=reference_word(local,tick,True,12,True,sch,bcch,broadcast,
+                                     combined_ccch='npe3_bts_layout: combined_ccch=1 ' in text):
                 raise ValueError('active burst differs from independent clocked waveform')
             if tick*1_000_000_000>(nanoseconds(stamp)+1)*13_000_000:
                 raise ValueError('active burst consumed before its conversion clock')
@@ -158,6 +159,7 @@ def check_active_burst_window(text,sch=False,window='active',bcch=False,broadcas
 
 
 def check(text,tone,burst=False,sch=False,bcch=False,broadcast=False):
+    combined_ccch='npe3_bts_layout: combined_ccch=1 ' in text
     headers=re.findall(r'rf_adc_lab: direct_adc=1 tuned_air_source=0 tone=([01]) reference=13000000 source_phase_divider=12 word_divider=(6|12) amplitude=1024 physical_clock_claim=0',text)
     if len(headers)!=1 or text.count('rf_adc_lab:')!=1 or headers[0][0]!=str(int(tone)):
         raise ValueError('missing explicit ADC-pin laboratory source')
@@ -170,7 +172,7 @@ def check(text,tone,burst=False,sch=False,bcch=False,broadcast=False):
     if broadcast:
         bcch_header='rf_adc_bcch: frames=2,3,4,5 tsc=2 schedule=0,1,2,3,1,1,2,3 repeated_si3_only=0 arfcn=35 epoch=0 physical_claim=0'
         declarations=re.findall(r'rf_adc_broadcast_si: index=([0-3]) arfcn=35 octets=([0-9a-f]{46}) physical_claim=0',text)
-        if not bcch or declarations!=[(str(kind),broadcast_octets(kind).hex()) for kind in range(4)] or text.count('rf_adc_broadcast_si:')!=4:
+        if not bcch or declarations!=[(str(kind),broadcast_octets(kind,combined_ccch=combined_ccch).hex()) for kind in range(4)] or text.count('rf_adc_broadcast_si:')!=4:
             raise ValueError('broadcast data differs from independent single-cell reference')
     elif 'rf_adc_broadcast_si:' in text:
         raise ValueError('unexpected full broadcast source')
@@ -214,7 +216,7 @@ def check(text,tone,burst=False,sch=False,bcch=False,broadcast=False):
             raise ValueError('delivered waveform epoch is missing its first word')
         if (last_sequence is not None and (sequence!=last_sequence+1 or tick!=last_tick+divider)):
             raise ValueError('delivered waveform prefix skips a source clock')
-        if int(value,16)!=reference_word(sequence,tick,tone,divider,burst,sch,bcch,broadcast):
+        if int(value,16)!=reference_word(sequence,tick,tone,divider,burst,sch,bcch,broadcast,combined_ccch):
             raise ValueError('ADC waveform differs from independent oscillator reference')
         # Log timestamps have nanosecond precision; the component gate checks
         # exact attoseconds independently. This is only a formatting allowance.

@@ -7,7 +7,7 @@ def broadcast_si_index(frame):
     return (0,1,2,3,1,1,2,3)[(frame//51)%8]
 
 
-def broadcast_octets(kind,arfcn=35):
+def broadcast_octets(kind,arfcn=35,*,combined_ccch=False):
     """Single-cell GSM900 laboratory broadcasts,PLMN001-01,LAC/CI1."""
     if not 1<=arfcn<=124: raise ValueError('laboratory broadcast supports GSM900 bitmap0 only')
     if kind==0:
@@ -17,7 +17,10 @@ def broadcast_octets(kind,arfcn=35):
         return bytes(block)
     # Sixteen BCCH Frequency List octets, NCC Permitted, three RACH octets.
     if kind==1: return bytes([0x59,6,0x1a]+[0]*16+[0xff,0,0,0])
-    if kind==2: return bytes.fromhex('49061b000100f11000014000000000000000002b2b2b2b')
+    if kind==2:
+        block=bytearray.fromhex('49061b000100f11000014000000000000000002b2b2b2b')
+        block[10]|=int(combined_ccch)
+        return bytes(block)
     if kind==3: return bytes([0x31,6,0x1c,0,0xf1,0x10,0,1]+[0]*5+[0x2b]*10)
     raise ValueError('unknown laboratory SI index')
 

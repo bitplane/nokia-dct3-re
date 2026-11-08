@@ -266,7 +266,8 @@ def main():
         if bcch:
             from tools.npe3_bcch_receive_check import check as check_bcch,check_broadcast
             journal=(first/'rom6_radio_writes.tsv').read_text()
-            report['bcch_result']=(check_broadcast(text,journal,dynamic_frames=args.provision_records)
+            report['bcch_result']=(check_broadcast(text,journal,dynamic_frames=args.provision_records,
+                                                  combined_ccch=args.raw_agch)
                                    if broadcast else check_bcch(text,journal))
             if broadcast:
                 from tools.npe3_rach_transmit_check import check as check_access

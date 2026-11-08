@@ -62,7 +62,7 @@ def check(text,writes):
                 physical_capture_qualified=False,camping_qualified=False,registration_qualified=False)
 
 
-def check_broadcast(text,writes,*,dynamic_frames=False):
+def check_broadcast(text,writes,*,dynamic_frames=False,combined_ccch=False):
     """Join the first complete SI set; do not classify later CCCH failures."""
     transactions=fire_transactions(writes,8)
     rows=list(FIRE.finditer(text))
@@ -85,7 +85,7 @@ def check_broadcast(text,writes,*,dynamic_frames=False):
     kinds=[]
     for index,frame in enumerate(frames):
         kind=broadcast_si_index(frame)
-        octets=broadcast_octets(kind)
+        octets=broadcast_octets(kind,combined_ccch=combined_ccch)
         expected=expected_fire_words(octets)
         candidates=[row for row in rows if row[6]=='003ae7' and int(row[4],16)==frame]
         publications=[packet for packet in packets if int.from_bytes(bytes.fromhex(packet['payload'])[4:6],'big')==frame]
