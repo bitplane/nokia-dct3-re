@@ -105,6 +105,17 @@ the immediate mapped reader can use the retained word without moving that
 write. This does not relax direct-ALU producer latency or qualify general
 MMR copies, interrupt composition or measured silicon timing.
 
+`mvpd_accumulator_destination` qualifies nonrepeated program-to-AL/AH/AG/
+BL/BH/BG copies with short-indirect and absolute destinations. Its 48
+positive cases/replays check both program pages, retained source/address
+after replacement, sibling/status preservation, guard masking and an
+immediate mapped ADD reader. The real mapped Write follows the retained
+program Read; forwarding does not move either bus event. Two negative
+cases retain the status-destination and single-repeat exclusions. The
+50-case section and existing 832 program-transfer/48 repeated-program
+controls pass. These clocks specify model ordering, not measured silicon
+timing; general peripheral destinations remain unqualified.
+
 READA resolves its Read-stage destination DAGEN update before a younger
 Access-stage instruction consumes that AR (SPRU131G 7.1). Its retained PAR
 sample, program-bus hold and Execute publication are unchanged.
