@@ -2730,9 +2730,24 @@ The native packet at 3.251654659 s is type `80`, body
 `400001000029002300004df9944f`, whose class-40 formatter reports error status 1.
 Thus nonzero raw input and FIR output reach a native receive attempt, but
 successful synchronization, BCCH, camping and registration remain unproved.
-Next join the aperture's writers and queued-source timestamps to its scheduled
-capture; do not assume it has the NSM-3 zero-window cause or move the waveform
-to obtain a CRC pass.
+The passive provenance check joins the final receive epoch's 960 words to
+the actual popped MFI queue slots, including their saved source timestamps.
+All match the independent waveform: source ticks `42243384..42254892`,
+frame 704 (SCH position 41), starting 3,384 ticks into its envelope.
+Thus the immediate laboratory gate misses the first 141 complex SCH samples;
+271 delivered scalar words are nonzero. This is a partial SCH, not absent
+SCH input or a complete burst. Source time is not the later CPU read time.
+The preceding 64 retained reads belong to the earlier receive epoch.
+
+All 192 aperture words match their last native stores at `794a..7959`
+between 3.250416703 and 3.250472923 s. The earlier builder-input snapshot
+at 3.250399319 s has source `0082`, coefficients `df85,6d1b,df85`, and
+arithmetic state `c100`. This establishes ownership and chronology, not an
+independent numerical qualification of that later builder. The checker
+rejects changed source words, epoch gaps, writer addresses/owners or aperture
+values. Both fresh 24-second provenance runs preserve native UI and complete
+I/O accounting. Next establish how the own FCCH timing residual schedules
+this partial capture, rather than moving the waveform to obtain a CRC pass.
 
 `verify-6210-alarm-off-snooze-no` combines the independently validated
 powered-off and Snooze lifecycles: two natural RTC wakes, separately checked

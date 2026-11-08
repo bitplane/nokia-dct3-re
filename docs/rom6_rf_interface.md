@@ -1198,6 +1198,13 @@ boot synchronization, BCCH or camping is implied.
 
 ### Correlator input and capture timing
 
+The following zero-aperture observations are NSM-3-specific. The own
+[6210 trial](6210_bringup.md#reference-clock-raw-adc-trials) instead checks
+192 nonzero native builder stores and a final 960-word receive epoch beginning
+141 complex samples into the independently generated SCH burst. Neither
+aperture qualifies synchronization; do not import one product's failure cause
+into the other or retime the independent source to fit the decoder.
+
 The first correlator pass is not reading stale reset data. All 192 words
 at `00d8..0197` were written by builder `7937..7966` at
 `3.342868352..3.342924879s`, immediately before the first mask-table

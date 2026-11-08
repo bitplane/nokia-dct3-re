@@ -176,7 +176,9 @@ def main():
         report['native_rx'] = check_rx_publications(text)
         if args.adc_source == 'fcch-sch':
             from tools.rom6_adc_lab_check import check_active_burst_window
+            from tools.npe3_sch_provenance_check import check as check_sch_provenance
             report['active_source_window'] = check_active_burst_window(text, sch=True)
+            report['sch_sample_provenance'] = check_sch_provenance(text)
             if report['native_filter']['nonzero_output_words'] == 0:
                 raise ValueError('coded raw source has not reached the qualified FIR output prefix')
         (run / 'adc-source.json').write_text(json.dumps(report, indent=2) + '\n')
