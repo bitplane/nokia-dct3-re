@@ -190,13 +190,14 @@ constexpr bool decode_staged_pipelined_repeat(u16 word)
 	bool const short_mar = (word & 0xff00) == 0x6d00 && u8(word) >= 0x80 && u8(word) < 0xe0 && (word & 0xf8) != 0x98;
 	bool const short_add = (word & 0xfe00) == 0 &&
 		(u8(word) < 0x98 || (u8(word) >= 0xc0 && u8(word) < 0xe0));
+	bool const shifted_circular_add = (word & 0xfc00) == 0x3c00 && u8(word) >= 0xc0 && u8(word) < 0xe0;
 	bool const short_logic = ((word & 0xfe00) == 0x1800 || (word & 0xfe00) == 0x1a00 || (word & 0xfe00) == 0x1c00) && u8(word) < 0x98;
 	bool const coefficient_repeat = staged_firs(word) || (staged_coefficient_mac(word) && !BIT(word, 9) && u8(word) < 0xe0);
 	// SFTL consumes the live accumulator in Execute, once per retained issue.
 	bool const logical_shift = (word & 0xfce0) == 0xf0e0;
 	bool const accumulator_add_sub = (word & 0xfcff) == 0xf400 || (word & 0xfcff) == 0xf420;
 	bool const short_double_add = (word & 0xfc00) == 0x5000 && u8(word) < 0x98;
-	return accumulator_add_sub || short_double_add || logical_shift || coefficient_repeat || short_add || short_logic || short_mar || staged_repeat_data_copy(word) || staged_repeat_destination_copy(word) || staged_repeat_accumulator_store(word) || staged_poly(word) || decode_staged_parallel_load(word) || staged_parallel_alu(word) || ((square_accumulate(word) || (word & 0xf800) == 0x2800) && u8(word) < 0x98) || (word & 0xf000) == 0xb000 || staged_mvdd(word) || (((word & 0xff00) == 0x4b00 || (word & 0xff00) == 0x8b00) && u8(word) < 0x98);
+	return accumulator_add_sub || short_double_add || logical_shift || coefficient_repeat || short_add || shifted_circular_add || short_logic || short_mar || staged_repeat_data_copy(word) || staged_repeat_destination_copy(word) || staged_repeat_accumulator_store(word) || staged_poly(word) || decode_staged_parallel_load(word) || staged_parallel_alu(word) || ((square_accumulate(word) || (word & 0xf800) == 0x2800) && u8(word) < 0x98) || (word & 0xf000) == 0xb000 || staged_mvdd(word) || (((word & 0xff00) == 0x4b00 || (word & 0xff00) == 0x8b00) && u8(word) < 0x98);
 }
 
 constexpr bool staged_repeat_accumulator_load(u16 word)
@@ -366,7 +367,7 @@ constexpr bool staged_mmr_pop(u16 word)
 
 constexpr bool decode_staged_data_copy(u16 word)
 {
-	return staged_direct_mvdm(word) || ((word & 0xff00) == 0x7000 && (u8(word) < 0xa0 || (u8(word) >= 0xe0 && u8(word) <= 0xf8)));
+	return staged_direct_mvdm(word) || ((word & 0xff00) == 0x7000 && (u8(word) < 0xa0 || (u8(word) >= 0xc0 && u8(word) <= 0xf8)));
 }
 
 constexpr bool staged_delay_copy(u16 word)

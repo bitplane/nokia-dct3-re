@@ -3,6 +3,14 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "c54x_circular_mvkd_and_shifted_repeat_add",
+      "owner": "tms320c54x_generic_cpu",
+      "status": "satisfied",
+      "predicate": "Short circular MVKD destinations and repeated shift16 circular ADD preserve their existing stage-owned bus/arithmetic contracts",
+      "current": "Separate64-case sections fail before admission and pass with64 replays each afterward. Circular MVKD covers four modes,power/non-power buffers,both wrap ends,same-address source/destination and two pages;source Read precedes destination Write by one clock with exact RAM/pointer/BK/status and continuation. Shift16 ADD covers four accumulator source/destination selections,four modes,wrapping repeat counts and two pages;ordered one-clock reads,live source feedback,exact40-bit results and continuation are checked. Repeated MVKD,other shift16 repeat modes,mapped/control-delay/CMPT/OVM/interrupt compositions and silicon timing are not newly qualified. Own upload sites0d98/0d9e motivate coverage but are absent from CPU admission.",
+      "evidence": ["cpu/tms320c54x/tms320c54x_decode.h", "tests/c54x/sections/circular_mvkd.h", "tests/c54x/sections/repeated_shifted_circular_add.h", "fixtures/c54x_sections.json", "docs/c54x_execution_contracts.md"]
+    },
+    {
       "id": "c54x_repeated_circular_smem_add",
       "owner": "tms320c54x_generic_cpu",
       "status": "satisfied",

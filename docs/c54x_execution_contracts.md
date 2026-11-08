@@ -1496,6 +1496,24 @@ compositions, mapped operands or physical silicon timing. The acquired
 6210 upload exercises the unit-increment form at `0d71`; no handset address
 is present in CPU admission or the generic test.
 
+`repeated_shifted_circular_add` separately qualifies the short shift-16 ADD
+composition: all four source/destination accumulator selections, four circular
+modes, wrapping counts and both program pages across 64 cases/replays. It
+checks live source feedback, not an assumed destination-only accumulation.
+Other shift-16 repeat address modes are not newly admitted.
+
+### Circular MVKD destinations
+
+`circular_mvkd` qualifies non-repeated fixed-RAM-source MVKD to the four short
+circular destination modes. Its 64 cases/replays cover unit/AR0 strides,
+increment/decrement wrap, power-of-two/non-power-of-two buffers, same-address
+source/destination and two program pages. Ordered source Read and destination
+Write are one clock apart; final RAM, pointer, BK, status and continuation
+are checked independently. The fixture rejects before admission. This adds no
+repeated MVKD, mapped source/destination or control-delay qualification.
+The acquired upload uses this form at `0d98`, followed by the separately
+qualified shifted repeat at `0d9e`; neither address is in CPU logic.
+
 Fixture counts below describe focused acceptance. Shared broad-run scope,
 tooling totals and native handset restoration are centralized in the
 [core regression checkpoint](#retained-suite-acceptance).
