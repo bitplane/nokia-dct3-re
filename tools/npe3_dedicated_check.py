@@ -34,8 +34,8 @@ def packets(text):
     return result
 
 
-def check(text):
-    agch=check_agch(text)
+def check(text,*,allow_normal=False):
+    agch=check_agch(text,allow_normal=allow_normal)
     after=float(agch['native_publication_times'][-1])
     stream=packets(text)
     configure=[p for p in stream if p['time']>after and p['kind']==2 and
@@ -44,8 +44,8 @@ def check(text):
         raise ValueError('missing unique assigned-SDCCH configuration after native AGCH')
     outgoing=[p for p in stream if p['time']>configure[0]['time'] and p['kind']==0x1b and
               len(p['body'])==28 and p['body'][:2]==bytes([0,0x80])]
-    if len(outgoing)!=1:
-        raise ValueError('missing unique native SEND_BLOCK for assigned SDCCH')
+    if not outgoing or not allow_normal and len(outgoing)!=1:
+        raise ValueError('missing native initial SEND_BLOCK for assigned SDCCH')
     lapdm=outgoing[0]['body'][2:25]
     length=lapdm[2]>>2
     layer3=lapdm[3:3+length]

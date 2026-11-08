@@ -4,10 +4,10 @@ from tools.gsm_xcch_signal import broadcast_octets,broadcast_si_index
 
 
 class BcchReceiveCheckTest(unittest.TestCase):
-    def fixture(self,broadcast=False):
+    def fixture(self,broadcast=False,frames=None):
         text,writes=[],[]
         cursor=0x80
-        frames=(719,770,821,872) if broadcast else (719,770,821)
+        frames=frames or ((719,770,821,872) if broadcast else (719,770,821))
         for index,frame in enumerate(frames,1):
             octets=broadcast_octets(broadcast_si_index(frame)) if broadcast else SI3
             words=expected_fire_words(octets)
@@ -44,6 +44,15 @@ class BcchReceiveCheckTest(unittest.TestCase):
                         ('r0=00000001','r0=00000000'),('frame=0368','frame=0369')]:
             with self.subTest(old=old),self.assertRaises(ValueError): check_broadcast(text.replace(old,new,1),writes)
         with self.assertRaises(ValueError): check_broadcast(*self.fixture())
+
+    def test_explicit_dynamic_cycle_checks_every_successful_block_until_all_types(self):
+        text,writes=self.fixture(True,(872,923,974,1025,1229))
+        report=check_broadcast(text,writes,dynamic_frames=True)
+        self.assertEqual(report['si_indices'],[1,2,3,1,0])
+        self.assertEqual(report['blocks'],5)
+        with self.assertRaises(ValueError):check_broadcast(text,writes)
+        with self.assertRaises(ValueError):check_broadcast(text.replace('frame=0368','frame=0369'),writes,dynamic_frames=True)
+        with self.assertRaises(ValueError):check_broadcast(*self.fixture(True,(770,821,872)),dynamic_frames=True)
 
     def test_every_fire_bit_is_load_bearing(self):
         text,writes=self.fixture()

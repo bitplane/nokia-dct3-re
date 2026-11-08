@@ -62,7 +62,7 @@ def check(text,writes):
                 physical_capture_qualified=False,camping_qualified=False,registration_qualified=False)
 
 
-def check_broadcast(text,writes):
+def check_broadcast(text,writes,*,dynamic_frames=False):
     """Join the first complete SI set; do not classify later CCCH failures."""
     transactions=fire_transactions(writes,8)
     rows=list(FIRE.finditer(text))
@@ -70,8 +70,20 @@ def check_broadcast(text,writes):
         raise ValueError('malformed broadcast FIRE observations')
     packets=[packet for packet in check_rx_publications(text)['packets']
              if packet['type']==0x80 and packet['payload'].startswith('50')]
+    frames=(719,770,821,872)
+    if dynamic_frames:
+        frames=[]
+        seen=set()
+        for packet in packets:
+            body=bytes.fromhex(packet['payload'])
+            if len(body)!=33 or body[2]!=0:continue
+            frame=int.from_bytes(body[3:6],'big')
+            frames.append(frame)
+            seen.add(broadcast_si_index(frame))
+            if len(seen)==4:break
+        if len(seen)!=4:raise ValueError('dynamic capture lacks a complete successful SI cycle')
     kinds=[]
-    for index,frame in enumerate((719,770,821,872)):
+    for index,frame in enumerate(frames):
         kind=broadcast_si_index(frame)
         octets=broadcast_octets(kind)
         expected=expected_fire_words(octets)
@@ -93,7 +105,7 @@ def check_broadcast(text,writes):
             raise ValueError('missing MCU SI type consumer')
     if not re.search(r'plmn_si3_parse: pc=002d3e3c hit=\d+ r0=00000001 state=0002 flags=0f ',text):
         raise ValueError('complete broadcast set did not reach MCU acquisition-success return')
-    return dict(native_complete_broadcast_qualified=True,blocks=4,bursts=16,
+    return dict(native_complete_broadcast_qualified=True,blocks=len(frames),bursts=4*len(frames),
                 si_indices=kinds,information_bits_per_block=184,parity_bits_per_block=40,
                 mcu_si_consumers_qualified=True,mcu_acquisition_return=1,
                 physical_capture_qualified=False,camping_qualified=False,registration_qualified=False)

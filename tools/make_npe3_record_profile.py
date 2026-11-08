@@ -34,26 +34,29 @@ def low_records(seed,chip,imei14,*,faid_table,identity_table,lock_table):
     faid=encode_record(faid_plain,chip,faid_table)
     locks=b''.join(encode_record(bytes.fromhex(plain),chip,lock_table) for plain in
                    ('ffffffffff0f0000007854c2','0000000000000000087c54c2'))
-    return identity+bcd+bytes([255])+faid+locks
+    # Own387ef6..387f50 advances through ten persisted slots and wraps to
+    # slot0 for the final reply. The experiment declares the same unlocked
+    # policy in every slot, rather than retaining donor-keyed placeholders.
+    return identity+bcd+bytes([255])+faid+locks*10
 
 
 def replace_low_records(pmm,records):
-    if not isinstance(records,bytes) or len(records)!=0x38:
-        raise ValueError('record fixture requires the complete56-byte low record family')
+    if not isinstance(records,bytes) or len(records)!=0x110:
+        raise ValueError('record fixture requires identity,FAID and ten lock slots')
     cache,rows,_=replay(pmm,0x9c4)
     if not rows or rows[0]!={'record':0x20,'source':0x26,'destination':0,'length':0x9c4}:
         raise ValueError('unexpected NPE-3 base record layout')
-    if any(row['destination']<0x38 for row in rows[1:]):
+    if any(row['destination']<0x110 for row in rows[1:]):
         raise ValueError('later low-record writes need a separate fixture contract')
     result=bytearray(pmm)
-    result[0x26:0x5e]=records
+    result[0x26:0x26+0x110]=records
     # Own387fb4 checks sum16(cache[0:11c]) against a BE32 field at11c.
     # Changing the encoded records must update this outer storage checksum,
     # independently of the DSP's decrypted-record validation.
     result[0x26+0x11c:0x26+0x120]=(sum(result[0x26:0x26+0x11c])&0xffff).to_bytes(4,'big')
     result[0x21]=record_checksum(0,result[0x26:0x26+0x9c4])
     after,after_rows,_=replay(result,0x9c4)
-    if (after[:0x38]!=records or after[0x38:0x11c]!=cache[0x38:0x11c] or
+    if (after[:0x110]!=records or after[0x110:0x11c]!=cache[0x110:0x11c] or
             after[0x120:]!=cache[0x120:] or rows!=after_rows):
         raise ValueError('record fixture changed unrelated journal semantics')
     return bytes(result)
@@ -76,6 +79,18 @@ def assess_runtime(text):
             [int(row[0]) for row in rows]!=list(range(1,len(rows)+1)) or
             [(int(value,16),int(owner,16)) for _,value,owner in rows[:7]]!=expected):
         raise ValueError('synthetic records did not pass all three initial native validators')
+    complete=expected+[(3,0x45e6),(7,0x45e9)]*10
+    settled=[(int(value,16),int(owner,16)) for _,value,owner in rows]==complete
+    offsets=[]
+    if settled:
+        reads=re.findall(r'npe3_record_storage_read: sequence=(\d+) offset=([0-9a-f]{4}) length=24 caller=([0-9a-f]{8}) t=[\d.]+ observer_writes=0',text)
+        offsets=[int(row[1],16) for row in reads]
+        if (offsets!=list(range(0x20,0x110,24))+[0x20] or
+                [int(row[0]) for row in reads]!=list(range(1,12)) or
+                [row[2] for row in reads]!=['00387471']+['00387f3f']*10 or
+                text.count('npe3_record_storage_read:')!=11 or
+                text.count('npe3_record_storage_read_complete: reads=11 cap=16 observer_writes=0')!=1):
+            raise ValueError('record validation lacks the complete own-MCU storage-read cycle')
     return dict(initial_native_validations_qualified=True,
                 later_validation_writes=[dict(value=int(value,16),owner=owner) for _,value,owner in rows[7:]],
-                complete_record_family_qualified=False,fitted_identity_claim=False)
+                complete_record_family_qualified=settled,storage_read_offsets=offsets,fitted_identity_claim=False)

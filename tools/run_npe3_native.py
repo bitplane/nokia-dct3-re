@@ -129,7 +129,8 @@ def main():
         (run/'record-profile.json').write_text(json.dumps(dict(
             synthetic=True,source_pmm_sha1='b3a527ede1be87bd715fb3741a81eef5bd422efa',
             fixture_pmm_sha1=hashlib.sha1(pmm).hexdigest(),example_imei14=EXAMPLE_IMEI14,
-            modeled_chip=OBSERVED_CHIP.hex(),fitted_identity_claim=False),indent=2)+'\n')
+            modeled_chip=OBSERVED_CHIP.hex(),uniform_unlocked_slots=10,
+            fitted_identity_claim=False),indent=2)+'\n')
     storage = run / 'nvram' / model
     storage.mkdir(parents=True)
     (storage / 'flash').write_bytes(flash.ljust(0x3fa000, b'\xff') + pmm)
@@ -251,26 +252,39 @@ def main():
             report['peak_source_clock'] = check_peak_clock(text,
                 index_bias=0 if args.capture_start == 'p09' else 1)
             if report['native_filter']['nonzero_output_words'] == 0:
-                raise ValueError('coded raw source has not reached the qualified FIR output prefix')
+                # Complete record processing changes acquisition chronology.
+                # Qualify the empty initial prefix separately; only the later
+                # fully source-correlated native SCH result can establish progress.
+                sch=report.get('sch_result',{})
+                if not (args.provision_records and sch.get('native_sch_crc_qualified') and
+                        sch.get('complete_source_burst_observed')):
+                    raise ValueError('coded raw source has not reached the qualified FIR output prefix')
+                report['initial_filter_prefix_empty_before_qualified_sch']=True
         (run / 'adc-source.json').write_text(json.dumps(report, indent=2) + '\n')
         if not report['transport_fault_free']:
             raise ValueError('raw ADC transport fault; no decoder/acquisition qualification')
         if bcch:
             from tools.npe3_bcch_receive_check import check as check_bcch,check_broadcast
-            report['bcch_result']=(check_broadcast if broadcast else check_bcch)(text,(first/'rom6_radio_writes.tsv').read_text())
+            journal=(first/'rom6_radio_writes.tsv').read_text()
+            report['bcch_result']=(check_broadcast(text,journal,dynamic_frames=args.provision_records)
+                                   if broadcast else check_bcch(text,journal))
             if broadcast:
                 from tools.npe3_rach_transmit_check import check as check_access
                 report['native_access']=check_access(text,(first/'rom6_radio_writes.tsv').read_text(),
-                    require_windows=True,require_releases=bool(args.tx_release))
+                    require_windows=True,require_releases=bool(args.tx_release),allow_normal=args.provision_records)
                 if args.raw_agch:
                     from tools.npe3_rach_transmit_check import check_agch
-                    report['raw_agch']=check_agch(text)
+                    report['raw_agch']=check_agch(text,allow_normal=args.provision_records)
                     from tools.npe3_dedicated_check import check as check_dedicated
-                    report['dedicated_submission']=check_dedicated(text)
+                    report['dedicated_submission']=check_dedicated(text,allow_normal=args.provision_records)
+                    if args.provision_records and report['native_access']['normal_control_blocks'][0]['octets']!=report['dedicated_submission']['lapdm']:
+                        raise ValueError('native port xCCH differs from the MCU initial SABM')
                     if args.provision_records:
                         from tools.make_npe3_record_profile import assess_runtime
                         report['record_profile']=assess_runtime(text)
-                        print('Native6210 synthetic records: PASS initial validators only; complete_record_family=0')
+                        print('Native6210 synthetic records: PASS initial validators; complete_record_family='+
+                              str(int(report['record_profile']['complete_record_family_qualified'])))
+                        print(f"Native6210 port xCCH: PASS blocks={len(report['native_access']['normal_control_blocks'])}; exact convolution/FIRE; physical_transmission=0 registration=0")
                     print(f"Native6210 raw AGCH: PASS native_decodes={report['raw_agch']['responses']}; tuned_air_source=0 registration=0")
                     print('Native6210 assigned SDCCH: PASS MCU SABM/Location Updating submission; native_transmission=0 registration=0')
                 elif 'npe3_raw_agch:' in text:

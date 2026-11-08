@@ -4,6 +4,7 @@ import io
 import math
 import re
 from tools.gsm_rach_signal import decode_p27_access
+from tools.gsm_normal_signal import decode_p27_normal,decode_control
 from tools.rom6_adc_measure_check import check_rx_publications
 
 WINDOW=re.compile(r'npe3_tx_window: sequence=(\d+) t=([\d.]+) words=(\d+) counter=([0-9a-f]{4}) controls=([0-9a-f,]+) deadlines=([\d.,-]+) observer_writes=0 physical_claim=0')
@@ -11,12 +12,23 @@ RELEASE=re.compile(r'npe3_tx_release: sequence=(\d+) t=([\d.]+) target=([0-9a-f]
 AGCH=re.compile(r'npe3_raw_agch: ra=([0-9a-f]{2}) access_frame=(\d+) start_frame=(\d+) octets=([0-9a-f]{46}) raw_adc_only=1 tuned_air_source=0 physical_claim=0')
 
 
-def check_agch(text, *, require_native=True):
+def check_agch(text, *, require_native=True,allow_normal=False):
     """Check external response content independently of the C++ decoder/BTS."""
-    releases=list(RELEASE.finditer(text))
+    releases=[]
+    normal=0
+    for release in RELEASE.finditer(text):
+        words=[int(word,16) for word in release[5].split(',')]
+        try:decode_p27_access(words,42)
+        except ValueError:
+            if not allow_normal:raise
+            decode_p27_normal(words)
+            normal+=1
+        else:releases.append(release)
     replies=list(AGCH.finditer(text))
     if not replies or len(replies)!=len(releases) or len(replies)!=text.count('npe3_raw_agch:'):
         raise ValueError('raw AGCH lacks one valid response per released access burst')
+    if allow_normal and text.count('npe3_raw_agch_skip: not_access=1 response=0')!=normal:
+        raise ValueError('normal transmit buffers unexpectedly generated an access response')
     starts=[]
     expected_native=[]
     for release,reply in zip(releases,replies):
@@ -134,8 +146,20 @@ def check_releases(text,bursts,windows):
                 network_reply=False,physical_release_qualified=False)
 
 
-def check(text,writes,bsic=42,*,require_windows=False,require_releases=False):
-    bursts=transactions(writes)
+def check(text,writes,bsic=42,*,require_windows=False,require_releases=False,allow_normal=False):
+    all_bursts=transactions(writes)
+    access_indices=[]
+    normal=[]
+    for index,burst in enumerate(all_bursts):
+        try:decode_p27_access(burst[2],bsic)
+        except ValueError:
+            if not allow_normal:raise
+            normal.append((index,decode_p27_normal(burst[2])))
+        else:access_indices.append(index)
+    bursts=[all_bursts[index] for index in access_indices]
+    if not bursts:raise ValueError('no independently decoded native access burst')
+    if allow_normal and not require_releases:
+        raise ValueError('mixed transmit qualification requires timed releases')
     reports=[packet for packet in check_rx_publications(text)['packets'] if packet['type']==0x84]
     if len(reports)!=len(bursts): raise ValueError('native RA_INFO/serializer count differs')
     decoded=[]
@@ -155,9 +179,31 @@ def check(text,writes,bsic=42,*,require_windows=False,require_releases=False):
                 physical_release_qualified=False,network_decode_qualified=False,
                 camping_qualified=False,registration_qualified=False)
     if require_windows or require_releases:
-        result['candidate_windows']=check_windows(text,bursts,frames)
+        window_frames=frames
+        if allow_normal:
+            releases=list(RELEASE.finditer(text))
+            if len(releases)!=len(all_bursts):raise ValueError('mixed transmit release count differs')
+            window_frames=[int(float(row[2])*13000000)//60000%2715648 for row in releases]
+            if [window_frames[index] for index in access_indices]!=frames:
+                raise ValueError('timed native access frames differ from RA_INFO')
+        result['candidate_windows']=check_windows(text,all_bursts,window_frames)
     if require_releases:
-        result['candidate_releases']=check_releases(text,bursts,result['candidate_windows'])
+        result['candidate_releases']=check_releases(text,all_bursts,result['candidate_windows'])
     elif 'npe3_tx_release:' in text or 'npe3_tx_candidate:' in text:
         raise ValueError('no-release control unexpectedly enabled the transmit candidate')
+    if allow_normal:
+        if not normal or len(normal)%4:
+            raise ValueError('native normal transmit stream lacks complete four-burst blocks')
+        blocks=[]
+        for at in range(0,len(normal),4):
+            group=normal[at:at+4]
+            indices=[item[0] for item in group]
+            source_frames=[window_frames[index] for index in indices]
+            if (indices!=list(range(indices[0],indices[0]+4)) or
+                    source_frames!=[(source_frames[0]+offset)%2715648 for offset in range(4)]):
+                raise ValueError('normal block buffers are not consecutive timed frames')
+            payload=decode_control([item[1] for item in group])
+            blocks.append(dict(start_frame=source_frames[0],octets=payload.hex()))
+        result['normal_control_blocks']=blocks
+        result['native_port_xcch_qualified']=True
     return result

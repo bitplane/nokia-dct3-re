@@ -195,7 +195,7 @@ void dct3_rf_adc_fixture_state::control_w(offs_t port, u16 data)
 	{
 		if (m_lab_tx.control(data))
 		{
-			if (m_observed_tx_windows++<16)
+			if (m_observed_tx_windows++<(m_raw_agch ? 128U : 16U))
 			{
 				auto &backend=*subdevice<nokia_dsp_c54x_device>("dsp_c54x");
 				std::array<double,4> deadlines{};
@@ -306,7 +306,7 @@ TIMER_CALLBACK_MEMBER(dct3_rf_adc_fixture_state::candidate_transmit_start)
 				machine().logerror("npe3_raw_agch: ra=%02x access_frame=%u start_frame=%u octets=%s raw_adc_only=1 tuned_air_source=0 physical_claim=0\n",
 					*access,unsigned(frame),unsigned(m_agch_start_frame),octets);
 			}
-			else machine().logerror("npe3_raw_agch: invalid_access=1 response=0\n");
+			else machine().logerror("npe3_raw_agch_skip: not_access=1 response=0\n");
 		}
 	}
 	arm_transmit_candidate();

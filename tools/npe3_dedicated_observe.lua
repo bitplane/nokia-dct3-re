@@ -30,6 +30,18 @@ for _,entry in ipairs({0x34b4,0x350c,0x3500,0x45b2,0x45ba,0x45c2,0x8508}) do
 end
 local writes=0
 local captured=false
+local parks=0
+handles[#handles+1]=cpu.spaces.data:install_write_tap(0x866,0x866,'npe3_send_block_park',function(_,value,mask)
+    if cpu.state.EXECPC.value~=0x3507 then return end
+    parks=parks+1
+    if parks<=8 then
+        machine:logerror(string.format('npe3_send_block_park: sequence=%d t=%.9f value=%04x mask=%04x owner=003507 observer_writes=0\n',
+            parks,machine.time:as_double(),value,mask))
+    end
+end)
+handles[#handles+1]=emu.add_machine_stop_notifier(function()
+    machine:logerror(string.format('npe3_send_block_park_complete: writes=%d cap=8 observer_writes=0\n',parks))
+end)
 handles[#handles+1]=cpu.spaces.data:install_write_tap(0x4fa,0x4fa,'npe3_integrity_flags',function(_,value,mask)
     if writes>=32 then return end
     writes=writes+1
@@ -47,6 +59,19 @@ end)
 _G.npe3_dedicated_observation=handles
 local arm=assert(machine.devices[':maincpu'])
 local space=arm.spaces.program
+local record_reads=0
+handles[#handles+1]=space:install_read_tap(0x503258,0x50325b,'npe3_record_storage_read',function()
+    if busy or arm.state.PC.value~=0x503258 or machine.time:as_double()>2 or
+            arm.state.R2.value~=24 or arm.state.R0.value<0x20 or arm.state.R0.value>=0x110 then return end
+    record_reads=record_reads+1
+    if record_reads<=16 then
+        machine:logerror(string.format('npe3_record_storage_read: sequence=%d offset=%04x length=24 caller=%08x t=%.9f observer_writes=0\n',
+            record_reads,arm.state.R0.value,arm.state.R14.value,machine.time:as_double()))
+    end
+end)
+handles[#handles+1]=emu.add_machine_stop_notifier(function()
+    machine:logerror(string.format('npe3_record_storage_read_complete: reads=%d cap=16 observer_writes=0\n',record_reads))
+end)
 local flag_writes=0
 handles[#handles+1]=space:install_write_tap(0x17fd98,0x17fd9b,'npe3_record_host_flags',function(address,value,mask)
     if address~=0x17fd98 or busy or flag_writes>=64 then return end
@@ -74,5 +99,13 @@ for _,entry in ipairs({0x387ad4,0x387c78,0x387d7e,0x387e9e,0x387f66}) do
         machine:logerror(string.format('npe3_record_host: entry=%08x t=%.9f r0=%08x r4=%08x r5=%08x r6=%08x r7=%08x r8=%08x observer_writes=0\n',
             entry,machine.time:as_double(),arm.state.R0.value,arm.state.R4.value,arm.state.R5.value,
             arm.state.R6.value,arm.state.R7.value,arm.state.R8.value))
+        if entry==0x387ad4 then
+            local context={}
+            busy=true
+            for at=0x16bf8c,0x16bfab do context[#context+1]=string.format('%02x',space:read_u8(at)) end
+            machine:logerror(string.format('npe3_record_context: hit=%d t=%.9f bytes=%s observer_writes=0\n',
+                hits,machine.time:as_double(),table.concat(context)))
+            busy=false
+        end
     end)
 end

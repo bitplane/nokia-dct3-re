@@ -11,12 +11,28 @@
       "evidence": ["cpu/tms320c54x/tms320c54x_decode.h", "cpu/tms320c54x/tms320c54x.cpp", "tests/c54x/sections/circular_memory_logic.h", "fixtures/c54x_sections.json", "docs/c54x_execution_contracts.md"]
     },
     {
-      "id": "npe3_synthetic_initial_record_validations",
+      "id": "npe3_synthetic_record_family_validations",
       "owner": "native_rom6_record_contract",
       "status": "satisfied",
-      "predicate": "An explicitly synthetic,checksummed external storage fixture passes the three initial native record validators without bypassing the extended record sequence",
-      "current": "The separate provision-records input uses exampleIMEI49015420621001,the observed modelchip00160010,explicit acquired DROM keys and the own flash seed. Existing factory-fixture seedxor17ca6089 yields nativefingerprintf65a0d46. Own startup0c30..0c46 compares decoded identity words1..4 with the plain seven-byte BCD field. Own387fb4 checks sum16(cache0..11b) against BE32at11c;without updating that independent checksum the MCU raises fault18/value12 and CONTACT SERVICE. The generator updates the low-block and journal checksums,leaves acquired files and unrelated cache/journal data unchanged,and writes a synthetic manifest. The24s Menu/SCH/SI/rawAGCH/MCUSABM checks pass. Real45b7/45bf/45e9 writes initially reach04fa7,but a subsequent organic opcode16 requests the next acquired24-byte slot and45e6 clears bit2 to3. Therefore complete-record-family validation,native dedicated transmission and registration remain unqualified. No flag,index,request,result or firmware state is forced. Ten stored slots and own387b14 indexbound10 constrain the next mapping task.",
+      "predicate": "Explicit synthetic external storage passes all ten native record slots and the final reread without bypassing firmware validation",
+      "current": "The provision-records fixture uses example IMEI49015420621001, observed modelchip00160010, acquired DROM keys and the own flash seed. All ten slots explicitly contain the same synthetic unlocked policy; this is not a recovered donor profile. The generator changes only cache0..10f and the independently checked low-block and journal checksums. Actual MCU helper reads visit20,38,50,68,80,98,b0,c8,e0,f8,20; all eleven native validations clear/set bit2 through45e6/45e9, producing27 observed flag writes and terminal04fa7. Actual owner3507 publishes zero SEND_BLOCK integrity errors. The24s Menu,SCH,SI,rawAGCH and MCU SABM checks pass. Initial04fa7 alone is not accepted as complete-family evidence. No firmware flag,index,request or result is forced; registration remains unqualified.",
       "evidence": ["tools/make_npe3_record_profile.py", "tools/test_make_npe3_record_profile.py", "tools/npe3_dedicated_observe.lua", "tools/run_npe3_native.py", "docs/rom6_rf_interface.md"]
+    },
+    {
+      "id": "rom6_fire_encode_functional_subset",
+      "owner": "nokia_dsp_fire",
+      "status": "satisfied",
+      "predicate": "The observed P38/P39/P3c encoder dialogue publishes the 40-bit FIRE remainder for184 information bits",
+      "current": "Control3,5 loads twelve words;fffc,2 and command3 finish encoding; control3,7 selects three result words. The first32 remainder bits are low-first in two words and the final8 occupy the high byte of the third. Native807f complements and packs these into xCCH parity. Tests cover zero,ones,walking bytes,SABM,ignored padding,partial/overflow/reset,peek and snapshots during loading/readback. Existing224-bit receive checking remains qualified. Unused output bits,physical execution latency and a complete peripheral specification remain unqualified.",
+      "evidence": ["driver/nokia_dsp_fire_state.h", "driver/nokia_dsp_c54x.cpp", "tests/unit/test_dsp_fire_encode.cpp", "tools/test_dsp_fire_cpp.py", "docs/rom6_rf_interface.md"]
+    },
+    {
+      "id": "npe3_native_port_xcch",
+      "owner": "native_rom6_reference_adc_laboratory",
+      "status": "satisfied",
+      "predicate": "Actual timed native P21/P27 releases encode the MCU SABM and subsequent control blocks with valid convolution and FIRE parity",
+      "current": "The24s synthetic-record run has one native RACH and forty normal buffers,all matched to timed P05 release windows. Independent decoding recovers ten four-burst xCCH blocks with exact training,tails,stealing flags,convolution and40-bit FIRE. The first block equals the MCU SABM containing its Location Updating Request. There are no owner3507 integrity-error writes and no illegal opcode. No raw UA is supplied,so SABM retransmits and registration is not claimed. Assignment20 denotes SDCCH/4,while current SI3 advertises noncombined CCCH; standards-coherent BTS composition remains open. This qualifies native serialized port bits,not physical RF or fitted clock identity.",
+      "evidence": ["tools/gsm_normal_signal.py", "tools/test_gsm_normal_signal.py", "tools/npe3_rach_transmit_check.py", "tools/npe3_dedicated_check.py", "tools/run_npe3_native.py", "docs/rom6_rf_interface.md"]
     },
     {
       "id": "npe3_record_validation_arithmetic",

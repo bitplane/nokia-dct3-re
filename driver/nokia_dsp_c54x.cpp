@@ -59,6 +59,9 @@ void nokia_dsp_c54x_device::device_start()
 	save_item(NAME(m_fire.status));
 	save_item(NAME(m_fire.count));
 	save_item(NAME(m_fire.phase));
+	save_item(NAME(m_fire.output));
+	save_item(NAME(m_fire.output_cursor));
+	save_item(NAME(m_fire.output_valid));
 	save_item(NAME(m_program));
 	save_item(NAME(m_data));
 	save_item(NAME(m_io));
@@ -592,7 +595,7 @@ u16 nokia_dsp_c54x_device::io_r(offs_t offset)
 		return m_fire.status_r();
 	case 0x39:
 		++m_rf_port39_reads;
-		return m_io[0x39];
+		return m_fire.data_r(m_io[0x39],!machine().side_effects_disabled());
 	case 0x2d:
 		return m_cobba->control_data_r();
 	default:

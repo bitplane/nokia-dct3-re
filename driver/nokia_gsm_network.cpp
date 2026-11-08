@@ -815,7 +815,7 @@ nokia_gsm_network_device::paging_request_group(
 std::array<u8, 24> nokia_gsm_network_device::immediate_assignment(
 		u8 random_access, u32 frame_number, u16 serving_arfcn) const
 {
-	// GSM 04.08 9.1.18 and 10.5.2.30. Assign SDCCH/8 subchannel 0,
+	// GSM 04.08 9.1.18 and 10.5.2.30. Assign SDCCH/4 subchannel 0,
 	// timeslot 0 on the non-hopping serving carrier, and echo the exact random
 	// access octet and reception frame which identify the phone's request.
 	const u8 t1_prime = (frame_number / 1326) & 0x1f;

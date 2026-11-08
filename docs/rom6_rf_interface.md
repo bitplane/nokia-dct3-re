@@ -42,8 +42,10 @@ independently generated payloads from filtered I/Q samples.
 The separate P05-start candidate clocks complete native buffers at the
 declared counter match without generating any reply. The raw-AGCH profile
 additionally decodes an external access response and makes the MCU configure
-SDCCH and submit SABM/Location Updating. Native transmission of that block
-parks at a firmware validation gate, described below. These laboratory
+SDCCH and submit SABM/Location Updating. With the explicit synthetic record
+family,the native P27 stream now contains independently valid xCCH blocks,
+including that exact SABM. The acquired PMM still parks at the validation
+gate,described below. These laboratory
 results do not retire the physical request/acknowledgement or tuning contract.
 
 | Receive scope | Current evidence | Not established |
@@ -56,6 +58,7 @@ results do not retire the physical request/acknowledgement or tuning contract.
 | Own 6210 full-SI candidate | Legal 24-second physical Menu, SI1..SI4 native decoding, MCU availability `0f`, observed success return, organic IDLE_RA/RA_INFO and independently checked P21/P27 access bits | Physical release timing/access grant, camping, registration and fitted timing/tuning |
 | Own 6210 P05-start candidate | Complete native buffers clocked at the projected P05 matches; same receive/UI checks and exact port-word preservation | Physical pin/timing identity, external network decode/AGCH, camping and registration |
 | Own 6210 raw-AGCH candidate | Exact successful native assignment decode; MCU assigned-SDCCH configuration and SABM containing Location Updating Request | Native dedicated transmission, validation-gate completion, camping/registration and physical timing/tuning |
+| Synthetic-record raw-AGCH run | Ten-slot validation cycle plus final reread; no validation-error writes;40 normal bursts decode to10 exact convolution/FIRE-valid xCCH blocks,including MCU SABM | Standards-coherent BTS configuration,raw dedicated downlink/UA,completed Location Updating and physical timing/tuning |
 
 The CPU additions needed by the normal-burst frontend have generic focused
 tests. The rebuilt native ROM6 menu/storage/save-state scenarios, ROM4
@@ -176,7 +179,12 @@ the native type80/class60 publisher carries successful status00, frame2620
 and the exact23-octet assignment
 `2d063f002000230b09ae00002b2b2b2b2b2b2b2b2b2b2b`.
 The independently checked response echoes RA and request reference and assigns
-SDCCH/8 subchannel0, timeslot0, non-hopping ARFCN35. The24-second run retains
+SDCCH/4 subchannel0, timeslot0, non-hopping ARFCN35. Descriptor20 denotes
+SDCCH/4,not SDCCH/8,per
+[TS44.018 table10.5.2.5.1](https://www.etsi.org/deliver/etsi_ts/144000_144099/144018/05.21.00_60/ts_144018v052100p.pdf).
+The laboratory SI3 still advertises non-combined CCCH,so a coherent combined
+cell or a separate-timeslot SDCCH/8 assignment remains necessary before
+claiming a standards-coherent BTS. The24-second run retains
 legal execution and physical Menu, but produces only the first access attempt
 and no subsequent native RX packets after this assignment. The MCU accepts
 the assignment as established by the ordered submissions below, but native
@@ -236,11 +244,11 @@ words294d/e5cd which differ from the B779 marker54c2. This is independently
 checked arithmetic evidence for the actual stored-record/model mismatch,
 not permission to force04fa or to copy a donor provisioning repair. The
 inverse helper accepts explicit plaintext/table/chip only and edits no storage.
-The next experiment must establish a coherent external provisioning contract
-or recover the acquired store's intended hardware identity before revisiting
-native SEND_BLOCK. No additional AGCH or UA can release this local error loop.
+The declared external record fixture below isolates that validation contract
+from the acquired store's unknown donor identity. No additional AGCH or UA
+can release the acquired-input error loop.
 
-### Synthetic initial-record fixture
+### Synthetic record-family fixture
 
 `--provision-records` adds an explicit, separate storage experiment to the raw
 AGCH run. It never changes the acquired PMM or the machine defaults. The
@@ -250,12 +258,13 @@ FAID plaintext uses the existing factory-fixture convention: flash seed XOR
 17ca6089, its complement and four zero bytes. Here that checksum equals the
 independently computed native startup fingerprintf65a0d46 exactly. The identity
 record contains the explicit example BCD bytes and duplicates them in the
-MCU-readable field; the first two lock blocks use the existing unlocked-fixture
-convention. These policy bytes remain a laboratory input, not a factory claim.
+MCU-readable field. All ten lock slots explicitly carry the same existing
+unlocked-fixture convention. These policy bytes remain a laboratory input,
+not a factory claim or an inference about the donor records.
 
 Storage obligations are independent of those decrypted-record checks. The own
 PMM journal has a2500-byte base payload at26,295 writes ending1bb0,and no
-later write to the initial56 bytes. MCU387fb4 compares sum16(cache[0:11c])
+later write to cache0..10f. MCU387fb4 compares sum16(cache[0:11c])
 against the BE32 field at11c;4a18b0 is a byte-sum,not CRC32. Failing to update
 it produces fault slot18/value12 and clears host17fd99 bit6 at3028dc,
 leading to CONTACT SERVICE even with all DSP validation bits set. The fixture
@@ -271,18 +280,32 @@ SHA256`e89cb6d0a3d680a9d0a321549a6f6f9583cbaf7c3b975c44f521f655a724752c`).
 unencrypted BCD bytes before45ba. A terminal program snapshot is unsuitable
 for this startup code because later acquisition uploads replace it.
 
-The checksummed fixture passes the unchanged24s Menu/SCH/SI/AGCH/MCU-SABM
-checks and initially reaches04fa=7 through real45b7/45bf/45e9 writes. It is
-**not a complete record-family fixture**: after that first reply the MCU
-organically requests the next24 bytes from cache38. Their native validation
-clears bit2 again,leaving04fa=3 and the same SEND_BLOCK error gate. The acquired
-cache contains ten24-byte slots at20..10f;slots1..9 contain the same encoded
-placeholder,not known valid records for the modeled chip. MCU387ad4..387b58
-owns the next-record decision and index bound10. Mapping this extended-record
-contract is the next software target;do not force its index,skip requests,set
-04fa,or reinterpret the initial7 as settled completion. The bounded fixture
-remains useful to distinguish initial validation from sequence completion;
-replace it when the full external record contract is recovered.
+The MCU itself reads offsets20,38,50,68,80,98,b0,c8,e0,f8 and20 again.
+The initial call returns to387471;the ten follow-ups return to387f3f.
+Own387ef6..387f50 increments the index,wraps at10,rereads slot0 and marks
+the final cycle. No index,request or completion is supplied by the fixture.
+Eleven native validations each clear then restore bit2 through45e6/45e9;
+04fa settles at7,with zero writes by the3507 error tail. Qualifying only the
+initial7 is insufficient:retaining the acquired next-slot placeholder makes
+the second validation fail and leaves3. All records and both outer checksums
+must agree.
+
+The complete24s gate retains legal execution and exact physical Menu. The
+longer startup changes the first decoded SCH fromFN704 to715 and the first
+SI cycle starts withSI4,not SI3. The provisioned run therefore checks the
+actual source-correlated SCH and every successful broadcast through a complete
+four-type cycle;the original fixed-profile expectations remain unchanged.
+Its earliest FIR prefix is correctly zero;the later fully source-correlated
+SCH proof qualifies progress,not a claim that this initial prefix was nonzero.
+
+Native accessRA0b atFN3378 receives raw AGCH at3382..3385. After the generic
+circular-logic admission and the FIRE encoding contract below,40 normal P27
+bursts form10 independently exact xCCH blocks. The first is the MCU's SABM/LU
+byte-for-byte;later blocks include retransmissions,SACCH reports and idle UI.
+No raw UA or Location Updating Accept is emitted,so retransmission/return
+to search is expected. Port-level coding is qualified,not physical emission
+or registration. The next external peer work is a coherent channel composition
+and contention-resolution UA derived from the actual transmitted block.
 
 ```sh
 .venv/bin/python tools/run_npe3_native.py --reference-clock --seconds 24 --adc-source fcch-sch-broadcast --capture-start p09 --tx-release p05 --raw-agch --provision-records
@@ -1367,7 +1390,7 @@ accelerator's status. The consumer accepts status `20` directly and uses
 status `40` for a correction path reading ports `3a/3b`; other results
 produce the failure flag. The request's `5` is not itself a successful check.
 
-### Functional FIRE check subset
+### Functional FIRE coding subset
 
 `nokia_dsp_fire_state` owns the observed input grammar at P3c/P39 and the
 computed check result at P38. The supported sequence is `3,5`, exactly14
@@ -1380,8 +1403,18 @@ unsupported operations cannot publish success. Result bits written by
 software are masked out. P3c=`3` restarts the input stream without inventing
 a reset of unrelated P38 command fields; cold device reset clears the state.
 
+For encoding,the same3/5 loading grammar admits exactly12 input words,
+of which only184 bits are information. Afterfffc/2,P38 command3 computes
+the uncomplemented40-bit polynomial remainder. Native3ab6 selects P3c3/7
+and reads three P39 words;807f complements them and packs the first32 bits
+LSB-first followed by the third word's high byte. Its unused low byte is
+not physically qualified. P39 no longer returns the last input word in
+this observed result-read phase;unknown/unselected phases retain the opaque
+register fallback. Output,cursor and validity are saved,with side-effect-free
+peek and partial-read restoration tests.
+
 This is synchronous **functional** completion, with no busy interval,
-interrupt latency, encoder, cipher result or error-correction claim. Status
+interrupt latency,cipher result or error-correction claim. Status
 `40` and its P3a/P3b correction data are not fabricated. A corrupted block
 is rejected even if real silicon might correct it. Other operation contracts
 remain unresolved, not successful no-ops.
@@ -1391,7 +1424,12 @@ and SI3 codewords and all224 single-bit corruptions of each, plus partial
 input, overflow, unsupported command, reset and state-copy replay. The
 native-backend BSP gate separately exercises the actual MMIO binding and
 MAME save/load midway through an input block. This qualifies the functional
-peripheral subset, not organic BCCH reception or physical accelerator timing.
+peripheral subset,not physical accelerator timing. Encoder vectors cover
+zero,all-ones,walking bytes and native SABM;partial/overflow/reset and
+ignored upper padding bits are checked independently. In the whole-phone
+run,the previous opaque P39 projection produced correct convolutional data
+but invalid FIRE bits (`d4 ff d4 ff ff` on the first block). Modeled readback
+makes all10 serialized xCCH blocks independently FIRE-valid.
 ### Isolated normal-burst receive chain
 
 The `--bursts` option instead supplies the four independent normal bursts'

@@ -46,10 +46,11 @@ through native DSP execution, then organically configures SDCCH and submits
 SABM containing a Location Updating Request. The DSP's SEND_BLOCK validation
 gate parks with04fa=0 before dedicated transmission. Dedicated-channel service and registration remain
 unqualified; these laboratory candidates do not replace the normal profile.
-The separate synthetic-record input passes the three initial validators but
-an organically requested next stored record clears bit2 again. Its24s UI/radio
-gate remains qualified only through MCU SABM submission;see the
-[extended record boundary](rom6_rf_interface.md#synthetic-initial-record-fixture).
+The separate synthetic-record input now completes the ten-slot native record
+cycle and final reread. Its24s gate additionally checks40 normal port bursts
+as10 convolution/FIRE-valid xCCH blocks,including the exact MCU SABM/LU.
+Raw dedicated downlink,standards-coherent BTS configuration and registration
+remain open;see the [record and transmit boundary](rom6_rf_interface.md#synthetic-record-family-fixture).
 The explicit 13 MHz DSP clock is provisional (the manual establishes RFIclk,
 not the DSP multiplier). A longer run requests MCU software reset near
 32 seconds, despite successful initial port-36 request completion. Timer input

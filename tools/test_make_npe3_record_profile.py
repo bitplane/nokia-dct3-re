@@ -12,14 +12,14 @@ class Npe3RecordFixtureTest(unittest.TestCase):
 
     def test_explicit_storage_records_decode_to_declared_policy(self):
         records=low_records(bytes.fromhex('e1906dcf'),self.chip,'49015420621001',**self.tables)
-        self.assertEqual(len(records),56)
+        self.assertEqual(len(records),0x110)
         self.assertEqual(records[12:20].hex(),'49015420621001ff')
         identity=decode_record(records[:12],self.chip,self.tables['identity_table'])
         self.assertEqual(identity.hex(),'792949015420621001ff0000')
         self.assertEqual(identity[2:10],records[12:20])
         self.assertEqual(decode_record(records[20:32],self.chip,self.tables['faid_table']).hex(),
                          'f65a0d4609a5f2b900000000')
-        for start in (32,44):
+        for start in range(32,0x110,12):
             self.assertEqual(decode_record(records[start:start+12],self.chip,self.tables['lock_table'])[-2:],
                              bytes.fromhex('54c2'))
 
@@ -37,14 +37,14 @@ class Npe3RecordFixtureTest(unittest.TestCase):
         original[0x18:0x1a]=bytes([0,1])
         original[0x20:0x26]=bytes.fromhex('000009c40000')
         original[0x26:0x26+0x9c4]=bytes(at%256 for at in range(0x9c4))
-        records=bytes(range(56))
+        records=bytes(at%256 for at in range(0x110))
         fixture=replace_low_records(bytes(original),records)
         cache,rows,_=replay(fixture,0x9c4)
-        self.assertEqual(cache[:56],records)
+        self.assertEqual(cache[:0x110],records)
         self.assertEqual(int.from_bytes(cache[0x11c:0x120],'big'),sum(cache[:0x11c])&65535)
         self.assertEqual(fixture[0x21],sum(cache)&255)
         changed={at for at,(old,new) in enumerate(zip(original,fixture)) if old!=new}
-        allowed={0x21}|set(range(0x26,0x5e))|set(range(0x142,0x146))
+        allowed={0x21}|set(range(0x26,0x136))|set(range(0x142,0x146))
         self.assertTrue(changed<=allowed)
         self.assertEqual(rows,[dict(record=0x20,source=0x26,destination=0,length=0x9c4)])
 
@@ -58,6 +58,17 @@ class Npe3RecordFixtureTest(unittest.TestCase):
         self.assertEqual(result['later_validation_writes'],[dict(value=3,owner='0045e6')])
         for bad in ('',text.replace('value=0007','value=0003'),text.replace('owner=0045e9','owner=0045b7')):
             with self.assertRaises(ValueError):assess_runtime(bad)
+        settled=states[:7]+[(3,0x45e6),(7,0x45e9)]*10
+        full='\n'.join(f'npe3_integrity_flags: sequence={index} t=0.7 value={value:04x} mask=ffff owner={owner:06x} observer_writes=0'
+                       for index,(value,owner) in enumerate(settled,1))
+        with self.assertRaises(ValueError):assess_runtime(full)
+        reads='\n'+'\n'.join(f'npe3_record_storage_read: sequence={index} offset={offset:04x} length=24 '
+                              f'caller={"00387471" if index==1 else "00387f3f"} t=0.7 observer_writes=0'
+                              for index,offset in enumerate(list(range(0x20,0x110,24))+[0x20],1))
+        reads+='\nnpe3_record_storage_read_complete: reads=11 cap=16 observer_writes=0'
+        self.assertTrue(assess_runtime(full+reads)['complete_record_family_qualified'])
+        with self.assertRaises(ValueError):assess_runtime(full+reads.replace('offset=0038','offset=0020'))
+        self.assertFalse(assess_runtime(full.rsplit('\n',1)[0])['complete_record_family_qualified'])
 
 
 if __name__=='__main__':unittest.main()
