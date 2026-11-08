@@ -69,14 +69,14 @@ def main():
                         help='add passive reset-policy and native ring observations')
     parser.add_argument('--radio', action='store_true',
                         help='capture complete passive DSP I/O writes and bounded read summaries')
-    parser.add_argument('--adc-source', choices=('silence', 'fcch-sch', 'fcch-sch-bcch'),
+    parser.add_argument('--adc-source', choices=('silence', 'fcch-sch', 'fcch-sch-bcch', 'fcch-sch-broadcast'),
                         help='explicit raw ADC laboratory source; requires --reference-clock')
     parser.add_argument('--capture-start', choices=('immediate', 'p09'), default='immediate',
                         help='explicit laboratory capture-edge hypothesis, not fitted hardware')
     args = parser.parse_args()
     if args.capture_start != 'immediate' and not args.adc_source:
         parser.error('capture-edge candidates require an explicit ADC laboratory source')
-    if args.adc_source == 'fcch-sch-bcch' and args.capture_start != 'p09':
+    if args.adc_source in ('fcch-sch-bcch','fcch-sch-broadcast') and args.capture_start != 'p09':
         parser.error('the raw BCCH candidate requires explicit P09 laboratory capture')
     if args.adc_source:
         if not args.reference_clock:
@@ -99,6 +99,7 @@ def main():
         if args.capture_start == 'p09':
             model = 'npe3zp9' if args.adc_source == 'silence' else 'npe3cp9'
             if args.adc_source == 'fcch-sch-bcch': model = 'npe3bp9'
+            if args.adc_source == 'fcch-sch-broadcast': model = 'npe3sp9'
     storage = run / 'nvram' / model
     storage.mkdir(parents=True)
     (storage / 'flash').write_bytes(flash.ljust(0x3fa000, b'\xff') + pmm)
@@ -180,8 +181,9 @@ def main():
         from tools.rom6_adc_lab_check import check as check_adc
         from tools.rom6_adc_filter_check import check as check_filter, check_mixer
         from tools.rom6_adc_measure_check import check_rx_publications
-        bcch=args.adc_source=='fcch-sch-bcch'
-        report = check_adc(text, args.adc_source != 'silence', burst=True, sch=True, bcch=bcch)
+        broadcast=args.adc_source=='fcch-sch-broadcast'
+        bcch=args.adc_source in ('fcch-sch-bcch','fcch-sch-broadcast')
+        report = check_adc(text, args.adc_source != 'silence', burst=True, sch=True, bcch=bcch,broadcast=broadcast)
         report['native_filter'] = check_filter(text,
             (first / 'rom6_adc_processing_program.be16').read_bytes(), flash,
             (ROOT / 'roms/nsm3r6/nsm3_rom6_program.be16').read_bytes(), product='6210')
@@ -200,7 +202,7 @@ def main():
             from tools.npe3_sch_provenance_check import check as check_sch_provenance, check_capture_compare
             from tools.rom6_adc_detect_check import (check_finite_search_acceptance,
                 check_finite_peak_accumulation, check_peak_clock)
-            report['active_source_window'] = check_active_burst_window(text, sch=True, bcch=bcch)
+            report['active_source_window'] = check_active_burst_window(text, sch=True, bcch=bcch,broadcast=broadcast)
             report['sch_sample_provenance'] = check_sch_provenance(text,
                 receive_words=992 if args.capture_start == 'p09' else 960)
             if args.capture_start == 'immediate':
@@ -223,10 +225,10 @@ def main():
         if not report['transport_fault_free']:
             raise ValueError('raw ADC transport fault; no decoder/acquisition qualification')
         if bcch:
-            from tools.npe3_bcch_receive_check import check as check_bcch
-            report['bcch_result']=check_bcch(text,(first/'rom6_radio_writes.tsv').read_text())
+            from tools.npe3_bcch_receive_check import check as check_bcch,check_broadcast
+            report['bcch_result']=(check_broadcast if broadcast else check_bcch)(text,(first/'rom6_radio_writes.tsv').read_text())
             (run/'adc-source.json').write_text(json.dumps(report,indent=2)+'\n')
-            print('Native6210 BCCH: PASS three raw SI3 blocks; camping=0 registration=0')
+            print('Native6210 BCCH: PASS '+('complete SI set and MCU acquisition return' if broadcast else 'three raw SI3 blocks')+'; camping=0 registration=0')
         print('Native6210 ADC source: PASS independently checked raw prefix; acquisition_claim=0')
         if 'sch_result' in report:
             result = report['sch_result']

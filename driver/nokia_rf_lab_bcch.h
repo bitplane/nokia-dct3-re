@@ -6,7 +6,7 @@
 #include "gsm_tch_f_l1.h"
 
 namespace nokia_rf_lab {
-// A single repeated SI3 control block, not a complete BTS broadcast schedule.
+// TS0 BCCH block positions. Payload scheduling belongs to the lab composition.
 constexpr bool bcch_active(std::uint64_t tick)
 {
 	unsigned const frame = (tick / 60'000) % 51;

@@ -3,6 +3,14 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "npe3_native_full_broadcast_set",
+      "owner": "native_rom6_reference_adc_laboratory",
+      "status": "satisfied",
+      "predicate": "The separately named full-SI raw source delivers all four broadcast types through native decoding and MCU consumers in a legal bounded capture",
+      "current": "npe3sp9 uses explicit lab cellARFCN35/BSIC42,PLMN001-01,LAC/CI1,no neighbours,and the shared eight-TC schedule0/1/2/3/1/1/2/3. Only standard octets are reused from the network model;all receive input is raw GMSK through the ADC source. In the legal8s capture,blocks719/770/821/872 decodeSI3/SI4/SI1/SI2. Independent224-bit FIRE transaction/result and23-octet publication checks pass for each;all four MCU handlers run,availability flags reach0f,and the observed2d3e3c return is1. The passing repeated-SI3 control is rejected as an incomplete set. A longer24s run correctly fails on later mapped-destination MVDD6e6f(source0dea,destination0009);this is not a passing full UI or camping gate. No fitted clock/mask,physical tuning/capture,camping or registration is inferred. The mapped MVDD contract is the next software boundary.",
+      "evidence": ["driver/gsm_mobility.h", "driver/nokia_dct3_research.cpp", "tools/gsm_xcch_signal.py", "tools/npe3_bcch_receive_check.py", "tools/noki6210_plmn_observe.lua", "tools/test_npe3_bcch_receive_check.py", "tools/test_gsm_xcch_signal.py", "docs/6210_bringup.md"]
+    },
+    {
       "id": "c54x_circular_mvkd_and_shifted_repeat_add",
       "owner": "tms320c54x_generic_cpu",
       "status": "satisfied",

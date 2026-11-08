@@ -1,32 +1,49 @@
 import unittest
-from tools.npe3_bcch_receive_check import SI3,check,expected_fire_words
+from tools.npe3_bcch_receive_check import SI3,check,check_broadcast,expected_fire_words
+from tools.gsm_xcch_signal import broadcast_octets,broadcast_si_index
 
 
 class BcchReceiveCheckTest(unittest.TestCase):
-    def fixture(self):
+    def fixture(self,broadcast=False):
         text,writes=[],[]
         cursor=0x80
-        words=expected_fire_words()
-        for index,frame in enumerate((719,770,821),1):
+        frames=(719,770,821,872) if broadcast else (719,770,821)
+        for index,frame in enumerate(frames,1):
+            octets=broadcast_octets(broadcast_si_index(frame)) if broadcast else SI3
+            words=expected_fire_words(octets)
             stamp=3.1+index*0.2
             values=[(0x3c,3),(0x3c,5)]+[(0x39,word) for word in words]+[(0x3c,0xfffc),(0x3c,2),(0x38,5)]
             for port,value in values:
                 writes.append(f'{stamp:.9f}\t003a50\t{port:04x}\t{value:04x}\tffff')
             text.append(f'npe3_bcch_fire: sequence={index} t={stamp+0.0001:.9f} status=0025 frame={frame:04x} words='+','.join(f'{word:04x}' for word in words)+' read_owner=003ae7 observer_writes=0')
-            body=bytes.fromhex('502a0000')+frame.to_bytes(2,'big')+bytes.fromhex('00230000')+SI3
+            body=bytes.fromhex('502a0000')+frame.to_bytes(2,'big')+bytes.fromhex('00230000')+octets
             # Odd-byte padding is deliberately not SI3 data.
             padded=body+b'\xa5'
             packet=[0x2180]+[int.from_bytes(padded[at:at+2],'big') for at in range(0,len(padded),2)]
             end=cursor+len(packet)
             text.append(f'rom6_measure_rx_commit: sequence={index} t={stamp+0.0002:.9f} previous={cursor:04x} producer={end:04x} consumer={cursor:04x} words='+','.join(f'{word:04x}' for word in packet)+' mask=ffff cpu_pc=002d08 observer_writes=0')
             cursor=end
-        text.append('rom6_measure_rx_complete: commits=3 cap=64 observer_writes=0')
+        text.append(f'rom6_measure_rx_complete: commits={len(frames)} cap=64 observer_writes=0')
+        if broadcast:
+            for handler in ('003b9fd0','003b9ed4','003ba0c0','003ba060'):
+                text.append('plmn_si3_parse: pc='+handler+' hit=1 ')
+            text.append('plmn_si3_parse: pc=002d3e3c hit=4 r0=00000001 state=0002 flags=0f ')
         return '\n'.join(text),'\n'.join(writes)
 
     def test_three_independent_blocks_with_padding(self):
         report=check(*self.fixture())
         self.assertEqual(report['blocks'],3)
         self.assertFalse(report['camping_qualified'])
+
+    def test_full_broadcast_needs_all_consumers_and_acquisition_return(self):
+        text,writes=self.fixture(True)
+        report=check_broadcast(text,writes)
+        self.assertEqual(report['si_indices'],[2,3,0,1])
+        self.assertFalse(report['camping_qualified'])
+        for old,new in [('pc=003ba060','pc=003ba062'),('flags=0f','flags=0d'),
+                        ('r0=00000001','r0=00000000'),('frame=0368','frame=0369')]:
+            with self.subTest(old=old),self.assertRaises(ValueError): check_broadcast(text.replace(old,new,1),writes)
+        with self.assertRaises(ValueError): check_broadcast(*self.fixture())
 
     def test_every_fire_bit_is_load_bearing(self):
         text,writes=self.fixture()

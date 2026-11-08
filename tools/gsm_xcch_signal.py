@@ -2,6 +2,26 @@
 TSC2='01000011101110100100001110'
 
 
+def broadcast_si_index(frame):
+    if frame<0: raise ValueError('negative TDMA frame')
+    return (0,1,2,3,1,1,2,3)[(frame//51)%8]
+
+
+def broadcast_octets(kind,arfcn=35):
+    """Single-cell GSM900 laboratory broadcasts,PLMN001-01,LAC/CI1."""
+    if not 1<=arfcn<=124: raise ValueError('laboratory broadcast supports GSM900 bitmap0 only')
+    if kind==0:
+        block=bytearray([0x55,6,0x19]+[0]*19+[0x2b])
+        bit=arfcn-1
+        block[18-bit//8]|=1<<(bit%8)
+        return bytes(block)
+    # Sixteen BCCH Frequency List octets, NCC Permitted, three RACH octets.
+    if kind==1: return bytes([0x59,6,0x1a]+[0]*16+[0xff,0,0,0])
+    if kind==2: return bytes.fromhex('49061b000100f11000014000000000000000002b2b2b2b')
+    if kind==3: return bytes([0x31,6,0x1c,0,0xf1,0x10,0,1]+[0]*5+[0x2b]*10)
+    raise ValueError('unknown laboratory SI index')
+
+
 def control_bits(octets):
     if not isinstance(octets,bytes) or len(octets)!=23:
         raise ValueError('control block requires23 octets')

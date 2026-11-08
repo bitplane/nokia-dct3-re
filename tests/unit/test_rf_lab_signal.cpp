@@ -2,6 +2,7 @@
 // copyright-holders:Gaz
 #include "nokia_rf_lab_signal.h"
 #include "nokia_rf_lab_bcch.h"
+#include "gsm_mobility.h"
 #include <cassert>
 #include <iostream>
 #include <string>
@@ -54,6 +55,12 @@ int main(int argc, char **argv)
 		assert(!nokia_rf_lab::sch_active(std::uint64_t(frame)*60'000+7104));
 	}
 	assert(sch_bursts==5);
+	std::array<unsigned,8> const si_by_tc{0,1,2,3,1,1,2,3};
+	for (unsigned frame=0; frame<408; ++frame)
+	{
+		assert(gsm::mobility::bcch_system_information_index(frame)==si_by_tc[frame/51]);
+		assert(gsm::mobility::bcch_system_information_index(frame+408)==si_by_tc[frame/51]);
+	}
 	for (unsigned frame=0; frame<51; ++frame)
 	{
 		bool const expected=frame>=2 && frame<=5;

@@ -86,6 +86,12 @@ void dct3_rf_adc_fixture_state::npe3bp9(machine_config &config)
 	m_bcch=true;
 }
 
+void dct3_rf_adc_fixture_state::npe3sp9(machine_config &config)
+{
+	npe3bp9(config);
+	m_full_broadcast=true;
+}
+
 void dct3_rf_adc_fixture_state::machine_start()
 {
 	nokia_dct3_state::machine_start();
@@ -93,7 +99,11 @@ void dct3_rf_adc_fixture_state::machine_start()
 	save_item(NAME(m_candidate_active));
 	save_item(NAME(m_candidate_target));
 	if (m_compare_start) machine().logerror("npe3_capture_candidate: p09_start=1 all_captures=1 block_request_latch=1 physical_claim=0 source_epoch_shift=0\n");
-	if (m_bcch)
+	if (m_full_broadcast)
+	{
+		machine().logerror("rf_adc_bcch: frames=2,3,4,5 tsc=2 schedule=0,1,2,3,1,1,2,3 repeated_si3_only=0 arfcn=35 epoch=0 physical_claim=0\n");
+	}
+	else if (m_bcch)
 	{
 		gsm::tch_f::packed_control_block const si3{0x49,0x06,0x1b,0x00,0x01,0x00,0xf1,0x10,
 			0x00,0x01,0x40,0,0,0,0,0,0,0,0,0x2b,0x2b,0x2b,0x2b};
@@ -109,6 +119,33 @@ void dct3_rf_adc_fixture_state::machine_start()
 		machine().logerror("rf_adc_sync: frame_ticks=60000 multiframe=51 fcch_frames=0,10,20,30,40 sch_frames=1,11,21,31,41 active_ticks=7104 epoch=0 envelope=rectangular bt=0.3 bsic=42 waveform_samples_per_symbol=4 other_slots=%s tuned_air_source=0\n",m_bcch ? "bcch" : "zero");
 	else if (m_burst)
 		machine().logerror("rf_adc_burst: frame_ticks=60000 multiframe=51 frames=0,10,20,30,40 active_ticks=7104 epoch=0 envelope=rectangular other_slots=zero tuned_air_source=0\n");
+}
+
+void dct3_rf_adc_fixture_state::machine_reset()
+{
+	nokia_dct3_state::machine_reset();
+	if (!m_full_broadcast) return;
+	// Topology is applied by the board reset, not machine_start. Cache only
+	// standards data after that setup; no network packet/verdict is delivered.
+	auto &network=*subdevice<nokia_gsm_network_device>("gsm_network");
+	// Explicit laboratory BTS composition, not a detected/fitted carrier.
+	auto cell=*network.cell_at(0);
+	cell.arfcn=35;
+	cell.bsic=42;
+	network.use_single_cell();
+	network.set_cell(0,cell);
+	for (unsigned kind=0; kind<4; ++kind)
+	{
+		auto const information=network.system_information(kind,35);
+		gsm::tch_f::packed_control_block octets{};
+		std::copy_n(information.begin(),octets.size(),octets.begin());
+		auto const bursts=nokia_rf_lab::bcch_bits(octets,2);
+		for (unsigned burst=0; burst<4; ++burst)
+			m_broadcast_samples[kind][burst]=nokia_rf_lab::gmsk_samples(bursts[burst]);
+		std::string hex;
+		for (auto byte:octets) hex+=util::string_format("%02x",byte);
+		machine().logerror("rf_adc_broadcast_si: index=%u arfcn=35 octets=%s physical_claim=0\n",kind,hex);
+	}
 }
 
 void dct3_rf_adc_fixture_state::control_w(offs_t port, u16 data)
@@ -166,7 +203,10 @@ u16 dct3_rf_adc_fixture_state::sample_r(offs_t component)
 	u64 const tick = machine().time().as_ticks(13'000'000);
 	if (m_bcch && nokia_rf_lab::bcch_active(tick))
 	{
-		auto const &sample=m_bcch_samples[(tick/60'000)%51-2][(tick%60'000)/12];
+		unsigned const burst=(tick/60'000)%51-2, position=(tick%60'000)/12;
+		auto const &sample=m_full_broadcast ?
+			m_broadcast_samples[gsm::mobility::bcch_system_information_index(tick/60'000)][burst][position] :
+			m_bcch_samples[burst][position];
 		m_q_latch=sample[1];
 		return u16(sample[0]);
 	}

@@ -61,8 +61,10 @@ public:
 	void npe3cp9(machine_config &config);
 	void npe3zp9(machine_config &config);
 	void npe3bp9(machine_config &config);
+	void npe3sp9(machine_config &config);
 protected:
 	void machine_start() override;
+	void machine_reset() override;
 private:
 	void configure_adc_lab(machine_config &config);
 	void control_w(offs_t port, u16 data);
@@ -76,7 +78,9 @@ private:
 	bool m_burst = false;
 	bool m_sch = false;
 	bool m_bcch = false;
+	bool m_full_broadcast = false;
 	std::array<std::array<std::array<s16, 2>, 148 * 4>, 4> m_bcch_samples{};
+	std::array<std::array<std::array<std::array<s16, 2>, 148 * 4>, 4>, 4> m_broadcast_samples{};
 	// Pure FN-derived memoization, not independent emulated state. Never
 	// restore its key separately from its table; a time rewind misses/rebuilds it.
 	u32 m_sch_cache_frame = ~u32(0);

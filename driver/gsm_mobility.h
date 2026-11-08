@@ -11,6 +11,13 @@
 namespace gsm::mobility
 {
 
+// TS 45.002 eight-multiframe BCCH schedule; indices SI1,SI2,SI3,SI4.
+constexpr unsigned bcch_system_information_index(std::uint32_t frame)
+{
+	constexpr std::array<unsigned,8> by_tc{0,1,2,3,1,1,2,3};
+	return by_tc[(frame/51)&7];
+}
+
 // TS 05.14 4.1.6: absent NCH, then L (DCS) or H (PCS), relative
 // to the CSN.1 padding pattern. The rest of the octet remains padding.
 constexpr std::uint8_t si1_band_rest_octets(bool pcs1900)

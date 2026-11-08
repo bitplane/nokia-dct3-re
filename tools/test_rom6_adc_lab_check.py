@@ -3,6 +3,18 @@ from tools.rom6_adc_lab_check import check,reference_word,continuous_queue_bound
 
 
 class AdcLabCheckTest(unittest.TestCase):
+    def test_full_broadcast_reference_uses_absolute_multiframe(self):
+        from tools.gsm_xcch_signal import broadcast_octets,normal_control_bursts,broadcast_si_index
+        from tools.gsm_sch_signal import gmsk_burst_samples
+        for tc in range(8):
+            frame=51*tc+2
+            burst=normal_control_bursts(broadcast_octets(broadcast_si_index(frame)))[0]
+            samples=gmsk_burst_samples(burst)
+            for index in (17,295,591):
+                tick=frame*60000+index*12
+                self.assertEqual(reference_word(1,tick,True,12,True,True,True,True),samples[index][0]&0xffff)
+                self.assertEqual(reference_word(2,tick+12,True,12,True,True,True,True),samples[index][1]&0xffff)
+
     def test_bcch_reference_is_four_bursts_with_latched_q(self):
         from tools.gsm_xcch_signal import normal_control_bursts
         from tools.gsm_sch_signal import gmsk_burst_samples

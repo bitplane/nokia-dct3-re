@@ -2819,11 +2819,9 @@ void nokia_radio_peer_device::emit_report()
 			// TC 0 even though it is optional for this non-hopping cell: the ROM can
 			// infer its completion during initial acquisition, but requires the real
 			// block when revalidating an already active serving channel.
-			static constexpr std::array<unsigned, 8> SI_BY_TC = { 0, 1, 2, 3, 1, 1, 2, 3 };
-			const unsigned tc = (frame_number / 51) & 7;
 			const auto system_information =
 					m_gsm_network->system_information(
-							SI_BY_TC[tc], report_arfcn);
+							gsm::mobility::bcch_system_information_index(frame_number), report_arfcn);
 			std::copy(system_information.begin(), system_information.end(), std::begin(payload) + 10);
 		}
 		else if (payload[0] == 0x40)

@@ -38,6 +38,10 @@ The separately named [raw-BCCH laboratory composition](#whole-phone-raw-bcch-lab
 also decodes SCH and three independently checked SI3 blocks in one coherent
 24-second interactive run. This does not yet prove MCU cell selection,
 camping or Location Updating, or promote its clock/capture model to hardware.
+The [full-SI candidate](#complete-si-broadcast-candidate) additionally completes
+the MCU's four-type broadcast acquisition in a legal eight-second capture;
+its full 24-second gate remains red at a later unsupported mapped-register
+MVDD. This candidate is not a replacement for the passing UI profile.
 The explicit 13 MHz DSP clock is provisional (the manual establishes RFIclk,
 not the DSP multiplier). A longer run requests MCU software reset near
 32 seconds, despite successful initial port-36 request completion. Timer input
@@ -2914,6 +2918,38 @@ the missing boundary. Establish the missing SI request/schedule and provide
 standards-derived raw broadcasts. No decoded messages, firmware
 fields, carrier selection or registration verdict are supplied. Existing
 SCH-only and zero-source profiles remain distinct controls.
+
+### Complete SI broadcast candidate
+
+`npe3sp9` adds the existing network model's SI1/SI2/SI3/SI4 data to the raw
+waveform path, using TC indices `0,1,2,3,1,1,2,3` on the eight-multiframe
+cycle. The schedule helper is shared with the HLE peer; no HLE packet or
+verdict is delivered to either processor. The explicit laboratory cell is
+ARFCN 35 / BSIC 42, PLMN 001-01, LAC/CI 1, with no advertised neighbours.
+Waveforms are derived after board/network reset configuration. The source
+is still an untuned ADC-pin stimulus, not an RF carrier selected by HAGAR.
+
+In the legal eight-second capture, complete blocks end at frames
+719/770/821/872, carrying SI3/SI4/SI1/SI2 respectively. Independent checks
+match all 184 information and 40 parity bits per block on the real FIRE
+transactions, final result reads and 23-octet native publications. All four
+MCU type handlers run; acquisition flags reach `0f` and the existing
+`2d3e3c` success return is 1. The repeated-SI3 control is rejected by this
+stronger check. This establishes complete broadcast acquisition in this
+laboratory composition, not camping or Location Updating.
+
+```sh
+.venv/bin/python tools/run_npe3_native.py --reference-clock --seconds 24 --adc-source fcch-sch-broadcast --capture-start p09
+```
+
+The full command intentionally remains fail-closed: after the new broadcast
+work and class-60 CCCH reception, native execution reaches `MVDD` at `6e6f`,
+copying RAM `0dea` to mapped accumulator-high register `0009`, and the CPU
+rejects that unsupported mapped-destination form. It must not be treated as
+a successful 24-second UI/transport run. Earlier circular ADD, circular MVKD
+and shifted repeated ADD boundaries have separate generic CPU tests; the
+mapped MVDD contract is the next software target. No fault suppression,
+decoded CCCH input or registration-state forcing is retained.
 
 `verify-6210-alarm-off-snooze-no` combines the independently validated
 powered-off and Snooze lifecycles: two natural RTC wakes, separately checked

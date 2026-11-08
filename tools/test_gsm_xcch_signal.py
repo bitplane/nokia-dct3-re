@@ -1,8 +1,22 @@
 import unittest
-from tools.gsm_xcch_signal import control_bits,coded_control,check_vector,TSC2
+from tools.gsm_xcch_signal import control_bits,coded_control,check_vector,TSC2,broadcast_octets,broadcast_si_index
 
 
 class XcchSourceTest(unittest.TestCase):
+    def test_broadcast_cycle_and_single_cell_channel_data(self):
+        for frame in range(816):
+            self.assertEqual(broadcast_si_index(frame),(0,1,2,3,1,1,2,3)[(frame//51)%8])
+        blocks=[broadcast_octets(kind) for kind in range(4)]
+        self.assertEqual([len(block) for block in blocks],[23]*4)
+        self.assertEqual([block[2] for block in blocks],[0x19,0x1a,0x1b,0x1c])
+        self.assertEqual(sum(byte.bit_count() for byte in blocks[0][3:19]),1)
+        self.assertEqual(blocks[0][14],4) # ARFCN35,bitmap0 bit34.
+        self.assertEqual(blocks[1][3:19],bytes(16))
+        self.assertEqual(blocks[1][19],0xff)
+        self.assertEqual(blocks[1][20:],bytes(3))
+        for kind,carrier in ((4,35),(0,0),(0,125)):
+            with self.assertRaises(ValueError): broadcast_octets(kind,carrier)
+
     def fixture(self):
         octets=bytes(23)
         coded=coded_control(octets)
