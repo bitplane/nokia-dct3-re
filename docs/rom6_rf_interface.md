@@ -652,12 +652,19 @@ Call Confirmed and all60 timed P05 releases;native assignment decode succeeds
 at19.654480198s. MCU packet02/body
 `042a02000271012fc1000023000000040000000000000000` requests traffic
 configuration and packet1b/body00b0 submits empty SABM. This is not proof of
-actual TCH transmission. The complete24s acceptance deliberately fails:
-the traffic DSP initializer reaches unsupported long-offset circular MAR
-6df2/0003 atb7a0. Repeated circular accumulator stores and MVDM dma,BRC
-were generic CPU gaps on this path and now have isolated regression tests;
-no firmware opcode or return value is replaced. The next boundary is generic
-long circular MAR support,then the actual TCH/F serializer/RX schedule.
+actual TCH transmission. The complete24s acceptance deliberately fails at
+repeated MVDK7195/0011 (c634..c635),reported atc637. Own preceding code sets
+AR5=b5ff and RPT count4;the source is ordinary RAM with five observed words
+2223/222f/222b/0016/126a. The literal destination starts at mapped AR1.
+The diagnostic `repeat_source=0013` is the engine's progressing repeated
+literal,not the source address. The next CPU contract is repeated mapped
+destination progression and source-pointer alias ordering,including the last
+destination potentially reaching AR5. Do not remove the guard without generic
+ordered-access/save-replay tests. Completed circular/repeat/delay instruction
+contracts live in `c54x_execution_contracts.md`;no firmware opcode or return
+value is replaced. Actual TCH/F serialization and RX scheduling remain open.
+Native8210 Menu acceptance remains green with these CPU extensions;this is
+a shared-core regression,not a successful6210 traffic-setup result.
 Do not
 inject083e again or clear the context byte. Broad heap watches used to locate
 the consumer are retired;bounded return/selector/context observations retain
