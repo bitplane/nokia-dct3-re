@@ -3,6 +3,7 @@ import re
 from tools.rom6_adc_measure_check import check_rx_publications
 
 SETUP=re.compile(r'npe3_raw_call_setup: uplink_start_frame=(\d+) start_frame=(\d+) octets=([0-9a-f]{46}) policy=plain_test_cell raw_adc_only=1 physical_claim=0')
+ASSIGNMENT=re.compile(r'npe3_raw_assignment: confirmed_start_frame=(\d+) start_frame=(\d+) octets=([0-9a-f]{46}) raw_adc_only=1 physical_claim=0')
 
 
 def check(text,blocks):
@@ -40,3 +41,27 @@ def check(text,blocks):
                 native_call_confirmed_qualified=bool(confirmed),
                 native_alerting_qualified=bool(alerting),connected_call_qualified=False,
                 speech_transport_qualified=False,physical_rf_tuning_qualified=False)
+
+
+def check_assignment(text,blocks):
+    setup=check(text,blocks)
+    rows=list(ASSIGNMENT.finditer(text))
+    if len(rows)!=1 or text.count('npe3_raw_assignment:')!=1:
+        raise ValueError('missing unique raw Assignment Command')
+    row=rows[0];source,start=int(row[1]),int(row[2])
+    expected=bytes.fromhex('032221062e094023006301'+'2b'*12)
+    if (bytes.fromhex(row[3])!=expected or source not in setup['native_call_confirmed_frames'] or
+            start!=((source+3)//51+1)*51+22):
+        raise ValueError('assignment does not acknowledge actual Call Confirmed on the declared channel')
+    matches=[]
+    for packet in check_rx_publications(text)['packets']:
+        body=bytes.fromhex(packet['payload'])
+        if (packet['type']==128 and len(body)==33 and body[:3]==b'\x80\x2a\0' and
+                int.from_bytes(body[3:6],'big')==(start+3)%2715648 and
+                body[6:8]==b'\0\x23' and body[10:]==expected and
+                float(packet['time'])>(start+3)*60000/13000000):
+            matches.append(packet)
+    if len(matches)!=1:raise ValueError('missing unique native Assignment Command decode')
+    return dict(native_assignment_decode_qualified=True,start_frame=start,
+                native_decode_time=matches[0]['time'],traffic_channel_qualified=False,
+                assignment_complete_qualified=False,speech_transport_qualified=False)

@@ -642,8 +642,22 @@ contains Call Confirmed `8308040460020081150101`;retransmissions occur at
 4270/4321/4372/4423 because the lab BTS does not yet acknowledge this I-frame.
 The reviewed pre-Menu frame shows5551234 calling with Answer/Reject. This
 proves incoming call presentation and native CC admission,not Alerting,
-traffic assignment,answer,connected media or physical tuning. Continue with
-LAPDm acknowledgement and standard assignment;do not substitute a DSP result.
+answer,connected media or physical tuning.
+
+The separate traffic-assignment switch acknowledges Call Confirmed with
+network N(S)=1/N(R)=1 and sends TCH/F timeslot1,ARFCN35,TSC2,speech-v1
+Assignment Command4255 (`032221062e094023006301` plus12 padding octets).
+Independent reconstruction checks the actual four-burst Paging Response and
+Call Confirmed and all60 timed P05 releases;native assignment decode succeeds
+at19.654480198s. MCU packet02/body
+`042a02000271012fc1000023000000040000000000000000` requests traffic
+configuration and packet1b/body00b0 submits empty SABM. This is not proof of
+actual TCH transmission. The complete24s acceptance deliberately fails:
+the traffic DSP initializer reaches unsupported long-offset circular MAR
+6df2/0003 atb7a0. Repeated circular accumulator stores and MVDM dma,BRC
+were generic CPU gaps on this path and now have isolated regression tests;
+no firmware opcode or return value is replaced. The next boundary is generic
+long circular MAR support,then the actual TCH/F serializer/RX schedule.
 Do not
 inject083e again or clear the context byte. Broad heap watches used to locate
 the consumer are retired;bounded return/selector/context observations retain
@@ -658,6 +672,8 @@ handoff is requalified.
 # Separate positive paging fixture;the default39dBm control is unchanged.
 .venv/bin/python tools/run_npe3_native.py --reference-clock --seconds 24 --adc-source fcch-sch-broadcast --capture-start p09 --tx-release p05 --raw-agch --provision-records --page-at 18 --cell-power-policy handset33
 # Add --incoming-call for the separate raw CC SETUP/native confirmation fixture.
+# Add --traffic-assignment to that fixture for the currently failing native
+# traffic-initialization investigation;this is not a green call gate.
 ```
 
 Host4a uses the DROM table atb041+4a=b08b,which selects35c5. That handler

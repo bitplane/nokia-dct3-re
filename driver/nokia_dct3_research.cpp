@@ -134,6 +134,7 @@ void dct3_rf_adc_fixture_state::machine_start()
 	save_item(NAME(m_ua_samples));
 	save_item(NAME(m_lu_start_frame));save_item(NAME(m_lu_samples));
 	save_item(NAME(m_setup_start_frame));save_item(NAME(m_setup_samples));
+	save_item(NAME(m_assignment_start_frame));save_item(NAME(m_assignment_samples));
 	save_item(NAME(m_lu_acknowledged));save_item(NAME(m_release_start_frame));
 	save_item(NAME(m_release_samples));
 	save_item(NAME(m_lab_tx_compares));
@@ -173,6 +174,7 @@ void dct3_rf_adc_fixture_state::machine_reset()
 	m_normal_start_frame=m_ua_start_frame=~u64(0);
 	m_lu_start_frame=~u64(0);
 	m_setup_start_frame=~u64(0);
+	m_assignment_start_frame=~u64(0);
 	m_lu_acknowledged=false;m_release_start_frame=~u64(0);
 	m_normal_count=0;m_contention_active=false;
 	m_page_identity_valid=m_page_pending=false;
@@ -377,6 +379,7 @@ TIMER_CALLBACK_MEMBER(dct3_rf_adc_fixture_state::candidate_transmit_start)
 				m_contention_active=m_lu_acknowledged=false;
 				m_normal_count=0;
 				m_ua_start_frame=m_lu_start_frame=m_release_start_frame=m_setup_start_frame=~u64(0);
+				m_assignment_start_frame=~u64(0);
 				u64 const frame=machine().time().as_ticks(13'000'000)/60'000;
 				auto const assignment=subdevice<nokia_gsm_network_device>("gsm_network")->immediate_assignment(
 					*access,frame%nokia_rf_lab::hyperframe,35);
@@ -426,6 +429,26 @@ void dct3_rf_adc_fixture_state::receive_normal_uplink(std::array<u16,15> const &
 	for (auto byte:*block) packed+=util::string_format("%02x",byte);
 	machine().logerror("npe3_bts_uplink: start_frame=%u octets=%s exact_code=1 port_bits_only=1 physical_claim=0\n",
 		unsigned(m_normal_start_frame),packed);
+	if ((ioport("LAB_BTS")->read()&8) && m_setup_start_frame!=~u64(0) && m_assignment_start_frame==~u64(0) &&
+			m_normal_start_frame>m_setup_start_frame+3 &&
+			(*block)[0]==1 && (*block)[1]==0x20 && ((*block)[2]&3)==1 &&
+			((*block)[2]>>2)>=2 && ((*block)[2]>>2)<=20 &&
+			(*block)[3]==0x83 && ((*block)[4]&0x3f)==8)
+	{
+		// Second network I-frame,N(S)=1. Its N(R)=1 acknowledges the
+		// handset's first I-frame (Call Confirmed); no decoded MCU input.
+		auto const assignment=subdevice<nokia_gsm_network_device>("gsm_network")->traffic_assignment(35);
+		gsm::tch_f::packed_control_block lapdm{};
+		lapdm.fill(0x2b);lapdm[0]=3;lapdm[1]=0x22;lapdm[2]=(assignment.size()<<2)|1;
+		std::copy(assignment.begin(),assignment.end(),lapdm.begin()+3);
+		m_assignment_start_frame=(frame/51+1)*51+22;
+		auto const encoded=nokia_rf_lab::bcch_bits(lapdm,0);
+		for (unsigned at=0;at<4;++at) m_assignment_samples[at]=nokia_rf_lab::gmsk_samples(encoded[at]);
+		packed.clear();for (auto byte:lapdm) packed+=util::string_format("%02x",byte);
+		machine().logerror("npe3_raw_assignment: confirmed_start_frame=%u start_frame=%u octets=%s raw_adc_only=1 physical_claim=0\n",
+			unsigned(m_normal_start_frame),unsigned(m_assignment_start_frame),packed);
+		return;
+	}
 	if (!m_lu_acknowledged && m_lu_start_frame!=~u64(0) &&
 			m_normal_start_frame>m_lu_start_frame+3 &&
 			(*block)[0]==3 && (*block)[1]==0x21 && (*block)[2]==1)
@@ -556,6 +579,12 @@ u16 dct3_rf_adc_fixture_state::sample_r(offs_t component)
 	if (component) return u16(m_q_latch);
 	u64 const tick = machine().time().as_ticks(13'000'000);
 	u64 const frame=tick/60'000;
+	if (m_raw_agch && frame>=m_assignment_start_frame && frame-m_assignment_start_frame<4 && tick%60'000<148*48)
+	{
+		auto const &sample=m_assignment_samples[frame-m_assignment_start_frame][(tick%60'000)/12];
+		m_q_latch=sample[1];
+		return u16(sample[0]);
+	}
 	if (m_raw_agch && frame>=m_setup_start_frame && frame-m_setup_start_frame<4 && tick%60'000<148*48)
 	{
 		auto const &sample=m_setup_samples[frame-m_setup_start_frame][(tick%60'000)/12];

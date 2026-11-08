@@ -3,6 +3,14 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "npe3_native_traffic_assignment_decode",
+      "owner": "native_rom6_reference_adc_laboratory",
+      "status": "satisfied",
+      "predicate": "The raw network Assignment Command is decoded natively after actual Call Confirmed",
+      "current": "Separate traffic-assignment input sends N(S)=1/N(R)=1,acknowledging actual Call Confirmed4219 and assigning TCH/F slot1 on35 with TSC2/speech-v1. Independent four-burst source reconstruction and60 timed release checks pass. Native successful Assignment Command4255 decode is19.654480198s. MCU requests packet02 traffic config042a02000271012fc1000023000000040000000000000000 and submits00b0 empty SABM. The overall24s gate is red:unsupported generic long circular MAR6df2/0003 atb7a0 stops DSP execution. Actual TCH RF serialization,Assignment Complete,Alerting,connected call and speech remain unqualified. Do not infer traffic success from MCU configuration or weaken the terminal illegal-instruction check.",
+      "evidence": ["driver/nokia_dct3_research.cpp", "tools/npe3_raw_call_setup_check.py", "tools/test_npe3_raw_call_setup_check.py", "tools/run_npe3_native.py", "docs/rom6_rf_interface.md", "docs/c54x_execution_contracts.md"]
+    },
+    {
       "id": "npe3_native_incoming_setup",
       "owner": "native_rom6_reference_adc_laboratory",
       "status": "satisfied",

@@ -22,7 +22,7 @@ ADC_BROADCAST_MENU_SHA256 = '8c7650fdb0514ec34c85b89795e529de062e6f141268a507baf
 ADC_LU_MENU_SHA256 = '5adef93609b763a40d0e3c9dca356d388a910bb393a518e99a53eec2c7184202'
 
 
-def configure_cell_power(directory,model,policy,*,incoming_call=False):
+def configure_cell_power(directory,model,policy,*,incoming_call=False,traffic_assignment=False):
     if policy=='legacy39':return
     if policy!='handset33':raise ValueError('unsupported cell power policy')
     config=ET.Element('mameconfig',version='10')
@@ -31,6 +31,8 @@ def configure_cell_power(directory,model,policy,*,incoming_call=False):
     ET.SubElement(ports,'port',tag=':LAB_BTS',type='CONFIG',mask='2',defvalue='0',value='2')
     if incoming_call:
         ET.SubElement(ports,'port',tag=':LAB_BTS',type='CONFIG',mask='4',defvalue='0',value='4')
+    if traffic_assignment:
+        ET.SubElement(ports,'port',tag=':LAB_BTS',type='CONFIG',mask='8',defvalue='0',value='8')
     destination=directory/'cfg';destination.mkdir()
     ET.ElementTree(config).write(destination/f'{model}.cfg',encoding='utf-8',xml_declaration=True)
 
@@ -127,9 +129,13 @@ def main():
                         help='separate standards-owned33dBm cell experiment; no firmware/clock/ADC change')
     parser.add_argument('--incoming-call',action='store_true',
                         help='external BTS sends plain CC SETUP only after actual native Paging Response')
+    parser.add_argument('--traffic-assignment',action='store_true',
+                        help='separate external TCH/F assignment after actual Call Confirmed')
     parser.add_argument('--provision-records', action='store_true',
                         help='explicit synthetic record fixture; acquired PMM remains unchanged')
     args = parser.parse_args()
+    if args.traffic_assignment and not args.incoming_call:
+        parser.error('traffic assignment requires the separate raw incoming-call fixture')
     if args.incoming_call and (args.cell_power_policy!='handset33' or args.page_at is None):
         parser.error('raw incoming call requires the separate33dBm addressed-page fixture')
     if args.cell_power_policy!='legacy39' and (not args.raw_agch or not args.provision_records or args.scenario!='menu' or args.seconds!=24):
@@ -196,7 +202,8 @@ def main():
     def execute(phase, scenario, seconds, persist=False):
         directory = run / phase
         directory.mkdir()
-        configure_cell_power(directory,model,args.cell_power_policy,incoming_call=args.incoming_call)
+        configure_cell_power(directory,model,args.cell_power_policy,incoming_call=args.incoming_call,
+                             traffic_assignment=args.traffic_assignment)
         cmd = command.copy()
         cmd[-1] = str(seconds)
         if not persist:
@@ -238,6 +245,9 @@ def main():
             if args.incoming_call:
                 from tools.npe3_raw_call_setup_check import check as check_call_setup
                 report['call_setup']=check_call_setup(text,access['normal_control_blocks'])
+            if args.traffic_assignment:
+                from tools.npe3_raw_call_setup_check import check_assignment
+                report['traffic_assignment']=check_assignment(text,access['normal_control_blocks'])
             print('Native6210 cell33: PASS native Paging Response from timed port bits; stable_camping=0 calls=0')
         (run/'cell-power-experiment.json').write_text(json.dumps(report,indent=2)+'\n')
         print('Native6210 cell-power experiment captured; other radio/UI outcomes remain unqualified')

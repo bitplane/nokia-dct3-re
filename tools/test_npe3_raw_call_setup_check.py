@@ -1,9 +1,25 @@
 import unittest
 from unittest.mock import patch
-from tools.npe3_raw_call_setup_check import check
+from tools.npe3_raw_call_setup_check import check,check_assignment
 
 
 class RawCallSetupTest(unittest.TestCase):
+    def test_assignment_requires_real_confirmation_and_exact_native_decode(self):
+        octets='032221062e094023006301'+'2b'*12
+        text=f'npe3_raw_assignment: confirmed_start_frame=4219 start_frame=4255 octets={octets} raw_adc_only=1 physical_claim=0'
+        packets=[dict(type=128,payload='802a00'+(4258).to_bytes(3,'big').hex()+'00230001'+octets,time='19.7')]
+        with patch('tools.npe3_raw_call_setup_check.check',return_value=dict(native_call_confirmed_frames=[4219])), \
+                patch('tools.npe3_raw_call_setup_check.check_rx_publications',return_value=dict(packets=packets)):
+            result=check_assignment(text,[])
+            self.assertTrue(result['native_assignment_decode_qualified'])
+            self.assertFalse(result['traffic_channel_qualified'])
+            for bad in ('',text+text,text.replace('4255','4256'),text.replace('032221','030221'),text.replace('4219','4218')):
+                with self.assertRaises(ValueError):check_assignment(bad,[])
+        for bad in ([],packets*2,[dict(packets[0],time='18.0')]):
+            with patch('tools.npe3_raw_call_setup_check.check',return_value=dict(native_call_confirmed_frames=[4219])), \
+                    patch('tools.npe3_raw_call_setup_check.check_rx_publications',return_value=dict(packets=bad)):
+                with self.assertRaises(ValueError):check_assignment(text,[])
+
     def fixture(self):
         octets='030045030504046002008134015c0581551532f4'+'2b'*3
         text=f'npe3_raw_call_setup: uplink_start_frame=4066 start_frame=4153 octets={octets} policy=plain_test_cell raw_adc_only=1 physical_claim=0'
