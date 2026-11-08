@@ -1,7 +1,7 @@
 import unittest
 from unittest.mock import patch
 
-from tools.npe3_addressed_page_check import check,check_mcu_admission,check_rr_delivery,check_controller,CONTROLLER_CODE
+from tools.npe3_addressed_page_check import check,check_mcu_admission,check_rr_delivery,check_controller,check_controller_lifecycle,CONTROLLER_CODE
 
 
 class AddressedPageTest(unittest.TestCase):
@@ -111,6 +111,27 @@ class AddressedPageTest(unittest.TestCase):
         for address in CONTROLLER_CODE:
             bad=image.copy();bad[address-0x200000]^=1
             with self.assertRaises(ValueError):check_controller(text,page,bad)
+
+
+class ControllerLifecycleTest(unittest.TestCase):
+    def test_a_clear_then_reentry_is_not_a_missing_initial_completion(self):
+        image=bytearray(0x1153c2)
+        image[0x115262:0x115276]=bytes.fromhex('2004468120019002a0b1f15bf98c980271a0e0e3')
+        image[0x1153c0:0x1153c2]=bytes.fromhex('71a5')
+        lines=[]
+        for n,(field,stamp,old,new,pc,saved) in enumerate((
+                ('procedure',2,0,1,0x315272,1),('procedure',12,1,0,0x3153c0,0x7ef),
+                ('procedure',16,0,1,0x315272,1),('pending',18.002,0,1,0x31547a,0x83e)),1):
+            lines.append(f'npe3_controller_transition: sequence={n} field={field} t={stamp:.9f} old={old:08x} new={new:08x} pc={pc:08x} lr=00470595 r0=00000001 r1=00000000 r4=00169be8 saved={saved:08x} observer_writes=0')
+        text='\n'.join(lines)+'\nnpe3_controller_transition_complete: changes=4 cap=256 end=24 observer_writes=0'
+        page={'native_decode_times':[18.0,22.0]}
+        result=check_controller_lifecycle(text,page,image)
+        self.assertTrue(result['missing_initial_clear_disproved'])
+        self.assertFalse(result['stable_camping_qualified'])
+        for old,new in (('saved=000007ef','saved=000007ee'),('old=00000001','old=00000000'),
+                        ('t=16.000000000','t=19.000000000'),('changes=4','changes=5')):
+            with self.subTest(old=old),self.assertRaises(ValueError):
+                check_controller_lifecycle(text.replace(old,new),page,image)
 
 
 if __name__=='__main__':unittest.main()

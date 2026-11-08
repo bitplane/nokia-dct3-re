@@ -1,5 +1,6 @@
 """Check external paging inputs separately from native wake/camping results."""
 import re
+from tools.rom6_tuning_contract import fields
 
 from tools.npe3_raw_ua_check import UPLINK,DISC_UA
 from tools.radio_mobile_identity import paging_group
@@ -8,6 +9,40 @@ from tools.rom6_adc_measure_check import check_rx_publications
 
 REQUEST=re.compile(r'npe3_bts_page_request: t=([\d.]+) identity=([0-9a-f]{16}) phase=(\d+) offset=(\d+) multiframes=2 after_frame=(\d+) octets=([0-9a-f]{46}) raw_adc_only=1 port_bits_identity=1 physical_claim=0')
 AIR=re.compile(r'npe3_bts_page_air: start_frame=(\d+) t=([\d.]+) raw_adc_only=1 physical_claim=0')
+
+
+def check_controller_lifecycle(text,page,image):
+    if (image[0x115262:0x115276].hex()!='2004468120019002a0b1f15bf98c980271a0e0e3'
+            or image[0x1153c0:0x1153c2].hex()!='71a5'):
+        raise ValueError('controller flag writer instructions changed')
+    rows=[fields(row) for row in re.findall(r'npe3_controller_transition: ([^\r\n]+)',text)]
+    count=len(rows)
+    if (not 0<count<256 or [int(r['sequence']) for r in rows]!=list(range(1,count+1))
+            or text.count(f'npe3_controller_transition_complete: changes={count} cap=256 end=24 observer_writes=0')!=1):
+        raise ValueError('missing or capped controller transition coverage')
+    last={}
+    for row in rows:
+        name=row['field'];old=int(row['old'],16);new=int(row['new'],16)
+        if (name not in ('procedure','pending','selector','continuation') or old==new
+                or row['observer_writes']!='0' or not 0<=float(row['t'])<=24
+                or name in last and last[name]!=old):
+            raise ValueError('discontinuous controller field history')
+        last[name]=new
+    procedure=[r for r in rows if r['field']=='procedure']
+    expected=[('00000000','00000001','00315272'),('00000001','00000000','003153c0'),
+              ('00000000','00000001','00315272')]
+    if ([(r['old'],r['new'],r['pc']) for r in procedure]!=expected
+            or any(r['r4']!='00169be8' for r in procedure) or procedure[1]['saved']!='000007ef'
+            or not float(procedure[0]['t'])<float(procedure[1]['t'])<float(procedure[2]['t'])<min(page['native_decode_times'])):
+        raise ValueError('controller did not clear and re-enter its page-deferring condition')
+    pending=[r for r in rows if r['field']=='pending']
+    if (len(pending)!=1 or pending[0]['saved']!='0000083e' or pending[0]['pc']!='0031547a'
+            or not min(page['native_decode_times'])<float(pending[0]['t'])<min(page['native_decode_times'])+0.01):
+        raise ValueError('first addressed page did not set the pending latch')
+    return dict(flag_set_times=[float(procedure[i]['t']) for i in (0,2)],
+                flag_clear_time=float(procedure[1]['t']),clear_input='07ef',
+                missing_initial_clear_disproved=True,procedure_semantics_qualified=False,
+                stable_camping_qualified=False)
 
 # Own controller: store/receive,three paging selectors,latch/free/repeat;
 # later pending-page drain and its two context-byte guards.

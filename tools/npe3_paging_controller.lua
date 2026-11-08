@@ -5,6 +5,30 @@ local cpu=assert(machine.devices[':maincpu'])
 local space=cpu.spaces.program
 local handles,counts={},{}
 local busy=false
+local transitions=0
+-- "procedure" is a trace label for byte+6,not a recovered semantic name.
+for _,field in ipairs({{0x169bee,1,'procedure'},{0x169bf3,1,'pending'},{0x169c06,2,'selector'},{0x169c14,4,'continuation'}}) do
+    local address,size,name=table.unpack(field)
+    local base=address&~3
+    handles[#handles+1]=space:install_write_tap(base,base+3,'npe3_controller_'..name,function(_,value,mask)
+        if busy or machine.time:as_double()>24 then return end
+        busy=true
+        local shift=(4-size-(address-base))*8
+        local bits=size==4 and 0xffffffff or ((1<<(size*8))-1)
+        local affected=(mask>>shift)&bits
+        local previous=(space:read_u32(base)>>shift)&bits
+        local incoming=(previous&~affected)|((value>>shift)&affected)
+        if affected~=0 and incoming~=previous then
+            transitions=transitions+1
+            if transitions<=256 then
+                machine:logerror(string.format('npe3_controller_transition: sequence=%d field=%s t=%.9f old=%08x new=%08x pc=%08x lr=%08x r0=%08x r1=%08x r4=%08x saved=%08x observer_writes=0\n',
+                    transitions,name,machine.time:as_double(),previous,incoming,cpu.state.PC.value,cpu.state.R14.value,
+                    cpu.state.R0.value,cpu.state.R1.value,cpu.state.R4.value,space:read_u32(cpu.state.R13.value+8)))
+            end
+        end
+        busy=false
+    end)
+end
 for _,entry in ipairs({0x31543e,0x315450,0x315472,0x314e04,0x3135c2}) do
     counts[entry]=0
     handles[#handles+1]=space:install_read_tap(entry&~3,(entry&~3)+3,'npe3_page_wait_'..entry,function()
@@ -27,6 +51,7 @@ for _,entry in ipairs({0x31543e,0x315450,0x315472,0x314e04,0x3135c2}) do
     end)
 end
 handles[#handles+1]=emu.add_machine_stop_notifier(function()
+    machine:logerror(string.format('npe3_controller_transition_complete: changes=%d cap=256 end=24 observer_writes=0\n',transitions))
     for entry,count in pairs(counts) do
         machine:logerror(string.format('npe3_paging_wait_complete: entry=%08x hits=%d cap=64 begin=12 end=24 observer_writes=0\n',entry,count))
     end

@@ -553,6 +553,22 @@ at those sampled points only,not transient objects between them;absence of
 DSP type89 is not evidence to synthesize a confirmation. The snapshot probe is
 retired after recording this bounded result.
 
+A complete bounded field-change trace through24seconds shows byte+6 set at
+2.437741846 (315272),cleared at12.046145538 (3153c0,received07ef),and set
+again at16.288393385 (315272). Thus an initial missing clear/completion is
+disproved:the condition re-enters before paging. The first page sets+0b at
+18.632392000 (31547a),and the second leaves the already-set latch unchanged.
+The common31525e tail publishes its report,sets continuation4 and writes1
+to byte+6;it is shared by multiple status branches,not exclusively07d4.
+The trace label `procedure` denotes this byte only,not a recovered procedure
+name. The17 observed field changes also distinguish diagnostic selector+1e
+from continuation+2c;312c58's selector store is not a mode transition.
+The native acceptance checker pins both flag writers and validates continuous
+field histories,clear/re-entry ordering and the first-page latch. The full
+DSP journal remains byte-identical. Why the ordinary lifecycle re-enters the
+condition,and how an RF-selective source changes that lifecycle,remain open;
+do not skip the second set or force a pending-page drain.
+
 The next question is which ordinary procedure/input brings this continuation
 to its pending-page drain,and why the current lifecycle does not do so. Do not
 inject083e again or clear the context byte. Broad heap watches used to locate

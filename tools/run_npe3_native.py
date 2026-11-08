@@ -326,11 +326,12 @@ def main():
                         from tools.npe3_raw_ua_check import check_paging_fill
                         addressed=None
                         if args.page_at is not None:
-                            from tools.npe3_addressed_page_check import check as check_page,check_mcu_admission,check_rr_delivery,check_controller
+                            from tools.npe3_addressed_page_check import check as check_page,check_mcu_admission,check_rr_delivery,check_controller,check_controller_lifecycle
                             report['addressed_page']=check_page(text,args.page_at)
                             report['paging_admission']=check_mcu_admission(text,report['addressed_page'])
                             report['paging_delivery']=check_rr_delivery(text,report['addressed_page'])
                             report['paging_controller']=check_controller(text,report['addressed_page'],flash)
+                            report['paging_controller_lifecycle']=check_controller_lifecycle(text,report['addressed_page'],flash)
                             addressed=bytes.fromhex(report['addressed_page']['octets'])
                             print(f"Native6210 addressed page: air_blocks={report['addressed_page']['observed_air_blocks']} native_decodes={report['addressed_page']['native_publications']}; stable_camping=0")
                         report['paging_fill']=check_paging_fill(text,report['raw_release']['common_configuration_time'],addressed_octets=addressed)
