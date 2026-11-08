@@ -33,6 +33,25 @@ correctness or current CPU-coverage claim. Imported interrupt masks can change
 reachability without establishing a legitimate hardware reset state; the loader
 document owns that provenance contract.
 
+### Circular memory logic
+
+AND/OR/XOR Smem now admit the existing DAGEN circular modesC0..DF for
+ordinary RAM, including the pipelined single-repeat path. Address calculation,
+postmodify and the retained Read operand use the same stage-owned path as
+the previously admitted forms; no handset address or result is special-cased.
+Circular mapped/peripheral sources below60 still reject before a read or
+pointer update. Indexed/reverse-carry modes98..BF are not admitted by this
+change.
+
+`circular_memory_logic` fails on the old decoder and passes84 cases/replays:
+72 positives cover all three operations,A/B,four circular updates and
+single/RPT/RPTB execution with sizes1/7/16,wraps,ordered RAM reads,pointer
+and status preservation and a following register write. Twelve negatives
+retain the mapped-source boundary. Existing memory_logic252,long_memory_logic9408
+and repeated circular arithmetic controls remain separate regressions.
+The tests do not establish physical issue timing or untested peripheral
+semantics.
+
 ### Host execution cost
 
 The staged frontend shares immutable opcode-property and compact descriptor

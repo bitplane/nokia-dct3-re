@@ -2836,6 +2836,10 @@ void tms320c54x_device::pipeline_step()
 		{
 			logerror("%s: staged indexed/circular LD mapped/peripheral source is unsupported\n", machine().describe_context()); m_illegal = true; return;
 		}
+		if (staged_memory_logic(m_pipeline_word[3]) && mode >= 0xc0 && mode < 0xe0 && m_pipeline_operand_address[3] < 0x60)
+		{
+			logerror("%s: staged circular logical mapped/peripheral source is unsupported\n", machine().describe_context()); m_illegal = true; return;
+		}
 		if ((m_pipeline_word[3] & 0xfe00) == 0x1400 && m_pipeline_operand_address[3] < 0x60)
 		{
 			logerror("%s: staged TS load mapped/peripheral source is unsupported instruction=%06x word=%04x source=%04x\n", machine().describe_context(), unsigned(m_pipeline_address[3]), m_pipeline_word[3], m_pipeline_operand_address[3]);

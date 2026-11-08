@@ -1,5 +1,6 @@
 {
   "scripted_io": 4,
+  "circular_memory_logic": 84,
   "repeated_accumulator_add": 96,
   "repeated_circular_add": 64,
   "circular_mvkd": 64,

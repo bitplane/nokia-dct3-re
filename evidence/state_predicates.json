@@ -3,6 +3,14 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "c54x_circular_memory_logic",
+      "owner": "tms320c54x_generic_cpu",
+      "status": "satisfied",
+      "predicate": "Circular RAM AND/OR/XOR use retained Read operands and DAGEN postmodify in single,RPT and block-repeat execution",
+      "current": "The generic section fails before admission and passes84 cases/replays afterward. Seventy-two positives cover all three operations,A/B,four circular update modes,single/RPT/RPTB,buffer sizes1/7/16,wraps,ordered reads,live accumulator feedback,flags and continuation. Twelve negatives reject mapped/peripheral sources below60 before data effects. Existing252 memory-logic and9408 long-memory-logic cases/replays pass. Only opcode admission and a mapped-source guard change;ordinary stage-owned address/Read/Execute logic is reused. Indexed/reverse-carry modes98..BF and physical timing are not qualified. The triggering native OR1ada at34a4 is an observed consumer,not an address in CPU logic.",
+      "evidence": ["cpu/tms320c54x/tms320c54x_decode.h", "cpu/tms320c54x/tms320c54x.cpp", "tests/c54x/sections/circular_memory_logic.h", "fixtures/c54x_sections.json", "docs/c54x_execution_contracts.md"]
+    },
+    {
       "id": "npe3_synthetic_initial_record_validations",
       "owner": "native_rom6_record_contract",
       "status": "satisfied",

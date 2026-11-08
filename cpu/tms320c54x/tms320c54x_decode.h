@@ -191,7 +191,8 @@ constexpr bool decode_staged_pipelined_repeat(u16 word)
 	bool const short_add = (word & 0xfe00) == 0 &&
 		(u8(word) < 0x98 || (u8(word) >= 0xc0 && u8(word) < 0xe0));
 	bool const shifted_circular_add = (word & 0xfc00) == 0x3c00 && u8(word) >= 0xc0 && u8(word) < 0xe0;
-	bool const short_logic = ((word & 0xfe00) == 0x1800 || (word & 0xfe00) == 0x1a00 || (word & 0xfe00) == 0x1c00) && u8(word) < 0x98;
+	bool const short_logic = ((word & 0xfe00) == 0x1800 || (word & 0xfe00) == 0x1a00 || (word & 0xfe00) == 0x1c00) &&
+		(u8(word) < 0x98 || (u8(word) >= 0xc0 && u8(word) < 0xe0));
 	bool const coefficient_repeat = staged_firs(word) || (staged_coefficient_mac(word) && !BIT(word, 9) && u8(word) < 0xe0);
 	// SFTL consumes the live accumulator in Execute, once per retained issue.
 	bool const logical_shift = (word & 0xfce0) == 0xf0e0;
@@ -582,7 +583,8 @@ constexpr bool decode_staged_block_repeat(u16 word)
 
 constexpr bool decode_staged_memory_logic(u16 word)
 {
-	return ((word & 0xfe00) == 0x1800 || (word & 0xfe00) == 0x1a00 || (word & 0xfe00) == 0x1c00) && (u8(word) < 0x98 || (u8(word) >= 0xe0 && u8(word) <= 0xf8));
+	return ((word & 0xfe00) == 0x1800 || (word & 0xfe00) == 0x1a00 || (word & 0xfe00) == 0x1c00) &&
+		(u8(word) < 0x98 || (u8(word) >= 0xc0 && u8(word) <= 0xf8));
 }
 
 constexpr bool staged_accumulator_logic(u16 word)
