@@ -51,8 +51,10 @@ cycle and final reread. Its24s gate additionally checks48 normal port bursts
 as12 convolution/FIRE-valid xCCH blocks,including the exact MCU SABM/LU.
 The combined-CCCH laboratory BTS derives UA from those timed bits,returns
 raw dedicated I/Q,and the native class80 receiver publishes the exact UA
-successfully. MCU link completion and Location Updating remain unqualified;
-see the [raw-UA boundary](rom6_rf_interface.md#native-raw-contention-resolution-ua).
+successfully. Raw Location Updating Accept is decoded and acknowledged by
+native uplink RR;the fresh SIM persists updated test-cell EF_LOCI.
+Normal channel release and stable camping/operator presentation remain open;
+see the [native MM boundary](rom6_rf_interface.md#native-location-updating-acceptance).
 The explicit 13 MHz DSP clock is provisional (the manual establishes RFIclk,
 not the DSP multiplier). A longer run requests MCU software reset near
 32 seconds, despite successful initial port-36 request completion. Timer input

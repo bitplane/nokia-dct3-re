@@ -122,6 +122,7 @@ void dct3_rf_adc_fixture_state::machine_start()
 	save_item(NAME(m_normal_count));save_item(NAME(m_normal_bits));
 	save_item(NAME(m_contention_sabm));save_item(NAME(m_contention_active));
 	save_item(NAME(m_ua_samples));
+	save_item(NAME(m_lu_start_frame));save_item(NAME(m_lu_samples));
 	save_item(NAME(m_lab_tx_compares));
 	save_item(NAME(m_lab_tx.words)); save_item(NAME(m_lab_tx.count));
 	save_item(NAME(m_lab_tx.loading)); save_item(NAME(m_lab_tx.ready)); save_item(NAME(m_lab_tx.overflow));
@@ -157,6 +158,7 @@ void dct3_rf_adc_fixture_state::machine_reset()
 	m_lab_tx_compares.fill(0);
 	m_agch_start_frame=~u64(0);
 	m_normal_start_frame=m_ua_start_frame=~u64(0);
+	m_lu_start_frame=~u64(0);
 	m_normal_count=0;m_contention_active=false;
 	m_lab_tx.reset();
 	m_observed_tx_windows=m_transmit_releases=0;
@@ -366,6 +368,25 @@ void dct3_rf_adc_fixture_state::receive_normal_uplink(std::array<u16,15> const &
 	for (auto byte:*ua) packed+=util::string_format("%02x",byte);
 	machine().logerror("npe3_raw_ua: uplink_start_frame=%u start_frame=%u octets=%s raw_adc_only=1 physical_claim=0\n",
 		unsigned(m_normal_start_frame),unsigned(m_ua_start_frame),packed);
+	// A declared plain laboratory registration policy,not an authentication
+	// verdict supplied to the handset. Derive identity only from air L3.
+	unsigned const length=(*block)[2]>>2;
+	auto const *request=block->data()+3;
+	if (length==18 && request[0]==5 && request[1]==8 && request[9]==8 && (request[10]&7)==1)
+	{
+		auto const accept=subdevice<nokia_gsm_network_device>("gsm_network")->location_update_accept(request,length,35);
+		gsm::tch_f::packed_control_block lapdm{};
+		lapdm.fill(0x2b);
+		lapdm[0]=3;lapdm[1]=0;lapdm[2]=(accept.size()<<2)|1;
+		std::copy(accept.begin(),accept.end(),lapdm.begin()+3);
+		m_lu_start_frame=m_ua_start_frame+51;
+		auto const accept_bursts=nokia_rf_lab::bcch_bits(lapdm,0);
+		for (unsigned at=0;at<4;++at) m_lu_samples[at]=nokia_rf_lab::gmsk_samples(accept_bursts[at]);
+		packed.clear();
+		for (auto byte:lapdm) packed+=util::string_format("%02x",byte);
+		machine().logerror("npe3_raw_lu_accept: uplink_start_frame=%u start_frame=%u octets=%s policy=plain_test_cell raw_adc_only=1 physical_claim=0\n",
+			unsigned(m_normal_start_frame),unsigned(m_lu_start_frame),packed);
+	}
 }
 
 TIMER_CALLBACK_MEMBER(dct3_rf_adc_fixture_state::candidate_receive_start)
@@ -396,6 +417,12 @@ u16 dct3_rf_adc_fixture_state::sample_r(offs_t component)
 	if (component) return u16(m_q_latch);
 	u64 const tick = machine().time().as_ticks(13'000'000);
 	u64 const frame=tick/60'000;
+	if (m_raw_agch && frame>=m_lu_start_frame && frame-m_lu_start_frame<4 && tick%60'000<148*48)
+	{
+		auto const &sample=m_lu_samples[frame-m_lu_start_frame][(tick%60'000)/12];
+		m_q_latch=sample[1];
+		return u16(sample[0]);
+	}
 	if (m_raw_agch && frame>=m_ua_start_frame && frame-m_ua_start_frame<4 && tick%60'000<148*48)
 	{
 		auto const &sample=m_ua_samples[frame-m_ua_start_frame][(tick%60'000)/12];

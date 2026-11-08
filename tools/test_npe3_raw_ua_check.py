@@ -1,9 +1,29 @@
 import unittest
 from unittest.mock import patch
-from tools.npe3_raw_ua_check import check
+from tools.npe3_raw_ua_check import check,check_location_update
 
 
 class RawUaCheckTest(unittest.TestCase):
+    def test_lu_accept_binds_identity_native_decode_and_uplink_ack(self):
+        sabm='013f4905087000f000fffe330809101010325476982b2b'
+        accept='030045050200f1100001170809101010325476982b2b2b'
+        ua='npe3_raw_ua: uplink_start_frame=3403 start_frame=3439 octets=01734905087000f000fffe330809101010325476982b2b raw_adc_only=1 physical_claim=0\n'
+        lu=f'npe3_raw_lu_accept: uplink_start_frame=3403 start_frame=3490 octets={accept} policy=plain_test_cell raw_adc_only=1 physical_claim=0'
+        blocks=[dict(start_frame=3403,octets=sabm),dict(start_frame=3505,octets='032101'+'2b'*20)]
+        packet=dict(type=128,payload='802a00'+(3493).to_bytes(3,'big').hex()+'0023fffe'+accept,time='16.2')
+        with patch('tools.npe3_raw_ua_check.check_rx_publications',return_value=dict(packets=[packet])):
+            report=check_location_update(ua+lu,blocks)
+            self.assertTrue(report['native_lapdm_ack_qualified'])
+            self.assertFalse(report['mm_registration_qualified'])
+            for bad in (lu+ua,ua,ua+lu+lu,ua+lu.replace('3490','3491'),
+                        ua+lu.replace('091010','081010')):
+                with self.assertRaises(ValueError):check_location_update(bad,blocks)
+            with self.assertRaises(ValueError):check_location_update(ua+lu,blocks[:1])
+            with self.assertRaises(ValueError):check_location_update(ua+lu,[blocks[0],dict(blocks[1],octets='034101'+'2b'*20)])
+        for bad in ([],[packet,packet],[dict(packet,payload=packet['payload'].replace('802a00','802a01'))]):
+            with patch('tools.npe3_raw_ua_check.check_rx_publications',return_value=dict(packets=bad)):
+                with self.assertRaises(ValueError):check_location_update(ua+lu,blocks)
+
     def test_contention_reply_requires_independent_complete_uplink(self):
         sabm='013f4905087000f000fffe330809101010325476982b2b'
         ua='01734905087000f000fffe330809101010325476982b2b'

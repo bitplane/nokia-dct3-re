@@ -4,10 +4,15 @@ import sys
 from pathlib import Path
 
 from tools.run_npe3_native import (check_execution, check_input_start, expected_menu_digest,
-    ADC_P09_MENU_SHA256, ADC_BROADCAST_MENU_SHA256, ADC_SCH_MENU_SHA256)
+    ADC_P09_MENU_SHA256, ADC_BROADCAST_MENU_SHA256, ADC_SCH_MENU_SHA256,ADC_LU_MENU_SHA256)
 
 
 class Native6210EvidenceTest(unittest.TestCase):
+    def test_lu_oracle_is_explicit_and_other_compositions_remain_unchanged(self):
+        self.assertEqual(expected_menu_digest('fcch-sch-broadcast','p09',True),ADC_LU_MENU_SHA256)
+        for source,capture in (('silence','p09'),('fcch-sch','p09'),('fcch-sch-broadcast','immediate')):
+            with self.assertRaises(ValueError):expected_menu_digest(source,capture,True)
+
     def test_record_fixture_requires_explicit_raw_agch_profile(self):
         script=Path(__file__).with_name('run_npe3_native.py')
         result=subprocess.run([sys.executable,str(script),'--provision-records'],capture_output=True,text=True)

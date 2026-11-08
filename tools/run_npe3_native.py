@@ -16,10 +16,17 @@ ADC_SCH_MENU_SHA256 = '81b207e77820f80f4844daeeebdbd260c1f2590888de1d0274ac67f7d
 ADC_P09_MENU_SHA256 = '748bea6093d040edebd9141c371983ad858fe1744d6f28403bb6605b79cd8638'
 # Full-SI acquisition changes the envelope animation phase, not menu text.
 ADC_BROADCAST_MENU_SHA256 = '8c7650fdb0514ec34c85b89795e529de062e6f141268a507bafc7eb77370df65'
+# Reviewed raw LU-Accept run: only envelope animation pixels25..48,33..39
+# differ from the preceding raw-UA oracle. Ordinary profiles stay unchanged.
+ADC_LU_MENU_SHA256 = '5adef93609b763a40d0e3c9dca356d388a910bb393a518e99a53eec2c7184202'
 
 
-def expected_menu_digest(adc_source, capture_start):
+def expected_menu_digest(adc_source, capture_start, native_lu=False):
     from tools.run_noki6210_acceptance import MENU_SHA256
+    if native_lu:
+        if adc_source!='fcch-sch-broadcast' or capture_start!='p09':
+            raise ValueError('LU Menu oracle requires the explicit full-SI P09 fixture')
+        return ADC_LU_MENU_SHA256
     if adc_source and adc_source != 'silence' and capture_start == 'p09':
         return ADC_BROADCAST_MENU_SHA256 if adc_source == 'fcch-sch-broadcast' else ADC_P09_MENU_SHA256
     return ADC_SCH_MENU_SHA256 if adc_source == 'fcch-sch' else MENU_SHA256
@@ -171,7 +178,7 @@ def main():
         return directory, text
     first, text = execute('primary', args.scenario,
                           args.input_at + 10 if args.scenario == 'phonebook' else max(args.seconds, args.input_at + 4),
-                          args.scenario == 'phonebook')
+                          args.scenario == 'phonebook' or args.provision_records)
     if args.scenario == 'phonebook':
         from PIL import Image
         from tools.run_noki6210_acceptance import check_phonebook
@@ -193,7 +200,7 @@ def main():
             raise ValueError('native 6210 physical Menu was not decoded')
         check_input_start(text, 'npe3_native_physical: key=Menu', args.input_at)
         with Image.open(first/'snap/npe3_after_menu.png') as frame:
-            digest = expected_menu_digest(args.adc_source, args.capture_start)
+            digest = expected_menu_digest(args.adc_source, args.capture_start,args.provision_records)
             check_frame(frame, digest, 'native 6210 Messages menu')
         print('Native6210 Menu: PASS bounded native boot and physical input')
     if args.radio:
@@ -289,6 +296,16 @@ def main():
                         from tools.npe3_raw_ua_check import check as check_ua
                         report['raw_ua']=check_ua(text,report['native_access']['normal_control_blocks'])
                         print('Native6210 raw UA: PASS native dedicated decode; registration=0')
+                        from tools.npe3_raw_ua_check import check_location_update
+                        report['raw_lu_accept']=check_location_update(text,report['native_access']['normal_control_blocks'])
+                        from tools.sim_phonebook_check import ADN_LENGTH
+                        card=(storage/'sim_card').read_bytes()
+                        if len(card)<ADN_LENGTH+11:raise ValueError('missing complete retained SIM location record')
+                        report['sim_location_after_lu']=card[ADN_LENGTH:ADN_LENGTH+11].hex()
+                        if report['sim_location_after_lu']!='ffffffff00f1100001ff00':
+                            raise ValueError('native MM did not persist updated test-cell EF_LOCI')
+                        report['raw_lu_accept']['native_mm_acceptance_qualified']=True
+                        print('Native6210 raw LU Accept: PASS native decode, timed uplink RR and updated SIM_LOCI='+report['sim_location_after_lu']+'; stable_camping=0')
                     print(f"Native6210 raw AGCH: PASS native_decodes={report['raw_agch']['responses']}; tuned_air_source=0 registration=0")
                     print('Native6210 assigned SDCCH: PASS MCU SABM/Location Updating submission; native_transmission=0 registration=0')
                 elif 'npe3_raw_agch:' in text:

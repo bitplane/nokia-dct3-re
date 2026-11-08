@@ -46,7 +46,10 @@ SDCCH and submit SABM/Location Updating. With the explicit synthetic record
 family,the native P27 stream now contains independently valid xCCH blocks,
 including that exact SABM. An external exact normal-burst decoder now
 returns contention-resolution UA as raw I/Q;the native dedicated receiver
-publishes the matching successful class80 result. The acquired PMM still parks at the validation
+publishes the matching successful class80 result. Raw Location Updating
+Accept also reaches the native receiver;the MCU acknowledges it and persists
+updated test-cell EF_LOCI. Normal channel release and stable camping remain
+open. The acquired PMM still parks at the validation
 gate,described below. These laboratory
 results do not retire the physical request/acknowledgement or tuning contract.
 
@@ -60,7 +63,7 @@ results do not retire the physical request/acknowledgement or tuning contract.
 | Own 6210 full-SI candidate | Legal 24-second physical Menu, SI1..SI4 native decoding, MCU availability `0f`, observed success return, organic IDLE_RA/RA_INFO and independently checked P21/P27 access bits | Physical release timing/access grant, camping, registration and fitted timing/tuning |
 | Own 6210 P05-start candidate | Complete native buffers clocked at the projected P05 matches; same receive/UI checks and exact port-word preservation | Physical pin/timing identity, external network decode/AGCH, camping and registration |
 | Own 6210 raw-AGCH candidate | Exact successful native assignment decode; MCU assigned-SDCCH configuration and SABM containing Location Updating Request | Native dedicated transmission, validation-gate completion, camping/registration and physical timing/tuning |
-| Synthetic-record raw-AGCH run | Ten-slot validation cycle plus final reread; no validation-error writes;combined CCCH;48 normal bursts decode to12 exact xCCH blocks;raw contention-resolution UA reaches successful native dedicated RX | MCU link-establishment completion,completed Location Updating and physical timing/tuning |
+| Synthetic-record raw-AGCH run | Ten-slot validation cycle;combined CCCH;48 normal bursts/12 exact xCCH blocks;raw UA and LU Accept reach native RX;native RR acknowledges and SIM EF_LOCI becomes updated | Normal network release,stable camping/operator presentation and physical timing/tuning |
 
 The CPU additions needed by the normal-burst frontend have generic focused
 tests. The rebuilt native ROM6 menu/storage/save-state scenarios, ROM4
@@ -347,11 +350,38 @@ and echo,and requires a unique successful native publication. Native uplink
 then contains idle UI rather than SABM retries;48 normal bursts form12
 valid xCCH blocks. UI/Menu,complete record validation and legal execution
 remain intact. This proves dedicated native reception,not MCU link completion
-or Location Updating. The MCU submits idle UI at16.158123769s and later
-reconfigures common control at17.632165538s;the laboratory BTS supplies
-neither SACCH system information nor Location Updating Accept yet. The next
-boundary is to identify the MCU link-completion/release contract and carry
-the corresponding standards-derived network L3/SACCH exchanges over raw I/Q.
+or Location Updating by itself. The UA-only control submits idle UI at
+16.158123769s and later reconfigures common control at17.632165538s.
+
+### Native Location Updating acceptance
+
+The explicit test-cell policy sends plain,unciphered Location Updating Accept
+after UA,using the existing network message builder and only the decoded
+air-interface request as subscriber input. Authentication/ciphering are not
+claimed. The IMSI is echoed as a Mobile Identity IE,with advertised
+PLMN001-01/LAC1. This follows
+[TS24.008 sections4.4.4.3,4.4.4.6 and9.2.13](https://www.etsi.org/deliver/etsi_ts/124000_124099/124008/03.20.00_60/ts_124008v032000p.pdf).
+LAPDm is a BS command,I-frame N(S)=0/N(R)=0;the first next SDCCH/4 block
+after UA carries
+`030045050200f1100001170809101010325476982b2b2b`
+at3541..3544. Native class80 publishes the exact block at16.359095143s;
+the MCU submits RR `032101` at16.393637846s and the timed native uplink
+3556..3559 independently decodes to that acknowledgement.
+
+The fresh fixture directory contains no pre-seeded SIM file. Its saved
+EF_LOCI changes from the card's unregistered initialization to
+`ffffffff00f1100001ff00`:no allocated TMSI,advertised LAI,and update status00.
+The runner retains fixture storage,checks this exact record,and leaves all
+acquired ROM/PMM files untouched. This qualifies native MM acceptance and
+SIM persistence,not stable camping or a completed normal release. The MCU
+still returns to common control without a network RR Channel Release;SACCH
+system information is also absent. These are the next bounded contracts.
+
+The Messages Menu oracle is deliberately re-banked only for the provisioned
+LU composition. The reviewed raw pixel hash is
+`5adef93609b763a40d0e3c9dca356d388a910bb393a518e99a53eec2c7184202`;
+comparison with the preceding UA frame changes only envelope-animation
+pixels25..48,33..39. Ordinary native and no-reply profile hashes are unchanged.
 
 ```sh
 .venv/bin/python tools/run_npe3_native.py --reference-clock --seconds 24 --adc-source fcch-sch-broadcast --capture-start p09 --tx-release p05 --raw-agch --provision-records
