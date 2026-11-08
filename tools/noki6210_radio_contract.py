@@ -1,6 +1,42 @@
 """Pin NPE-3's own acquisition RX routing and channel correlation."""
 import hashlib
 from capstone import Cs, CS_ARCH_ARM, CS_MODE_THUMB, CS_MODE_BIG_ENDIAN
+from capstone.arm import ARM_OP_IMM, ARM_OP_REG, ARM_REG_R0
+
+
+def broadcast_type_targets(image):
+    """Execute all64 masked type inputs through the actual subtract cascade."""
+    decoder=Cs(CS_ARCH_ARM,CS_MODE_THUMB|CS_MODE_BIG_ENDIAN)
+    decoder.detail=True
+    start,end=0x3b9ea4,0x3b9ece
+    code={ins.address:ins for ins in decoder.disasm(image[start-0x200000:end-0x200000],start)}
+    result={}
+    for kind in range(64):
+        pc,value,z,c=start,kind,False,False
+        for _ in range(64):
+            if pc not in code:
+                result[kind]=pc
+                break
+            ins=code[pc]
+            ops=ins.operands
+            if ins.mnemonic in ('subs','cmp'):
+                if (ops[0].type!=ARM_OP_REG or ops[0].reg!=ARM_REG_R0 or ops[-1].type!=ARM_OP_IMM or
+                        len(ops)==3 and (ops[1].type!=ARM_OP_REG or ops[1].reg!=ARM_REG_R0)):
+                    raise ValueError('unsupported BCCH cascade operand')
+                immediate=ops[-1].imm
+                difference=(value-immediate)&0xffffffff
+                z,c=difference==0,value>=immediate
+                if ins.mnemonic=='subs': value=difference
+                pc+=ins.size
+            elif ins.mnemonic in ('b','beq','bne','bhi'):
+                taken={'b':True,'beq':z,'bne':not z,'bhi':c and not z}[ins.mnemonic]
+                pc=ops[0].imm if taken else pc+ins.size
+            else: raise ValueError('unsupported BCCH cascade instruction')
+        else: raise ValueError('BCCH cascade failed to terminate')
+    expected={2:0x3ba060,3:0x3ba060,0x19:0x3ba0c0,0x1a:0x3ba060,0x1b:0x3b9fd0,0x1c:0x3b9ed4}
+    if result!={kind:expected.get(kind,0x3ba13c) for kind in range(64)}:
+        raise ValueError('own complete BCCH type dispatch differs')
+    return result
 
 
 def verify(image):
@@ -50,6 +86,10 @@ def verify(image):
         0x3ba73c: ('cmp', 'r1, #0x50'),
         0x3ba75e: ('bl', '#0x3b9e34'),
         0x3b9e34: ('push', '{r4, r5, r6, r7, lr}'),
+        0x3b9fd0: ('movs', 'r0, #5'),
+        0x3b9ff2: ('movs', 'r0, #0x1b'),
+        0x3b9ff4: ('bl', '#0x3b9598'),
+        0x3b9614: ('b', '#0x3b9764'),
         0x3ba0c0: ('adds', 'r1, r5, #3'),
         0x3ba0c4: ('bl', '#0x3b9388'),
         0x3ba0d0: ('movs', 'r0, #0x19'),
@@ -540,10 +580,13 @@ def verify(image):
             raise ValueError(f'own selection literal differs at {address:x}')
     if read(0x3f25ac, 4) != bytes.fromhex('002819a9') or read(0x2819a9, 3) != bytes([5, 3, 3]):
         raise ValueError('own type-57 selector-3 mapping differs')
+    targets=broadcast_type_targets(image)
     return {'rx_table': '4f6078', 'type_8b_handler': '45835c',
             'bcch_status': '0800', 'bcch_destination_task': 18,
-            'bcch_object_consumer': '3b9302', 'si3_parser': '43f074',
-            'si3_publication_status': '03f8', 'si3_publication_task': 14,
+            'bcch_object_consumer': '3b9302', 'si1_parser': '43f074',
+            'si1_type_handler': '3ba0c0', 'si3_type_handler': '3b9fd0',
+            'si3_field_parser': '3b9764', 'bcch_type_inputs_checked': len(targets),
+            'bcch_publication_status': '03f8', 'bcch_publication_task': 14,
             'selection_tx_writer': '426a3c',
             'selection_tx_ring': '10000',
             'selection_tx_write_index': '100a4',

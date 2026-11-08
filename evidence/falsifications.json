@@ -3,6 +3,13 @@
   "kind": "falsifications",
   "entries": [
     {
+      "id": "npe3_native_si3_fails_mcu_header_admission",
+      "status": "disproven",
+      "hypothesis": "Native status-zero SI3 blocks fail MCU channel/header admission because they never reach3ba0c0",
+      "conclusion": "The independently executed64-input masked-type cascade proves3ba0c0 owns type19(SI1),not type1b(SI3). SI3 selects3b9fd0 and operation1b field parser3b9764. The native raw-BCCH trace admits channel50 and exact49061b... bytes, reaches both mandatory field-reader success tails3b9fe0/3b9ff0 and the first operation-success tail3ba002 with result1. Missing3ba0c0 is expected for this repeated-SI3 source;it is not evidence of missing hardware delivery or header rejection. The older43f074 parser closure is SI1-scoped. Complete broadcast acquisition and camping remain unproved.",
+      "evidence": ["tools/noki6210_radio_contract.py", "tools/test_noki6210_radio_contract.py", "tools/noki6210_plmn_observe.lua", "docs/6210_bringup.md"]
+    },
+    {
       "id": "npe3_p09_start_96_word_staging_is_transport_complete",
       "status": "disproven",
       "hypothesis": "Whole-sequence P09-start capture with inherited96-word staging and per-produced-block interrupt pulses is sufficient for lossless native6210 receive operation for both coded and zero ADC sources",

@@ -3,6 +3,14 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "npe3_native_mcu_si3_admission",
+      "owner": "native_rom6_reference_adc_laboratory",
+      "status": "satisfied",
+      "predicate": "The MCU admits raw-decoded native SI3 to its actual type1b field parser and accepts the first operation",
+      "current": "The bounded native trace sees exact24-byte copied buffer49061b000100f11000014000000000000000002b2b2b2b22,channel50,and header checks3b9e84/3b9e98. Real SI3 handler3b9fd0 reaches mandatory reader returns3b9fe0/3b9ff0 with1,field parser3b9764,and first operation-success branch3ba002 with1. Final22 is outside the23-byte block,not a changed SI3 octet. Static enumeration covers64/64 masked types and distinguishes SI1(type19)->3ba0c0/43f074 from SI3(type1b)->3b9fd0/3b9764. Changed-cascade unit control rejects. This qualifies MCU SI3 admission,not full broadcast acquisition,camping or registration.",
+      "evidence": ["tools/noki6210_plmn_observe.lua", "tools/noki6210_radio_contract.py", "tools/test_noki6210_radio_contract.py", "docs/6210_bringup.md"]
+    },
+    {
       "id": "npe3_native_laboratory_bcch_decode",
       "owner": "native_rom6_reference_adc_laboratory",
       "status": "satisfied",

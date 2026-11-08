@@ -735,18 +735,20 @@ object's status to `0800` and posts it to task 18 at `457f70`. Both fresh
 controls observe object `105cec`, caller `457f75`, at 6.773790308 seconds;
 the same object's `0800` header is read by `3b9302` at trace PC `3b9308`.
 That helper caches the object at context offset `1c`. Its caller `3ba706`
-has a state-2/channel-50 path into BCCH decoder `3b9e34`; SI3 chooses
-`3ba0c0`, then operation `19` in `3b9598` reaches parser `43f074`.
+has a state-2/channel-50 path into BCCH decoder `3b9e34`. The complete
+64-input masked-type census maps SI1 (`19`) to `3ba0c0`, then operation `19`
+in `3b9598` reaches parser `43f074`. SI3 (`1b`) instead selects `3b9fd0`,
+operation `1b`, and field parser `3b9764`.
 These static branches are pinned by `noki6210_radio_contract.py`, not all
 asserted as executed by the header-read probe. Object reuse after reception
 must not be interpreted as continued ownership by the original message.
 Evidence: `tmp/6210-plmn-consumer-{national,international}/error.log.gz`.
-In paired fresh 25-second observations, the first SI3 reaches `3ba0c0` in context
+In paired fresh 25-second observations, the SI1 route reaches `3ba0c0` in context
 state 2 with flags `0e`. Both return 1 from `43f074` at `3b9a72`, take
 the success branch `3b9a82`, and return 1 from the enclosing operation at
 `3ba0d6`. The national control subsequently gets Location Updating acceptance;
 the international control does not emit random access. Thus rejection at
-these sampled parser return boundaries is excluded, not all PLMN validation
+these sampled SI1 parser return boundaries is excluded, not SI3 parsing or all PLMN validation
 or all state-machine branches. Evidence:
 `tmp/6210-plmn-parser-{national,international}/error.log.gz`.
 The compact passive probe is `tools/noki6210_plmn_observe.lua`, scoped to
@@ -2901,12 +2903,15 @@ in the 224-bit input. The FIRE model remains a functional zero-syndrome
 subset, not measured timing or error correction.
 
 The next boundary is MCU consumption and complete broadcast acquisition:
-the bounded native eight-second trace reaches its own BCCH consumer `3b9e34`
-for the successful blocks, in context state 2, but does not observe the mapped
-SI3 branch `3ba0c0`. Delivery to that consumer is therefore not the missing
-boundary. Audit its channel/header admission before attributing the return
-to scanning solely to the incomplete SI schedule. Then establish the missing
-SI request/schedule and provide standards-derived raw broadcasts. No decoded messages, firmware
+the native consumer admits the exact SI3 bytes on channel `50`, in context
+state 2. Its real SI3 handler `3b9fd0` reaches both mandatory field-reader
+success tails (`3b9fe0`, `3b9ff0`), field parser `3b9764`, and first successful
+operation return `3ba002` with result 1. The absence of `3ba0c0` is expected:
+that is the SI1 handler, not SI3. `noki6210_radio_contract.py` independently
+enumerates all 64 masked types through the actual subtract cascade to guard
+this ownership distinction. Neither delivery nor SI3 header admission is
+the missing boundary. Establish the missing SI request/schedule and provide
+standards-derived raw broadcasts. No decoded messages, firmware
 fields, carrier selection or registration verdict are supplied. Existing
 SCH-only and zero-source profiles remain distinct controls.
 
