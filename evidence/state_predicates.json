@@ -3,6 +3,14 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "c54x_stlm_direct_low_ram",
+      "owner": "tms320c54x_generic_cpu",
+      "status": "satisfied",
+      "predicate": "Direct STLM reaches ordinary low RAM0060..007f with its existing store timing and DP/CPL-independent addressing",
+      "current": "Sixteen cases plus replay fail before admission and pass afterward: both range endpoints,A/B sources,CPL off/on with nonzero DP,and two program pages. One exact-address bus write,unchanged accumulators/status/SP and retained RAM are required. Existing peripheral and register STLM controls remain separate. Acquired own6210 upload uses8960 at17c9 to store B to scratch0060; no handset address is in the CPU admission. Indirect non-AR destinations,new saturation modes and repeat/control compositions are not newly qualified.",
+      "evidence": ["cpu/tms320c54x/tms320c54x_decode.h", "tests/c54x/sections/stlm_low_ram.h", "fixtures/c54x_sections.json", "docs/c54x_execution_contracts.md"]
+    },
+    {
       "id": "c54x_conditional_return_inside_repeat_block",
       "owner": "tms320c54x_generic_cpu",
       "status": "satisfied",

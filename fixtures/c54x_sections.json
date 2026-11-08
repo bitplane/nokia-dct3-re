@@ -27,6 +27,7 @@
   "stlm_address": 256,
   "stlm_peripheral": 64,
   "stlm_register": 896,
+  "stlm_low_ram": 16,
   "byte_swap": 512,
   "block_swap": 1048,
   "block_edges": 16,

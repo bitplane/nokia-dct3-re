@@ -1624,6 +1624,21 @@ they do not newly qualify saturation modes, indirect accumulator destinations
 or control/repeat/interrupt compositions. The NSM-3 witness is `STLM A,AH`
 at resident `5c76` (`8809`).
 
+### Direct STLM low-RAM destinations
+
+Direct STLM also addresses ordinary low RAM `0060..007f`; this uses the
+existing Execute-owned store and seven-bit MMR addressing, not the current
+DP/CPL-selected data page. The admission adds no peripheral behavior or
+second arithmetic implementation. Indirect non-AR destinations and new
+repeat/control compositions remain unqualified.
+
+`stlm_low_ram` checks 16 cases plus replay: both range endpoints, A/B sources,
+DP nonzero with CPL off/on, and two program pages. It requires exactly one
+correct-address bus write, unchanged accumulators/status/SP and retained RAM.
+The test fails before admission. Existing register and peripheral STLM tests
+remain separate controls. The acquired own-upload ROM6 witness at `17c9`
+stores B to scratch word `0060`; the generic CPU does not special-case it.
+
 ### Signed MAC/MAS with a BK operand
 
 `memory_mac` owns 15,616 cases/replays across MAC/MACR/MAS/MASR,
