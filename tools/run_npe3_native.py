@@ -224,6 +224,11 @@ def main():
         if args.page_at is not None:
             from tools.npe3_native_paging_response_check import check as check_native_page_response
             report['paging_response']=check_native_page_response(text,(first/'rom6_radio_writes.tsv').read_text())
+            from tools.npe3_rach_transmit_check import check as check_access
+            from tools.npe3_raw_ua_check import check as check_ua
+            access=check_access(text,(first/'rom6_radio_writes.tsv').read_text(),
+                                require_windows=True,require_releases=True,allow_normal=True)
+            report['raw_ua']=check_ua(text,access['normal_control_blocks'])
             print('Native6210 cell33: PASS native Paging Response from timed port bits; stable_camping=0 calls=0')
         (run/'cell-power-experiment.json').write_text(json.dumps(report,indent=2)+'\n')
         print('Native6210 cell-power experiment captured; other radio/UI outcomes remain unqualified')

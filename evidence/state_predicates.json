@@ -3,6 +3,14 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "npe3_native_paging_response_link",
+      "owner": "native_rom6_reference_adc_laboratory",
+      "status": "satisfied",
+      "predicate": "The second native SABM receives its own raw contention UA after the prior link disconnects",
+      "current": "The lab BTS releases contention ownership on independently decoded DISC. In the fresh33dBm capture,LU SABM2740 receives UA2776 and Paging Response SABM4066 receives UA4102. Native class80 successful decode times are12.828335055 and18.948326396. The independent checker reconstructs both echoes from actual convolution/FIRE-valid timed uplinks and requires both native publications. A two-link unit fixture rejects a different SABM without intervening DISC. No new LU Accept is sent for RR Paging Response. MM/CC setup,stable camping,fitted RF tuning and speech remain unqualified;the next work is network signalling over the established link.",
+      "evidence": ["driver/nokia_dct3_research.cpp", "tools/npe3_raw_ua_check.py", "tools/test_npe3_raw_ua_check.py", "tools/run_npe3_native.py", "docs/rom6_rf_interface.md"]
+    },
+    {
       "id": "npe3_native_paging_response",
       "owner": "native_rom6_reference_adc_laboratory",
       "status": "satisfied",

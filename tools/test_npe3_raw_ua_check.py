@@ -4,6 +4,26 @@ from tools.npe3_raw_ua_check import check,check_location_update,check_release,ch
 
 
 class RawUaCheckTest(unittest.TestCase):
+    def test_disconnect_releases_contention_for_a_different_initial_message(self):
+        first='013f4905087000f000fffe330809101010325476982b2b'
+        second='013f41062707033319810809101010325476982b2b2b2b'
+        disc='015301'+'2b'*20
+        def capture(with_disc):
+            blocks=[dict(start_frame=3403,octets=first)]
+            if with_disc:blocks.append(dict(start_frame=3454,octets=disc))
+            blocks.append(dict(start_frame=3505,octets=second))
+            text=''
+            for block in blocks:
+                frame=block['start_frame'];data=block['octets']
+                text+=f'npe3_bts_uplink: start_frame={frame} octets={data} exact_code=1 port_bits_only=1 physical_claim=0\n'
+                if data!=disc:
+                    reply='0173'+data[4:]
+                    start=((frame+3)//51+1)*51+22
+                    text+=f'npe3_raw_ua: uplink_start_frame={frame} start_frame={start} octets={reply} raw_adc_only=1 physical_claim=0\n'
+            return text,blocks
+        self.assertEqual(check(*capture(True),require_native=False)['raw_ua_schedules'],2)
+        with self.assertRaises(ValueError):check(*capture(False),require_native=False)
+
     def test_paging_fill_requires_native_post_release_reception_but_not_fitted_carrier(self):
         fill='1506210001f0'+'2b'*17
         text=f'npe3_bts_pch: starts=6,12,16 octets={fill} tsc=2 no_identity=1 raw_adc_only=1 physical_claim=0'

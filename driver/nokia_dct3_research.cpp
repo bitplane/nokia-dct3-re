@@ -448,6 +448,9 @@ void dct3_rf_adc_fixture_state::receive_normal_uplink(std::array<u16,15> const &
 		auto const ua=gsm::normal::disconnect_ua(*block);
 		if (ua)
 		{
+			// DISC ends this LAPDm contention context; a subsequent access may
+			// establish a new link with different initial information.
+			m_contention_active=false;
 			m_ua_start_frame=(frame/51+1)*51+22;
 			m_page_not_before=m_ua_start_frame+4;
 			auto const bursts=nokia_rf_lab::bcch_bits(*ua,0);

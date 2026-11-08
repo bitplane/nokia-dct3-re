@@ -22,6 +22,9 @@ def check(text,blocks,*,require_native=True):
     identity=None
     for row in uplinks:
         data=bytes.fromhex(row[2]);length=data[2]>>2
+        if data[:3]==b'\x01\x53\x01':
+            identity=None
+            continue
         if data[0:2]!=b'\x01\x3f' or data[2]&3!=1 or not 1<=length<=20:continue
         request=data[2:3+length]
         if identity is not None and request!=identity:continue

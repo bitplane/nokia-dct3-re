@@ -628,9 +628,13 @@ assignment,native page decode and convolution/FIRE-valid response. The
 fresh39dBm control preserves its complete DSP journal SHA256
 `e6f4b9c05d50f08663cc7cbc7fc1c5166a51b1d84c805dd43573c0dbd9118074`.
 Neither fixture identifies fitted RF tuning or proves stable camping/calls.
-The next boundary is closing the new LAPDm link:the laboratory BTS still
-retains the previous LU contention identity after DISC and rejects the
-different Paging Response SABM. Do not
+DISC now releases the laboratory BTS's prior contention identity. The fresh
+capture receives an independently checked echoed UA for the Paging Response
+at4102;native successful decode is18.948326396s. The earlier LU UA remains
+at2776 (12.828335055s). The checker permits a different initial message only
+after actual timed DISC;without DISC its negative fixture rejects it.
+The next boundary is network MM/CC signalling on this established second
+LAPDm link,not another synthetic handset completion. Do not
 inject083e again or clear the context byte. Broad heap watches used to locate
 the consumer are retired;bounded return/selector/context observations retain
 the contract. The fresh native capture reproduces UI,SIM,LU and raw release,
