@@ -1,7 +1,7 @@
 -- Passive bus census around the qualified physical native-ROM6 UI run.
 local directory=assert(debug.getinfo(1,'S').source:sub(2):match('^(.*[/])'))
 local machine=manager.machine
-local npe3=machine.system.name=='npe3ref' or machine.system.name=='npe3r6'
+local npe3=machine.system.name=='npe3ref' or machine.system.name=='npe3r6' or machine.system.name=='npe3afs' or machine.system.name=='npe3ad0'
 dofile(directory..(npe3 and 'rom6_reset_policy_observe.lua' or 'rom6_native_ui.lua'))
 local cpu=assert(machine.devices[':dsp_c54x:cpu'])
 local stream=assert(io.open('rom6_radio_writes.tsv','wb'))
@@ -29,7 +29,7 @@ local function observe(direction,address,value,mask)
         else item.pcs_capped=true end
     end
     if direction=='W' then
-        if writes>=1048576 then overflow=true; return end
+        if writes>=2097152 then overflow=true; return end
         writes=writes+1
         assert(stream:write(string.format('%.9f\t%06x\t%04x\t%04x\t%04x\n',now,pc,address,value,mask)))
         if address==0x31 and not captured_output_overlay then

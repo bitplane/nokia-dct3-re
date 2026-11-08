@@ -3,6 +3,14 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "npe3_raw_adc_fir_and_native_sch_attempt",
+      "owner": "native_rom6_reference_adc_laboratory",
+      "status": "satisfied",
+      "predicate": "Own 6210 reference-clock execution consumes independently checked raw samples through a numerically qualified FIR and publishes its own failed SCH report without packet injection",
+      "current": "The fixed divider12/96-word laboratory compositions differ only in silence versus FCCH/coded-SCH source, not MCU bytes, PMM, native clock or receive gating. Silence24s reconciles16765024 reads, peak93,496 zero FIR outputs and38 commits; coded32s reconciles3667840 reads, peak82,496 independently convolved outputs including104 nonzero and8 commits. Both preserve physical Messages UI, strict native entries and zero fault/uncovered/illegal counts. The coded raw prefix covers4096 words/five epochs; a separate active1024-word FCCH/off-slot window matches source ticks31800012..31812288. Own upload source offsets and the differing13d2 block are pinned separately from8210. First SCH aperture at3.250482022s contains192 nonzero words; native type80 at3.251654659s has body400001000029002300004df9944f/error1. This is neither physical MFI timing/capacity nor tuned RF, successful SCH/BCCH, camping, registration or fitted clock/mask proof. Aperture provenance is the next boundary.",
+      "evidence": ["driver/nokia_dct3_research.cpp", "tools/run_npe3_native.py", "tools/rom6_adc_lab.lua", "tools/rom6_adc_lab_check.py", "tools/rom6_adc_filter_check.py", "tools/rom6_receive_contract.py", "tools/rom6_rx_ring_observe.lua", "tools/rom6_adc_measure_check.py", "docs/6210_bringup.md"]
+    },
+    {
       "id": "npe3_reference_clock_ctsi_independent_late_storage",
       "owner": "native_rom6_reference_compatibility",
       "status": "satisfied",

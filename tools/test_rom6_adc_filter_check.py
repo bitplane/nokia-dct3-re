@@ -29,7 +29,7 @@ class AdcFilterCheckTest(unittest.TestCase):
             with self.subTest(old=old),self.assertRaises(ValueError):
                 check_mode1_mixer(text.replace(old,new,1))
 
-    def fixture(self,mixer_mode=0,mixer_pointer=0x80):
+    def fixture(self,mixer_mode=0,mixer_pointer=0x80,output_cap=128):
         lines=['rom6_adc_processing_initial: history='+','.join(['0000']*16)+
                ' coefficients='+','.join(f'{word:04x}' for word in COEFFICIENTS)+' observer_writes=0']
         output=0
@@ -42,7 +42,7 @@ class AdcFilterCheckTest(unittest.TestCase):
             if read>32 and read%4==0:
                 for value,pc in (('fc00','002496'),('0400','002497')):
                     output+=1
-                    if output<=128:
+                    if output<=output_cap:
                         lines.append(f'rom6_adc_filter: write={output} read={read} address={0xc8+(output-1)%16:04x} value={value} cpu_pc={pc} st1=c900 observer_writes=0')
             if read%32==0 and 64<=read<=288:
                 count=2 if mixer_mode else 4
@@ -50,7 +50,7 @@ class AdcFilterCheckTest(unittest.TestCase):
                 values=','.join(['0000']*count)
                 lines.append(f'rom6_adc_mixer: write={(read-32)//32} read={read} previous={mixer_pointer:04x} pointer={pointer:04x} mode={mixer_mode:04x} values={values} cpu_pc=0024d7 observer_writes=0')
                 mixer_pointer=pointer
-        lines.append('rom6_adc_processing_complete: history_writes=1024 filter_writes=496 input_cap=1024 output_cap=128 observer_writes=0')
+        lines.append(f'rom6_adc_processing_complete: history_writes=1024 filter_writes=496 input_cap=1024 output_cap={output_cap} observer_writes=0')
         lines.append('rom6_adc_mixer_complete: writes=31 cap=8 observer_writes=0')
         return '\n'.join(lines)
 
@@ -66,6 +66,12 @@ class AdcFilterCheckTest(unittest.TestCase):
         for name in ('physical_clock_qualified','rssi_qualified','fcch_qualified',
                      'sch_qualified','bcch_qualified','camping_qualified'):
             self.assertFalse(result[name])
+
+    def test_complete_first_input_block_is_independently_convolved(self):
+        result=self.checked(self.fixture(output_cap=496))
+        self.assertEqual((result['checked_output_words'],result['nonzero_output_words']),(496,496))
+        with self.assertRaises(ValueError):
+            self.checked(self.fixture(output_cap=496).replace('write=496 ', 'write=497 '))
 
     def test_rounding_and_signed_coefficients(self):
         history=[0]*16

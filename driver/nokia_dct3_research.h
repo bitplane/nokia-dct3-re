@@ -56,9 +56,12 @@ public:
 	void nsm3ad0(machine_config &config);
 	void nsm3afb(machine_config &config);
 	void nsm3afs(machine_config &config);
+	void npe3afs(machine_config &config);
+	void npe3ad0(machine_config &config);
 protected:
 	void machine_start() override;
 private:
+	void configure_adc_lab(machine_config &config);
 	void control_w(offs_t port, u16 data);
 	u16 sample_r(offs_t component);
 	void fault_observe_w(int state);

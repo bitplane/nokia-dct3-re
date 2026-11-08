@@ -16,12 +16,23 @@ REGIONS=(
     (0x13d2,0x140e,0x115634,'c301dfaa143af16af3d42d2a1cf601e8f26cdffe70e85f3c3eb123341fb3abe6'),
     (0x1980,0x1990,0x116190,'5b6b44a5d062c8836f7809e6fb6e87466507ed4cf135ea05ae7912c7ba651c5b'),
 )
+SOURCE_OFFSETS = {
+    # Pinned MCU builds: NSM-3 v5.31 and NPE-3 v5.56 PPM C, not all revisions.
+    '8210': tuple(region[2] for region in REGIONS),
+    '6210': (0x1f8b6, 0x24ad0, 0x1efd0, 0x1fb2c),
+}
+SOURCE_HASH_OVERRIDES = {
+    ('6210', 0x13d2): 'dd4cc8c2b76ab553ca73f72e136d512512113845dab1f0cdf79b211a41a5a179',
+}
 
 
-def check_program(program,mcu):
+def check_program(program,mcu,*,product='8210'):
     if len(program)!=0x20000:
         raise ValueError('incomplete first-read program view')
-    for start,end,offset,digest in REGIONS:
+    if product not in SOURCE_OFFSETS:
+        raise ValueError('unknown receive upload profile')
+    for (start,end,_,digest),offset in zip(REGIONS,SOURCE_OFFSETS[product]):
+        digest=SOURCE_HASH_OVERRIDES.get((product,start),digest)
         block=program[start*2:end*2]
         if hashlib.sha256(block).hexdigest()!=digest or mcu[offset:offset+len(block)]!=block:
             raise ValueError('receive code is not the pinned own upload')

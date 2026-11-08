@@ -38,7 +38,7 @@ def check_output_overlay(image, overlay):
 
 def census(text, stream):
     footers=re.findall(r'rom6_radio_capture: writes=(\d+) overflow=([01]) observer_writes=0',text)
-    if len(footers)!=1 or footers[0][1]!='0' or not 0<int(footers[0][0])<1048576:
+    if len(footers)!=1 or footers[0][1]!='0' or not 0<int(footers[0][0])<2097152:
         raise ValueError('missing, empty, duplicate or truncated radio capture')
     ports={}
     for match in PORT.finditer(text):

@@ -2681,6 +2681,59 @@ not issuing-instruction identity, and makes neither a fitted-clock nor an
 RF-acquisition claim. [The receive contract](rom6_rf_interface.md) owns the
 shared ADC/compare hypotheses and independently qualified decoder paths.
 
+### Reference-clock raw ADC trials
+
+The isolated `npe3ad0` and `npe3afs` machines reuse the existing laboratory
+MFI transport at scalar divider 12 with 96-word provisional staging. Both
+use own NPE-3 uploads/provisioning and the labelled reference DSP clock.
+The only difference between these two lab configurations is zero input
+versus the independently generated, fixed-epoch FCCH/coded-SCH waveform.
+Neither is a recovered physical receiver, tuned air source or default profile.
+
+```sh
+.venv/bin/python tools/run_npe3_native.py --reference-clock --seconds 24 --adc-source silence
+.venv/bin/python tools/run_npe3_native.py --reference-clock --seconds 32 --adc-source fcch-sch
+```
+
+| Scope | Silence, 24 seconds | FCCH/SCH, 32 seconds |
+| --- | --- | --- |
+| Complete I/O writes | 1,236,882 | 792,336 |
+| Actual P27 reads, reconciled to clocked queue | 16,765,024 | 3,667,840 |
+| Provisional peak occupancy | 93 | 82 |
+| First 1,024 inputs / 496 FIR outputs | All outputs zero | 104 nonzero outputs; all 496 match independent convolution |
+| Complete native ring commits | 38; no type-80 report | Eight; includes the failed class-40 report below |
+
+Both runs have no FIFO faults, illegal instruction, uncovered low-ROM read or
+restart, and preserve physical Messages interaction. The positive trial's
+reviewed envelope-animation phase changes 54 pixels inside `(25,33)..(49,40)`;
+its separate exact Menu hash is `81b207e77820f80f4844daeeebdbd260c1f2590888de1d0274ac67f7d036b586`.
+The ordinary native Menu hash is not changed. Full write capture fails closed
+on overflow; the journal budget is now 2,097,152 records. The earlier longer
+silence trials exceeded the old budget and are not complete-I/O evidence.
+
+The FIR checker pins own source offsets `1f8b6`, `24ad0`, `1efd0`, `1fb2c`
+for the four observed upload blocks and `1eac4` for the resident prefix.
+The `13d2` block differs from NSM-3 and has its own digest; the actual native
+FIR code and independent signed-convolution oracle are shared, not an imported
+8210 source address. The 4,096-word raw prefix matches independently generated
+samples over five capture epochs. A separate 1,024-word active window contains
+592 FCCH and 432 off-slot words at source ticks `31800012..31812288`.
+It does not contain a coded SCH burst, so this window alone is not SCH-input
+qualification.
+
+At 3.250482022 s, Execute owner `76ae` prepares the first SCH correlator
+aperture at `00d8`. All 192 captured words are nonzero (BE16 SHA256
+`23ab4f5d68f3130fdfa4870a875fa80b131b2acbd5bd2e2bbb78c5cd62b91e16`),
+unlike the previously observed NSM-3 zero aperture. Current/next software
+frame records are `00000029/0000002a`; these are not decoded GSM frame numbers.
+The native packet at 3.251654659 s is type `80`, body
+`400001000029002300004df9944f`, whose class-40 formatter reports error status 1.
+Thus nonzero raw input and FIR output reach a native receive attempt, but
+successful synchronization, BCCH, camping and registration remain unproved.
+Next join the aperture's writers and queued-source timestamps to its scheduled
+capture; do not assume it has the NSM-3 zero-window cause or move the waveform
+to obtain a CRC pass.
+
 `verify-6210-alarm-off-snooze-no` combines the independently validated
 powered-off and Snooze lifecycles: two natural RTC wakes, separately checked
 alarm-only uploads, silent endpoint intervals while powered off, physical

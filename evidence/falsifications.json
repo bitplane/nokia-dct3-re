@@ -3,6 +3,13 @@
   "kind": "falsifications",
   "entries": [
     {
+      "id": "npe3_immediate_adc_lab_source_sufficient_for_sch",
+      "status": "disproven",
+      "hypothesis": "The inherited immediate P03/P21 laboratory receive gate with divider12,96-word staging and a fixed-epoch coded source is sufficient for native6210 SCH decoding",
+      "conclusion": "The32s reference-clock trial has fault-free reconciled raw transport, independently matched4096-word prefix,1024-word active FCCH/off-slot window and496 exact FIR outputs including104 nonzero. Yet the first native correlator aperture at3.250482022s produces the class40/type80 error1 body400001000029002300004df9944f. All192 aperture words are nonzero, so the prior NSM-3 all-zero-window explanation cannot simply be imported. This rejects sufficiency of the exact laboratory setup, not every capture policy, the isolated decoder, or the physical hardware. No source epoch, compare delay, firmware field or decoded result is tuned to obtain success.",
+      "evidence": ["docs/6210_bringup.md", "docs/rom6_rf_interface.md", "tools/run_npe3_native.py", "tools/rom6_adc_lab.lua", "tools/rom6_adc_filter_check.py"]
+    },
+    {
       "id": "ccont_rtc_bit_gates_native_ctsi_frame",
       "status": "disproven",
       "hypothesis": "CCONT register 6 bit 1 is the native DSP CTSI frame interrupt enable",

@@ -10,6 +10,9 @@ import sys
 import tempfile
 
 ROOT = Path(__file__).resolve().parents[1]
+# Reviewed Messages envelope animation phase under finite ADC stimulation.
+# Keep the ordinary native Menu oracle unchanged.
+ADC_SCH_MENU_SHA256 = '81b207e77820f80f4844daeeebdbd260c1f2590888de1d0274ac67f7d036b586'
 if __package__ in (None, ''):
     sys.path.insert(0, str(ROOT))
 
@@ -65,7 +68,13 @@ def main():
                         help='add passive reset-policy and native ring observations')
     parser.add_argument('--radio', action='store_true',
                         help='capture complete passive DSP I/O writes and bounded read summaries')
+    parser.add_argument('--adc-source', choices=('silence', 'fcch-sch'),
+                        help='explicit raw ADC laboratory source; requires --reference-clock')
     args = parser.parse_args()
+    if args.adc_source:
+        if not args.reference_clock:
+            parser.error('ADC experiments require the explicitly labelled reference clock')
+        args.radio = True
     if not 24 <= args.seconds <= 120:
         parser.error('Menu check duration must be 24..120 seconds')
     if not 20 <= args.input_at <= 100:
@@ -78,13 +87,15 @@ def main():
     run = Path(tempfile.mkdtemp(prefix='npe3-native-', dir=ROOT / 'tmp'))
     print(f'Native6210 evidence: {run}', flush=True)
     model = 'npe3ref' if args.reference_clock else 'npe3r6'
+    if args.adc_source:
+        model = 'npe3ad0' if args.adc_source == 'silence' else 'npe3afs'
     storage = run / 'nvram' / model
     storage.mkdir(parents=True)
     (storage / 'flash').write_bytes(flash.ljust(0x3fa000, b'\xff') + pmm)
     roms = run / 'roms'
     roms.mkdir()
     (roms / model).symlink_to(ROOT / 'roms/nsm3r6', target_is_directory=True)
-    observer = ('rom6_native_radio.lua' if args.radio else
+    observer = ('rom6_adc_lab.lua' if args.adc_source else 'rom6_native_radio.lua' if args.radio else
                 'rom6_reset_policy_observe.lua' if args.reset_policy else 'npe3_native_observe.lua')
     command=[str(ROOT/'mame/mame'),model,'-rompath',str(roms)+';'+str(ROOT/'roms'),
         '-nvram_directory',str(run/'nvram'),'-cfg_directory','cfg','-snapshot_directory','snap',
@@ -140,7 +151,8 @@ def main():
             raise ValueError('native 6210 physical Menu was not decoded')
         check_input_start(text, 'npe3_native_physical: key=Menu', args.input_at)
         with Image.open(first/'snap/npe3_after_menu.png') as frame:
-            check_frame(frame, MENU_SHA256, 'native 6210 Messages menu')
+            digest = ADC_SCH_MENU_SHA256 if args.adc_source == 'fcch-sch' else MENU_SHA256
+            check_frame(frame, digest, 'native 6210 Messages menu')
         print('Native6210 Menu: PASS bounded native boot and physical input')
     if args.radio:
         from tools.rom6_radio_census import census, find_output_source
@@ -152,6 +164,25 @@ def main():
         report['rf_acquisition_claim'] = False
         (run / 'radio-census.json').write_text(json.dumps(report, indent=2) + '\n')
         print(f"Native6210 radio census: PASS writes={report['write_records']} own_writer={report['own_output_writer']['mcu_offset']} acquisition_claim=0")
+    if args.adc_source:
+        from tools.rom6_adc_lab_check import check as check_adc
+        from tools.rom6_adc_filter_check import check as check_filter, check_mixer
+        from tools.rom6_adc_measure_check import check_rx_publications
+        report = check_adc(text, args.adc_source != 'silence', burst=True, sch=True)
+        report['native_filter'] = check_filter(text,
+            (first / 'rom6_adc_processing_program.be16').read_bytes(), flash,
+            (ROOT / 'roms/nsm3r6/nsm3_rom6_program.be16').read_bytes(), product='6210')
+        report['native_mixer'] = check_mixer(text)
+        report['native_rx'] = check_rx_publications(text)
+        if args.adc_source == 'fcch-sch':
+            from tools.rom6_adc_lab_check import check_active_burst_window
+            report['active_source_window'] = check_active_burst_window(text, sch=True)
+            if report['native_filter']['nonzero_output_words'] == 0:
+                raise ValueError('coded raw source has not reached the qualified FIR output prefix')
+        (run / 'adc-source.json').write_text(json.dumps(report, indent=2) + '\n')
+        if not report['transport_fault_free']:
+            raise ValueError('raw ADC transport fault; no decoder/acquisition qualification')
+        print('Native6210 ADC source: PASS independently checked raw prefix; acquisition_claim=0')
 
 
 if __name__ == '__main__':

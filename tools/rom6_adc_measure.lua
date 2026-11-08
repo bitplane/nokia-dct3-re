@@ -3,25 +3,7 @@ local directory=assert(debug.getinfo(1,'S').source:sub(2):match('^(.*[/])'))
 dofile(directory..'rom6_adc_lab.lua')
 local machine=manager.machine
 local cpu=assert(machine.devices[':dsp_c54x:cpu'])
-local publications=0
-local ring_tap=cpu.spaces.data:install_write_tap(0x8e4,0x8e4,'rom6_measure_rx_commit',function(_,value,mask)
-    local previous=cpu.spaces.data:read_u16(0x8e4)
-    if previous==value then return end
-    publications=publications+1
-    if publications>64 then return end
-    local packed={}
-    if previous>=0x80 and previous<0xe4 and value>=0x80 and value<0xe4 then
-        local cursor=previous
-        while cursor~=value do
-            packed[#packed+1]=string.format('%04x',cpu.spaces.data:read_u16(0x800+cursor))
-            cursor=cursor+1
-            if cursor==0xe4 then cursor=0x80 end
-        end
-    end
-    machine:logerror(string.format('rom6_measure_rx_commit: sequence=%d t=%.9f previous=%04x producer=%04x consumer=%04x words=%s mask=%04x cpu_pc=%06x observer_writes=0\n',
-        publications,machine.time:as_double(),previous,value,cpu.spaces.data:read_u16(0x8e5),table.concat(packed,','),mask,cpu.state.GENPC.value))
-end)
-_G.rom6_measure_ring_tap=ring_tap
+dofile(directory..'rom6_rx_ring_observe.lua')
 machine.debugger.visible_cpu=cpu
 machine.debugger:command('temp5=0;temp6=0;temp7=0;temp8=0')
 cpu.debug:bpset(0x4317,'temp5<20',
@@ -40,6 +22,5 @@ _G.rom6_measure_stop=emu.add_machine_stop_notifier(function()
     machine.debugger.visible_cpu=cpu
     machine.debugger:command('logerror "rom6_measure_complete: calls=%d pending=%d cap=32 observer_writes=0\\n",temp5,temp6')
     machine.debugger:command('logerror "rom6_measure_correct_complete: calls=%d pending=%d cap=16 observer_writes=0\\n",temp7,temp8')
-    machine:logerror(string.format('rom6_measure_rx_complete: commits=%d cap=64 observer_writes=0\n',publications))
     machine.debugger:command('dasm rom6_measure_program.asm,2300,280,1,:dsp_c54x:cpu')
 end)

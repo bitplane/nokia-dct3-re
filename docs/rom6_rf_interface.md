@@ -10,6 +10,13 @@ bounded FIR/mixer/correlation arithmetic and finite-FCCH **control acceptance**
 have focused checks. These do not qualify a physically timed RF receiver.
 [Native boot acceptance](rom6_dsp_bringup.md) remains separate.
 
+The own-upload 6210 reference-clock [raw ADC comparison](6210_bringup.md#reference-clock-raw-adc-trials)
+now qualifies fault-free sample delivery and 496 independent FIR outputs,
+including 104 nonzero outputs under the coded source. Its first SCH aperture
+is nonzero but the native report still has error status 1. This is a distinct
+aperture-provenance question, not evidence that NSM-3's zero-window diagnosis
+or a physical clock/capture interpretation transfers unchanged.
+
 The immediate frontier is **capture-edge ownership**: which P09/P0a/P0b
 events start conversion, admit samples and assert MFI INT0, and how those
 events relate to the DSP I/O counter/reload epoch. Under the current declared

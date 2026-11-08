@@ -16,6 +16,11 @@ namespace nokia_dct3 {
 void dct3_rf_adc_fixture_state::nsm3adc(machine_config &config)
 {
 	nsm3r6(config);
+	configure_adc_lab(config);
+}
+
+void dct3_rf_adc_fixture_state::configure_adc_lab(machine_config &config)
+{
 	auto &mfi = NOKIA_MFI_RX(config, "mfi_rx", 13'000'000);
 	mfi.set_word_divider(12); // Candidate matched to native post-FIR quarter-rate mixing, not measured silicon.
 	mfi.set_staging_limit(96); // One block-rounded >=69-word service-gap trial; not physical MFI capacity.
@@ -45,6 +50,20 @@ void dct3_rf_adc_fixture_state::nsm3afs(machine_config &config)
 {
 	nsm3afb(config);
 	m_sch = true;
+}
+
+void dct3_rf_adc_fixture_state::npe3afs(machine_config &config)
+{
+	npe3ref(config);
+	configure_adc_lab(config);
+	m_burst = true;
+	m_sch = true;
+}
+
+void dct3_rf_adc_fixture_state::npe3ad0(machine_config &config)
+{
+	npe3afs(config);
+	m_tone = false;
 }
 
 void dct3_rf_adc_fixture_state::machine_start()

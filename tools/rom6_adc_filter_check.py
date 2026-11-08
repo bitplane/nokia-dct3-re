@@ -8,7 +8,7 @@ from tools.rom6_receive_contract import check_program
 INITIAL=re.compile(r'rom6_adc_processing_initial: history=([0-9a-f]{4}(?:,[0-9a-f]{4}){15}) coefficients=([0-9a-f]{4}(?:,[0-9a-f]{4}){7}) observer_writes=0')
 HISTORY=re.compile(r'rom6_adc_history: read=(\d+) address=([0-9a-f]{4}) value=([0-9a-f]{4}) observer_writes=0')
 FILTER=re.compile(r'rom6_adc_filter: write=(\d+) read=(\d+) address=([0-9a-f]{4}) value=([0-9a-f]{4}) cpu_pc=([0-9a-f]{6}) st1=([0-9a-f]{4}) observer_writes=0')
-COMPLETE=re.compile(r'rom6_adc_processing_complete: history_writes=(\d+) filter_writes=(\d+) input_cap=1024 output_cap=128 observer_writes=0')
+COMPLETE=re.compile(r'rom6_adc_processing_complete: history_writes=(\d+) filter_writes=(\d+) input_cap=1024 output_cap=(128|496) observer_writes=0')
 MIXER=re.compile(r'rom6_adc_mixer: write=(\d+) read=(\d+) previous=([0-9a-f]{4}) pointer=([0-9a-f]{4}) mode=([0-9a-f]{4}) values=([0-9a-f]{4}(?:,[0-9a-f]{4}){1,3}) cpu_pc=([0-9a-f]{6}) observer_writes=0')
 COEFFICIENTS=(0x0387,0x11a3,0x2ad6,0x4000,0x4000,0x2ad6,0x11a3,0x0387)
 
@@ -24,19 +24,20 @@ def fir_word(history,coefficients,last,component):
     return ((total+0x8000)>>16)&0xffff
 
 
-def check_filter_program(program,mcu,resident):
-    check_program(program,mcu)
+def check_filter_program(program,mcu,resident,*,product='8210'):
+    check_program(program,mcu,product=product)
     if (digest(resident)!=PINNED['working/rom6_program.be16'] or
             program[0x2468*2:0x24d4*2]!=resident[0x2468*2:0x24d4*2] or
             program[0x25bc*2:0x25c6*2]!=resident[0x25bc*2:0x25c6*2]):
         raise ValueError('native FIR code differs from supplied resident ROM')
-    if (program[0x590*2:0x736*2]!=mcu[0x115128:0x115128+844] or
+    offset={'8210':0x115128,'6210':0x1eac4}[product]
+    if (program[0x590*2:0x736*2]!=mcu[offset:offset+844] or
             program[0x05de*2:0x05df*2]!=bytes.fromhex('fc00')):
         raise ValueError('native FIR entry hook is not the observed return')
 
 
-def check(text,program,mcu,resident):
-    check_filter_program(program,mcu,resident)
+def check(text,program,mcu,resident,*,product='8210'):
+    check_filter_program(program,mcu,resident,product=product)
     initial=list(INITIAL.finditer(text))
     complete=list(COMPLETE.finditer(text))
     if (len(initial)!=1 or text.count('rom6_adc_processing_initial:')!=1 or
@@ -50,9 +51,10 @@ def check(text,program,mcu,resident):
         raise ValueError('native FIR lacks the complete first waveform prefix')
     histories=list(HISTORY.finditer(text))
     outputs=list(FILTER.finditer(text))
+    output_cap=int(complete[0].group(3))
     if (len(histories)!=1024 or text.count('rom6_adc_history:')!=1024 or
-            len(outputs)!=128 or text.count('rom6_adc_filter:')!=128 or
-            complete[0].groups()!=('1024','496')):
+            len(outputs)!=output_cap or text.count('rom6_adc_filter:')!=output_cap or
+            complete[0].groups()[:2]!=('1024','496')):
         raise ValueError('native FIR prefix is incomplete or has unexpected accounting')
     events=sorted([(row.start(),'input',row) for row in histories]+
                   [(row.start(),'output',row) for row in outputs])
@@ -77,7 +79,7 @@ def check(text,program,mcu,resident):
             nonzero+=value!=0
     return dict(discarded_scalar_words=32,history_words=1024,checked_output_words=written,
                 nonzero_output_words=nonzero,output_order='Q,I',complex_decimation=2,
-                scope='first128 output words within first1024 delivered inputs',
+                scope=f'first{written} output words within first1024 delivered inputs',
                 physical_clock_qualified=False,rssi_qualified=False,fcch_qualified=False,
                 sch_qualified=False,bcch_qualified=False,camping_qualified=False)
 
@@ -99,6 +101,9 @@ def check_mixer(text):
     # Caller first qualifies these FIR words and code with check(). This is a
     # bounded arithmetic join, not a separate waveform/physical-clock oracle.
     filtered=list(FILTER.finditer(text))
+    if len(filtered) not in (128,496):
+        raise ValueError('mixer input requires a qualified FIR prefix')
+    filtered=filtered[:128]
     mixers=list(MIXER.finditer(text))
     totals=re.findall(r'rom6_adc_mixer_complete: writes=(\d+) cap=8 observer_writes=0',text)
     if (len(filtered)!=128 or len(mixers)!=8 or text.count('rom6_adc_mixer:')!=8 or
