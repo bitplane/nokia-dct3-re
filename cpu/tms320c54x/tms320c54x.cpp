@@ -1882,10 +1882,11 @@ void tms320c54x_device::pipeline_step()
 				staged_conditional_branch(m_pipeline_control_word) && !staged_conditional_call(m_pipeline_control_word);
 			bool const delay_load = staged_offset_load(word) && (word & 0xfe00) == 0x1000;
 			bool const delay_dld = staged_extended_dld(word);
-			// RETD/RPTBD/CALLD's two delay words can hold one absolute DST. Its retained
+			// These two-word delay spans can hold one absolute DST. Its retained
 			// address/source and two write clocks use the ordinary DST path.
 			bool const delay_dst = staged_extended_dst(word) && u8(word) == 0xf8 &&
-				(m_pipeline_control_word == 0xfe00 || m_pipeline_control_word == 0xf272 || m_pipeline_control_word == 0xf274);
+				(m_pipeline_control_word == 0xfe00 || m_pipeline_control_word == 0xf272 || m_pipeline_control_word == 0xf274 ||
+				 (staged_banz(m_pipeline_control_word) && !staged_extended_banz(m_pipeline_control_word) && BIT(m_pipeline_control_word,9)));
 			bool const delay_asm = (word & 0xff00) == 0x3200 &&
 				(u8(word) < 0xa0 || (u8(word) >= 0xe0 && u8(word) <= 0xf8));
 			bool const delay_shift = staged_shifted_smem(word) && u8(word) < 0x98;

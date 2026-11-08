@@ -9,6 +9,7 @@
   "block_delay_absolute_dst": 16,
   "repeated_circular_square": 33,
   "call_delay_absolute_dst": 24,
+  "count_delay_absolute_dst": 48,
   "circular_mvkd": 64,
   "repeated_shifted_circular_add": 64,
   "mvdd_accumulator_destination": 152,
