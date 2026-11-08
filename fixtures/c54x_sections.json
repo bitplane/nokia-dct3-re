@@ -421,6 +421,7 @@
   "block_branch": 392,
   "block_branch_limits": 14,
   "block_terminal_exit": 20,
+  "block_conditional_return": 20,
   "block_xc": 2176,
   "mapped_move_repeat_owner": 32,
   "block_single_repeat": 192,

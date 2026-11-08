@@ -3,6 +3,14 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "c54x_conditional_return_inside_repeat_block",
+      "owner": "tms320c54x_generic_cpu",
+      "status": "satisfied",
+      "predicate": "A nondelayed conditional return before REA selects the caller or ordinary repeat continuation without inventing stack or controller effects",
+      "current": "Twenty independent block_conditional_return cases plus replay fail before admission and pass afterward across zero/two counts, first/last/never returns, A/B predicates and two pages. Pointer advancement, one caller marker, balanced SP, BRC, RSA/REA, explicit software BRAF clear and caller continuation are checked. Ordinary conditional-return and repeat-boundary controls remain separate. Acquired ROM6 exercises this form at6298 inside6298..629a; the CPU contains no handset-specific address rule. Delayed/endpoint returns, interrupt composition and silicon pipeline phase are not newly qualified.",
+      "evidence": ["cpu/tms320c54x/tms320c54x.cpp", "tests/c54x/sections/block_conditional_return.h", "fixtures/c54x_sections.json", "docs/c54x_execution_contracts.md"]
+    },
+    {
       "id": "c54x_conditional_forward_exit_at_repeat_endpoint",
       "owner": "tms320c54x_generic_cpu",
       "status": "satisfied",

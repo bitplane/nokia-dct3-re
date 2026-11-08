@@ -5142,6 +5142,23 @@ defines REA as the last instruction word and the Decode-time decrement.
 The acquired ROM6 instruction at `6238` supplies a concrete consumer with
 extension at `6239`; it is not a firmware-specific CPU exception.
 
+## Conditional return inside a block
+
+Nondelayed RC may return before REA. The existing conditional-return engine
+retains its predicate and owns the ordinary stack pop; admitting it inside
+the block does not synthesize a second return or silently clear BRAF/BRC.
+An untaken RC reaches the ordinary endpoint; a taken RC preserves the
+remaining controller state until software clears or replaces it.
+Endpoint RC and delayed returns inside blocks remain outside this admission.
+
+`block_conditional_return` checks 20 cases plus replay: zero/two repeat counts,
+first/last/never returns, A/B predicates and two pages. It verifies exact
+source-pointer advancement, one caller marker, balanced SP, BRC, RSA/REA,
+explicit software BRAF clear and the caller continuation. The test fails
+before admission. The ordinary conditional-return and block-boundary tests
+remain independent controls. Acquired ROM6 uses the admitted form at `6298`
+inside `6298..629a`; no firmware address is present in the CPU logic.
+
 ## RPTBD delay-owned T load
 
 One-word `LD Smem,T` can occupy either RPTBD delay position while retaining
