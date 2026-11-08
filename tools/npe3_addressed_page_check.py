@@ -9,6 +9,45 @@ from tools.rom6_adc_measure_check import check_rx_publications
 
 REQUEST=re.compile(r'npe3_bts_page_request: t=([\d.]+) identity=([0-9a-f]{16}) phase=(\d+) offset=(\d+) multiframes=2 after_frame=(\d+) octets=([0-9a-f]{46}) raw_adc_only=1 port_bits_identity=1 physical_claim=0')
 AIR=re.compile(r'npe3_bts_page_air: start_frame=(\d+) t=([\d.]+) raw_adc_only=1 physical_claim=0')
+REENTRY_CODE={
+    0x30f62c:'b5301c052018f0b3fb2d1c04484b802060652d04d00920081900210c1909221019122314191bf7fef9591c20f134f91d20121c21f0b2fe2e',
+    0x30f768:'000007f2',0x314fdc:'48cc21009a032300f0b7fe02',
+    0x315310:'000009f7',0x2a3458:'000009f7',0x2a3a2c:'202b01c02100f7fcfac1',
+}
+
+
+def check_reentry_source(text,image):
+    for address,code in REENTRY_CODE.items():
+        if image[address-0x200000:address-0x200000+len(code)//2].hex()!=code:
+            raise ValueError('native re-entry source code changed')
+    rows=[fields(row) for row in re.findall(r'npe3_controller_source: ([^\r\n]+)',text)]
+    count=len(rows)
+    if (not 0<count<512 or [int(r['sequence']) for r in rows]!=list(range(1,count+1))
+            or text.count(f'npe3_controller_source_complete: entries={count} cap=512 begin=12 end=18 observer_writes=0')!=1):
+        raise ValueError('missing or capped re-entry source coverage')
+    reports=[fields(row) for row in re.findall(r'npe3_controller_report: ([^\r\n]+)',text)]
+    if (len(reports)!=2 or text.count('npe3_controller_report_complete: posts=2 cap=16 begin=12 end=18 observer_writes=0')!=1
+            or [int(r['sequence']) for r in reports]!=[1,2]
+            or any(r['caller']!='0030f665' or r['observer_writes']!='0' for r in reports)):
+        raise ValueError('missing native07f2 result pair')
+    bodies=[bytes.fromhex(r['bytes']) for r in reports]
+    if any(len(b)!=32 or b[:2]!=bytes.fromhex('07f2') for b in bodies) or [int.from_bytes(b[4:8],'big') for b in bodies]!=[2,4]:
+        raise ValueError('native07f2 result values changed')
+    chain=[]
+    for entry,register,value in ((0x30f62c,'r0',4),(0x3ccbec,'r0',0x9f7),
+            (0x2a3a18,'input',0x9f7),(0x29ffb8,'r0',0x1580),(0x2e2e60,'r0',0x9c8),
+            (0x2a086c,'r0',0x9c8),(0x29ffb8,'r0',0x7d4),(0x3151da,'saved',0x7d4)):
+        hits=[r for r in rows if int(r['entry'],16)==entry and int(r[register],16)==value]
+        if len(hits)!=1:raise ValueError('missing unique re-entry chain boundary')
+        chain.append(hits[0])
+    times=[float(r['t']) for r in chain]
+    if (times!=sorted(times) or not times[0]<float(reports[1]['t'])<times[1]
+            or chain[0]['lr']!='002d3151' or chain[1]['lr']!='00314fe9' or chain[1]['saved']!='000007f2'
+            or times[-1]-times[0]>0.05 or any(r['observer_writes']!='0' for r in rows)):
+        raise ValueError('native result4 is not the observed re-entry chain')
+    return dict(result_pair=[2,4],result4_constructor_caller='2d314c',rr_report='09f7',
+                restart_status='1580',selection_report='09c8',rr_input='07d4',
+                candidate_rejection_reason_qualified=False,stable_camping_qualified=False)
 
 
 def check_controller_lifecycle(text,page,image):

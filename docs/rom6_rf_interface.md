@@ -569,8 +569,27 @@ DSP journal remains byte-identical. Why the ordinary lifecycle re-enters the
 condition,and how an RF-selective source changes that lifecycle,remain open;
 do not skip the second set or force a pending-page drain.
 
-The next question is which ordinary procedure/input brings this continuation
-to its pending-page drain,and why the current lifecycle does not do so. Do not
+The re-entry source is an ordinary handset report chain,not a missing DSP
+acknowledgment. Constructor30f62c posts07f2 to task18 with a BE32 result at+4.
+The native run posts result2 at15.102925077 and result4 at16.271560692,both
+through30f660. Result4's observed constructor caller is2d314c;the constructor
+deliberately skips30d908's cell-data copy in this case,so remaining object
+bytes are not valid cell information. RR receives the second07f2 and publishes
+09f7 through314fe4/3ccbec. Handler2a3a18 consumes09f7 and dispatches1580;
+the upper controller constructs09c8,translator2a086c maps it to07d4,and the
+RR selector reaches the shared byte+6 setter. `check_reentry_source` joins
+these actual boundaries with pinned constructor/report instructions;the full
+DSP journal retains its baseline hash.
+
+The static path to2d314c follows candidate-return checks at2d3104..312e;
+possible choosers include30f690,30c998 and the mode8 fallback30e6e4. Which
+chooser/eligibility guard rejects the native candidate is not yet runtime
+qualified. Zero-hit interior-PC probes at these helpers were removed and do
+not establish absence. Inspect their data contracts or validated execution
+boundaries,not an invented completion or a forced controller result.
+
+The next question is why candidate selection reaches result4 at2d314c,
+restarting the lifecycle instead of settling ordinary paging. Do not
 inject083e again or clear the context byte. Broad heap watches used to locate
 the consumer are retired;bounded return/selector/context observations retain
 the contract. The fresh native capture reproduces UI,SIM,LU and raw release,

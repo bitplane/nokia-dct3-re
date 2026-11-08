@@ -1,7 +1,7 @@
 import unittest
 from unittest.mock import patch
 
-from tools.npe3_addressed_page_check import check,check_mcu_admission,check_rr_delivery,check_controller,check_controller_lifecycle,CONTROLLER_CODE
+from tools.npe3_addressed_page_check import check,check_mcu_admission,check_rr_delivery,check_controller,check_controller_lifecycle,check_reentry_source,CONTROLLER_CODE,REENTRY_CODE
 
 
 class AddressedPageTest(unittest.TestCase):
@@ -114,6 +114,29 @@ class AddressedPageTest(unittest.TestCase):
 
 
 class ControllerLifecycleTest(unittest.TestCase):
+    def test_real_result4_drives_reentry_without_assigning_rejection_semantics(self):
+        image=bytearray(0x115400)
+        for address,code in REENTRY_CODE.items():
+            image[address-0x200000:address-0x200000+len(code)//2]=bytes.fromhex(code)
+        lines=[]
+        for n,(entry,r0,lr,saved,argument) in enumerate((
+                (0x30f62c,4,0x2d3151,0,0),(0x3ccbec,0x9f7,0x314fe9,0x7f2,0),
+                (0x2a3a18,0x9f7,0,0,0x9f7),(0x29ffb8,0x1580,0,0,0),
+                (0x2e2e60,0x9c8,0,0,0),(0x2a086c,0x9c8,0,0,0),
+                (0x29ffb8,0x7d4,0,0,0),(0x3151da,0,0,0x7d4,0)),1):
+            lines.append(f'npe3_controller_source: sequence={n} entry={entry:08x} t={16+n*0.002:.9f} r0={r0:08x} lr={lr:08x} saved={saved:08x} input={argument:08x} observer_writes=0')
+        for n,result,stamp in ((1,2,15),(2,4,16.003)):
+            body=bytes.fromhex('07f20000')+result.to_bytes(4,'big')+bytes(24)
+            lines.append(f'npe3_controller_report: sequence={n} t={stamp:.9f} bytes={body.hex()} caller=0030f665 observer_writes=0')
+        text='\n'.join(lines)+'\nnpe3_controller_report_complete: posts=2 cap=16 begin=12 end=18 observer_writes=0\nnpe3_controller_source_complete: entries=8 cap=512 begin=12 end=18 observer_writes=0'
+        result=check_reentry_source(text,image)
+        self.assertEqual(result['restart_status'],'1580')
+        self.assertFalse(result['candidate_rejection_reason_qualified'])
+        for old,new in (('lr=002d3151','lr=002d3155'),('input=000009f7','input=000009f9'),
+                        ('07f2000000000004','07f2000000000003'),('entries=8','entries=9')):
+            with self.subTest(old=old),self.assertRaises(ValueError):
+                check_reentry_source(text.replace(old,new),image)
+
     def test_a_clear_then_reentry_is_not_a_missing_initial_completion(self):
         image=bytearray(0x1153c2)
         image[0x115262:0x115276]=bytes.fromhex('2004468120019002a0b1f15bf98c980271a0e0e3')
