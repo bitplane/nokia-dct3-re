@@ -123,6 +123,8 @@ void dct3_rf_adc_fixture_state::machine_start()
 	save_item(NAME(m_contention_sabm));save_item(NAME(m_contention_active));
 	save_item(NAME(m_ua_samples));
 	save_item(NAME(m_lu_start_frame));save_item(NAME(m_lu_samples));
+	save_item(NAME(m_lu_acknowledged));save_item(NAME(m_release_start_frame));
+	save_item(NAME(m_release_samples));
 	save_item(NAME(m_lab_tx_compares));
 	save_item(NAME(m_lab_tx.words)); save_item(NAME(m_lab_tx.count));
 	save_item(NAME(m_lab_tx.loading)); save_item(NAME(m_lab_tx.ready)); save_item(NAME(m_lab_tx.overflow));
@@ -159,6 +161,7 @@ void dct3_rf_adc_fixture_state::machine_reset()
 	m_agch_start_frame=~u64(0);
 	m_normal_start_frame=m_ua_start_frame=~u64(0);
 	m_lu_start_frame=~u64(0);
+	m_lu_acknowledged=false;m_release_start_frame=~u64(0);
 	m_normal_count=0;m_contention_active=false;
 	m_lab_tx.reset();
 	m_observed_tx_windows=m_transmit_releases=0;
@@ -306,6 +309,11 @@ TIMER_CALLBACK_MEMBER(dct3_rf_adc_fixture_state::candidate_transmit_start)
 			auto const access=gsm::rach::decode_p27(words,42);
 			if (access)
 			{
+				// A new externally observed access starts a new single-MS lab
+				// connection. No handset registration state is changed here.
+				m_contention_active=m_lu_acknowledged=false;
+				m_normal_count=0;
+				m_ua_start_frame=m_lu_start_frame=m_release_start_frame=~u64(0);
 				u64 const frame=machine().time().as_ticks(13'000'000)/60'000;
 				auto const assignment=subdevice<nokia_gsm_network_device>("gsm_network")->immediate_assignment(
 					*access,frame%nokia_rf_lab::hyperframe,35);
@@ -355,6 +363,39 @@ void dct3_rf_adc_fixture_state::receive_normal_uplink(std::array<u16,15> const &
 	for (auto byte:*block) packed+=util::string_format("%02x",byte);
 	machine().logerror("npe3_bts_uplink: start_frame=%u octets=%s exact_code=1 port_bits_only=1 physical_claim=0\n",
 		unsigned(m_normal_start_frame),packed);
+	if (!m_lu_acknowledged && m_lu_start_frame!=~u64(0) &&
+			m_normal_start_frame>m_lu_start_frame+3 &&
+			(*block)[0]==3 && (*block)[1]==0x21 && (*block)[2]==1)
+	{
+		m_lu_acknowledged=true;
+		auto const release=subdevice<nokia_gsm_network_device>("gsm_network")->channel_release();
+		gsm::tch_f::packed_control_block lapdm{};
+		lapdm.fill(0x2b);
+		// The second network I-frame: N(S)=1,N(R)=0,P=0.
+		lapdm[0]=3;lapdm[1]=2;lapdm[2]=(release.size()<<2)|1;
+		std::copy(release.begin(),release.end(),lapdm.begin()+3);
+		m_release_start_frame=(frame/51+1)*51+22;
+		auto const bursts=nokia_rf_lab::bcch_bits(lapdm,0);
+		for (unsigned at=0;at<4;++at) m_release_samples[at]=nokia_rf_lab::gmsk_samples(bursts[at]);
+		packed.clear();for (auto byte:lapdm) packed+=util::string_format("%02x",byte);
+		machine().logerror("npe3_raw_release: ack_start_frame=%u start_frame=%u octets=%s raw_adc_only=1 physical_claim=0\n",
+			unsigned(m_normal_start_frame),unsigned(m_release_start_frame),packed);
+		return;
+	}
+	if (m_release_start_frame!=~u64(0) && m_normal_start_frame>m_release_start_frame+3)
+	{
+		auto const ua=gsm::normal::disconnect_ua(*block);
+		if (ua)
+		{
+			m_ua_start_frame=(frame/51+1)*51+22;
+			auto const bursts=nokia_rf_lab::bcch_bits(*ua,0);
+			for (unsigned at=0;at<4;++at) m_ua_samples[at]=nokia_rf_lab::gmsk_samples(bursts[at]);
+			packed.clear();for (auto byte:*ua) packed+=util::string_format("%02x",byte);
+			machine().logerror("npe3_raw_disc_ua: disc_start_frame=%u start_frame=%u octets=%s raw_adc_only=1 physical_claim=0\n",
+				unsigned(m_normal_start_frame),unsigned(m_ua_start_frame),packed);
+			return;
+		}
+	}
 	auto const ua=gsm::normal::contention_ua(*block);
 	if (!ua) return;
 	if (m_contention_active &&
@@ -417,6 +458,12 @@ u16 dct3_rf_adc_fixture_state::sample_r(offs_t component)
 	if (component) return u16(m_q_latch);
 	u64 const tick = machine().time().as_ticks(13'000'000);
 	u64 const frame=tick/60'000;
+	if (m_raw_agch && frame>=m_release_start_frame && frame-m_release_start_frame<4 && tick%60'000<148*48)
+	{
+		auto const &sample=m_release_samples[frame-m_release_start_frame][(tick%60'000)/12];
+		m_q_latch=sample[1];
+		return u16(sample[0]);
+	}
 	if (m_raw_agch && frame>=m_lu_start_frame && frame-m_lu_start_frame<4 && tick%60'000<148*48)
 	{
 		auto const &sample=m_lu_samples[frame-m_lu_start_frame][(tick%60'000)/12];

@@ -1,9 +1,38 @@
 import unittest
 from unittest.mock import patch
-from tools.npe3_raw_ua_check import check,check_location_update
+from tools.npe3_raw_ua_check import check,check_location_update,check_release
 
 
 class RawUaCheckTest(unittest.TestCase):
+    def test_release_requires_two_decodes_ack_disc_and_immediate_common_reconfiguration(self):
+        release='03020d060d00'+'2b'*17
+        ua='017301'+'2b'*20
+        text=('npe3_raw_lu_accept: uplink_start_frame=3454 start_frame=3541 octets='+'00'*23+
+              ' policy=plain_test_cell raw_adc_only=1 physical_claim=0\n'
+              f'npe3_raw_release: ack_start_frame=3556 start_frame=3592 octets={release} raw_adc_only=1 physical_claim=0\n'
+              f'npe3_raw_disc_ua: disc_start_frame=3658 start_frame=3694 octets={ua} raw_adc_only=1 physical_claim=0')
+        blocks=[dict(start_frame=frame,octets=header+'2b'*20) for frame,header in
+                ((3556,'032101'),(3607,'034101'),(3658,'015301'))]
+        native=[dict(type=128,payload='802a00'+frame.to_bytes(3,'big').hex()+'0023fffe'+data,time=str(stamp))
+                for frame,data,stamp in ((3595,release,16.6),(3697,ua,17.07))]
+        common=[dict(time=17.08,kind=2,body=bytes(8)+b'\x60'+bytes(15))]
+        with patch('tools.npe3_raw_ua_check.check_rx_publications',return_value=dict(packets=native)), \
+                patch('tools.npe3_dedicated_check.packets',return_value=common):
+            self.assertTrue(check_release(text,blocks)['native_normal_release_qualified'])
+            for bad in (text.replace('3592','3593'),text.replace(release,release.replace('0302','0300')),
+                        text.replace('3694','3695'),text.replace('ack_start_frame=3556','ack_start_frame=3607')):
+                with self.assertRaises(ValueError):check_release(bad,blocks)
+            for bad in (blocks[:2],blocks[::2],blocks[1:],blocks+blocks[:1]):
+                with self.assertRaises(ValueError):check_release(text,bad)
+        for packets in ([],native[:1],native+native[:1]):
+            with patch('tools.npe3_raw_ua_check.check_rx_publications',return_value=dict(packets=packets)), \
+                    patch('tools.npe3_dedicated_check.packets',return_value=common):
+                with self.assertRaises(ValueError):check_release(text,blocks)
+        for packets in ([],[dict(common[0],time=17.5)],[dict(common[0],body=bytes(24))]):
+            with patch('tools.npe3_raw_ua_check.check_rx_publications',return_value=dict(packets=native)), \
+                    patch('tools.npe3_dedicated_check.packets',return_value=packets):
+                with self.assertRaises(ValueError):check_release(text,blocks)
+
     def test_lu_accept_binds_identity_native_decode_and_uplink_ack(self):
         sabm='013f4905087000f000fffe330809101010325476982b2b'
         accept='030045050200f1100001170809101010325476982b2b2b'

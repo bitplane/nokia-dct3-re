@@ -5,6 +5,8 @@ from tools.rom6_adc_measure_check import check_rx_publications
 UPLINK=re.compile(r'npe3_bts_uplink: start_frame=(\d+) octets=([0-9a-f]{46}) exact_code=1 port_bits_only=1 physical_claim=0')
 UA=re.compile(r'npe3_raw_ua: uplink_start_frame=(\d+) start_frame=(\d+) octets=([0-9a-f]{46}) raw_adc_only=1 physical_claim=0')
 LU=re.compile(r'npe3_raw_lu_accept: uplink_start_frame=(\d+) start_frame=(\d+) octets=([0-9a-f]{46}) policy=plain_test_cell raw_adc_only=1 physical_claim=0')
+RELEASE=re.compile(r'npe3_raw_release: ack_start_frame=(\d+) start_frame=(\d+) octets=([0-9a-f]{46}) raw_adc_only=1 physical_claim=0')
+DISC_UA=re.compile(r'npe3_raw_disc_ua: disc_start_frame=(\d+) start_frame=(\d+) octets=([0-9a-f]{46}) raw_adc_only=1 physical_claim=0')
 
 
 def check(text,blocks,*,require_native=True):
@@ -86,3 +88,47 @@ def check_location_update(text,blocks):
                 downlink_start_frame=start,native_decode_time=matches[0]['time'],
                 acknowledgement_frame=acknowledgements[0]['start_frame'],
                 mm_registration_qualified=False,physical_transmission_qualified=False)
+
+
+def check_release(text,blocks):
+    """Check actual normal-release exchange and the MCU return to common RX."""
+    from tools.npe3_dedicated_check import packets as mcu_packets
+    releases=list(RELEASE.finditer(text));responses=list(DISC_UA.finditer(text))
+    if (len(releases)!=1 or len(responses)!=1 or
+            text.count('npe3_raw_release:')!=1 or text.count('npe3_raw_disc_ua:')!=1):
+        raise ValueError('missing unique raw normal-release exchange')
+    release,response=releases[0],responses[0]
+    locations=list(LU.finditer(text))
+    ack,start=int(release[1]),int(release[2])
+    disc,ua_start=int(response[1]),int(response[2])
+    by_frame={block['start_frame']:bytes.fromhex(block['octets']) for block in blocks}
+    expected_release=b'\x03\x02\x0d\x06\x0d\0'+b'\x2b'*17
+    expected_ua=b'\x01\x73\x01'+b'\x2b'*20
+    if (len(locations)!=1 or ack<=int(locations[0][2])+3 or release.start()<locations[0].end() or
+            len(by_frame)!=len(blocks) or by_frame.get(ack,b'')[:3]!=b'\x03\x21\x01' or
+            start!=(ack//51+1)*51+22 or bytes.fromhex(release[3])!=expected_release or
+            by_frame.get(disc,b'')[:3]!=b'\x01\x53\x01' or disc<=start+3 or
+            ua_start!=(disc//51+1)*51+22 or bytes.fromhex(response[3])!=expected_ua or
+            response.start()<release.end()):
+        raise ValueError('normal release differs from actual acknowledgement/DISC or channel grammar')
+    if not any(start+3<frame<disc and data[:3]==b'\x03\x41\x01' for frame,data in by_frame.items()):
+        raise ValueError('no native RR acknowledges second network I-frame')
+    native=check_rx_publications(text)['packets'];times=[]
+    for frame,data in ((start,expected_release),(ua_start,expected_ua)):
+        matches=[]
+        for packet in native:
+            body=bytes.fromhex(packet['payload'])
+            if (packet['type']==128 and len(body)==33 and body[:3]==b'\x80\x2a\0' and
+                    int.from_bytes(body[3:6],'big')==(frame+3)%2715648 and
+                    body[6:8]==b'\0\x23' and body[10:]==data and
+                    float(packet['time'])>(frame+3)*60000/13000000):
+                matches.append(packet)
+        if len(matches)!=1:raise ValueError('missing unique native release/closing-UA decode')
+        times.append(float(matches[0]['time']))
+    common=[packet for packet in mcu_packets(text) if times[-1]<packet['time']<times[-1]+0.1 and
+            packet['kind']==2 and len(packet['body'])==24 and packet['body'][8]==0x60]
+    if len(common)!=1:raise ValueError('MCU did not return to common control after closing UA')
+    return dict(native_normal_release_qualified=True,channel_release_start=start,
+                disconnect_frame=disc,closing_ua_start=ua_start,
+                native_decode_times=times,common_configuration_time=common[0]['time'],
+                stable_camping_qualified=False,physical_transmission_qualified=False)

@@ -48,8 +48,8 @@ including that exact SABM. An external exact normal-burst decoder now
 returns contention-resolution UA as raw I/Q;the native dedicated receiver
 publishes the matching successful class80 result. Raw Location Updating
 Accept also reaches the native receiver;the MCU acknowledges it and persists
-updated test-cell EF_LOCI. Normal channel release and stable camping remain
-open. The acquired PMM still parks at the validation
+updated test-cell EF_LOCI. A raw Channel Release/DISC/UA exchange returns
+the MCU to common control. Stable camping remains open. The acquired PMM still parks at the validation
 gate,described below. These laboratory
 results do not retire the physical request/acknowledgement or tuning contract.
 
@@ -63,7 +63,7 @@ results do not retire the physical request/acknowledgement or tuning contract.
 | Own 6210 full-SI candidate | Legal 24-second physical Menu, SI1..SI4 native decoding, MCU availability `0f`, observed success return, organic IDLE_RA/RA_INFO and independently checked P21/P27 access bits | Physical release timing/access grant, camping, registration and fitted timing/tuning |
 | Own 6210 P05-start candidate | Complete native buffers clocked at the projected P05 matches; same receive/UI checks and exact port-word preservation | Physical pin/timing identity, external network decode/AGCH, camping and registration |
 | Own 6210 raw-AGCH candidate | Exact successful native assignment decode; MCU assigned-SDCCH configuration and SABM containing Location Updating Request | Native dedicated transmission, validation-gate completion, camping/registration and physical timing/tuning |
-| Synthetic-record raw-AGCH run | Ten-slot validation cycle;combined CCCH;48 normal bursts/12 exact xCCH blocks;raw UA and LU Accept reach native RX;native RR acknowledges and SIM EF_LOCI becomes updated | Normal network release,stable camping/operator presentation and physical timing/tuning |
+| Synthetic-record raw-AGCH run | Ten-slot validation cycle;combined CCCH;32 normal bursts/8 exact xCCH blocks;native UA/LU Accept and RR acknowledgement;updated SIM EF_LOCI;raw normal release back to common RX | Stable camping/registered presentation and physical timing/tuning |
 
 The CPU additions needed by the normal-burst frontend have generic focused
 tests. The rebuilt native ROM6 menu/storage/save-state scenarios, ROM4
@@ -347,8 +347,8 @@ The coherent24s run decodes SABM at uplink3454..3457 and schedules UA at
 with frame3493,BSIC42 and ARFCN35. The acceptance checker independently
 joins every BTS uplink to timed port decoding,verifies the response schedule
 and echo,and requires a unique successful native publication. Native uplink
-then contains idle UI rather than SABM retries;48 normal bursts form12
-valid xCCH blocks. UI/Menu,complete record validation and legal execution
+then contains idle UI rather than SABM retries;the UA-only control has48
+normal bursts/12 valid xCCH blocks. UI/Menu,complete record validation and legal execution
 remain intact. This proves dedicated native reception,not MCU link completion
 or Location Updating by itself. The UA-only control submits idle UI at
 16.158123769s and later reconfigures common control at17.632165538s.
@@ -373,15 +373,40 @@ EF_LOCI changes from the card's unregistered initialization to
 `ffffffff00f1100001ff00`:no allocated TMSI,advertised LAI,and update status00.
 The runner retains fixture storage,checks this exact record,and leaves all
 acquired ROM/PMM files untouched. This qualifies native MM acceptance and
-SIM persistence,not stable camping or a completed normal release. The MCU
-still returns to common control without a network RR Channel Release;SACCH
-system information is also absent. These are the next bounded contracts.
+SIM persistence,not stable camping. The LU-only control returns to common
+control without a network RR Channel Release;normal release is qualified
+separately below. SACCH system information is still absent.
 
 The Messages Menu oracle is deliberately re-banked only for the provisioned
 LU composition. The reviewed raw pixel hash is
 `5adef93609b763a40d0e3c9dca356d388a910bb393a518e99a53eec2c7184202`;
 comparison with the preceding UA frame changes only envelope-animation
 pixels25..48,33..39. Ordinary native and no-reply profile hashes are unchanged.
+
+### Native normal channel release
+
+The external BTS waits for exact timed `RR N(R)=1` after LU Accept before
+transmitting RR Channel Release,cause0,in network I-frame N(S)=1/N(R)=0.
+At uplink3556..3559,the native port supplies that acknowledgement. The raw
+reply `03020d060d002b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b`
+occupies downlink3592..3595 and native class80 publishes exact success at
+16.594479846s. Native uplink3607..3610 acknowledges N(R)=2;uplink3658..3661
+then carries DISC `015301`. Only this real command triggers empty UA
+`017301` at3694..3697,decoded natively at17.065241846s. The MCU reconfigures
+common control at17.067163462s,immediately after UA rather than the LU-only
+control's later17.632s return. DISC P=1/UA F=1 follow
+[TS44.006 section8.4.4.2](https://www.etsi.org/deliver/etsi_ts/144000_144099/144006/04.00.00_60/ts_144006v040000p.pdf).
+
+The checker binds all replies to independently decoded timed uplinks,checks
+both native downlink publications,and requires the actual MCU common-channel
+configuration within100ms of closing UA. Missing/changed RR,DISC,coding,
+downlink status/sequence or common configuration reject. New observed RACH
+starts a new single-MS laboratory connection;it does not modify handset
+registration state. Physical Menu retains the LU-phase exact hash,EF_LOCI
+remains updated,and all32 normal bursts form8 exact xCCH blocks. The idle
+frame displays `DCT3 LAB`,but the UA-only control also displays that SIM name:
+the label alone is not a registration/camping oracle. Valid idle paging,
+longer registered operation and fitted RF tuning remain separate contracts.
 
 ```sh
 .venv/bin/python tools/run_npe3_native.py --reference-clock --seconds 24 --adc-source fcch-sch-broadcast --capture-start p09 --tx-release p05 --raw-agch --provision-records

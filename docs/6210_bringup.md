@@ -47,13 +47,14 @@ SABM containing a Location Updating Request. The DSP's SEND_BLOCK validation
 gate parks with04fa=0 before dedicated transmission. Dedicated-channel service and registration remain
 unqualified; these laboratory candidates do not replace the normal profile.
 The separate synthetic-record input now completes the ten-slot native record
-cycle and final reread. Its24s gate additionally checks48 normal port bursts
-as12 convolution/FIRE-valid xCCH blocks,including the exact MCU SABM/LU.
+cycle and final reread. Its24s gate additionally checks32 normal port bursts
+as8 convolution/FIRE-valid xCCH blocks,including the exact MCU SABM/LU.
 The combined-CCCH laboratory BTS derives UA from those timed bits,returns
 raw dedicated I/Q,and the native class80 receiver publishes the exact UA
 successfully. Raw Location Updating Accept is decoded and acknowledged by
 native uplink RR;the fresh SIM persists updated test-cell EF_LOCI.
-Normal channel release and stable camping/operator presentation remain open;
+Raw RR Channel Release,native acknowledgement/DISC,closing UA and the MCU
+return to common RX are also qualified. Stable camping/registered presentation remain open;
 see the [native MM boundary](rom6_rf_interface.md#native-location-updating-acceptance).
 The explicit 13 MHz DSP clock is provisional (the manual establishes RFIclk,
 not the DSP multiplier). A longer run requests MCU software reset near

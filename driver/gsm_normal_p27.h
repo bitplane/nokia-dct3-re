@@ -61,5 +61,15 @@ inline std::optional<tch_f::packed_control_block> contention_ua(
 	std::copy_n(sabm.begin()+3,length,result.begin()+3);
 	return result;
 }
+
+inline std::optional<tch_f::packed_control_block> disconnect_ua(
+		tch_f::packed_control_block const &disc)
+{
+	if (disc[0]!=1 || disc[1]!=0x53 || disc[2]!=1) return std::nullopt;
+	tch_f::packed_control_block result{};
+	result.fill(0x2b);
+	result[0]=1;result[1]=0x73;result[2]=1;
+	return result;
+}
 } // namespace gsm::normal
 #endif // MAME_NOKIA_GSM_NORMAL_P27_H

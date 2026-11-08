@@ -25,6 +25,7 @@ int main()
 		};
 		print(*block);
 		auto ua=gsm::normal::contention_ua(*block);
+		if (!ua) ua=gsm::normal::disconnect_ua(*block);
 		std::cout<<' ';if (ua) print(*ua);else std::cout<<"none";
 		std::cout<<'\n';
 	}

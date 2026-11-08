@@ -306,6 +306,9 @@ def main():
                             raise ValueError('native MM did not persist updated test-cell EF_LOCI')
                         report['raw_lu_accept']['native_mm_acceptance_qualified']=True
                         print('Native6210 raw LU Accept: PASS native decode, timed uplink RR and updated SIM_LOCI='+report['sim_location_after_lu']+'; stable_camping=0')
+                        from tools.npe3_raw_ua_check import check_release
+                        report['raw_release']=check_release(text,report['native_access']['normal_control_blocks'])
+                        print('Native6210 raw release: PASS RR Channel Release, native DISC/UA and MCU common RX; stable_camping=0')
                     print(f"Native6210 raw AGCH: PASS native_decodes={report['raw_agch']['responses']}; tuned_air_source=0 registration=0")
                     print('Native6210 assigned SDCCH: PASS MCU SABM/Location Updating submission; native_transmission=0 registration=0')
                 elif 'npe3_raw_agch:' in text:

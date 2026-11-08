@@ -14,16 +14,17 @@ class NormalP27CppTest(unittest.TestCase):
         if not compiler:self.skipTest('C++ compiler unavailable')
         root=Path(__file__).resolve().parents[1]
         sabm=bytes.fromhex('013f4905087000f000fffe330809101010325476982b2b')
-        cases=[]
-        for payload in (bytes(23),bytes([255])*23,bytes(range(23)),sabm):
+        def serialize(payload):
             bursts=[]
-            for raw in normal_control_bursts(payload):
-                bits=list(raw)
-                bits[61:87]=TSC0
+            for raw in normal_control_bursts(bytes(payload)):
+                bits=list(raw);bits[61:87]=TSC0
                 lane=[0]*9+bits+[1]*23
                 bursts.append([sum(lane[word*12+bit]<<bit for bit in range(12)) for word in range(15)])
+            return bursts
+        cases=[]
+        for payload in (bytes(23),bytes([255])*23,bytes(range(23)),sabm):
             expected=payload.hex()+' '+(sabm[:1]+b'\x73'+sabm[2:]).hex() if payload==sabm else payload.hex()+' none'
-            cases.append((0,bursts,expected))
+            cases.append((0,serialize(payload),expected))
         good=cases[-1][1]
         for bit in (9,12,69,70,95,96,154):
             bad=[row.copy() for row in good]
@@ -33,12 +34,12 @@ class NormalP27CppTest(unittest.TestCase):
         # Re-encode malformed SABM headers: FEC/FIRE remain valid,but no UA.
         for position,value in ((0,3),(1,0x2f),(2,0),(2,0x55),(2,0x4b)):
             payload=bytearray(sabm);payload[position]=value
-            bursts=[]
-            for raw in normal_control_bursts(bytes(payload)):
-                bits=list(raw);bits[61:87]=TSC0
-                lane=[0]*9+bits+[1]*23
-                bursts.append([sum(lane[word*12+bit]<<bit for bit in range(12)) for word in range(15)])
-            cases.append((0,bursts,payload.hex()+' none'))
+            cases.append((0,serialize(payload),payload.hex()+' none'))
+        disc=bytes.fromhex('015301')+b'\x2b'*20
+        cases.append((0,serialize(disc),disc.hex()+' '+(b'\x01\x73\x01'+b'\x2b'*20).hex()))
+        for position,value in ((0,3),(1,0x43),(2,5)):
+            bad=bytearray(disc);bad[position]=value
+            cases.append((0,serialize(bad),bad.hex()+' none'))
         stdin='\n'.join(str(tsc)+' '+' '.join(f'{word:x}' for burst in bursts for word in burst)
                         for tsc,bursts,_ in cases)
         with tempfile.TemporaryDirectory() as directory:
