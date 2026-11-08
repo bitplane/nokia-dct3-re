@@ -86,7 +86,11 @@ def main():
                         help='separate timed native-buffer candidate; no network reply')
     parser.add_argument('--raw-agch', action='store_true',
                         help='separate external access decoder and raw AGCH waveform experiment')
+    parser.add_argument('--provision-records', action='store_true',
+                        help='explicit synthetic record fixture; acquired PMM remains unchanged')
     args = parser.parse_args()
+    if args.provision_records and not args.raw_agch:
+        parser.error('synthetic record fixture requires the separate raw AGCH experiment')
     if args.raw_agch and args.tx_release!='p05':
         parser.error('raw AGCH requires the explicit P05 transmit candidate')
     if args.tx_release and (args.adc_source!='fcch-sch-broadcast' or args.capture_start!='p09'):
@@ -119,6 +123,13 @@ def main():
             if args.adc_source == 'fcch-sch-broadcast': model = 'npe3sp9'
     if args.tx_release:model='npe3tp5'
     if args.raw_agch:model='npe3ap5'
+    if args.provision_records:
+        from tools.make_npe3_record_profile import make_profile,EXAMPLE_IMEI14,OBSERVED_CHIP
+        pmm=make_profile(flash,pmm,(ROOT/'roms/nsm3r6/nsm3_rom6_data.be16').read_bytes())
+        (run/'record-profile.json').write_text(json.dumps(dict(
+            synthetic=True,source_pmm_sha1='b3a527ede1be87bd715fb3741a81eef5bd422efa',
+            fixture_pmm_sha1=hashlib.sha1(pmm).hexdigest(),example_imei14=EXAMPLE_IMEI14,
+            modeled_chip=OBSERVED_CHIP.hex(),fitted_identity_claim=False),indent=2)+'\n')
     storage = run / 'nvram' / model
     storage.mkdir(parents=True)
     (storage / 'flash').write_bytes(flash.ljust(0x3fa000, b'\xff') + pmm)
@@ -256,6 +267,10 @@ def main():
                     report['raw_agch']=check_agch(text)
                     from tools.npe3_dedicated_check import check as check_dedicated
                     report['dedicated_submission']=check_dedicated(text)
+                    if args.provision_records:
+                        from tools.make_npe3_record_profile import assess_runtime
+                        report['record_profile']=assess_runtime(text)
+                        print('Native6210 synthetic records: PASS initial validators only; complete_record_family=0')
                     print(f"Native6210 raw AGCH: PASS native_decodes={report['raw_agch']['responses']}; tuned_air_source=0 registration=0")
                     print('Native6210 assigned SDCCH: PASS MCU SABM/Location Updating submission; native_transmission=0 registration=0')
                 elif 'npe3_raw_agch:' in text:

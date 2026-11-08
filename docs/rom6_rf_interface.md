@@ -240,6 +240,54 @@ The next experiment must establish a coherent external provisioning contract
 or recover the acquired store's intended hardware identity before revisiting
 native SEND_BLOCK. No additional AGCH or UA can release this local error loop.
 
+### Synthetic initial-record fixture
+
+`--provision-records` adds an explicit, separate storage experiment to the raw
+AGCH run. It never changes the acquired PMM or the machine defaults. The
+fixture declares example IMEI14`49015420621001` and the already observed model
+chip00160010, not fitted donor identity. All tables come from the pinned DROM.
+FAID plaintext uses the existing factory-fixture convention: flash seed XOR
+17ca6089, its complement and four zero bytes. Here that checksum equals the
+independently computed native startup fingerprintf65a0d46 exactly. The identity
+record contains the explicit example BCD bytes and duplicates them in the
+MCU-readable field; the first two lock blocks use the existing unlocked-fixture
+convention. These policy bytes remain a laboratory input, not a factory claim.
+
+Storage obligations are independent of those decrypted-record checks. The own
+PMM journal has a2500-byte base payload at26,295 writes ending1bb0,and no
+later write to the initial56 bytes. MCU387fb4 compares sum16(cache[0:11c])
+against the BE32 field at11c;4a18b0 is a byte-sum,not CRC32. Failing to update
+it produces fault slot18/value12 and clears host17fd99 bit6 at3028dc,
+leading to CONTACT SERVICE even with all DSP validation bits set. The fixture
+therefore recomputes this low-block sum and the base record's checksum byte,
+preserving all unrelated cache bytes and journal entries. Its manifest records
+source/derived PMM hashes and the synthetic identity.
+
+The early program snapshot taken at the actual45b4 data write establishes the
+own upload at0c01..0c47 (MCU file24f7e,142 bytes,
+SHA256`e89cb6d0a3d680a9d0a321549a6f6f9583cbaf7c3b975c44f521f655a724752c`).
+0c0d..0c16 compares the decoded FAID pair with04f7:04f8. The identity arm
+0c30..0c46 compares decoded words1/2/3 and word4's high byte with the seven
+unencrypted BCD bytes before45ba. A terminal program snapshot is unsuitable
+for this startup code because later acquisition uploads replace it.
+
+The checksummed fixture passes the unchanged24s Menu/SCH/SI/AGCH/MCU-SABM
+checks and initially reaches04fa=7 through real45b7/45bf/45e9 writes. It is
+**not a complete record-family fixture**: after that first reply the MCU
+organically requests the next24 bytes from cache38. Their native validation
+clears bit2 again,leaving04fa=3 and the same SEND_BLOCK error gate. The acquired
+cache contains ten24-byte slots at20..10f;slots1..9 contain the same encoded
+placeholder,not known valid records for the modeled chip. MCU387ad4..387b58
+owns the next-record decision and index bound10. Mapping this extended-record
+contract is the next software target;do not force its index,skip requests,set
+04fa,or reinterpret the initial7 as settled completion. The bounded fixture
+remains useful to distinguish initial validation from sequence completion;
+replace it when the full external record contract is recovered.
+
+```sh
+.venv/bin/python tools/run_npe3_native.py --reference-clock --seconds 24 --adc-source fcch-sch-broadcast --capture-start p09 --tx-release p05 --raw-agch --provision-records
+```
+
 The reference project's registration notes independently associate04fa with
 record/identity validation and report a6210 FAID/provisioning repair. That is
 a hypothesis source, not an imported fix: its failed profile had04fa=6,

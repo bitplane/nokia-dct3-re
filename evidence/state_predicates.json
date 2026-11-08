@@ -3,6 +3,14 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "npe3_synthetic_initial_record_validations",
+      "owner": "native_rom6_record_contract",
+      "status": "satisfied",
+      "predicate": "An explicitly synthetic,checksummed external storage fixture passes the three initial native record validators without bypassing the extended record sequence",
+      "current": "The separate provision-records input uses exampleIMEI49015420621001,the observed modelchip00160010,explicit acquired DROM keys and the own flash seed. Existing factory-fixture seedxor17ca6089 yields nativefingerprintf65a0d46. Own startup0c30..0c46 compares decoded identity words1..4 with the plain seven-byte BCD field. Own387fb4 checks sum16(cache0..11b) against BE32at11c;without updating that independent checksum the MCU raises fault18/value12 and CONTACT SERVICE. The generator updates the low-block and journal checksums,leaves acquired files and unrelated cache/journal data unchanged,and writes a synthetic manifest. The24s Menu/SCH/SI/rawAGCH/MCUSABM checks pass. Real45b7/45bf/45e9 writes initially reach04fa7,but a subsequent organic opcode16 requests the next acquired24-byte slot and45e6 clears bit2 to3. Therefore complete-record-family validation,native dedicated transmission and registration remain unqualified. No flag,index,request,result or firmware state is forced. Ten stored slots and own387b14 indexbound10 constrain the next mapping task.",
+      "evidence": ["tools/make_npe3_record_profile.py", "tools/test_make_npe3_record_profile.py", "tools/npe3_dedicated_observe.lua", "tools/run_npe3_native.py", "docs/rom6_rf_interface.md"]
+    },
+    {
       "id": "npe3_record_validation_arithmetic",
       "owner": "native_rom6_record_contract",
       "status": "satisfied",

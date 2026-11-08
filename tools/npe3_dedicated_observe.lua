@@ -29,10 +29,50 @@ for _,entry in ipairs({0x34b4,0x350c,0x3500,0x45b2,0x45ba,0x45c2,0x8508}) do
     end)
 end
 local writes=0
+local captured=false
 handles[#handles+1]=cpu.spaces.data:install_write_tap(0x4fa,0x4fa,'npe3_integrity_flags',function(_,value,mask)
     if writes>=32 then return end
     writes=writes+1
     machine:logerror(string.format('npe3_integrity_flags: sequence=%d t=%.9f value=%04x mask=%04x owner=%06x observer_writes=0\n',
         writes,machine.time:as_double(),value,mask,cpu.state.EXECPC.value))
+    if not captured and cpu.state.EXECPC.value==0x45b4 then
+        captured=true
+        busy=true
+        local file=assert(io.open('npe3_record_program.be16','wb'))
+        for at=0,65535 do file:write(string.pack('>I2',cpu.spaces.program:read_u16(at))) end
+        file:close()
+        busy=false
+    end
 end)
 _G.npe3_dedicated_observation=handles
+local arm=assert(machine.devices[':maincpu'])
+local space=arm.spaces.program
+local flag_writes=0
+handles[#handles+1]=space:install_write_tap(0x17fd98,0x17fd9b,'npe3_record_host_flags',function(address,value,mask)
+    if address~=0x17fd98 or busy or flag_writes>=64 then return end
+    busy=true
+    local old=space:read_u32(address)
+    local after=(old&~mask)|(value&mask)
+    if ((old~after)&0x00ff0000)~=0 then
+        flag_writes=flag_writes+1
+        machine:logerror(string.format('npe3_record_host_flags: t=%.9f old=%02x new=%02x owner=%08x observer_writes=0\n',
+            machine.time:as_double(),(old>>16)&255,(after>>16)&255,arm.state.PC.value))
+        if arm.state.PC.value==0x3028dc then
+            local faults={}
+            for at=0x17fbe0,0x17fbf7 do faults[#faults+1]=string.format('%02x',space:read_u8(at)) end
+            machine:logerror(string.format('npe3_record_host_faults: index=%u pointer=%08x bytes=%s t=%.9f observer_writes=0\n',
+                arm.state.R0.value,arm.state.R1.value,table.concat(faults),machine.time:as_double()))
+        end
+    end
+    busy=false
+end)
+for _,entry in ipairs({0x387ad4,0x387c78,0x387d7e,0x387e9e,0x387f66}) do
+    local hits=0
+    handles[#handles+1]=space:install_read_tap(entry&~3,(entry&~3)+3,'npe3_record_host_'..entry,function()
+        if busy or arm.state.PC.value~=entry or hits>=4 then return end
+        hits=hits+1
+        machine:logerror(string.format('npe3_record_host: entry=%08x t=%.9f r0=%08x r4=%08x r5=%08x r6=%08x r7=%08x r8=%08x observer_writes=0\n',
+            entry,machine.time:as_double(),arm.state.R0.value,arm.state.R4.value,arm.state.R5.value,
+            arm.state.R6.value,arm.state.R7.value,arm.state.R8.value))
+    end)
+end

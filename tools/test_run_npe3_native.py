@@ -8,6 +8,12 @@ from tools.run_npe3_native import (check_execution, check_input_start, expected_
 
 
 class Native6210EvidenceTest(unittest.TestCase):
+    def test_record_fixture_requires_explicit_raw_agch_profile(self):
+        script=Path(__file__).with_name('run_npe3_native.py')
+        result=subprocess.run([sys.executable,str(script),'--provision-records'],capture_output=True,text=True)
+        self.assertEqual(result.returncode,2)
+        self.assertNotIn('Native6210 evidence:',result.stdout)
+
     def test_raw_agch_requires_explicit_timed_transmitter(self):
         script=Path(__file__).with_name('run_npe3_native.py')
         result=subprocess.run([sys.executable,str(script),'--raw-agch'],capture_output=True,text=True)
