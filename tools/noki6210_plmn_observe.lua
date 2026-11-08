@@ -1,6 +1,7 @@
 -- Own NPE-3 v5.56 bounded SI3 observations; no state or transport writes.
 local machine = manager.machine
-assert(machine.system.name == 'npe3hle', 'requires NPE-3 research-HLE composition')
+assert(machine.system.name == 'npe3hle' or machine.system.name == 'npe3bp9',
+    'requires own NPE-3 HLE or raw-BCCH laboratory composition')
 local cpu = assert(machine.devices[':maincpu'])
 local space = cpu.spaces['program']
 local taps, busy = {}, false

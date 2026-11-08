@@ -2901,8 +2901,12 @@ in the 224-bit input. The FIRE model remains a functional zero-syndrome
 subset, not measured timing or error correction.
 
 The next boundary is MCU consumption and complete broadcast acquisition:
-follow its own SI3 consumer, establish the missing SI request/schedule, then
-provide standards-derived raw broadcasts. No decoded messages, firmware
+the bounded native eight-second trace reaches its own BCCH consumer `3b9e34`
+for the successful blocks, in context state 2, but does not observe the mapped
+SI3 branch `3ba0c0`. Delivery to that consumer is therefore not the missing
+boundary. Audit its channel/header admission before attributing the return
+to scanning solely to the incomplete SI schedule. Then establish the missing
+SI request/schedule and provide standards-derived raw broadcasts. No decoded messages, firmware
 fields, carrier selection or registration verdict are supplied. Existing
 SCH-only and zero-source profiles remain distinct controls.
 
