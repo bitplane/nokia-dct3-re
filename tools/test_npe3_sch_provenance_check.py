@@ -31,11 +31,11 @@ class SchProvenanceTest(unittest.TestCase):
             with self.subTest(old=old), self.assertRaises(ValueError):
                 check_capture_compare(self.controls().replace(old, new), source)
 
-    def fixture(self):
-        lines = ['mfi_rx_epoch: first_tick=42243384 divider=12 physical_clock_claim=0']
+    def fixture(self, first_tick=42243384):
+        lines = [f'mfi_rx_epoch: first_tick={first_tick} divider=12 physical_clock_claim=0']
         for index in range(1024):
             sequence = index + 1 if index < 64 else index - 63
-            tick = 41586924 + index * 12 if index < 64 else 42243384 + (index - 64) * 12
+            tick = 41586924 + index * 12 if index < 64 else first_tick + (index - 64) * 12
             value = reference_word(sequence, tick, True, 12, True, True)
             lines.append(f'npe3_sch_raw: ordinal={index+1} t={tick/13000000+.00001:.9f} value={value:04x} source_tick={tick} capture_sequence={sequence} owner=002592 observer_writes=0')
         owners = (0x794a, 0x794b, 0x794f, 0x7950, 0x7955, 0x7956, 0x7958, 0x7959)
@@ -53,6 +53,9 @@ class SchProvenanceTest(unittest.TestCase):
         self.assertEqual(report['missing_sch_prefix_complex_samples'], 141)
         self.assertEqual(report['source_frame'], 704)
         self.assertFalse(report['sch_qualified'])
+
+    def test_half_sample_start_is_not_rounded_to_a_complete_sample(self):
+        self.assertEqual(check(self.fixture(42243396))['missing_sch_prefix_complex_samples'], 141.5)
 
     def test_reject_changed_source_order_builder_and_accounting(self):
         text = self.fixture()

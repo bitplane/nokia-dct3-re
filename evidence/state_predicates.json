@@ -3,6 +3,14 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "native_dsp_reload_preserves_fractional_counter_phase",
+      "owner": "native_dsp_declared_counter_model",
+      "status": "satisfied",
+      "predicate": "P0e modulus writes preserve the running divider fraction and exact armed compare time in the declared13MHz/12 counter model",
+      "current": "The executable backend fixture fails before correction on a same-value write half a quarter after load. After correction it observes counter1 on the original clock, the exact original target2 callback, and counter3 after a changed modulus. Existing compare replacement/save-restore/ack/reset/MFI tests, backend BSP and ROM4 coherent/30s processing gates pass. Own6210 native24s UI and raw-source checks pass with778500 complete writes; its capture advances only84 reference ticks to42243300(frame704 offset3300), still137.5 complex-sample intervals late and error1. Seven confirmations/residual-2 persist. This establishes model consistency, not silicon reload semantics, physical clock, successful SCH, camping or registration. P0d still explicitly loads a new epoch.",
+      "evidence": ["driver/nokia_dsp_c54x.cpp", "tests/devices/nokia_dsp_serial_test.cpp", "tools/run_c54x_serial_compare.py", "tools/npe3_sch_provenance_check.py", "tools/test_npe3_sch_provenance_check.py", "docs/rom6_rf_interface.md", "docs/6210_bringup.md"]
+    },
+    {
       "id": "npe3_finite_fcch_residual_and_compare_bounds",
       "owner": "native_rom6_reference_adc_laboratory",
       "status": "satisfied",

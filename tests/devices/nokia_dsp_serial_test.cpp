@@ -5,6 +5,7 @@
 #include "nokia_ccont.h"
 #include "nokia_cobba.h"
 #include "nokia_dsp_c54x.h"
+#include "nokia_dsp_compare_clock.h"
 #include "nokia_dspif.h"
 #include "nokia_hagar.h"
 #include "nokia_mfi_rx.h"
@@ -80,6 +81,16 @@ private:
 		{
 			m_adc_first_time=m_adc_time; m_adc_first_tick=m_adc_last_tick; m_adc_first_source=m_adc_source;
 		}
+	}
+	attotime reference_offset(u64 ticks) const
+	{
+		using namespace nokia_dsp_compare_clock;
+		return attotime(ticks/reference_hz,fractional_attoseconds(ticks));
+	}
+	void next_counter_phase(u64 ticks)
+	{
+		++m_stage;
+		m_timer->adjust(m_counter_anchor+reference_offset(ticks)-machine().time());
 	}
 	TIMER_CALLBACK_MEMBER(step)
 	{
@@ -181,7 +192,24 @@ private:
 		case 11:
 			expect(m_adc_source==m_disabled_adc_source && m_adc_blocks==m_disabled_adc_blocks,"disabled MFI does not clock or notify");
 			m_mfi->reset(); expect(!m_mfi->produced() && !m_mfi->consumed(),"MFI reset clears state");
-			osd_printf_info("C54x compare boundary: PASS replacement=1 armed_restore=1 exact_time=1 ack_ports=1,2 periodic=1 raw_zero=1 cancellation=1 reset_abort=1 hagar_restore=1 mfi_clock_restore=1 mfi_irq_owner=1 physical_latch_claim=0\n");
+			m_backend->reset_line_w(1);
+			io.write_word(0x0e,999); io.write_word(0x0d,0); io.write_word(4,2);
+			m_counter_anchor=machine().time(); m_counter_events=m_events;
+			next_counter_phase(6); return;
+		case 12:
+			// Rewrite half a quarter after the load: the divider is not reset.
+			io.write_word(0x0e,999); next_counter_phase(13); return;
+		case 13:
+			expect(io.read_word(0x0d)==1,"unchanged reload preserves fractional reference phase");
+			expect(m_events==m_counter_events,"reload does not deliver compare early");
+			next_counter_phase(25); return;
+		case 14:
+			expect(m_events==m_counter_events+1 && m_time==m_counter_anchor+reference_offset(24),
+				"unchanged reload retains the exact armed compare deadline");
+			io.write_word(0x0e,1999); next_counter_phase(36); return;
+		case 15:
+			expect(io.read_word(0x0d)==3,"changed reload also preserves the running divider phase");
+			osd_printf_info("C54x compare boundary: PASS replacement=1 armed_restore=1 exact_time=1 ack_ports=1,2 periodic=1 raw_zero=1 cancellation=1 reset_abort=1 hagar_restore=1 mfi_clock_restore=1 mfi_irq_owner=1 reload_phase=1 physical_latch_claim=0\n");
 			fatalerror("C54x compare boundary tests complete");
 		}
 		++m_stage;
@@ -196,6 +224,8 @@ private:
 	unsigned m_stage=0,m_events=0;
 	u64 m_tuple=0;
 	attotime m_time,m_reference_time;
+	attotime m_counter_anchor;
+	unsigned m_counter_events=0;
 	u64 m_adc_source=0,m_adc_consumed=0,m_adc_blocks=0,m_adc_last_tick=0;
 	u64 m_reference_adc_source=0,m_reference_adc_tick=0;
 	attotime m_adc_time,m_reference_adc_time;

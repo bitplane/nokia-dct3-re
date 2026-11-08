@@ -13,15 +13,16 @@ have focused checks. These do not qualify a physically timed RF receiver.
 The own-upload 6210 reference-clock [raw ADC comparison](6210_bringup.md#reference-clock-raw-adc-trials)
 now qualifies fault-free sample delivery and 496 independent FIR outputs,
 including 104 nonzero outputs under the coded source. Its first SCH aperture
-is nonzero but the native report still has error status 1. This is a distinct
-aperture-provenance question, not evidence that NSM-3's zero-window diagnosis
-or a physical clock/capture interpretation transfers unchanged.
+is nonzero but the native report still has error status 1. Its queued-source
+and native last-writer provenance are checked: the final capture starts partway
+through SCH. NSM-3's zero-window diagnosis does not transfer unchanged.
 
 The immediate frontier is **capture-edge ownership**: which P09/P0a/P0b
 events start conversion, admit samples and assert MFI INT0, and how those
 events relate to the DSP I/O counter/reload epoch. Under the current declared
-P03-level laboratory gate, the first SCH window contains zeros and native
-decoding fails. Mode-1 product/history and mixer checks do not expose an
+P03-level laboratory gate, the NSM-3 first SCH window contains zeros; the
+6210 window is nonzero but partial. Both fail native decoding.
+Mode-1 product/history and mixer checks do not expose an
 arithmetic defect; the P03 bit-8 poll does not prove a missing hardware clear.
 Organic SCH/BCCH reception and camping remain unqualified. This is now
 distinct from decoder execution: isolated native SCH and BCCH paths recover
@@ -210,6 +211,22 @@ Existing registers, pending bits and reference epoch remain saved/reset by
 the backend; no new firmware state or forced counter publication is added.
 The 13 MHz/12 physical rate, equality-at-write policy and RF serial latch phase
 remain separately unmeasured for ROM6.
+
+P0e reload writes also retain the divider's fractional phase, including
+unchanged-value writes. The executable backend fixture writes at half a
+quarter, observes the next counter increment on the original clock, and
+requires the original exact compare deadline; a changed-modulus write is
+checked separately. The former implementation re-anchored to each write and
+fails this fixture. P0d explicitly loads the counter and still establishes
+a new epoch. These are internal consistency rules for the declared model,
+not a recovered silicon reload specification.
+
+The 6210's corrected run retains seven FCCH confirmations, residual `-2`,
+native Messages UI and a failed SCH report. Its first receive tick is now
+`42243300` (frame 704, offset 3300), only 84 reference ticks earlier than
+the pre-correction capture. It remains 137.5 complex-sample intervals into
+the SCH envelope. Fractional reload loss was real, but not the acquisition
+blocker; no source shift or rate change is justified by this result.
 
 ## Cross-reference limits
 

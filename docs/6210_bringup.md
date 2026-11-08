@@ -2721,7 +2721,8 @@ samples over five capture epochs. A separate 1,024-word active window contains
 It does not contain a coded SCH burst, so this window alone is not SCH-input
 qualification.
 
-At 3.250482022 s, Execute owner `76ae` prepares the first SCH correlator
+In the pre-divider-phase-correction baseline, at 3.250482022 s,
+Execute owner `76ae` prepares the first SCH correlator
 aperture at `00d8`. All 192 captured words are nonzero (BE16 SHA256
 `23ab4f5d68f3130fdfa4870a875fa80b131b2acbd5bd2e2bbb78c5cd62b91e16`),
 unlike the previously observed NSM-3 zero aperture. Current/next software
@@ -2773,6 +2774,19 @@ The remaining boundary is the relationship between FCCH capture origin,
 counter/reload phase and the subsequent acquisition edge. Preserve the fixed
 source epoch; distinguish a counter-model consistency defect from an
 unproved hardware compare policy before changing the receive gate.
+
+The [counter-phase correction](rom6_rf_interface.md#counter-phase-contract)
+retains fractional time across P0e writes without changing the declared rate.
+The fresh 24-second run preserves own native initialization/Menu, seven FCCH
+confirmations and residual `-2`; it reconciles 778,500 I/O writes.
+The final source epoch moves only 84 reference ticks earlier, to
+`42243300..42254808`, still starting at frame-704 offset 3300
+(137.5 complex-sample intervals into SCH). The aperture SHA256 is now
+`d3257af7d1a6f0a0e6e3746568cf06fd1a3d3379339369ef297d4c9586b5c147`;
+native type-80 body `40000100002900230000fa944ff9` still reports error 1.
+The unchanged-schedule compare bounds become 7908..7932; a first-completed
+block would start at 7536..7560, both still after the envelope. The consistency
+fix does not solve physical capture ownership or synchronization.
 
 `verify-6210-alarm-off-snooze-no` combines the independently validated
 powered-off and Snooze lifecycles: two natural RTC wakes, separately checked

@@ -653,7 +653,17 @@ void nokia_dsp_c54x_device::io_w(offs_t offset, u16 data)
 	else if (port == 0x0e)
 	{
 		m_frame_counter_base = frame_counter();
-		m_frame_counter_epoch = machine().time();
+		// Reload changes the modulus, not the running 13MHz/12 divider.
+		// Keep the unconsumed fraction; re-anchoring at this MMIO write
+		// otherwise delays an armed compare even when data is unchanged.
+		using namespace nokia_dsp_compare_clock;
+		if (m_reset_released)
+		{
+			u64 const completed = ((machine().time()-m_frame_counter_epoch).as_ticks(reference_hz)/12)*12;
+			m_frame_counter_epoch += attotime(completed/reference_hz,fractional_attoseconds(completed));
+		}
+		else
+			m_frame_counter_epoch = machine().time();
 		m_slot_frame_length = data;
 		m_frame_counter_base %= frame_period();
 		if (m_reset_released)

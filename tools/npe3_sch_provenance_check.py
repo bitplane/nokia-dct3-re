@@ -126,7 +126,7 @@ def check(text):
                 source_first_tick=start, source_last_tick=finish,
                 source_frame=start // 60000, source_frame_phase=phase,
                 starts_inside_sch=sch_frame and phase < 7104,
-                missing_sch_prefix_complex_samples=phase // 24 if sch_frame and phase < 7104 else None,
+                missing_sch_prefix_complex_samples=phase / 24 if sch_frame and phase < 7104 else None,
                 nonzero_source_words=sum(value != 0 for _, _, value in current),
                 native_aperture_words_checked=192,
                 aperture_sha256=hashlib.sha256(b''.join(word.to_bytes(2, 'big') for word in samples)).hexdigest(),
