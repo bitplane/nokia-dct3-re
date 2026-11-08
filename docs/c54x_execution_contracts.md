@@ -2427,8 +2427,8 @@ store consumer, interrupt/delay composition or physical phase timing.
 
 The original `BCD c85e,AGEQ` at `03:c852` has delay words `5692` and
 `578a` at `03:c854..c855`, entirely inside the block `03:c851..c862`.
-Both delay words execute regardless of the captured predicate. Admission
-is limited to signed accumulator conditions with an internal target and
+Both delay words execute regardless of the captured predicate. These and
+the separately qualified status predicates require an internal target and
 the complete delay span strictly before the endpoint. A taken redirect
 restarts speculative Fetch accounting from the Decode-owned BRC without
 consuming an extra iteration; it does not reset the architectural count.
@@ -2443,6 +2443,15 @@ captured word. Existing nondelayed/negative/backward block-branch,
 delayed-call and interrupt-loop profiles pass separately. This fixture
 does not establish its own IRQ/NMI composition, endpoint-overlapping delay
 spans, outside-block targets or physical phase timing.
+
+`internal_overflow_branch` adds32 cases/restores for delayed AOV/ANOV and
+BOV/BNOV inside an active block:initial flag states,count0/2 and two pages.
+The selected overflow flag is consumed even on the untaken path;the other
+overflow flag survives. A delay-slot flag change affects subsequent iterations,
+not the captured decision. Ordered arm writes,delay pointer updates,RSA/REA,
+BRC and final status are checked. Overflow-driven exits outside the block and
+endpoint-overlapping delay spans are not admitted by this extension. The
+native ROM6 witness is fa60/c1b1 atc1aa insidec1a7..c1b4.
 
 Passive original Execute counts are 510 at the branch, 510 at its first
 delay address, 8,702 at the second delay address and 510 at the join. The

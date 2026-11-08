@@ -12,6 +12,7 @@
   "count_delay_absolute_dst": 48,
   "repeated_mapped_ar_mvdk": 14,
   "reverse_carry_mvkd": 13,
+  "internal_overflow_branch": 32,
   "circular_mvkd": 64,
   "repeated_shifted_circular_add": 64,
   "mvdd_accumulator_destination": 152,
