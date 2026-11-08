@@ -121,6 +121,10 @@ void dct3_rf_adc_fixture_state::machine_start()
 	save_item(NAME(m_normal_start_frame));save_item(NAME(m_ua_start_frame));
 	save_item(NAME(m_normal_count));save_item(NAME(m_normal_bits));
 	save_item(NAME(m_contention_sabm));save_item(NAME(m_contention_active));
+	save_item(NAME(m_page_identity));save_item(NAME(m_page_identity_valid));
+	save_item(NAME(m_page_pending));save_item(NAME(m_page_phase));save_item(NAME(m_page_offset));
+	save_item(NAME(m_page_not_before));save_item(NAME(m_page_last_block));
+	save_item(NAME(m_addressed_page_samples));
 	save_item(NAME(m_ua_samples));
 	save_item(NAME(m_lu_start_frame));save_item(NAME(m_lu_samples));
 	save_item(NAME(m_lu_acknowledged));save_item(NAME(m_release_start_frame));
@@ -163,6 +167,9 @@ void dct3_rf_adc_fixture_state::machine_reset()
 	m_lu_start_frame=~u64(0);
 	m_lu_acknowledged=false;m_release_start_frame=~u64(0);
 	m_normal_count=0;m_contention_active=false;
+	m_page_identity_valid=m_page_pending=false;
+	m_page_identity.fill(0);m_page_phase=m_page_offset=0;
+	m_page_not_before=m_page_last_block=~u64(0);
 	m_lab_tx.reset();
 	m_observed_tx_windows=m_transmit_releases=0;
 	m_transmit_compare_written=false;
@@ -203,6 +210,34 @@ void dct3_rf_adc_fixture_state::machine_reset()
 		for (auto byte:octets) hex+=util::string_format("%02x",byte);
 		machine().logerror("rf_adc_broadcast_si: index=%u arfcn=35 octets=%s physical_claim=0\n",kind,hex);
 	}
+}
+
+INPUT_CHANGED_MEMBER(dct3_rf_adc_fixture_state::bts_page_w)
+{
+	if (!newval || !m_raw_agch) return;
+	u64 const frame=machine().time().as_ticks(13'000'000)/60'000;
+	if (!m_page_identity_valid || frame<m_page_not_before)
+	{
+		machine().logerror("npe3_bts_page_ignored: t=%.9f no_released_air_identity=1 physical_claim=0\n",machine().time().as_double());
+		return;
+	}
+	unsigned const suffix=(m_page_identity[6]>>4)*100+(m_page_identity[7]&15)*10+(m_page_identity[7]>>4);
+	// The raw BTS advertises combined CCCH,BS_AG_BLKS_RES=0 and
+	// BS_PA_MFRMS=2. Do not reuse the HLE cell's nine-block DRX schedule.
+	auto const slot=nokia::radio::subscriber_paging_slot(suffix,true,0,2);
+	if (!slot) return;
+	m_page_phase=slot->multiframe_phase;m_page_offset=slot->frame_offset;
+	auto const page=subdevice<nokia_gsm_network_device>("gsm_network")->paging_request(m_page_identity.data(),m_page_identity.size());
+	gsm::tch_f::packed_control_block octets{};
+	std::copy_n(page.begin(),octets.size(),octets.begin());
+	auto const bursts=nokia_rf_lab::bcch_bits(octets,2);
+	for (unsigned at=0;at<4;++at) m_addressed_page_samples[at]=nokia_rf_lab::gmsk_samples(bursts[at]);
+	m_page_pending=true;m_page_not_before=frame+1;m_page_last_block=~u64(0);
+	std::string identity,packed;
+	for (auto byte:m_page_identity) identity+=util::string_format("%02x",byte);
+	for (auto byte:octets) packed+=util::string_format("%02x",byte);
+	machine().logerror("npe3_bts_page_request: t=%.9f identity=%s phase=%u offset=%u multiframes=2 after_frame=%u octets=%s raw_adc_only=1 port_bits_identity=1 physical_claim=0\n",
+		machine().time().as_double(),identity,m_page_phase,m_page_offset,unsigned(m_page_not_before),packed);
 }
 
 void dct3_rf_adc_fixture_state::control_w(offs_t port, u16 data)
@@ -319,6 +354,10 @@ TIMER_CALLBACK_MEMBER(dct3_rf_adc_fixture_state::candidate_transmit_start)
 			auto const access=gsm::rach::decode_p27(words,42);
 			if (access)
 			{
+				if (m_page_pending)
+					machine().logerror("npe3_bts_page_access: t=%.9f ra=%02x last_page_frame=%u port_bits_only=1 physical_claim=0\n",
+						machine().time().as_double(),*access,unsigned(m_page_last_block));
+				m_page_pending=false;m_page_not_before=~u64(0);
 				// A new externally observed access starts a new single-MS lab
 				// connection. No handset registration state is changed here.
 				m_contention_active=m_lu_acknowledged=false;
@@ -398,6 +437,7 @@ void dct3_rf_adc_fixture_state::receive_normal_uplink(std::array<u16,15> const &
 		if (ua)
 		{
 			m_ua_start_frame=(frame/51+1)*51+22;
+			m_page_not_before=m_ua_start_frame+4;
 			auto const bursts=nokia_rf_lab::bcch_bits(*ua,0);
 			for (unsigned at=0;at<4;++at) m_ua_samples[at]=nokia_rf_lab::gmsk_samples(bursts[at]);
 			packed.clear();for (auto byte:*ua) packed+=util::string_format("%02x",byte);
@@ -425,6 +465,14 @@ void dct3_rf_adc_fixture_state::receive_normal_uplink(std::array<u16,15> const &
 	auto const *request=block->data()+3;
 	if (length==18 && request[0]==5 && request[1]==8 && request[9]==8 && (request[10]&7)==1)
 	{
+		bool valid=bool(request[10]&8);
+		for (unsigned at=0;at<8;++at)
+			valid=valid && (request[10+at]>>4)<=9 && (at==0 || (request[10+at]&15)<=9);
+		if (valid)
+		{
+			std::copy_n(request+10,m_page_identity.size(),m_page_identity.begin());
+			m_page_identity_valid=true;
+		}
 		auto const accept=subdevice<nokia_gsm_network_device>("gsm_network")->location_update_accept(request,length,35);
 		gsm::tch_f::packed_control_block lapdm{};
 		lapdm.fill(0x2b);
@@ -495,7 +543,16 @@ u16 dct3_rf_adc_fixture_state::sample_r(offs_t component)
 	auto const pch=nokia::radio::combined_ccch_burst(frame);
 	if (m_raw_agch && pch && tick%60'000<148*48)
 	{
-		auto const &sample=m_paging_samples[*pch][(tick%60'000)/12];
+		bool const addressed=m_page_pending && frame>=m_page_not_before &&
+			(frame/51)%2==m_page_phase && frame%51>=m_page_offset && frame%51<m_page_offset+4;
+		if (addressed && frame-*pch!=m_page_last_block)
+		{
+			m_page_last_block=frame-*pch;
+			machine().logerror("npe3_bts_page_air: start_frame=%u t=%.9f raw_adc_only=1 physical_claim=0\n",
+				unsigned(m_page_last_block),machine().time().as_double());
+		}
+		auto const &samples=addressed ? m_addressed_page_samples : m_paging_samples;
+		auto const &sample=samples[*pch][(tick%60'000)/12];
 		m_q_latch=sample[1];
 		return u16(sample[0]);
 	}

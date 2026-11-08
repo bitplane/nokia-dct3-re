@@ -23,7 +23,7 @@ def registered_mobile_identity(text: str) -> str:
     return match.group("identity")
 
 
-def paging_group(identity: str) -> tuple[int, int]:
+def paging_group(identity: str, *, combined=False, reserved=0, multiframes=2) -> tuple[int, int]:
     if len(identity) != 16:
         raise ValueError("registered mobile identity is not eight octets")
     octets = bytes.fromhex(identity)
@@ -33,7 +33,12 @@ def paging_group(identity: str) -> tuple[int, int]:
     digits = [octets[0] >> 4]
     for octet in octets[1:]:
         digits.extend((octet & 0x0f, octet >> 4))
+    if not octets[0] & 8 or any(digit>9 for digit in digits):
+        raise ValueError("registered mobile identity is not a fifteen-digit IMSI")
+    total=3 if combined else 9
+    if not 0<=reserved<total or reserved>7 or not 2<=multiframes<=9:
+        raise ValueError("invalid single-CCCH paging parameters")
+    offsets=CCCH_BLOCK_OFFSETS[reserved:total]
     last_three = digits[12] * 100 + digits[13] * 10 + digits[14]
-    group = last_three % (len(CCCH_BLOCK_OFFSETS) * 2)
-    return group // len(CCCH_BLOCK_OFFSETS), CCCH_BLOCK_OFFSETS[
-        group % len(CCCH_BLOCK_OFFSETS)]
+    group = last_three % (len(offsets) * multiframes)
+    return group // len(offsets), offsets[group % len(offsets)]

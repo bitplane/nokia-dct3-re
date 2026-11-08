@@ -24,6 +24,33 @@ int main()
 	static_assert(common_control_block_end(2396) == 2406);
 	static_assert(common_control_block_end(2'715'647 + 4) == 2'715'648 + 9);
 	static_assert(common_control_block_end(19, true) == 19);
+
+	static_assert(subscriber_paging_slot(789,true,0,2)->multiframe_phase==1);
+	static_assert(subscriber_paging_slot(789,true,0,2)->frame_offset==6);
+	static_assert(subscriber_paging_slot(789,false,0,2)->multiframe_phase==1);
+	static_assert(subscriber_paging_slot(789,false,0,2)->frame_offset==36);
+	static_assert(!subscriber_paging_slot(1000,true,0,2));
+	static_assert(!subscriber_paging_slot(1,true,3,2));
+	static_assert(!subscriber_paging_slot(1,false,8,2));
+	static_assert(!subscriber_paging_slot(1,true,0,1));
+	static_assert(!subscriber_paging_slot(1,true,0,10));
+	for (bool combined : {false,true})
+		for (unsigned reserved=0;reserved<(combined ? 3U : 8U);++reserved)
+			for (unsigned multiframes=2;multiframes<=9;++multiframes)
+				for (unsigned imsi=0;imsi<1000;++imsi)
+				{
+					auto const slot=subscriber_paging_slot(imsi,combined,reserved,multiframes);
+					assert(slot && slot->multiframe_phase<multiframes);
+					unsigned index=0;
+					for (unsigned start : {6,12,16,22,26,32,36,42,46})
+					{
+						if (start==slot->frame_offset) break;
+						++index;
+					}
+					unsigned const available=(combined ? 3 : 9)-reserved;
+					assert(index>=reserved && index<reserved+available);
+					assert(slot->multiframe_phase*available+index-reserved==imsi%(available*multiframes));
+				}
 	for (unsigned frame=0;frame<204;++frame)
 	{
 		auto burst=combined_ccch_burst(frame);

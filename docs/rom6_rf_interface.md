@@ -67,6 +67,7 @@ results do not retire the physical request/acknowledgement or tuning contract.
 | Own 6210 raw-AGCH candidate | Exact successful native assignment decode; MCU assigned-SDCCH configuration and SABM containing Location Updating Request | Native dedicated transmission, validation-gate completion, camping/registration and physical timing/tuning |
 | Synthetic-record raw-AGCH run | Ten-slot validation cycle;combined CCCH;32 normal bursts/8 exact xCCH blocks;native UA/LU Accept and RR acknowledgement;updated SIM EF_LOCI;raw normal release back to common RX | Stable camping/registered presentation and physical timing/tuning |
 | Idle-paging source | All three combined CCCH blocks carry exact no-identity fill;25 native CRC-success publications in a complete60s capture;MM storage and Menu retained | Continuous idle reception,source-FN binding and physical carrier selection |
+| Addressed paging | The uplink IMSI determines combined PCH phase1/block6;two raw pages decode natively and pass the MCU's paging-group admission | Native Paging Response,stable camping and physical carrier selection |
 
 The CPU additions needed by the normal-burst frontend have generic focused
 tests. The rebuilt native ROM6 menu/storage/save-state scenarios, ROM4
@@ -486,8 +487,52 @@ actual gate return to its formatter and actual committed RX payload:56 are
 forwarded and5 correctly decoded no-identity fills are filtered. There is no
 unexplained publication loss in this window. Some filtered successes occur
 after the last forwarded empty fill,so MCU message silence is not a receive
-failure oracle. The next useful input is an independently addressed paging
-request,with its DRX/source-frame contract checked explicitly.
+failure oracle. Addressed paging has the separate receive/admission contract
+below;it does not yet qualify a native Paging Response or stable camping.
+
+### Native addressed paging
+
+The research-only `Laboratory BTS page` input requests an external network
+action after the raw closing UA. The BTS retains only the IMSI decoded from
+the actual timed uplink SABM/Location Updating Request;it does not inspect MCU
+subscriber state. The ordinary raw-AGCH control leaves this input inactive.
+The input constructs a standards-valid IMSI Paging Request Type1 and supplies
+only its coded GMSK I/Q. It neither posts a decoded packet nor changes handset
+state. The plain test-cell policy remains unchanged.
+
+[TS45.002 sections6.5.2/6.5.3 and table5](https://www.etsi.org/deliver/etsi_ts/145000_145099/145002/18.00.00_60/ts_145002v180000p.pdf)
+give three PCH blocks for the advertised combined CCCH with no AGCH reservation.
+With BS_PA_MFRMS=2,the transmitted IMSI ending789 selects group3:odd
+51-multiframes,block starting at offset6. The nine-block non-combined HLE
+schedule must not be reused here. The shared arithmetic has standalone C++
+tests over every IMSI suffix,reservation count and allowed multiframe count;
+the independent Python checker derives the same slot from the actual IMSI
+and checks the source SI3 configuration.
+
+In the24s run,the external input is serviced at18.016666667s. Actual sample
+reads encounter addressed blocks starting4035 and4953. Native class60
+publishes the exact23 octets at18.629975 and22.866722s (rounded),with native
+paging-pattern gate result2 rather than the empty-fill result0. These sparse
+sample observations are not proof of a complete DRX listening schedule.
+
+Both objects reach the MCU's457db8 path. Own helper489c7a derives phase1
+and paging-block index0 from live control4100. The completed decision at
+457e80 hasR6=1,and457a32 receives the original bytes with status0 and the
+accepted-group argument1. That forwarder constructs message0623 for task15.
+Thus timing/group admission is not the missing boundary for these pages.
+Task15 consumes0623,strips the L2 pseudo-length and posts05eb to task18.
+The ordinary RR parser copies the on-air IMSI and returns event083e. No new
+access or Paging Response is observed within24s;follow that controller
+decision rather than inventing a DSP wake/completion. Unique source-FN
+binding,physical tuning and stable camping remain unqualified.
+The inactive-input control's entire radio-write journal remains byte-identical
+to the preceding no-page checkpoint. Temporary heap-read probes were retired
+after locating the consumer;the retained observations are bounded entry/post/
+parser-return taps,not watches that can misattribute later heap reuse.
+
+```sh
+.venv/bin/python tools/run_npe3_native.py --reference-clock --seconds 24 --adc-source fcch-sch-broadcast --capture-start p09 --tx-release p05 --raw-agch --provision-records --page-at 18
+```
 
 Host4a uses the DROM table atb041+4a=b08b,which selects35c5. That handler
 copies one word to0578,acknowledges the host ring through2e2f,and returns.

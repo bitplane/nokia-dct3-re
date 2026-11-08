@@ -52,5 +52,25 @@ constexpr std::optional<unsigned> combined_ccch_burst(std::uint64_t frame)
 	return std::nullopt;
 }
 
+struct paging_slot
+{
+	unsigned multiframe_phase;
+	unsigned frame_offset;
+};
+
+// TS45.002 6.5.2/6.5.3 and table5, one CCCH. Reserved AGCH blocks
+// precede the available PCH blocks; multiframes is decoded BS_PA_MFRMS.
+constexpr std::optional<paging_slot> subscriber_paging_slot(
+		unsigned imsi_mod1000, bool combined, unsigned reserved, unsigned multiframes)
+{
+	constexpr unsigned starts[]={6,12,16,22,26,32,36,42,46};
+	unsigned const total=combined ? 3 : 9;
+	if (imsi_mod1000>=1000 || reserved>7 || reserved>=total || multiframes<2 || multiframes>9)
+		return std::nullopt;
+	unsigned const available=total-reserved;
+	unsigned const group=imsi_mod1000%(available*multiframes);
+	return paging_slot{group/available,starts[reserved+group%available]};
+}
+
 } // namespace nokia::radio
 #endif // MAME_NOKIA_NOKIA_RADIO_TIMING_H

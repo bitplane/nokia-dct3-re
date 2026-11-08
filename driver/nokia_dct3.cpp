@@ -1826,6 +1826,13 @@ static INPUT_PORTS_START( noki6210 )
 	PORT_INCLUDE(noki5210)
 INPUT_PORTS_END
 
+static INPUT_PORTS_START( npe3_raw_bts )
+	PORT_INCLUDE(noki6210)
+	PORT_START("LAB_BTS")
+	PORT_BIT( 0x01, IP_ACTIVE_HIGH, IPT_OTHER ) PORT_NAME("Laboratory BTS page")
+		PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(dct3_rf_adc_fixture_state::bts_page_w), 0)
+INPUT_PORTS_END
+
 static INPUT_PORTS_START( noki8290 )
 	// NSB-7's own 25-byte normal and five-byte special maps match exactly.
 	PORT_INCLUDE(noki5210)
@@ -3256,7 +3263,7 @@ SYST( 2000, npe3zp9, noki6210, 0, npe3zp9, noki6210, dct3_rf_adc_fixture_state, 
 SYST( 2000, npe3bp9, noki6210, 0, npe3bp9, noki6210, dct3_rf_adc_fixture_state, empty_init, "Nokia", "6210 reference-clock P09-start raw BCCH candidate", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2000, npe3sp9, noki6210, 0, npe3sp9, noki6210, dct3_rf_adc_fixture_state, empty_init, "Nokia", "6210 reference-clock P09-start full SI broadcast candidate", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2000, npe3tp5, noki6210, 0, npe3tp5, noki6210, dct3_rf_adc_fixture_state, empty_init, "Nokia", "6210 reference-clock P05 transmit-release candidate", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
-SYST( 2000, npe3ap5, noki6210, 0, npe3ap5, noki6210, dct3_rf_adc_fixture_state, empty_init, "Nokia", "6210 reference-clock raw AGCH candidate", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
+SYST( 2000, npe3ap5, noki6210, 0, npe3ap5, npe3_raw_bts, dct3_rf_adc_fixture_state, empty_init, "Nokia", "6210 reference-clock raw AGCH candidate", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2000, npe3hle, noki6210, 0, npe3hle, noki6210, nokia_dct3_state, empty_init, "Nokia", "6210 native uploads with runtime HLE (research fixture)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2000, npe3mbus, noki6210, 0, npe3mbus, noki6210, nokia_dct3_state, empty_init, "Nokia", "6210 clocked MBUS and sleep (research fixture)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2000, noki6250, 0,      0,      noki6250, noki6250, nokia_dct3_state, empty_init, "Nokia", "Nokia 6250", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )

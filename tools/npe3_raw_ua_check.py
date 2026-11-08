@@ -134,7 +134,7 @@ def check_release(text,blocks):
                 stable_camping_qualified=False,physical_transmission_qualified=False)
 
 
-def check_paging_fill(text,common_configuration_time):
+def check_paging_fill(text,common_configuration_time,*,addressed_octets=None):
     """Qualify native no-identity PCH decoding without inferring camping."""
     from tools.gsm_xcch_signal import paging_fill_octets
     fill=paging_fill_octets()
@@ -153,6 +153,7 @@ def check_paging_fill(text,common_configuration_time):
         if frame>=2715648 or frame%51 not in (9,15,19):
             raise ValueError('successful common block differs from combined source schedule')
         if body[10:] in assignments:continue
+        if addressed_octets is not None and body[10:]==addressed_octets:continue
         if body[10:]!=fill:raise ValueError('native common block differs from transmitted no-identity fill')
         # Repeated identical fills cannot uniquely bind an output to one air
         # block. Preserve reported-FN/time disagreements rather than fitting a

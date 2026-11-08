@@ -93,9 +93,13 @@ def main():
                         help='separate timed native-buffer candidate; no network reply')
     parser.add_argument('--raw-agch', action='store_true',
                         help='separate external access decoder and raw AGCH waveform experiment')
+    parser.add_argument('--page-at', type=int,
+                        help='bounded external BTS page at16..20 seconds in a24s raw-AGCH run')
     parser.add_argument('--provision-records', action='store_true',
                         help='explicit synthetic record fixture; acquired PMM remains unchanged')
     args = parser.parse_args()
+    if args.page_at is not None and (not args.raw_agch or not 16<=args.page_at<=20 or args.seconds!=24):
+        parser.error('addressed-page observation requires raw AGCH,16..20s input and the bounded24s run')
     if args.provision_records and not args.raw_agch:
         parser.error('synthetic record fixture requires the separate raw AGCH experiment')
     if args.raw_agch and args.tx_release!='p05':
@@ -166,6 +170,8 @@ def main():
         env['NPE3_NATIVE_SCENARIO'] = scenario
         env['NPE3_NATIVE_INPUT_AT'] = str(args.input_at)
         env['NPE3_NATIVE_SECONDS'] = str(seconds)
+        env.pop('NPE3_NATIVE_PAGE_AT',None)
+        if args.page_at is not None:env['NPE3_NATIVE_PAGE_AT']=str(args.page_at)
         with (directory / 'console.log').open('w') as output:
             subprocess.run(cmd, cwd=directory, env=env, stdout=output,
                            stderr=subprocess.STDOUT, check=True, timeout=600)
@@ -311,7 +317,15 @@ def main():
                         report['raw_release']=check_release(text,report['native_access']['normal_control_blocks'])
                         print('Native6210 raw release: PASS RR Channel Release, native DISC/UA and MCU common RX; stable_camping=0')
                         from tools.npe3_raw_ua_check import check_paging_fill
-                        report['paging_fill']=check_paging_fill(text,report['raw_release']['common_configuration_time'])
+                        addressed=None
+                        if args.page_at is not None:
+                            from tools.npe3_addressed_page_check import check as check_page,check_mcu_admission,check_rr_delivery
+                            report['addressed_page']=check_page(text,args.page_at)
+                            report['paging_admission']=check_mcu_admission(text,report['addressed_page'])
+                            report['paging_delivery']=check_rr_delivery(text,report['addressed_page'])
+                            addressed=bytes.fromhex(report['addressed_page']['octets'])
+                            print(f"Native6210 addressed page: air_blocks={report['addressed_page']['observed_air_blocks']} native_decodes={report['addressed_page']['native_publications']}; stable_camping=0")
+                        report['paging_fill']=check_paging_fill(text,report['raw_release']['common_configuration_time'],addressed_octets=addressed)
                         print(f"Native6210 PCH fill: PASS native_blocks={report['paging_fill']['blocks']} last_time={report['paging_fill']['last_time']:.9f}; stable_camping=0")
                         from tools.rom6_idle_contract import check as check_idle
                         report['idle_contract']=check_idle(text,(first/'npe3_terminal_program.be16').read_bytes(),

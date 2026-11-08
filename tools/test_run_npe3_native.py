@@ -8,6 +8,14 @@ from tools.run_npe3_native import (check_execution, check_input_start, expected_
 
 
 class Native6210EvidenceTest(unittest.TestCase):
+    def test_addressed_page_requires_bounded_explicit_raw_profile(self):
+        script=Path(__file__).with_name('run_npe3_native.py')
+        for args in (['--page-at','18'],['--raw-agch','--page-at','15'],
+                     ['--raw-agch','--page-at','18','--seconds','60'],
+                     ['--raw-agch','--page-at','23','--seconds','24']):
+            result=subprocess.run([sys.executable,str(script),*args],capture_output=True,text=True)
+            self.assertEqual(result.returncode,2)
+            self.assertNotIn('Native6210 evidence:',result.stdout)
     def test_lu_oracle_is_explicit_and_other_compositions_remain_unchanged(self):
         self.assertEqual(expected_menu_digest('fcch-sch-broadcast','p09',True),ADC_LU_MENU_SHA256)
         for source,capture in (('silence','p09'),('fcch-sch','p09'),('fcch-sch-broadcast','immediate')):

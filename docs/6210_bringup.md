@@ -58,7 +58,9 @@ return to common RX are also qualified. No-identity idle paging reaches native
 class60 after release,and a complete60s run retains legal execution and updated
 EF_LOCI. Reported FN includes a firmware-owned conditional+2 adjustment;
 some valid empty pages are intentionally filtered before MCU publication.
-Addressed paging/DRX and unique source-frame binding remain unresolved;
+Two raw IMSI-addressed pages now decode and pass the MCU's paging-group
+admission;the input identity comes only from actual uplink bits. A native
+Paging Response,complete DRX listening and unique source-frame binding remain unresolved;
 stable camping/registered presentation remains open;
 see the [native MM boundary](rom6_rf_interface.md#native-location-updating-acceptance).
 The explicit 13 MHz DSP clock is provisional (the manual establishes RFIclk,
