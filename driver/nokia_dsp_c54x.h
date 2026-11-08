@@ -31,6 +31,8 @@ public:
 	void set_external_rf_receive(bool enabled) { m_external_rf_receive = enabled; }
 	auto rf_receive_cb() { return m_rf_receive_cb.bind(); }
 	auto rf_control_cb() { return m_rf_control_cb.bind(); }
+	// Execution/reset state for a lab attachment, not a recovered COBBA pin.
+	auto rf_reset_cb() { return m_rf_reset_cb.bind(); }
 	// Counter-model facts for explicit lab wiring, not fitted pin semantics.
 	attotime lab_counter_deadline(u16 target) const;
 	u16 lab_counter_value() const { return frame_counter(); }
@@ -112,6 +114,7 @@ private:
 	devcb_write64 m_transfer_compare_cb;
 	devcb_read16 m_rf_receive_cb;
 	devcb_write16 m_rf_control_cb;
+	devcb_write_line m_rf_reset_cb;
 	bool m_external_rf_receive = false;
 	std::array<u16, 0x10000> m_program{};
 	std::array<u16, 0x10000> m_data{};

@@ -1,7 +1,7 @@
 -- Observe actual DSP-side ring commits; never construct or deliver packets.
 local machine=manager.machine
 local cpu=assert(machine.devices[':dsp_c54x:cpu'])
-local cap=machine.system.name=='npe3sp9' and 256 or 64
+local cap=(machine.system.name=='npe3sp9' or machine.system.name=='npe3tp5') and 256 or 64
 local commits=0
 local tap=cpu.spaces.data:install_write_tap(0x8e4,0x8e4,'rom6_measure_rx_commit',function(_,value,mask)
     local previous=cpu.spaces.data:read_u16(0x8e4)

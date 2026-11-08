@@ -20,7 +20,8 @@ nokia_dsp_c54x_device::nokia_dsp_c54x_device(const machine_config &mconfig,
 	m_data_rom(*this, finder_base::DUMMY_TAG),
 	m_transfer_compare_cb(*this),
 	m_rf_receive_cb(*this, 0),
-	m_rf_control_cb(*this)
+	m_rf_control_cb(*this),
+	m_rf_reset_cb(*this)
 {
 }
 
@@ -310,6 +311,7 @@ void nokia_dsp_c54x_device::reset_line_w(int released)
 	m_frame_counter_base = frame_counter();
 	m_frame_counter_epoch = machine().time();
 	m_reset_released = released;
+	m_rf_reset_cb(released);
 	if (!released) m_slot_request_pending = m_transfer_request_pending = false;
 	m_host_command_line = false;
 	m_host_command_vector = 0;

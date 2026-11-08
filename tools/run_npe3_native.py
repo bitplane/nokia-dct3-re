@@ -82,7 +82,11 @@ def main():
                         help='explicit raw ADC laboratory source; requires --reference-clock')
     parser.add_argument('--capture-start', choices=('immediate', 'p09'), default='immediate',
                         help='explicit laboratory capture-edge hypothesis, not fitted hardware')
+    parser.add_argument('--tx-release', choices=('p05',),
+                        help='separate timed native-buffer candidate; no network reply')
     args = parser.parse_args()
+    if args.tx_release and (args.adc_source!='fcch-sch-broadcast' or args.capture_start!='p09'):
+        parser.error('P05 transmit candidate requires full-SI P09 laboratory source')
     if args.capture_start != 'immediate' and not args.adc_source:
         parser.error('capture-edge candidates require an explicit ADC laboratory source')
     if args.adc_source in ('fcch-sch-bcch','fcch-sch-broadcast') and args.capture_start != 'p09':
@@ -109,6 +113,7 @@ def main():
             model = 'npe3zp9' if args.adc_source == 'silence' else 'npe3cp9'
             if args.adc_source == 'fcch-sch-bcch': model = 'npe3bp9'
             if args.adc_source == 'fcch-sch-broadcast': model = 'npe3sp9'
+    if args.tx_release:model='npe3tp5'
     storage = run / 'nvram' / model
     storage.mkdir(parents=True)
     (storage / 'flash').write_bytes(flash.ljust(0x3fa000, b'\xff') + pmm)
@@ -239,7 +244,8 @@ def main():
             report['bcch_result']=(check_broadcast if broadcast else check_bcch)(text,(first/'rom6_radio_writes.tsv').read_text())
             if broadcast:
                 from tools.npe3_rach_transmit_check import check as check_access
-                report['native_access']=check_access(text,(first/'rom6_radio_writes.tsv').read_text(),require_windows=True)
+                report['native_access']=check_access(text,(first/'rom6_radio_writes.tsv').read_text(),
+                    require_windows=True,require_releases=bool(args.tx_release))
                 print(f"Native6210 access serialization: PASS attempts={report['native_access']['attempts']}; physical_release=0 registration=0")
             (run/'adc-source.json').write_text(json.dumps(report,indent=2)+'\n')
             print('Native6210 BCCH: PASS '+('complete SI set and MCU acquisition return' if broadcast else 'three raw SI3 blocks')+'; camping=0 registration=0')

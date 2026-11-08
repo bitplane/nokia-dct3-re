@@ -1,5 +1,5 @@
 import unittest
-from tools.npe3_rach_transmit_check import check,transactions,check_windows
+from tools.npe3_rach_transmit_check import check,transactions,check_windows,check_releases
 from tools.test_gsm_rach_signal import WORDS
 
 
@@ -53,6 +53,19 @@ class NativeAccessTransmitTest(unittest.TestCase):
             with self.assertRaises(ValueError):check_windows(bad,bursts,[476])
         with self.assertRaises(ValueError):check_windows(text,bursts,[477])
         with self.assertRaises(ValueError):check(self.text,self.journal(),require_windows=True)
+
+    def test_release_requires_explicit_candidate_exact_buffer_and_deadline(self):
+        marker='npe3_tx_candidate: p05_start=1 port_buffer_only=1 network_reply=0 physical_claim=0\n'
+        row=('npe3_tx_release: sequence=1 t=2.300000000 target=071f counter=071f words='+
+             ','.join(f'{word:04x}' for word in WORDS)+' network_reply=0 physical_claim=0')
+        burst=(2,2.2,WORDS,(0x71f,0x8aa,0x67c,0x90e))
+        windows=dict(p05_deadlines=[2.3])
+        self.assertTrue(check_releases(marker+row,[burst],windows)['timed_candidate_release_qualified'])
+        for bad in (row,marker,marker+row+'\n'+row,marker+row.replace('counter=071f','counter=071e'),
+                    marker+row.replace('2.300000000','2.300000010'),marker+row.replace('b9ff','b9fe'),
+                    marker+row.replace('network_reply=0','network_reply=1')):
+            with self.assertRaises(ValueError):check_releases(bad,[burst],windows)
+        with self.assertRaises(ValueError):check(self.text+'\n'+marker,self.journal())
 
 
 if __name__=='__main__':unittest.main()

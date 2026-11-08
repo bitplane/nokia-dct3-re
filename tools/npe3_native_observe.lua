@@ -2,7 +2,7 @@
 local directory=assert(debug.getinfo(1,'S').source:sub(2):match('^(.*[/])'))
 dofile(directory..'dct3_model_scout.lua')
 local machine=manager.machine
-local reference=machine.system.name=='npe3ref' or machine.system.name=='npe3afs' or machine.system.name=='npe3ad0' or machine.system.name=='npe3cp9' or machine.system.name=='npe3zp9' or machine.system.name=='npe3bp9' or machine.system.name=='npe3sp9'
+local reference=machine.system.name=='npe3ref' or machine.system.name=='npe3afs' or machine.system.name=='npe3ad0' or machine.system.name=='npe3cp9' or machine.system.name=='npe3zp9' or machine.system.name=='npe3bp9' or machine.system.name=='npe3sp9' or machine.system.name=='npe3tp5'
 assert(reference or machine.system.name=='npe3r6')
 assert(not machine.devices[':dsp_hle'] and not machine.devices[':dsp_staged'])
 local arm=assert(machine.devices[':maincpu'])

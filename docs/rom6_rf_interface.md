@@ -39,8 +39,10 @@ arithmetic defect; the P03 bit-8 poll does not prove a missing hardware clear.
 Physical SCH/BCCH reception and camping remain unqualified. This is now
 distinct from laboratory decoder execution: isolated native SCH and BCCH paths recover
 independently generated payloads from filtered I/Q samples.
-The next 6210 target is timed release of its serialized uplink bits, then raw
-AGCH and native CCCH/camping progression. These laboratory
+The separate P05-start candidate now clocks complete native buffers at the
+declared counter match without generating any reply. The next 6210 target
+is externally decoded access followed by raw AGCH and native CCCH/camping
+progression. These laboratory
 results do not retire the physical request/acknowledgement or tuning contract.
 
 | Receive scope | Current evidence | Not established |
@@ -51,6 +53,7 @@ results do not retire the physical request/acknowledgement or tuning contract.
 | Own 6210 P09-start candidate | Complete source burst, native SCH CRC/information/parity and FN704/BSIC42; legal 65-second UI run; zero-source 24-second transport control | Physical capture policy/capacity and acknowledgement; BCCH/camping |
 | Own 6210 raw-BCCH candidate | SCH plus three four-burst SI3 blocks, exact FIRE input/result and native publications; coherent 24-second Menu/transport acceptance | Complete broadcast schedule, MCU acquisition/camping, fitted timing/tuning |
 | Own 6210 full-SI candidate | Legal 24-second physical Menu, SI1..SI4 native decoding, MCU availability `0f`, observed success return, organic IDLE_RA/RA_INFO and independently checked P21/P27 access bits | Physical release timing/access grant, camping, registration and fitted timing/tuning |
+| Own 6210 P05-start candidate | Complete native buffers clocked at the projected P05 matches; same receive/UI checks and exact port-word preservation | Physical pin/timing identity, external network decode/AGCH, camping and registration |
 
 The CPU additions needed by the normal-burst frontend have generic focused
 tests. The rebuilt native ROM6 menu/storage/save-state scenarios, ROM4
@@ -118,6 +121,32 @@ timed endpoint rather than RA_INFO or private descriptors. Only subsequent
 raw AGCH waveform reception may establish a native assignment. The existing
 broadcast-only composition remains the no-reply control; no physical clock,
 pin function or fitted ROM identity is promoted by the candidate.
+
+The separate `npe3tp5` composition implements this experiment:
+
+```sh
+.venv/bin/python tools/run_npe3_native.py --reference-clock --seconds 24 --adc-source fcch-sch-broadcast --capture-start p09 --tx-release p05
+```
+
+It arms from the actual P05 write, not buffer completion or RA_INFO. The
+finite P21/P27 collector admits only the observed complete fifteen-word
+transaction; partial, overflowed, aborted or replaced loads cannot release.
+Invalid P05 values and backend reset cancel pending candidate work. Counter
+reloads re-project the compare using the existing model. At a matching edge
+the complete buffer is consumed once and emitted as a laboratory event;
+neither a firmware completion nor network response is produced.
+
+Four native events preserve every original port word and match the projected
+P05 times exactly, with target and counter both `071f`. The checker requires
+the explicit candidate identity and rejects missing/duplicate, early/late,
+wrong-counter or changed-buffer events. `npe3sp9` remains a no-release,
+no-reply control. Logical framing/replacement/reset and mid-load restoration
+have executable C++ tests; runtime buffer/control state and its MAME timer
+are registered, but a timed handset save/restore is not yet qualified.
+Fifteen words is a bounded observed transaction, not a claimed hardware FIFO
+capacity; other transmit lengths/formats remain rejected. The next endpoint
+must decode these timed words independently and
+only then schedule standards-derived raw AGCH samples.
 
 The original [NSM-3 System Module manual, Issue 1 12/1999](https://www.eserviceinfo.com/preview_html.php?fileid=5456&previewid=3011)
 identifies the 13MHz COBBA clock and separate IData/QData connections

@@ -5,6 +5,7 @@
 #define MAME_NOKIA_NOKIA_DCT3_RESEARCH_H
 
 #include "nokia_dct3_state.h"
+#include "nokia_rf_lab_tx.h"
 
 namespace nokia_dct3 {
 
@@ -62,6 +63,7 @@ public:
 	void npe3zp9(machine_config &config);
 	void npe3bp9(machine_config &config);
 	void npe3sp9(machine_config &config);
+	void npe3tp5(machine_config &config);
 protected:
 	void machine_start() override;
 	void machine_reset() override;
@@ -69,10 +71,15 @@ private:
 	void configure_adc_lab(machine_config &config);
 	void control_w(offs_t port, u16 data);
 	void transmit_word_w(u16 data);
+	void rf_reset_w(int released);
 	u16 sample_r(offs_t component);
 	void fault_observe_w(int state);
 	TIMER_CALLBACK_MEMBER(candidate_receive_start);
+	TIMER_CALLBACK_MEMBER(candidate_transmit_start);
+	void arm_transmit_candidate();
 	emu_timer *m_candidate_timer=nullptr;
+	emu_timer *m_transmit_timer=nullptr;
+	bool m_p05_transmit=false, m_transmit_compare_written=false;
 	bool m_compare_start=false, m_candidate_active=false;
 	u16 m_candidate_target=0;
 	bool m_tone = true;
@@ -88,11 +95,10 @@ private:
 	std::array<std::array<s16, 2>, 148 * 4> m_sch_cache{};
 	s16 m_q_latch = 0;
 	u16 m_adc_receive_control = 0, m_adc_mfi_control = 0;
-	// Diagnostic observations, not rewound by save/load. Never used to clock
-	// RF, deliver packets or alter pins; canonical port state stays in backend.
-	std::array<u16,4> m_observed_tx_compares{};
-	unsigned m_observed_tx_words=0, m_observed_tx_windows=0;
-	bool m_observed_tx_active=false;
+	std::array<u16,4> m_lab_tx_compares{};
+	nokia_rf_lab_tx m_lab_tx;
+	// Diagnostic counters are not rewound; they never select firmware work.
+	unsigned m_observed_tx_windows=0, m_transmit_releases=0;
 };
 
 INPUT_PORTS_EXTERN(nmp5stage);

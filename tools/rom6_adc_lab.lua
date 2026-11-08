@@ -1,16 +1,16 @@
 -- Raw ADC-pin laboratory experiment. Observes, never changes firmware state.
 local directory=assert(debug.getinfo(1,'S').source:sub(2):match('^(.*[/])'))
 local machine=manager.machine
-local npe3=machine.system.name=='npe3afs' or machine.system.name=='npe3ad0' or machine.system.name=='npe3cp9' or machine.system.name=='npe3zp9' or machine.system.name=='npe3bp9' or machine.system.name=='npe3sp9'
+local npe3=machine.system.name=='npe3afs' or machine.system.name=='npe3ad0' or machine.system.name=='npe3cp9' or machine.system.name=='npe3zp9' or machine.system.name=='npe3bp9' or machine.system.name=='npe3sp9' or machine.system.name=='npe3tp5'
 dofile(directory..(npe3 and 'rom6_native_radio.lua' or 'rom6_native_observe.lua'))
 if npe3 then
     dofile(directory..'rom6_rx_ring_observe.lua')
-    if machine.system.name=='npe3afs' or machine.system.name=='npe3cp9' or machine.system.name=='npe3bp9' or machine.system.name=='npe3sp9' then
+    if machine.system.name=='npe3afs' or machine.system.name=='npe3cp9' or machine.system.name=='npe3bp9' or machine.system.name=='npe3sp9' or machine.system.name=='npe3tp5' then
         dofile(directory..'npe3_sch_provenance.lua')
         dofile(directory..'npe3_fcch_schedule.lua')
         dofile(directory..'npe3_normal_receive.lua')
-        if machine.system.name=='npe3bp9' or machine.system.name=='npe3sp9' then dofile(directory..'noki6210_plmn_observe.lua') end
-        if machine.system.name=='npe3sp9' then dofile(directory..'npe3_tx_ring_observe.lua') end
+        if machine.system.name=='npe3bp9' or machine.system.name=='npe3sp9' or machine.system.name=='npe3tp5' then dofile(directory..'noki6210_plmn_observe.lua') end
+        if machine.system.name=='npe3sp9' or machine.system.name=='npe3tp5' then dofile(directory..'npe3_tx_ring_observe.lua') end
     end
 end
 local output_cap=npe3 and 496 or 128

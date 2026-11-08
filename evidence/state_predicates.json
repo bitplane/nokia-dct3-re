@@ -3,6 +3,14 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "npe3_p05_timed_transmit_candidate",
+      "owner": "native_rom6_reference_adc_laboratory",
+      "status": "satisfied",
+      "predicate": "The separately named P05 candidate consumes complete native port buffers exactly once at their programmed modeled counter matches without supplying replies",
+      "current": "npe3tp5 inherits full-SI/P09 receive input and explicit45.5MHz reference execution,adding only a P05-match laboratory endpoint. Four complete15-word P21/P27 buffers are released at12.066360308/12.329437231/17.198665231/17.457127692 with target=counter=071f and every word identical to its actual native transaction. The full24s gate retains legal execution,physical Menu,SCH/SI and independent access-code checks,then requires explicit candidate identity,complete release count,exact counter/deadline/buffer correspondence and network_reply=0. The separate npe3sp9 no-release/no-reply control passes unchanged. Executable C++ framing tests reject partial/overflow/aborted/replaced loads,consume complete buffers once,and restore mid-load words;an edge discards unfinished work so late commits cannot revive it. Runtime buffer,compare and timer state are registered;timed handset save/restore remains unqualified. Invalid P05/backend reset cancel pending work. No physical FIFO capacity,pin function,fitted clock/mask,RF emission,network decode,AGCH,camping or registration is inferred.",
+      "evidence": ["driver/nokia_rf_lab_tx.h", "driver/nokia_dct3_research.cpp", "driver/nokia_dct3_research.h", "driver/nokia_dsp_c54x.cpp", "tests/unit/test_rf_lab_tx.cpp", "tools/test_rf_lab_tx_cpp.py", "tools/npe3_rach_transmit_check.py", "tools/test_npe3_rach_transmit_check.py", "tools/run_npe3_native.py", "docs/rom6_rf_interface.md"]
+    },
+    {
       "id": "npe3_native_transmit_window_projection",
       "owner": "native_rom6_reference_adc_laboratory",
       "status": "satisfied",

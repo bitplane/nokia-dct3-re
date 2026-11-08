@@ -1,10 +1,22 @@
 import unittest
+import subprocess
+import sys
+from pathlib import Path
 
 from tools.run_npe3_native import (check_execution, check_input_start, expected_menu_digest,
     ADC_P09_MENU_SHA256, ADC_BROADCAST_MENU_SHA256, ADC_SCH_MENU_SHA256)
 
 
 class Native6210EvidenceTest(unittest.TestCase):
+    def test_transmit_candidate_requires_explicit_full_si_reference_composition(self):
+        script=Path(__file__).with_name('run_npe3_native.py')
+        for args in ([],['--adc-source','silence'],
+                     ['--adc-source','fcch-sch-broadcast'],
+                     ['--adc-source','fcch-sch-broadcast','--capture-start','p09']):
+            result=subprocess.run([sys.executable,str(script),'--tx-release','p05',*args],capture_output=True,text=True)
+            self.assertEqual(result.returncode,2)
+            self.assertNotIn('Native6210 evidence:',result.stdout)
+
     def test_full_broadcast_oracle_does_not_replace_other_profiles(self):
         from tools.run_noki6210_acceptance import MENU_SHA256
         self.assertNotEqual(ADC_BROADCAST_MENU_SHA256, ADC_P09_MENU_SHA256)

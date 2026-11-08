@@ -7,6 +7,7 @@ from tools.gsm_rach_signal import decode_p27_access
 from tools.rom6_adc_measure_check import check_rx_publications
 
 WINDOW=re.compile(r'npe3_tx_window: sequence=(\d+) t=([\d.]+) words=(\d+) counter=([0-9a-f]{4}) controls=([0-9a-f,]+) deadlines=([\d.,-]+) observer_writes=0 physical_claim=0')
+RELEASE=re.compile(r'npe3_tx_release: sequence=(\d+) t=([\d.]+) target=([0-9a-f]{4}) counter=([0-9a-f]{4}) words=([0-9a-f,]+) network_reply=0 physical_claim=0')
 
 
 def transactions(writes):
@@ -47,6 +48,7 @@ def check_windows(text,bursts,frames):
     if len(rows)!=len(bursts) or len(rows)!=text.count('npe3_tx_window:'):
         raise ValueError('incomplete projected transmit windows')
     source_frames=[]
+    p05_deadlines=[]
     for index,(row,burst) in enumerate(zip(rows,bursts),1):
         number,stamp,count,counter,controls,deadlines=row.groups()
         stamp=float(stamp);counter=int(counter,16)
@@ -63,13 +65,31 @@ def check_windows(text,bursts,frames):
                 max(phases)-min(phases)>2e-9 or not due[2]<due[0]<due[1]<due[3]):
             raise ValueError('projected transmit controls do not share the declared counter phase')
         source_frames.append(int(due[0]*13000000)//60000%2715648)
+        p05_deadlines.append(due[0])
     if source_frames!=frames:
         raise ValueError('P05 source-frame projection differs from native RA_INFO')
-    return dict(windows=len(rows),p05_source_frames=source_frames,
+    return dict(windows=len(rows),p05_source_frames=source_frames,p05_deadlines=p05_deadlines,
                 declared_counter_hz='13000000/12',physical_release_qualified=False)
 
 
-def check(text,writes,bsic=42,*,require_windows=False):
+def check_releases(text,bursts,windows):
+    identity='npe3_tx_candidate: p05_start=1 port_buffer_only=1 network_reply=0 physical_claim=0'
+    rows=list(RELEASE.finditer(text))
+    deadlines=windows.get('p05_deadlines',[])
+    if (text.count(identity)!=1 or text.count('npe3_tx_candidate:')!=1 or
+            len(rows)!=len(bursts) or len(deadlines)!=len(bursts) or len(rows)!=text.count('npe3_tx_release:')):
+        raise ValueError('missing explicit complete P05 laboratory releases')
+    for index,(row,burst,due) in enumerate(zip(rows,bursts,deadlines),1):
+        sequence,stamp,target,counter,words=row.groups()
+        if (int(sequence)!=index or target!=counter or int(target,16)!=burst[3][0] or
+                tuple(int(word,16) for word in words.split(','))!=tuple(burst[2]) or
+                not burst[1]<float(stamp) or abs(float(stamp)-due)>1e-9):
+            raise ValueError('timed candidate release differs from native buffer or counter deadline')
+    return dict(timed_candidate_release_qualified=True,releases=len(rows),
+                network_reply=False,physical_release_qualified=False)
+
+
+def check(text,writes,bsic=42,*,require_windows=False,require_releases=False):
     bursts=transactions(writes)
     reports=[packet for packet in check_rx_publications(text)['packets'] if packet['type']==0x84]
     if len(reports)!=len(bursts): raise ValueError('native RA_INFO/serializer count differs')
@@ -89,5 +109,10 @@ def check(text,writes,bsic=42,*,require_windows=False):
                 framing_offsets=[row['framing_offset'] for row in decoded],
                 physical_release_qualified=False,network_decode_qualified=False,
                 camping_qualified=False,registration_qualified=False)
-    if require_windows:result['candidate_windows']=check_windows(text,bursts,frames)
+    if require_windows or require_releases:
+        result['candidate_windows']=check_windows(text,bursts,frames)
+    if require_releases:
+        result['candidate_releases']=check_releases(text,bursts,result['candidate_windows'])
+    elif 'npe3_tx_release:' in text or 'npe3_tx_candidate:' in text:
+        raise ValueError('no-release control unexpectedly enabled the transmit candidate')
     return result

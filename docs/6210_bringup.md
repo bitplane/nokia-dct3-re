@@ -2967,9 +2967,13 @@ pointer dependency correction additionally enables four complete P21/P27
 transactions, independently checked as access octets `0b,08,06,06` with BSIC42;
 see [the serialization contract](rom6_rf_interface.md#native-access-serialization).
 This is not a timed RF emission, access grant, camping or registration. The
-source remains untuned and supplies no decoded CCCH reply. The next boundary
-is timed hardware release and standards-derived raw AGCH reception. No fault
-suppression or firmware-state forcing is retained.
+source remains untuned and supplies no decoded CCCH reply. The separate
+`--tx-release p05` / `npe3tp5` laboratory candidate now consumes those complete
+native buffers at the programmed modeled matches, without supplying a reply;
+the broadcast-only control remains unchanged. Physical release semantics
+are still unqualified. The next laboratory boundary is independent access
+decode at that timed endpoint and standards-derived raw AGCH reception. No
+fault suppression or firmware-state forcing is retained.
 
 `verify-6210-alarm-off-snooze-no` combines the independently validated
 powered-off and Snooze lifecycles: two natural RTC wakes, separately checked

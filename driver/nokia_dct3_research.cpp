@@ -32,6 +32,7 @@ void dct3_rf_adc_fixture_state::configure_adc_lab(machine_config &config)
 	backend.set_external_rf_receive(true);
 	backend.rf_receive_cb().set(mfi, FUNC(nokia_mfi_rx_device::read));
 	backend.rf_control_cb().set(FUNC(dct3_rf_adc_fixture_state::control_w));
+	backend.rf_reset_cb().set(FUNC(dct3_rf_adc_fixture_state::rf_reset_w));
 	subdevice<nokia_cobba_device>("cobba")->rf_receive_cb().set(FUNC(dct3_rf_adc_fixture_state::sample_r));
 	subdevice<nokia_cobba_device>("cobba")->rf_transmit_cb().set(FUNC(dct3_rf_adc_fixture_state::transmit_word_w));
 }
@@ -93,10 +94,22 @@ void dct3_rf_adc_fixture_state::npe3sp9(machine_config &config)
 	m_full_broadcast=true;
 }
 
+void dct3_rf_adc_fixture_state::npe3tp5(machine_config &config)
+{
+	npe3sp9(config);
+	m_p05_transmit=true;
+}
+
 void dct3_rf_adc_fixture_state::machine_start()
 {
 	nokia_dct3_state::machine_start();
 	m_candidate_timer=timer_alloc(FUNC(dct3_rf_adc_fixture_state::candidate_receive_start),this);
+	m_transmit_timer=timer_alloc(FUNC(dct3_rf_adc_fixture_state::candidate_transmit_start),this);
+	save_item(NAME(m_transmit_compare_written));
+	save_item(NAME(m_lab_tx_compares));
+	save_item(NAME(m_lab_tx.words)); save_item(NAME(m_lab_tx.count));
+	save_item(NAME(m_lab_tx.loading)); save_item(NAME(m_lab_tx.ready)); save_item(NAME(m_lab_tx.overflow));
+	if (m_p05_transmit) machine().logerror("npe3_tx_candidate: p05_start=1 port_buffer_only=1 network_reply=0 physical_claim=0\n");
 	save_item(NAME(m_candidate_active));
 	save_item(NAME(m_candidate_target));
 	if (m_compare_start) machine().logerror("npe3_capture_candidate: p09_start=1 all_captures=1 block_request_latch=1 physical_claim=0 source_epoch_shift=0\n");
@@ -124,9 +137,11 @@ void dct3_rf_adc_fixture_state::machine_start()
 
 void dct3_rf_adc_fixture_state::machine_reset()
 {
-	m_observed_tx_compares.fill(0);
-	m_observed_tx_words=m_observed_tx_windows=0;
-	m_observed_tx_active=false;
+	m_lab_tx_compares.fill(0);
+	m_lab_tx.reset();
+	m_observed_tx_windows=m_transmit_releases=0;
+	m_transmit_compare_written=false;
+	m_transmit_timer->adjust(attotime::never);
 	nokia_dct3_state::machine_reset();
 	if (!m_full_broadcast) return;
 	// Topology is applied by the board reset, not machine_start. Cache only
@@ -156,36 +171,36 @@ void dct3_rf_adc_fixture_state::control_w(offs_t port, u16 data)
 {
 	if (port>=5 && port<=8)
 	{
-		m_observed_tx_compares[port-5]=data;
+		m_lab_tx_compares[port-5]=data;
+		if (m_p05_transmit && port==5)
+		{
+			m_transmit_compare_written=true;
+			arm_transmit_candidate();
+		}
 		return; // Observation must not re-arm the separate receive candidate.
 	}
 	if (m_full_broadcast && port==0x21)
 	{
-		u16 const control=data&0x0e00;
-		if (control==0x0a00)
+		if (m_lab_tx.control(data))
 		{
-			m_observed_tx_active=true;
-			m_observed_tx_words=0;
-		}
-		else if (m_observed_tx_active)
-		{
-			if (control==0x0600 && m_observed_tx_windows++<16)
+			if (m_observed_tx_windows++<16)
 			{
 				auto &backend=*subdevice<nokia_dsp_c54x_device>("dsp_c54x");
 				std::array<double,4> deadlines{};
 				for (unsigned i=0;i<4;++i)
 				{
-					auto const due=backend.lab_counter_deadline(m_observed_tx_compares[i]);
+					auto const due=backend.lab_counter_deadline(m_lab_tx_compares[i]);
 					deadlines[i]=due==attotime::never ? -1 : due.as_double();
 				}
 				machine().logerror("npe3_tx_window: sequence=%u t=%.9f words=%u counter=%04x controls=%04x,%04x,%04x,%04x deadlines=%.9f,%.9f,%.9f,%.9f observer_writes=0 physical_claim=0\n",
-					m_observed_tx_windows,machine().time().as_double(),m_observed_tx_words,backend.lab_counter_value(),
-					m_observed_tx_compares[0],m_observed_tx_compares[1],m_observed_tx_compares[2],m_observed_tx_compares[3],
+					m_observed_tx_windows,machine().time().as_double(),m_lab_tx.count+unsigned(m_lab_tx.overflow),backend.lab_counter_value(),
+					m_lab_tx_compares[0],m_lab_tx_compares[1],m_lab_tx_compares[2],m_lab_tx_compares[3],
 					deadlines[0],deadlines[1],deadlines[2],deadlines[3]);
 			}
-			m_observed_tx_active=false;
 		}
 	}
+	if (m_p05_transmit && (port==0x0d || port==0x0e) && m_transmit_compare_written)
+		arm_transmit_candidate();
 	// Testable lab wiring, not a fitted MFI truth table. The always-on bit10
 	// candidate overran before RF work; keep the observed port3 RX window.
 	if (port == 3) m_adc_receive_control = data;
@@ -212,7 +227,55 @@ void dct3_rf_adc_fixture_state::control_w(offs_t port, u16 data)
 
 void dct3_rf_adc_fixture_state::transmit_word_w(u16 data)
 {
-	if (m_full_broadcast && m_observed_tx_active) ++m_observed_tx_words;
+	if (m_full_broadcast) m_lab_tx.write(data);
+}
+
+void dct3_rf_adc_fixture_state::rf_reset_w(int released)
+{
+	if (released) return;
+	m_lab_tx.reset();
+	m_lab_tx_compares.fill(0);
+	m_transmit_compare_written=false;
+	if (m_transmit_timer) m_transmit_timer->adjust(attotime::never);
+}
+
+void dct3_rf_adc_fixture_state::arm_transmit_candidate()
+{
+	auto const due=subdevice<nokia_dsp_c54x_device>("dsp_c54x")->lab_counter_deadline(m_lab_tx_compares[0]);
+	if (due==attotime::never)
+	{
+		m_transmit_timer->adjust(attotime::never);
+		m_lab_tx.reset();
+	}
+	else m_transmit_timer->adjust(due-machine().time());
+}
+
+TIMER_CALLBACK_MEMBER(dct3_rf_adc_fixture_state::candidate_transmit_start)
+{
+	if (!m_p05_transmit) return;
+	auto &backend=*subdevice<nokia_dsp_c54x_device>("dsp_c54x");
+	if (backend.lab_counter_deadline(m_lab_tx_compares[0])==attotime::never)
+	{
+		arm_transmit_candidate();
+		return;
+	}
+	if (backend.lab_counter_value()!=m_lab_tx_compares[0])
+	{
+		machine().logerror("npe3_tx_release: missed_counter=1 physical_claim=0\n");
+		m_lab_tx.reset();
+		arm_transmit_candidate();
+		return;
+	}
+	std::array<u16,15> words{};
+	if (m_lab_tx.release(words))
+	{
+		std::string packed;
+		for (auto word:words) packed+=util::string_format("%s%04x",packed.empty() ? "" : ",",word);
+		machine().logerror("npe3_tx_release: sequence=%u t=%.9f target=%04x counter=%04x words=%s network_reply=0 physical_claim=0\n",
+			++m_transmit_releases,machine().time().as_double(),m_lab_tx_compares[0],
+			subdevice<nokia_dsp_c54x_device>("dsp_c54x")->lab_counter_value(),packed);
+	}
+	arm_transmit_candidate();
 }
 
 TIMER_CALLBACK_MEMBER(dct3_rf_adc_fixture_state::candidate_receive_start)
