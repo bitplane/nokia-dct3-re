@@ -3,6 +3,22 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "c54x_mvpd_accumulator_destination",
+      "owner": "tms320c54x_generic_cpu",
+      "status": "satisfied",
+      "predicate": "Nonrepeated program-to-accumulator MVPD retains source/address ownership and immediate mapped-reader semantics",
+      "current": "The section fails before admission and passes50 cases/replays afterward. Forty-eight positives cover all six fields,four values,short-indirect/absolute forms,two pages,source/address replacement after resolution,guard masking,sibling/status preservation and immediate mapped ADD. Two negatives retain status-destination and single-repeat limits. Existing832 program-transfer,48 repeated-program and96 mapped-accumulator-move cases/replays pass. Real program Read and mapped Write remain separate ordered bus events;no firmware address enters CPU admission. General peripheral destinations and physical timing are not qualified.",
+      "evidence": ["cpu/tms320c54x/tms320c54x.cpp", "tests/c54x/sections/mvpd_accumulator_destination.h", "fixtures/c54x_sections.json", "docs/c54x_execution_contracts.md"]
+    },
+    {
+      "id": "npe3_native_random_access_submission",
+      "owner": "native_rom6_reference_adc_laboratory",
+      "status": "satisfied",
+      "predicate": "After native full-SI acquisition the own MCU organically publishes an IDLE_RA random-access request",
+      "current": "The read-only producer-index observer sees34 commits with zero invalid indices between seconds2 and12. At11.591029385 the MCU publishes080c,0000,0b66,0000,0000 through its existing ring:IDLE_RA with nonzero random-access octet0b. No packet is delivered,acknowledged or dequeued by the observer. With qualified mapped MVDD/MVPD CPU copies,the24s run next stops at80bd STLM A,$60 inside a block repeat;the full gate correctly remains red. Submission does not establish transmission,access completion,camping,registration,physical tuning or fitted clock/mask identity.",
+      "evidence": ["tools/npe3_tx_ring_observe.lua", "tools/rom6_adc_lab.lua", "docs/6210_bringup.md", "docs/rom6_rf_interface.md"]
+    },
+    {
       "id": "c54x_mvdd_accumulator_destination",
       "owner": "tms320c54x_generic_cpu",
       "status": "satisfied",
@@ -15,7 +31,7 @@
       "owner": "native_rom6_reference_adc_laboratory",
       "status": "satisfied",
       "predicate": "The separately named full-SI raw source delivers all four broadcast types through native decoding and MCU consumers in a legal bounded capture",
-      "current": "npe3sp9 uses explicit lab cellARFCN35/BSIC42,PLMN001-01,LAC/CI1,no neighbours,and the shared eight-TC schedule0/1/2/3/1/1/2/3. Only standard octets are reused from the network model;all receive input is raw GMSK through the ADC source. In the legal8s capture,blocks719/770/821/872 decodeSI3/SI4/SI1/SI2. Independent224-bit FIRE transaction/result and23-octet publication checks pass for each;all four MCU handlers run,availability flags reach0f,and the observed2d3e3c return is1. The passing repeated-SI3 control is rejected as an incomplete set. A longer24s run correctly fails on later mapped-destination MVDD6e6f(source0dea,destination0009);this is not a passing full UI or camping gate. No fitted clock/mask,physical tuning/capture,camping or registration is inferred. The mapped MVDD contract is the next software boundary.",
+      "current": "npe3sp9 uses explicit lab cellARFCN35/BSIC42,PLMN001-01,LAC/CI1,no neighbours,and the shared eight-TC schedule0/1/2/3/1/1/2/3. Only standard octets are reused from the network model;all receive input is raw GMSK through the ADC source. In the legal8s capture,blocks719/770/821/872 decodeSI3/SI4/SI1/SI2. Independent224-bit FIRE transaction/result and23-octet publication checks pass for each;all four MCU handlers run,availability flags reach0f,and the observed2d3e3c return is1. The passing repeated-SI3 control is rejected as an incomplete set. Generic CPU tests now qualify the later mapped MVDD/MVPD copies. The24s gate instead rejects STLM A,$60 inside block80bd..80c7 and remains red. No fitted clock/mask,physical tuning/capture,camping or registration is inferred.",
       "evidence": ["driver/gsm_mobility.h", "driver/nokia_dct3_research.cpp", "tools/gsm_xcch_signal.py", "tools/npe3_bcch_receive_check.py", "tools/noki6210_plmn_observe.lua", "tools/test_npe3_bcch_receive_check.py", "tools/test_gsm_xcch_signal.py", "docs/6210_bringup.md"]
     },
     {

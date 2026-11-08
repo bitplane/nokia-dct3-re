@@ -2942,14 +2942,19 @@ laboratory composition, not camping or Location Updating.
 .venv/bin/python tools/run_npe3_native.py --reference-clock --seconds 24 --adc-source fcch-sch-broadcast --capture-start p09
 ```
 
-The full command intentionally remains fail-closed: after the new broadcast
-work and class-60 CCCH reception, native execution reaches `MVDD` at `6e6f`,
-copying RAM `0dea` to mapped accumulator-high register `0009`, and the CPU
-rejects that unsupported mapped-destination form. It must not be treated as
-a successful 24-second UI/transport run. Earlier circular ADD, circular MVKD
-and shifted repeated ADD boundaries have separate generic CPU tests; the
-mapped MVDD contract is the next software target. No fault suppression,
-decoded CCCH input or registration-state forcing is retained.
+The full command intentionally remains fail-closed. Generic CPU tests now
+qualify the mapped-accumulator MVDD and MVPD copies reached after broadcast
+acquisition. The current 24-second capture instead rejects `STLM A,$60`
+inside the block repeat at `80bd..80c7`: ordinary RAM is caught by the
+control-register mutation guard. This is not a passing full UI/transport run.
+
+The bounded read-only MCU TX observer sees 34 ring commits between seconds
+2 and 12, with valid producer indices. At 11.591029385 seconds the MCU
+organically publishes `080c,0000,0b66,0000,0000`: IDLE_RA with random-access
+octet `0b`. This proves request submission, not DSP transmission, access
+completion, camping or registration. The source remains untuned and supplies
+no decoded CCCH reply. No fault suppression or firmware-state forcing is
+retained.
 
 `verify-6210-alarm-off-snooze-no` combines the independently validated
 powered-off and Snooze lifecycles: two natural RTC wakes, separately checked

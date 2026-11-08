@@ -10,6 +10,7 @@ if npe3 then
         dofile(directory..'npe3_fcch_schedule.lua')
         dofile(directory..'npe3_normal_receive.lua')
         if machine.system.name=='npe3bp9' or machine.system.name=='npe3sp9' then dofile(directory..'noki6210_plmn_observe.lua') end
+        if machine.system.name=='npe3sp9' then dofile(directory..'npe3_tx_ring_observe.lua') end
     end
 end
 local output_cap=npe3 and 496 or 128
