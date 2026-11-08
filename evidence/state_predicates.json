@@ -3,6 +3,14 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "c54x_block_stlm_low_ram",
+      "owner": "tms320c54x_generic_cpu",
+      "status": "satisfied",
+      "predicate": "Block-repeat control admission distinguishes direct low-RAM STLM from loop-control mutations",
+      "current": "The generic section rejects its first ordinary-RAM case before correction and passes44 cases/replays after narrowing the guard to preserve only direct60..7f RAM stores. Thirty-six positives cover three addresses,A/B,two pages,counts0/1/7,ordered live-source writes and continuation. Eight negatives preserve BRC/PMST/peripheral/indirect limits before data effects. Existing16 low-RAM STLM and8 block-control cases/replays pass. The own native upload reaches8860 at80bd;CPU admission contains no handset address. Other controls,interrupt composition and physical timing are not newly qualified.",
+      "evidence": ["cpu/tms320c54x/tms320c54x.cpp", "tests/c54x/sections/block_stlm_ram.h", "fixtures/c54x_sections.json", "docs/c54x_execution_contracts.md"]
+    },
+    {
       "id": "c54x_mvpd_accumulator_destination",
       "owner": "tms320c54x_generic_cpu",
       "status": "satisfied",

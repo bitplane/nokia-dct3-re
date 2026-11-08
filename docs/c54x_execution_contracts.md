@@ -116,6 +116,14 @@ cases retain the status-destination and single-repeat exclusions. The
 controls pass. These clocks specify model ordering, not measured silicon
 timing; general peripheral destinations remain unqualified.
 
+`block_stlm_ram` distinguishes direct STLM destinations `60..7f` (ordinary
+low RAM, independent of DP/CPL) from control-register mutations in a block
+repeat. Its 36 positive cases/replays check three destinations, A/B, two
+program pages, counts 0/1/7, exact ordered writes, live accumulator feedback
+and continuation. Eight negative cases/replays preserve the BRC/PMST/
+peripheral and indirect-form exclusions before data effects. No register
+control, interrupt or physical timing behavior is newly qualified.
+
 READA resolves its Read-stage destination DAGEN update before a younger
 Access-stage instruction consumes that AR (SPRU131G 7.1). Its retained PAR
 sample, program-bus hold and Execute publication are unchanged.
