@@ -47,8 +47,10 @@ def check(text: str, minimum_frames: int = 800, *, scan_30s: bool = False) -> di
         )
     if result["rf_reads"] < 1000:
         raise ValueError(f"only {result['rf_reads']} RF reads; receiver did not become active")
-    if result["first_rf_frame"] != 30:
-        raise ValueError(f"RF receiver started on frame {result['first_rf_frame']}, expected 30")
+    # Regression snapshot after removing the unrelated CCONT RTC gate.
+    # This count is not a measured physical startup latency.
+    if result["first_rf_frame"] != 24:
+        raise ValueError(f"RF receiver started on frame {result['first_rf_frame']}, expected 24")
     expected_reads = 32 * (result["frame_expiries"] - result["first_rf_frame"] + 1)
     # The fixed-time cutoff may leave two frames in flight after the
     # documented two-cycle XOR #lk,16 cost is applied.
@@ -80,24 +82,26 @@ def check(text: str, minimum_frames: int = 800, *, scan_30s: bool = False) -> di
         # Independent port-4 completion drains the original five-pair
         # descriptor bursts. This replaces, rather than accepts alongside,
         # the old payload-alias and ring-plus-slot snapshots.
-        expected_count = 1537
+        expected_count = 1536
         # Logging is capped at 32, independently of the uncapped total.
         prefix = burst * 2 + [(0x2813, 0x30, 0x4028)] + burst * 2
         prefix += [(value, 0x30, 0x4028) for value in range(0x2727, 0x272e)]
         expected_writes = [(i, *row) for i, row in enumerate(prefix, 1)]
-        if (result["frame_expiries"], result["rf_reads"]) != (20280, 648032):
+        if (result["frame_expiries"], result["rf_reads"]) != (20272, 647968):
             raise ValueError(
                 "30-second scan frame/read snapshot changed: "
-                f"frames={result['frame_expiries']} expected=20280 "
-                f"delta={result['frame_expiries'] - 20280:+d}; "
-                f"rf_reads={result['rf_reads']} expected=648032 "
-                f"delta={result['rf_reads'] - 648032:+d}; "
+                f"frames={result['frame_expiries']} expected=20272 "
+                f"delta={result['frame_expiries'] - 20272:+d}; "
+                f"rf_reads={result['rf_reads']} expected=647968 "
+                f"delta={result['rf_reads'] - 647968:+d}; "
                 f"rf_port32_writes={result['rf_port32_writes']} expected={expected_count} "
                 f"delta={result['rf_port32_writes'] - expected_count:+d}"
             )
-        if not re.search(r"space=io direction=write address=000e value=0546 mask=ffff pc=0959\b", text):
+        reload_site = r'pc=[0-9a-f]{4}\b.*owner=000957\b' if owned else r'pc=0959\b'
+        if not re.search(r"space=io direction=write address=000e value=0546 mask=ffff " + reload_site, text):
             raise ValueError("missing uploaded scan reload")
-        if not re.search(r"rom4_speech_state: address=0284 value=007c mask=ffff pc=3d8f\b.*t=6\.", text):
+        selector_site = r'pc=[0-9a-f]{4}\b.*t=6\..*owner=003d8d\b' if owned else r'pc=3d8f\b.*t=6\.'
+        if not re.search(r"rom4_speech_state: address=0284 value=007c mask=ffff " + selector_site, text):
             raise ValueError("missing later search-list selector")
     if owned:
         owner={0xa240:0xa23e,0x3712:0x3710,0x4028:0x4025}

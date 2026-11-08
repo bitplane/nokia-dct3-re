@@ -201,6 +201,20 @@ class CodecTraceTests(unittest.TestCase):
     def test_separate_paths(self):
         check_trace(self.trace())
 
+    def test_complete_preinitialization_frame_preserves_control_bits(self):
+        early = '\n'.join(
+            f'rom4_serial_audit: space=io direction={direction} address=0021 '
+            f'value={value} mask=ffff pc={pc} t=0.1'
+            for direction, value, pc in [('read', '0000', '3221'),
+                                         ('write', '0c00', '3228'),
+                                         ('read', '0c00', '33f6'),
+                                         ('write', '0400', '33fd')])
+        check_trace(early + '\n' + self.trace())
+        for changed in (early.replace('0400', '0000'),
+                        '\n'.join(early.splitlines()[:-1])):
+            with self.assertRaisesRegex(ValueError, 'I/O control'):
+                check_trace(changed + '\n' + self.trace())
+
     def test_instruction_owners_not_later_fetch_context(self):
         owners = {'0e22':'000e20','0e24':'000e22','0e31':'000e30','0e5d':'000e5c',
                   '3464':'003461','358b':'00358a','4555':'004553','4559':'004557',

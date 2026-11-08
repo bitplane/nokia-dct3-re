@@ -28,6 +28,25 @@ for _,site in ipairs({{selected,'selected'},{rearm,'rearm'}}) do
 end
 _G.rom6_policy_observers=handles
 if npe3 then
+    local serial_writes=0
+    handles[#handles+1]=arm.spaces.program:install_write_tap(0x20000,0xaffff,'npe3_policy_ccont_serial',function(address,value,mask)
+        for lane=0,3 do
+            local shift=24-8*lane
+            if (address+lane)&0xff==0x2c and (mask>>shift)&0xff~=0 and serial_writes<256 then
+                local byte=(value>>shift)&0xff
+                if arm.state.GENPC.value~=0x4ec744 or (byte~=0x54 and byte~=0x56) then goto next_lane end
+                serial_writes=serial_writes+1
+                local stack={}
+                for offset=0,9 do
+                    stack[#stack+1]=string.format('%08x',arm.spaces.program:read_u32(arm.state.R13.value+4*offset))
+                end
+                machine:logerror(string.format('rom6_reset_policy_ccont_tx: ordinal=%d t=%.9f data=%02x pc=%08x selector=%02x mask=%02x stack=%s observer_writes=0\n',
+                    serial_writes,machine.time:as_double(),byte,
+                    arm.state.GENPC.value,arm.state.R6.value,arm.state.R7.value,table.concat(stack,',')))
+            end
+            ::next_lane::
+        end
+    end)
     handles[#handles+1]=arm.spaces.program:install_write_tap(0x20000,0xaffff,'npe3_policy_control',function(address,value,mask)
         if address&0x7ffff~=0x20000 or mask&0xff00==0 then return end
         machine:logerror(string.format('rom6_reset_policy_mad2: t=%.9f address=%08x value=%08x mask=%08x pc=%08x observer_writes=0\n',

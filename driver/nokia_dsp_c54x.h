@@ -6,7 +6,6 @@
 
 #include "cpu/tms320c54x/tms320c54x.h"
 #include "nokia_cobba.h"
-#include "nokia_ccont.h"
 #include "nokia_dsp_backend.h"
 #include "nokia_dspif.h"
 #include "nokia_dsp_control_state.h"
@@ -68,7 +67,6 @@ public:
 
 	void set_transport_tag(char const *tag) { m_transport.set_tag(tag); }
 	void set_cobba_tag(char const *tag) { m_cobba.set_tag(tag); }
-	void set_ccont_tag(char const *tag) { m_ccont.set_tag(tag); }
 	void set_program_rom_tag(char const *tag) { m_program_rom.set_tag(tag); }
 	void set_data_rom_tag(char const *tag) { m_data_rom.set_tag(tag); }
 
@@ -106,7 +104,6 @@ private:
 	required_device<tms320c54x_device> m_cpu;
 	required_device<nokia_dspif_device> m_transport;
 	required_device<nokia_cobba_device> m_cobba;
-	required_device<nokia_ccont_device> m_ccont;
 	required_region_ptr<u16> m_program_rom;
 	required_region_ptr<u16> m_data_rom;
 	devcb_write64 m_transfer_compare_cb;

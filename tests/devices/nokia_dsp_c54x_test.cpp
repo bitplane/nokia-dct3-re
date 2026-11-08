@@ -32,10 +32,13 @@ public:
 		NOKIA_DSP_C54X(config, m_backend, 13'000'000);
 		m_backend->set_transport_tag("^test_transport");
 		m_backend->set_cobba_tag("^test_codec");
-		m_backend->set_ccont_tag("^test_power");
 		m_backend->set_program_rom_tag("^test_program");
 		m_backend->set_data_rom_tag("^test_data");
 		m_backend->set_external_codec_clock(true);
+		// Isolate serial sources from autonomous CTSI frame INT0. CCONT's
+		// reset register contents are not a frame-clock suppression mechanism.
+		m_backend->set_external_rf_receive(true);
+		m_backend->rf_receive_cb().set(m_cobba, FUNC(nokia_cobba_device::rf_receive_sample));
 	}
 protected:
 	virtual void machine_start() override

@@ -62,15 +62,18 @@ _G.npe3_native_stop=emu.add_machine_stop_notifier(function()
     machine:logerror(string.format('npe3_native_coverage: missing_program_reads=%d observer_writes=0\n',missing_program))
 end)
 local scenario=os.getenv('NPE3_NATIVE_SCENARIO') or 'menu'
+local input_at=tonumber(os.getenv('NPE3_NATIVE_INPUT_AT') or '20')
+assert(input_at and input_at>=20 and input_at<=100)
 if scenario~='menu' then
+    _G.noki6210_phonebook_start=input_at
     dofile(directory..(scenario=='phonebook' and 'noki6210_phonebook_input.lua' or 'noki6210_phonebook_read.lua'))
     return
 end
 _G.npe3_native_input=coroutine.create(function()
-    if not emu.wait(20) then return end
+    if not emu.wait(input_at) then return end
     machine.screens[':screen']:snapshot('npe3_before_menu.png')
     local key=assert(machine.ioport.ports[':COL.1'].fields['Left Softkey / Menu'])
-    machine:logerror('npe3_native_physical: key=Menu t=20 observer_writes=0\n')
+    machine:logerror(string.format('npe3_native_physical: key=Menu t=%d observer_writes=0\n',input_at))
     key:set_value(1)
     if not emu.wait(0.15) then key:set_value(0);return end
     key:set_value(0)

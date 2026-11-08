@@ -14,6 +14,12 @@ if __package__ in (None, ''):
     sys.path.insert(0, str(ROOT))
 
 
+def check_input_start(text, marker, expected):
+    times = re.findall(re.escape(marker) + r' t=([\d.]+)', text)
+    if len(times) != 1 or abs(float(times[0]) - expected) > 0.02:
+        raise ValueError('native 6210 physical input did not start at the requested horizon')
+
+
 def check_execution(text, loader, program, flash, *, reference=False, minimum_seconds=0):
     """Reject incomplete initialization, restarts and unacquired low ROM reads."""
     clock = 45_500_000 if reference else 13_000_000
@@ -51,6 +57,8 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--seconds', type=int, default=30)
     parser.add_argument('--scenario', choices=('menu', 'phonebook'), default='menu')
+    parser.add_argument('--input-at', type=int, default=20,
+                        help='physical input start in emulated seconds (20..100)')
     parser.add_argument('--reference-clock', action='store_true',
                         help='select the separate 45.5MHz reference-DSP experiment, not a fitted 6210 clock')
     parser.add_argument('--reset-policy', action='store_true',
@@ -58,6 +66,8 @@ def main():
     args = parser.parse_args()
     if not 24 <= args.seconds <= 120:
         parser.error('Menu check duration must be 24..120 seconds')
+    if not 20 <= args.input_at <= 100:
+        parser.error('physical input start must be 20..100 seconds')
     flash = (ROOT / 'roms/noki6210/6210_556c.fls').read_bytes()
     pmm = (ROOT / 'roms/noki6210/6210 virgin eeprom 005fa000.fls').read_bytes()
     if (hashlib.sha1(flash).hexdigest() != '3d9ea319503e78ec69b60d72cda23e461e118ea9'
@@ -91,6 +101,7 @@ def main():
             cmd.append('-verbose')
         env = {k: v for k, v in os.environ.items() if not k.startswith('NOKIA_DCT3_')}
         env['NPE3_NATIVE_SCENARIO'] = scenario
+        env['NPE3_NATIVE_INPUT_AT'] = str(args.input_at)
         with (directory / 'console.log').open('w') as output:
             subprocess.run(cmd, cwd=directory, env=env, stdout=output,
                            stderr=subprocess.STDOUT, check=True, timeout=600)
@@ -102,17 +113,17 @@ def main():
             if 'npe3_native_' in line:
                 print(line)
         return directory, text
-    # Save is at 28 s. This bounded gate ends before the separately observed
-    # ~32 s DSP restart; --seconds 34 deliberately tests and rejects that restart.
     first, text = execute('primary', args.scenario,
-                          30 if args.scenario == 'phonebook' else args.seconds,
+                          args.input_at + 10 if args.scenario == 'phonebook' else max(args.seconds, args.input_at + 4),
                           args.scenario == 'phonebook')
     if args.scenario == 'phonebook':
         from PIL import Image
         from tools.run_noki6210_acceptance import check_phonebook
         card = storage / 'sim_card'
         before = card.read_bytes()
-        cold, read_text = execute('cold', 'read', 27)
+        cold, read_text = execute('cold', 'read', args.input_at + 7)
+        check_input_start(text, '6210_phonebook_physical: action=names', args.input_at)
+        check_input_start(read_text, '6210_phonebook_read_physical: action=names', args.input_at)
         with Image.open(cold / 'snap/6210_phonebook_read_contact.png') as frame:
             check_phonebook(text, read_text, before, frame)
         if before != card.read_bytes():
@@ -124,6 +135,7 @@ def main():
         if ('npe3_native_physical: key=Menu' not in text
                 or 'npe3_native_key: value=19' not in text):
             raise ValueError('native 6210 physical Menu was not decoded')
+        check_input_start(text, 'npe3_native_physical: key=Menu', args.input_at)
         with Image.open(first/'snap/npe3_after_menu.png') as frame:
             check_frame(frame, MENU_SHA256, 'native 6210 Messages menu')
         print('Native6210 Menu: PASS bounded native boot and physical input')

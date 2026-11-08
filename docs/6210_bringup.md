@@ -30,6 +30,9 @@ saves `A / 123` through SIM UPDATE RECORD; a fresh boot retrieves and renders
 the retained record without rewriting it. The bounded runs finish before
 32 seconds, with no illegal instruction or uncovered low-program ROM read.
 
+The separate reference-clock composition now also completes 65 seconds and
+native scan-result publication after decoupling CTSI from CCONT RTC control;
+see the [qualified experiment](#reference-clock-experiment-and-adc-interrupt-boundary).
 This is compatibility evidence, not identification of the fitted DSP mask.
 The explicit 13 MHz DSP clock is provisional (the manual establishes RFIclk,
 not the DSP multiplier). A longer run requests MCU software reset near
@@ -125,7 +128,7 @@ Reproduce the extended negative control with:
 .venv/bin/python tools/run_npe3_native.py --reference-clock --seconds 34 --reset-policy
 ```
 
-The reference rate gets past the stable-counter retry but does **not** resolve
+With the former CCONT gate, the reference rate got past the stable-counter retry but did **not** resolve
 the reset: the same four initial ring publications appear, the reviewed
 Messages menu renders, and the MCU still selects reason `68` and resets near
 31.96 seconds. The runner correctly rejects the repeated initialization.
@@ -138,15 +141,54 @@ producer `0518` and consumer `0519` both remain `0080` from seconds 3 through
 7. On 8210, register 6 stays `56`, the producer reaches `0088`, and the
 native `028a 0004` publication occurs at 2.792270703 seconds.
 
-The inherited backend gates its frame-driven INT0 on CCONT register-6 bit 1.
-Thus the observed `56 -> 54` transition disables that modeled interrupt while
-the frame timer continues expiring. This localizes a model dependency, not a
-recovered silicon contract: CCONT register 6 is otherwise compatibility
-storage with unidentified control semantics. Determine the writer's intended
-clock lifecycle and the actual ADC/INT0 source before removing the gate,
-adding sample interrupts or interpreting the missing packet as a heartbeat.
+The former backend gated frame-driven INT0 on CCONT register-6 bit 1.
+The own MCU's masked writer `4ec698` uses descriptor `0702`; runtime stack
+snapshots identify `4ed4aa` setting the bit and `4ed4b6` setting then clearing
+it. The latter is called by `4744d4`, alongside the RTC-counter helpers
+(`4ed442..4ed4a8` converts hours/minutes/seconds and day to seconds).
+The observed clear is at 1.559752846 s. Upstream MAME also labels CCONT
+register 6 as [RTC enable control](https://github.com/mamedev/mame/blob/master/src/mame/nokia/nokia_3310.cpp).
+Neither that label nor the reference emulator's similar interpretation proves
+every register bit; the own manual separately establishes the RF reference
+clock rather than an RTC-derived CTSI clock.
+
+The backend no longer attaches to CCONT or uses this register as a CTSI gate.
+Existing frame cadence, CPU masks, reset handling and external-RF ownership
+remain unchanged. With this correction the 45.5 MHz **reference** composition
+completes 65.016667 s with exactly two reset/loader entries (boot's loader
+phases), one resident entry, zero illegal instructions/uncovered low-ROM reads,
+reviewed physical Messages-menu pixels, and native type-8b scan results around
+47.24 s followed by type-8a. No policy reason/reset timer is selected. CCONT
+remains `54`, proving those publications do not require altering its contents.
+The provisional 13 MHz counter-retry limitation is separate and not repaired
+by this change; no fitted clock or full RF reception is established.
+
+Late-input storage acceptance starts physical Names at second 60 in each
+independent process. Save at second 68 completes SIM UPDATE RECORD; the first
+process finishes at 70.016667 s. The cold process opens the retained contact
+at second 63 and finishes at 67.016667 s, with exact reviewed contact pixels,
+unchanged retained card bytes, and no UPDATE RECORD during readback. Both
+processes retain the strict native upload/entry/coverage checks. Reproduce:
+
+```sh
+.venv/bin/python tools/run_npe3_native.py --reference-clock --scenario phonebook --input-at 60
+```
+
+An executable backend fixture holds register 6 at `54` and requires frame
+INT0 in the default composition, no autonomous frame INT0 in the external-RF
+composition, and subsequent external data-ready delivery. Serial-only fixtures
+explicitly select external-RF ownership rather than relying on CCONT reset
+contents to suppress unrelated interrupts. ROM4 can now service one complete
+frame ISR before its port-21 initializer; the checker validates that exact
+early RMW cycle as well as three subsequent initialized cycles.
 The samples use saved-state items, not side-effecting CCONT reads; no observer
-writes firmware state or publishes packets.
+writes firmware state or publishes packets. Frame-driven ADC service itself
+remains a partial timing model, not a measured physical sample-ready source.
+The extra 30-second ROM4 processing observation is not fully requalified:
+the RF transaction/cadence check passes with the new explicit snapshot
+(20,272 frames, 647,968 reads, 1,536 port-32 writes), but the deeper processing
+gate still rejects its old mode/branch-count snapshot. Do not describe that
+gate as green or relax its arithmetic/ordering assertions without review.
 
 The literal census covers the complete `3a0000`-byte own MCU image in
 halfword steps with `tools/find_literal_loads.py --encoding big`: state-base

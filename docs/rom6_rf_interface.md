@@ -407,7 +407,8 @@ Own-code ownership is concrete:
 This supports investigating P09 as a receive-position comparator, but does not
 prove its interrupt route, recurring cadence, buffer ownership, sample rate or
 signed-position rule. The backend currently stores P09 without scheduling it;
-its frame callback independently asserts INT0 when the CCONT clock is enabled.
+its frame callback independently asserts INT0 while the DSP is released and
+external-RF ownership is not selected. CCONT RTC control does not gate CTSI.
 Do not transplant the sibling's explicitly diagnostic PA09 cadence as measured
 hardware. A receive model must separate sample production, data-available
 notification and frame timing before a native decoder result can qualify it.
@@ -595,7 +596,7 @@ Logical tests cover ordering, provenance, peeks, partial blocks, overrun,
 underrun and reset. The MAME component gate saves a partial buffer and checks
 its exact first restored block, transfer ticks and completion time. An
 independent second backend provides an interrupt-ownership control: with the
-same enabled CCONT frame clock, the default backend receives frame INT0, the
+same independent CTSI frame clock, the default backend receives frame INT0, the
 external backend receives none while idle, and its explicit data-available
 input does assert INT0 without a P03 write. This is composition conformance,
 not a claim about the fitted MAD2 interrupt multiplexer. An

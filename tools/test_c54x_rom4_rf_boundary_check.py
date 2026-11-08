@@ -1,9 +1,10 @@
+import re
 import unittest
 
 from tools.c54x_rom4_rf_boundary_check import check
 
 
-def summary(*, frames=865, reads=26752, first_frame=30, pairs=13,
+def summary(*, frames=865, reads=26944, first_frame=24, pairs=13,
             port38=0, port39=0, ifr="0000", imr="035f"):
     burst = [(0x2a04, 6, 0xa240), (0x41, 0x40, 0x3712),
              (0x27a2, 0x30, 0x3712), (0x41, 0x20, 0x3712),
@@ -36,7 +37,7 @@ class C54xRom4RfBoundaryCheckTest(unittest.TestCase):
             check(text.replace(' owner=004025',''))
 
     def scan_summary(self):
-        text = '\n'.join(line for line in summary(frames=20280, reads=648032, pairs=1537).splitlines()
+        text = '\n'.join(line for line in summary(frames=20272, reads=647968, pairs=1536).splitlines()
                          if not line.startswith('rom4_rf_port32:')) + '\n'
         burst = [(0x2a04, 6, 0xa240), (0x41, 0x40, 0x3712),
                  (0x27a2, 0x30, 0x3712), (0x41, 0x20, 0x3712),
@@ -51,7 +52,18 @@ class C54xRom4RfBoundaryCheckTest(unittest.TestCase):
             "rom4_speech_state: address=0284 value=007c mask=ffff pc=3d8f t=6.426\n")
 
     def test_accepts_exact_scan_snapshot(self):
-        self.assertEqual(check(self.scan_summary(), scan_30s=True)["rf_port32_writes"], 1537)
+        self.assertEqual(check(self.scan_summary(), scan_30s=True)["rf_port32_writes"], 1536)
+
+    def test_scan_uses_instruction_owner_not_fetch_context(self):
+        text = self.scan_summary()
+        for pc, owner in [('a240', '00a23e'), ('3712', '003710'), ('4028', '004025'),
+                          ('a1bc', '00a1ba'), ('0959', '000957'), ('3d8f', '003d8d')]:
+            text = re.sub(r'pc=' + pc + r'( t=[\d.]+)?',
+                          lambda match: 'pc=ffff' + (match[1] or '') + ' owner=' + owner, text)
+        check(text, scan_30s=True)
+        for owner, message in [('000957', 'scan reload'), ('003d8d', 'search-list selector')]:
+            with self.assertRaisesRegex(ValueError, message):
+                check(text.replace('owner=' + owner, 'owner=ffffff'), scan_30s=True)
 
     def test_requires_full_capped_scan_prefix(self):
         text = self.scan_summary()
@@ -65,25 +77,25 @@ class C54xRom4RfBoundaryCheckTest(unittest.TestCase):
 
     def test_rejects_previous_private_latch_snapshot(self):
         with self.assertRaisesRegex(ValueError, "snapshot changed"):
-            check(self.scan_summary().replace("frame_expiries=20280", "frame_expiries=20288")
-                  .replace("rf_reads=648032", "rf_reads=648288"), scan_30s=True)
+            check(self.scan_summary().replace("frame_expiries=20272", "frame_expiries=20280")
+                  .replace("rf_reads=647968", "rf_reads=648224"), scan_30s=True)
 
     def test_rejects_payload_alias_and_missing_transfer_snapshots(self):
         for count in (1520, 1518):
             with self.assertRaises(ValueError):
-                check(self.scan_summary().replace('frame_expiries=20280', 'frame_expiries=20285')
-                      .replace('rf_reads=648032', 'rf_reads=648192')
-                      .replace('rf_port32_writes=1537', f'rf_port32_writes={count}'), scan_30s=True)
+                check(self.scan_summary().replace('frame_expiries=20272', 'frame_expiries=20277')
+                      .replace('rf_reads=647968', 'rf_reads=648128')
+                      .replace('rf_port32_writes=1536', f'rf_port32_writes={count}'), scan_30s=True)
 
     def test_snapshot_failure_reports_current_drift_without_accepting_it(self):
-        text = (self.scan_summary().replace("frame_expiries=20280", "frame_expiries=20282")
-                .replace("rf_reads=648032", "rf_reads=648096")
-                .replace("rf_port32_writes=1537", "rf_port32_writes=1519"))
+        text = (self.scan_summary().replace("frame_expiries=20272", "frame_expiries=20274")
+                .replace("rf_reads=647968", "rf_reads=648032")
+                .replace("rf_port32_writes=1536", "rf_port32_writes=1519"))
         with self.assertRaises(ValueError) as caught:
             check(text, scan_30s=True)
-        for detail in ("frames=20282 expected=20280 delta=+2",
-                       "rf_reads=648096 expected=648032 delta=+64",
-                       "rf_port32_writes=1519 expected=1537 delta=-18"):
+        for detail in ("frames=20274 expected=20272 delta=+2",
+                       "rf_reads=648032 expected=647968 delta=+64",
+                       "rf_port32_writes=1519 expected=1536 delta=-17"):
             self.assertIn(detail, str(caught.exception))
 
     def test_sequence_failure_distinguishes_count_from_prefix(self):
@@ -99,7 +111,7 @@ class C54xRom4RfBoundaryCheckTest(unittest.TestCase):
 
     def test_scan_requires_reload_selector_and_exact_sequence(self):
         for old, new in (("value=0546", "value=0547"), ("value=007c", "value=0001"),
-                         ("port31=27a2", "port31=27a3"), ("rf_port32_writes=1537", "rf_port32_writes=1538")):
+                         ("port31=27a2", "port31=27a3"), ("rf_port32_writes=1536", "rf_port32_writes=1538")):
             with self.assertRaises(ValueError):
                 check(self.scan_summary().replace(old, new), scan_30s=True)
 
@@ -117,10 +129,10 @@ class C54xRom4RfBoundaryCheckTest(unittest.TestCase):
         self.assertEqual(check(summary())["frame_expiries"], 865)
 
     def test_accepts_one_in_flight_frame_at_time_cutoff(self):
-        self.assertEqual(check(summary(frames=866))["rf_reads"], 26752)
+        self.assertEqual(check(summary(frames=866))["rf_reads"], 26944)
 
     def test_accepts_two_in_flight_frames_at_time_cutoff(self):
-        self.assertEqual(check(summary(frames=866, reads=26720))["rf_reads"], 26720)
+        self.assertEqual(check(summary(frames=866, reads=26912))["rf_reads"], 26912)
 
     def test_rejects_wrong_first_rf_frame(self):
         with self.assertRaisesRegex(ValueError, "started on frame 23"):

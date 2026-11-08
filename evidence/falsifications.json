@@ -3,6 +3,13 @@
   "kind": "falsifications",
   "entries": [
     {
+      "id": "ccont_rtc_bit_gates_native_ctsi_frame",
+      "status": "disproven",
+      "hypothesis": "CCONT register 6 bit 1 is the native DSP CTSI frame interrupt enable",
+      "conclusion": "Own 6210 masked descriptor 0702 is set by 4ed4aa and toggled by 4ed4b6, called from RTC-adjacent 4744d4; its clear at 1.559752846s formerly suppressed backend INT0. The independent RF-reference CTSI source is no longer coupled to this unestablished CCONT interpretation. At the separately labelled 45.5MHz reference rate, unchanged CCONT54 now permits ADC producer progress, native scan publications and 65.016667s without reset. This falsifies the emulator coupling, not every possible physical CCONT clock effect. It does not establish the fitted6210 DSP rate or physical ADC cadence, and does not solve the separate provisional13MHz counter retry.",
+      "evidence": ["driver/nokia_dsp_c54x.cpp", "tests/devices/nokia_dsp_serial_test.cpp", "tools/rom6_reset_policy_observe.lua", "tools/run_npe3_native.py", "docs/6210_bringup.md", "docs/ccont_subsystem.md"]
+    },
+    {
       "id": "npe3_reason68_is_adjacent_idle_miss_threshold",
       "status": "disproven",
       "hypothesis": "The native 6210 reason68 reset proves that service byte17fda3 represents DSP activity and the adjacent counter17fd9e reached15 consecutive misses",

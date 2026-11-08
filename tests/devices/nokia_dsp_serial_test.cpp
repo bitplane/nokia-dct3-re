@@ -28,12 +28,12 @@ public:
 		m_mfi->data_available_cb().set(FUNC(c54x_serial_test_state::adc_ready));
 		NOKIA_DSP_C54X(config,m_backend,13'000'000);
 		m_backend->set_transport_tag("^transport"); m_backend->set_cobba_tag("^codec");
-		m_backend->set_ccont_tag("^power"); m_backend->set_program_rom_tag("^program");
+		m_backend->set_program_rom_tag("^program");
 		m_backend->set_data_rom_tag("^data");
 		m_backend->transfer_compare_cb().set(FUNC(c54x_serial_test_state::compare));
 		auto &external=NOKIA_DSP_C54X(config,"external",13'000'000);
 		external.set_transport_tag("^transport"); external.set_cobba_tag("^codec");
-		external.set_ccont_tag("^power"); external.set_program_rom_tag("^program");
+		external.set_program_rom_tag("^program");
 		external.set_data_rom_tag("^data"); external.set_external_rf_receive(true);
 	}
 protected:
@@ -94,8 +94,8 @@ private:
 				cpu.suspend(SUSPEND_REASON_DISABLE,true); external.reset_line_w(1);
 				cpu.space(AS_IO).write_word(0x0e,999); cpu.space(AS_IO).write_word(0x0d,0);
 				auto &power=*subdevice<nokia_ccont_device>("power");
-				power.select_w(1); power.serial_w(6<<3); power.serial_w(2); power.select_w(0);
-				expect(power.dsp_frame_clock_enabled(),"frame clock enabled for IRQ ownership controls");
+				// RTC control must not gate the independent RF-reference timer.
+				power.select_w(1); power.serial_w(6<<3); power.serial_w(0x54); power.select_w(0);
 			}
 			io.write_word(0x0e,999); io.write_word(0x0d,0);
 			io.write_word(0x30,0x100); io.write_word(0x31,0xaaaa); io.write_word(0x32,0xbbbb);
@@ -139,7 +139,7 @@ private:
 			{
 				auto &external=*subdevice<nokia_dsp_c54x_device>("external");
 				auto &cpu=*subdevice<tms320c54x_device>("external:cpu");
-				expect(m_cpu->state_int(tms320c54x_device::STATE_IFR)&1,"default composition retains frame INT0");
+				expect(m_cpu->state_int(tms320c54x_device::STATE_IFR)&1,"default frame INT0 survives CCONT register6 bit1 clear");
 				expect(!(cpu.state_int(tms320c54x_device::STATE_IFR)&1),"external owner has no idle frame INT0");
 				external.rf_data_available_w(1);
 			}

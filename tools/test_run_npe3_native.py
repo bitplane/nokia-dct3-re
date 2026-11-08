@@ -1,9 +1,16 @@
 import unittest
 
-from tools.run_npe3_native import check_execution
+from tools.run_npe3_native import check_execution, check_input_start
 
 
 class Native6210EvidenceTest(unittest.TestCase):
+    def test_physical_start_requires_actual_requested_time(self):
+        marker = '6210_phonebook_physical: action=names'
+        check_input_start(marker + ' t=60.000000', marker, 60)
+        for text in (marker + ' t=20.000000', marker, (marker + ' t=60\n') * 2):
+            with self.assertRaisesRegex(ValueError, 'horizon'):
+                check_input_start(text, marker, 60)
+
     def setUp(self):
         self.flash = bytearray(0x26000)
         self.flash[0x24b7c:0x24b7c + 1258] = bytes([0xa5]) * 1258

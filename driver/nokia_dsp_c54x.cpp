@@ -16,7 +16,6 @@ nokia_dsp_c54x_device::nokia_dsp_c54x_device(const machine_config &mconfig,
 	m_cpu(*this, "cpu"),
 	m_transport(*this, finder_base::DUMMY_TAG),
 	m_cobba(*this, finder_base::DUMMY_TAG),
-	m_ccont(*this, finder_base::DUMMY_TAG),
 	m_program_rom(*this, finder_base::DUMMY_TAG),
 	m_data_rom(*this, finder_base::DUMMY_TAG),
 	m_transfer_compare_cb(*this),
@@ -198,7 +197,10 @@ TIMER_CALLBACK_MEMBER(nokia_dsp_c54x_device::frame_timer_expired)
 	// rounding and can put an already-armed compare before its counter tick.
 
 	++m_frame_timer_expiries;
-	const bool enabled = m_ccont->dsp_frame_clock_enabled();
+	// CTSI uses the RF reference, not CCONT's independent RTC control.
+	// Register 6 bit 1 is toggled by the MCU's RTC lifecycle; using it here
+	// suppresses ADC service during an otherwise running native DSP boot.
+	const bool enabled = !m_external_rf_receive;
 	if (m_frame_timer_expiries <= 64)
 		machine().logerror("rom4_frame_timer: expiry=%llu enabled=%u length=%u pc=%04x pmst=%04x ifr=%04x imr=%04x t=%.6f\n",
 				m_frame_timer_expiries, enabled, m_slot_frame_length ? m_slot_frame_length : 4999,
@@ -207,7 +209,7 @@ TIMER_CALLBACK_MEMBER(nokia_dsp_c54x_device::frame_timer_expired)
 				u16(m_cpu->state_int(tms320c54x_device::STATE_IFR)),
 				u16(m_cpu->state_int(tms320c54x_device::STATE_IMR)),
 				machine().time().as_double());
-	if (enabled && !m_external_rf_receive)
+	if (enabled)
 	{
 		m_cpu->set_input_line(0, HOLD_LINE); // CTSI/GSM frame interrupt
 	}

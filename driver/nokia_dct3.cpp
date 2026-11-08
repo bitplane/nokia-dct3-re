@@ -2125,7 +2125,6 @@ void nokia_dct3_state::configure_native_dsp_attachments(nokia_dsp_c54x_device &b
 {
 	backend.set_transport_tag("^dspif");
 	backend.set_cobba_tag("^cobba");
-	backend.set_ccont_tag("^ccont");
 	backend.set_program_rom_tag("^dsp_program");
 	backend.set_data_rom_tag("^dsp_data");
 }

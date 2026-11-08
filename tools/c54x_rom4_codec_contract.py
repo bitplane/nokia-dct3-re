@@ -567,6 +567,12 @@ def check_trace(text: str) -> None:
         raise ValueError("missing native serial reset/release setup")
     io = [(direction, value, pc) for space, direction, address, value, pc, _ in records
           if space == "io" and address == "0021"]
+    # An independent CTSI frame may run before the control initializer. It
+    # must still execute the complete, bit-preserving ISR RMW sequence.
+    early = sites([("read", "0000", "3221"), ("write", "0c00", "3228"),
+                   ("read", "0c00", "33f6"), ("write", "0400", "33fd")])
+    if io[:len(early)] == early:
+        io = io[len(early):]
     expected = [("write", "1482", "4555"), ("write", "1482", "4559"),
                 ("write", "0482", "455d")]
     expected += [("read", "0482", "3221"), ("write", "0c82", "3228"),

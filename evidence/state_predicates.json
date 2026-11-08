@@ -3,6 +3,14 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "npe3_reference_clock_ctsi_independent_late_storage",
+      "owner": "native_rom6_reference_compatibility",
+      "status": "satisfied",
+      "predicate": "The explicitly reference-clock6210 composition remains native beyond60s and completes late physical SIM save and independent cold readback without reset suppression",
+      "current": "After removing unsupported CCONT-register6-to-CTSI coupling, npe3ref at45.5MHz completes65.016667s with exact own uploads, verifier0000/0006, self-test0d/00/c4, two reset/loader boot phases, one resident entry and zero illegal/uncovered low-ROM reads. Physical Messages pixels match and native type8b/type8a scan traffic appears around47s while CCONT remains54. A separate persistent run starts physical Names at60s, saves A/123 at68s and finishes70.016667s. Independent cold input starts60s, opens contact63s and finishes67.016667s with exact contact pixels, retained card bytes and no readback UPDATE. The stable native8210 control remains green at65s. This is not a fitted6210 clock/mask identification, physical ADC timing, successful RF acquisition or normal-machine promotion. The provisional13MHz counter retry and the additional ROM4 30s processing snapshot drift remain separate open qualifications.",
+      "evidence": ["driver/nokia_dsp_c54x.cpp", "driver/nokia_dct3_research.cpp", "tools/run_npe3_native.py", "tools/npe3_native_observe.lua", "tools/noki6210_phonebook_input.lua", "tools/noki6210_phonebook_read.lua", "tools/test_run_npe3_native.py", "docs/6210_bringup.md"]
+    },
+    {
       "id": "rom6_counter_retry_conditional_timing",
       "owner": "native_rom6_counter_read_diagnostic",
       "status": "satisfied",

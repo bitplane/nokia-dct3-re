@@ -13,10 +13,10 @@ local sequence = {
     {1, 'Left Softkey / Menu', 'save'},
 }
 local input = coroutine.create(function()
-    if not emu.wait(20) then return end
+    if not emu.wait(_G.noki6210_phonebook_start or 20) then return end
     for _, step in ipairs(sequence) do
         local key = assert(machine.ioport.ports[':COL.' .. step[1]].fields[step[2]])
-        machine:logerror('6210_phonebook_physical: action=' .. step[3] .. '\n')
+        machine:logerror(string.format('6210_phonebook_physical: action=%s t=%.6f\n',step[3],machine.time:as_double()))
         key:set_value(1)
         if not emu.wait(0.15) then key:set_value(0); return end
         key:set_value(0)
