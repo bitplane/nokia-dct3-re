@@ -33,7 +33,7 @@ void nokia_hagar_device::compare_output_w(u64 tuple)
 	u32 const word = (u32(u16(tuple >> 16)) << 16) | u16(tuple >> 32);
 	m_state.write(control, word);
 	++m_transactions;
-	if (machine().options().verbose() && m_transactions <= 65536)
+	if ((m_trace || machine().options().verbose()) && m_transactions <= 65536)
 	{
 		u16 key = 0;
 		u64 frequency = 0;
@@ -42,6 +42,6 @@ void nokia_hagar_device::compare_output_w(u64 tuple)
 			m_transactions, control, word, m_state.seen, m_state.route, m_state.pll,
 			m_state.configuration, candidate, key, frequency, machine().time().as_double());
 	}
-	else if (machine().options().verbose() && m_transactions == 65537)
+	else if ((m_trace || machine().options().verbose()) && m_transactions == 65537)
 		machine().logerror("hagar_command: overflow=1\n");
 }

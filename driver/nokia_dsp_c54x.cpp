@@ -271,11 +271,11 @@ TIMER_CALLBACK_MEMBER(nokia_dsp_c54x_device::transfer_timer_expired)
 		| (u64(m_io[0x32]) << 16) | m_io[4];
 	bool const was_pending = m_transfer_request_pending;
 	m_transfer_compare_cb(tuple);
-	if (machine().options().verbose() && m_transfer_timer_expiries <= 65536)
+	if ((m_transfer_trace || machine().options().verbose()) && m_transfer_timer_expiries <= 65536)
 		machine().logerror("dsp_compare_output: sequence=%llu control=%04x low=%04x high=%04x target=%04x counter=%04x pending_before=%u t=%.9f\n",
 			m_transfer_timer_expiries, m_io[0x30], m_io[0x31], m_io[0x32], m_io[4],
 			frame_counter(), was_pending, machine().time().as_double());
-	else if (machine().options().verbose() && m_transfer_timer_expiries == 65537)
+	else if ((m_transfer_trace || machine().options().verbose()) && m_transfer_timer_expiries == 65537)
 		machine().logerror("dsp_compare_output: overflow=1\n");
 	if (m_transfer_timer_expiries <= 256)
 		machine().logerror("rom4_transfer_timer: expiry=%llu target=%04x counter=%04x delay=%u t=%.9f\n",

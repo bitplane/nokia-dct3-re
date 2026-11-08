@@ -25,6 +25,7 @@ public:
 	// P30:P31:P32:P04, high to low16-bit words. This is not a claim about
 	// physical SCU payload latching or serial-shift completion.
 	auto transfer_compare_cb() { return m_transfer_compare_cb.bind(); }
+	void set_transfer_trace(bool enabled) { m_transfer_trace = enabled; }
 	// Explicit lab receiver substitution. External data-available exclusively
 	// owns INT0, including idle capture periods; do not also inject frame pulses.
 	// This is not fitted mux knowledge. Non-laboratory compositions are unchanged.
@@ -144,6 +145,7 @@ private:
 	u64 m_slot_timer_expiries = 0;
 	u64 m_transfer_timer_expiries = 0;
 	u64 m_frame_timer_expiries = 0;
+	bool m_transfer_trace = false;
 	u32 m_io_trace_count = 0;
 	u32 m_rf_trace_count = 0;
 	u32 m_rf_port38_reads = 0;

@@ -107,6 +107,12 @@ void dct3_rf_adc_fixture_state::npe3ap5(machine_config &config)
 {
 	npe3tp5(config);
 	m_raw_agch=true;
+	// Passive comparison with the independently recovered NSM-3 word
+	// grammar. Do not use its candidate as RF readiness or sample gating.
+	auto &hagar=NOKIA_HAGAR(config,"hagar",0);
+	hagar.set_trace(true);
+	subdevice<nokia_dsp_c54x_device>("dsp_c54x")->set_transfer_trace(true);
+	subdevice<nokia_dsp_c54x_device>("dsp_c54x")->transfer_compare_cb().set(hagar,FUNC(nokia_hagar_device::compare_output_w));
 }
 
 void dct3_rf_adc_fixture_state::machine_start()

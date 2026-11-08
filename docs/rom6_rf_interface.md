@@ -547,6 +547,12 @@ field/control-flow contracts,not established semantic names for the current
 procedure or a complete census of its exit inputs. No field is changed by
 the observer or BTS source.
 
+Read-only snapshots at12,14,16,18,20 and24seconds find the channel-confirmation
+pointer173fc4 zero each time. This excludes an outstanding confirmation object
+at those sampled points only,not transient objects between them;absence of
+DSP type89 is not evidence to synthesize a confirmation. The snapshot probe is
+retired after recording this bounded result.
+
 The next question is which ordinary procedure/input brings this continuation
 to its pending-page drain,and why the current lifecycle does not do so. Do not
 inject083e again or clear the context byte. Broad heap watches used to locate
@@ -923,7 +929,8 @@ Native FCCH/SCH/BCCH, camp and registration come after those boundaries.
 
 ## Partial HAGAR command state
 
-Only the `nsm3r6` research composition attaches `nokia_hagar_device`. It receives
+The `nsm3r6` and raw-laboratory `npe3ap5` research compositions attach
+`nokia_hagar_device`. It receives
 the raw P30/P31/P32/P04 tuple on actual compare callbacks, not port reads or
 firmware-PC hooks. It owns the last `4100`, `4400` and `4a80` words, their
 validity and receipt count. All are saved/resettable. No second descriptor queue,
@@ -950,6 +957,17 @@ reference-divider control, serial clocks or a working receiver.
 The qualified 60-second serial run checks all 24,914 device receipts: 19,205
 have a conditional candidate and 5,709 remain unresolved, covering all 548 scan
 keys. Its complete timestamped write stream retains the baseline SHA256 above.
+
+The6210 24-second addressed-page run independently pairs64,928 command receipts
+with their exact compare-edge tuples. All remain unresolved by the NSM-3
+contract: its6,463 configuration writes are `4a800502` (2,406) and `4a800308`
+(4,057),not the qualified `0402`/`0208` payloads. No bit-masking equivalence,
+frequency candidate or RX-readiness follows. The observer supplies no samples;
+the full1,468,878-row DSP write journal remains byte-identical to the prior
+page run (SHA256 `e6f4b9c05d50f08663cc7cbc7fc1c5166a51b1d84c805dd43573c0dbd9118074`).
+Native UI,SIM,raw LU/release and two addressed-page admissions still pass.
+Recovering the6210 configuration producers is required before reusing the
+NSM-3 frequency interpretation or introducing source tuning.
 
 ## Receive interrupt and clock boundary
 
