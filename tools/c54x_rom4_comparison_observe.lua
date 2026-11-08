@@ -1,4 +1,7 @@
 -- Passive full-width comparison operands; CPU-bus writes do not cover uploads.
+-- Program taps below are fetch-context diagnostics, not execution counters.
+-- NSE-1 processing acceptance uses c54x_rom4_processing_execute.lua instead;
+-- retain this shared format for the separate NSE-2 investigation's consumer.
 local machine = manager.machine
 local cpu = assert(machine.devices[":dsp_c54x:cpu"])
 local program, memory = cpu.spaces["program"], cpu.spaces["data"]

@@ -605,127 +605,50 @@ port-`0x38` status reads. A coherent 12-second run records zero reads on both
 activation and sample encoding must be recovered before a controlled GSM
 burst can be meaningfully attached.
 
-The earlier isolated single-entry profile (not current cold-scan acceptance)
-reaches `4414/4428/4460` three
-times and `4433` once. Mode `00ac` is cleared at startup, then written as
-`1` at 2.104547481 s, `2` at 2.109165308 s, `9` at 2.138664673 s, and `1`
-at 2.161736846 s. The first three writes occur at PC `442b`; the final write
-occurs at `32b6`. The active frame paths include `32f4` 6,033 times, `33b4`
-seven times and sample-read instruction `3249` 3,384 times. Thus the
-mode initializer is live, and the old zero-mode-only description is not the
-current receiver lifecycle. Mode 1 branches through `32f4` and has its own
-four-read block beginning at `330a`; its sample meaning and publication
-contract remain unproved. Word `1973` still receives only zero initialization
-in this run. The RF gate independently passes with 6,499 frames, 207,040
-sample reads and three control writes, without acquisition. These counts
-come from passive program/data taps in `c54x_rom4_mode_observe.lua`, with
-31 observed fetches at `3da2` as a positive control. Observer handles are
-retained for the whole machine lifetime; otherwise Lua garbage collection
-can invalidate a cached-fetch tap. The next receiver analysis must start
-from this active mode-1 path rather than try to activate `4414` again.
+### Executed no-cell processing contract
 
-That isolated mode-1 processing census records 48,264 fetches of `330a`,
-eight per mode-1 frame, followed by 6,033 executions of the absolute
-`CMPM 06fd,#1` at `3326`. The reduction branch at `332b` executes twice;
-`3347` executes 6,031 times, with `06fd=1` at its first two observed entries.
-All 6,033 frames reach `3360`, `337c` and `33b0`. At the first two `337c`
-entries, control word `06bc` is `0828/082a`; the corresponding exit
-observations are `082a/0828`. This is live processing, not an idle sample
-reader. The delayed conditional branch includes the bit-clearing instruction
-at `337c` in its delay words, so that instruction's execution alone does not
-prove the following processing arm was selected.
+The current 30-second own-profile acceptance uses instruction-entry debugger
+probes, not program-fetch proximity to PC. The latter can count a return
+address twice or snapshot a filter before its Read-stage address updates.
+The shared fetch observer remains a diagnostic consumed by the separate
+NSE-2 investigation; it is not the NSE-1 execution oracle.
 
-At these bounded snapshots, `2194=3` and `2196=0`. No fetch occurs at the
-candidate processing call `33ac` to `42f6`; `42f6` itself executes four times
-elsewhere in the boot. Its global execution count therefore must not be
-used as evidence that this sample-processing call succeeds. The passive
-observer records these exact instruction-start sites (not their immediate
-operand words), and the fresh RF gate still passes with 207,040 sample reads.
-The sample encoding, the computation feeding `2194/2196`, and whether this
-arm reports RF acquisition remain unresolved. No nonzero sample or control
-state has been synthesized to satisfy the comparisons.
+After removing the unsupported CCONT RTC-to-CTSI gate, the fixed composition
+has 20,272 frame expiries, 647,968 port-27 reads and 1,536 port-32 programming
+pairs. Executed mode 1 makes 1,027 passes, each with eight filter iterations
+and one ordered call/return through each hook `3360 -> 2400 -> 3362` and
+`336c -> 2402 -> 336e`. Both hooks remain `fc00` (RET), preserving zero
+A/B. Selector `06fd` has CPU-bus writes zero, zero, one; 22 executed passes
+use the alternate reduction and 1,005 use the steady reduction.
 
-The operands at `2194` and `2196` are double-word loads, not independent
-16-bit samples. `tools/c54x_rom4_comparison_observe.lua` records their complete
-pairs as `0003d9de` and `00000fa0`. At the first four observed `3382` load
-entries B is zero; after the accumulator subtraction at `3384`, A is
-`0000000fa0` (+4,000). The `BCD ... ALT` at `3385` is fetched 3,017 times;
-its negative-result destination `33a1` and the later comparison at `33a4`
-are never fetched. Thus the later `2194/5` comparison does not explain this
-run's exclusion: the preceding comparison already selects another arm.
-No RF units or meaning are assigned to the pair values.
-
-The observer sees three CPU-bus writes to `06fd`: startup zero, zero at
-PC `312c` (2.120203519 s), then one at `3135` (2.180201942 s), consistent
-with the two early alternate reduction frames. Each pair half has only a
-startup-clear write through this CPU-bus tap even though its later value is
-nonzero. Backend upload/copy writes bypass that tap, so this is not an
-all-writer closure or proof that the operands never change. Their original
-upload ownership and the computation feeding B remain the next static/data
-flow questions. The fresh RF acceptance gate passes alongside this passive
-capture; neither an artificial measurement nor a threshold override is used.
-
-The steady reduction at `3347..3356` consumes 16 words beginning at `1a48`.
-Ignoring saturation/guard effects, its two shifted linear combinations are
+The steady reduction at `3347..3356` consumes sixteen words at `1a48`.
+Ignoring saturation/guard effects, its linear combinations are
 `A=(x1+x2-x5-x6+x9+x10-x13-x14)<<16` and
-`B=(x0-x3-x4+x7+x8-x11-x12+x15)<<16`; it is not a sum of squares.
-The final read does not advance AR2, leaving it at `1a57`. Four passive entry
-snapshots contain sixteen zero words and leave both accumulators zero.
-This explains the observed zero B without assigning I/Q or RF units to the
-input buffer.
+`B=(x0-x3-x4+x7+x8-x11-x12+x15)<<16`, not a sum of squares.
+Double-word operands at `2194/5` and `2196/7` are `0003d9de` and
+`00000fa0`; no RF units are assigned. The comparison at `3385` executes
+514 times with A=4,000 and B=0. Four `33ac` continuations use candidates
+`0027/002d`, each once before and after selector-one publication, with
+A=`002d0000/00330000` and B=`005a0000`. Global calls to `42f6` elsewhere
+are not evidence for this particular entrance.
 
-Live program reads at `2400/2402` both return `fc00` (`RET`), not an uploaded
-replacement, and the first four caller/return snapshots preserve zero A/B.
-After the `3360` hook, the code at `3362..336b` processes the `06d2` vector;
-the `2402` hook at `336c` likewise preserves B before the saved-result and
-comparison tail. The hooks are each observed 6,033 times. Therefore these
-hook slots do not supply an absent nonzero measurement in this boot.
-Recovering the producer/encoding of the `1a48` reduction input and its
-upstream port-`27` filtering is the unresolved boundary; changing the
-comparison operands or installing a hook result would bypass it.
+Filter setup chooses output `1a48`, BK=`0010`, AR0=2 and eight coefficients
+`0387,11a3,2ad6,4000,4000,2ad6,11a3,0387`. At Execute entry, address
+updates from Read are already visible: AR3 advances by two words per
+iteration; AR4 cycles `0087/008b/008f/0083`, AR6 cycles
+`0081/0085/0089/008d`, and AR5 is `21aa`. These are not initialization
+values or inferred physical I/Q assignments. All unattached input and
+reduction-output words remain zero.
 
-The producer census closes the unfilled-buffer explanation for this boot.
-Besides 16 startup clears, the `1a48..1a57` CPU-bus write tap records 48,264
-writes at PC `3322` and 48,264 at `3323`, corresponding to the parallel-store
-instructions `d6e9/e4e9` at `3321/3322`. Their total is exactly 16 writes
-per observed mode-1 frame. All 96,528 live writes are zero. Independently,
-the port-`27` read tap records 207,040 reads with zero nonzero input words.
-Thus the running pipeline fills the reduction buffer; it is not waiting for
-an absent buffer-initialization event. In the demonstrated unattached-input
-composition its live zero input and zero filtered output are consistent.
-This is not a nonzero-signal conformance result or a specification of RF
-sample packing. Further native receiver advancement requires evidence for
-the actual input contract, not a fabricated internal result. The passive
-comparison observer retains both counts alongside the full-width operand
-and hook snapshots, and the independent RF gate remains green.
-
-The live program snapshot further bounds the upstream filter. Setup at
-`32f8..3309` selects output `1a48`, copies AR2 to AR3, sets BK to `0010`,
-AR0 to `0002`, AR6 to `0080`, AR4 to `0084`, AR5 to `21a9`, and repeats
-through `3325`. Four `74d6 0027` port reads occur at `330a/3310/3316/331c`.
-Between those reads the dual-memory MPY/MAC instructions consume history
-and coefficient words; `d6e9/e4e9` publish the two output words. The first
-four passive loop-entry snapshots show ST1=`e900`, BK=`0010`, AR0=`0002`,
-AR3=`1a48/1a4a/1a4c/1a4e`, AR4=`0084/0088/008c/0080`, and
-AR6=`0080/0084/0088/008c`. AR5 remains `21a9`, whose first eight words are
-`0387,11a3,2ad6,4000,4000,2ad6,11a3,0387` in all four snapshots.
-This identifies circular history and a symmetric coefficient sequence,
-not a physical I/Q mapping, scaling or sample-ready protocol. In particular,
-ST1.FRCT is clear in these snapshots; interpreting the words as normalized
-fractional coefficients would require additional evidence. The comparison
-observer records these bounded entries without modifying input or state.
-
-`make check-c54x-rom4-processing` regenerates the product's own EEPROM in a
-private directory, runs both passive observers for 30 seconds and checks the
-RF interface separately from the processing results. It requires sustained
-mode-1 execution, eight filter iterations per mode-1 frame, the four ordered
-filter-entry snapshots including status, history/output pointers and exact
-coefficient order, matched caller/hook counts, the two early alternate
-reduction frames, every-other-frame comparisons, exact full-width bounded
-snapshots, live producer counts and zero unattached input/output. Missing or
-duplicate observer records fail closed. These are regression expectations
-for this acquired ROM and composition, not universal radio constants;
-the success line explicitly reports `acquisition_claim=0`.
+`make check-c54x-rom4-processing` checks execution order, instructions,
+full-width operands, circular pointers, coefficient order, selector lifecycle
+and zero input/output alongside the independent RF transaction/cadence gate.
+The RF read observer uses Read-stage instruction ownership at all sixteen
+static port-27 sites. Counts are 372,128 initial-filter, 242,016 circular-history,
+32,864 scan-filter and 960 capture-filter reads across 64 buckets. Nonzero
+`00aa` selects history before `00ac` selects the other mode-specific readers.
+This is model regression and source-priority evidence, not physical sample
+cadence, packing, acquisition or handset speech.
 
 The physical bus is constrained independently by Nokia's NSE-1 System Module
 manual: COBBA uses a twelve-data-bit/four-address-bit parallel interface for

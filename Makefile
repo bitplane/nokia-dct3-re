@@ -1725,8 +1725,8 @@ check-c54x-rom4-processing: build
 		cd "$$tmp"; \
 		$(abspath $(MAME_DIR))/mame noki5110 -rompath $(abspath $(MAME_DIR))/roms \
 			-nvram_directory "$$tmp/nvram" -video none -sound none -log \
-			-skip_gameinfo -nothrottle -seconds_to_run 30 \
-			-autoboot_script $(abspath tools/c54x_rom4_processing_observe.lua) >console.log 2>&1; \
+			-skip_gameinfo -nothrottle -seconds_to_run 30 -debug -debugger none \
+			-autoboot_script $(abspath tools/c54x_rom4_processing_acceptance.lua) >console.log 2>&1; \
 		$(PYTHON) $(abspath tools/c54x_rom4_processing_check.py) error.log --scan-30s; \
 		$(PYTHON) $(abspath tools/c54x_rom4_rf_consumers_check.py) \
 			--program $(abspath $(MAME_DIR))/roms/noki5110/nse1_rom4_dsp_program.bin \

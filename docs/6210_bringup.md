@@ -184,11 +184,10 @@ early RMW cycle as well as three subsequent initialized cycles.
 The samples use saved-state items, not side-effecting CCONT reads; no observer
 writes firmware state or publishes packets. Frame-driven ADC service itself
 remains a partial timing model, not a measured physical sample-ready source.
-The extra 30-second ROM4 processing observation is not fully requalified:
-the RF transaction/cadence check passes with the new explicit snapshot
-(20,272 frames, 647,968 reads, 1,536 port-32 writes), but the deeper processing
-gate still rejects its old mode/branch-count snapshot. Do not describe that
-gate as green or relax its arithmetic/ordering assertions without review.
+The additional 30-second ROM4 processing gate is requalified with execution-entry
+observations rather than ambiguous fetch counters. Its [processing contract](rom4_dsp_loader.md#executed-no-cell-processing-contract)
+requires 1,027 passes, 8,216 filter iterations, ordered hook returns, four
+continuations, exact operands and independent RF transaction/read accounting.
 
 The literal census covers the complete `3a0000`-byte own MCU image in
 halfword steps with `tools/find_literal_loads.py --encoding big`: state-base

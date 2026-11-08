@@ -10,7 +10,7 @@ end)
 taps[#taps + 1] = cpu.spaces.io:install_read_tap(0x27, 0x27, 'rf_consumer_read', function()
     if _G.rom4_observation_read then return end
     local holdoff = cpu.spaces.data:read_u16(0x00aa) ~= 0 and 1 or 0
-    local key = string.format('%02x:%04x:%04x:%04x:%d', cpu.state['XPC'].value, cpu.state['PC'].value,
+    local key = string.format('%02x:%06x:%04x:%04x:%d', cpu.state['XPC'].value, cpu.state['READPC'].value,
         cpu.spaces.data:read_u16(0x00ac), control, holdoff)
     local row = counts[key]
     local now = machine.time:as_double()
@@ -29,7 +29,7 @@ local stop = emu.add_machine_stop_notifier(function()
         local xpc, pc, mode, value, holdoff = key:match('(%x+):(%x+):(%x+):(%x+):(%d)')
         local row = counts[key]
         machine:logerror(string.format(
-            'rom4_rf_consumer: xpc=%s pc=%s mode=%s control=%s holdoff=%s count=%d first=%.9f last=%.9f\n',
+            'rom4_rf_consumer: xpc=%s owner=%s mode=%s control=%s holdoff=%s count=%d first=%.9f last=%.9f\n',
             xpc, pc, mode, value, holdoff, row.count, row.first, row.last))
     end
     machine:logerror(string.format('rom4_rf_consumer_summary: reads=%d buckets=%d physical_rate_claim=0 t=%.9f\n',
