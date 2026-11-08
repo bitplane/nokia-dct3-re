@@ -1832,7 +1832,7 @@ Execute result/status, exact data ordering and final continuation/frame state.
 For a short FCALLD delay, Read precedes the caller-page Write at the same
 pipeline clock; extended forms publish that frame before the later Read.
 
-### Absolute double-word store in RETD/RPTBD delay words
+### Absolute double-word store in RETD/RPTBD/CALLD delay words
 
 `return_delay_absolute_dst` covers 24 independent cases/restores: either
 accumulator, three absolute addresses (including an odd opcode-shaped literal
@@ -1846,6 +1846,13 @@ both accumulators,ordinary/top RAM pairs,count0/3 and two in-flight snapshots.
 Exactly one ordered high/low pair is written before the separately counted
 body;RSA/REA,BRC,continuation and pointer increments are checked. The native
 ROM6 traffic initializer reaches RPTBD atb7a5 and absolute DST B atb7a7/3376.
+`call_delay_absolute_dst` adds24 cases/restores for CALLD:both accumulators,
+ordinary/odd-opcode-shaped/top RAM pairs,four snapshots and immediate versus
+NOP-separated callee RET. Both halves and the balanced call frame are checked.
+In the shared model clock,an immediate RET's independent stack Read precedes
+the older DST writes;the target NOP separates them. This is a retained model
+ordering,not a new measured silicon timing claim. Native CALLD atb835 targets
+06b0 with absolute DST A atb837/2ad4 in its two delay words.
 Other extended DST addressing forms and other delayed-control owners remain
 outside this newly admitted composition. The native NSM-3 witness is RETD at
 `0dfd`, DST B at `0dfe`, absolute destination `2f68` at `0dff`.
