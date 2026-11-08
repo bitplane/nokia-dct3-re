@@ -3,6 +3,14 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "npe3_native_incoming_setup",
+      "owner": "native_rom6_reference_adc_laboratory",
+      "status": "satisfied",
+      "predicate": "An air-identity-matched Paging Response leads to raw CC SETUP,native Call Confirmed and caller presentation",
+      "current": "The separate incoming-call input schedules standards-owned plain speech SETUP for5551234 at4153,only after actual Paging Response SABM4066 and echoed UA4102. Native decode succeeds19.183711363s. Timed uplink4219 contains8308040460020081150101 Call Confirmed;unacknowledged repeats occur4270/4321/4372/4423. Reviewed pre-Menu pixels show5551234 calling with Answer/Reject. The independent checker binds exact source payload,schedule,successful native decoder publication and timed native CC. Alerting,traffic assignment,physical answer,connected speech and fitted RF tuning remain unqualified. Next implement the external BTS's LAPDm acknowledgement,then assignment,without handset state injection.",
+      "evidence": ["driver/nokia_dct3_research.cpp", "tools/npe3_raw_call_setup_check.py", "tools/test_npe3_raw_call_setup_check.py", "tools/run_npe3_native.py", "docs/rom6_rf_interface.md"]
+    },
+    {
       "id": "npe3_native_paging_response_link",
       "owner": "native_rom6_reference_adc_laboratory",
       "status": "satisfied",

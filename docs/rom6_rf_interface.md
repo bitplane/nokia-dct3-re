@@ -634,7 +634,17 @@ at4102;native successful decode is18.948326396s. The earlier LU UA remains
 at2776 (12.828335055s). The checker permits a different initial message only
 after actual timed DISC;without DISC its negative fixture rejects it.
 The next boundary is network MM/CC signalling on this established second
-LAPDm link,not another synthetic handset completion. Do not
+LAPDm link,not another synthetic handset completion. The separately enabled
+`--incoming-call` fixture now sends the existing network encoder's plain
+speech SETUP for5551234 only after that IMSI-matched Paging Response. Raw
+SETUP4153 decodes successfully at19.183711363s. Actual timed uplink4219
+contains Call Confirmed `8308040460020081150101`;retransmissions occur at
+4270/4321/4372/4423 because the lab BTS does not yet acknowledge this I-frame.
+The reviewed pre-Menu frame shows5551234 calling with Answer/Reject. This
+proves incoming call presentation and native CC admission,not Alerting,
+traffic assignment,answer,connected media or physical tuning. Continue with
+LAPDm acknowledgement and standard assignment;do not substitute a DSP result.
+Do not
 inject083e again or clear the context byte. Broad heap watches used to locate
 the consumer are retired;bounded return/selector/context observations retain
 the contract. The fresh native capture reproduces UI,SIM,LU and raw release,
@@ -647,6 +657,7 @@ handoff is requalified.
 .venv/bin/python tools/run_npe3_native.py --reference-clock --seconds 24 --adc-source fcch-sch-broadcast --capture-start p09 --tx-release p05 --raw-agch --provision-records --page-at 18
 # Separate positive paging fixture;the default39dBm control is unchanged.
 .venv/bin/python tools/run_npe3_native.py --reference-clock --seconds 24 --adc-source fcch-sch-broadcast --capture-start p09 --tx-release p05 --raw-agch --provision-records --page-at 18 --cell-power-policy handset33
+# Add --incoming-call for the separate raw CC SETUP/native confirmation fixture.
 ```
 
 Host4a uses the DROM table atb041+4a=b08b,which selects35c5. That handler

@@ -22,13 +22,15 @@ ADC_BROADCAST_MENU_SHA256 = '8c7650fdb0514ec34c85b89795e529de062e6f141268a507baf
 ADC_LU_MENU_SHA256 = '5adef93609b763a40d0e3c9dca356d388a910bb393a518e99a53eec2c7184202'
 
 
-def configure_cell_power(directory,model,policy):
+def configure_cell_power(directory,model,policy,*,incoming_call=False):
     if policy=='legacy39':return
     if policy!='handset33':raise ValueError('unsupported cell power policy')
     config=ET.Element('mameconfig',version='10')
     system=ET.SubElement(config,'system',name=model)
     ports=ET.SubElement(system,'input')
     ET.SubElement(ports,'port',tag=':LAB_BTS',type='CONFIG',mask='2',defvalue='0',value='2')
+    if incoming_call:
+        ET.SubElement(ports,'port',tag=':LAB_BTS',type='CONFIG',mask='4',defvalue='0',value='4')
     destination=directory/'cfg';destination.mkdir()
     ET.ElementTree(config).write(destination/f'{model}.cfg',encoding='utf-8',xml_declaration=True)
 
@@ -123,9 +125,13 @@ def main():
                         help='bounded external BTS page at16..20 seconds in a24s raw-AGCH run')
     parser.add_argument('--cell-power-policy',choices=('legacy39','handset33'),default='legacy39',
                         help='separate standards-owned33dBm cell experiment; no firmware/clock/ADC change')
+    parser.add_argument('--incoming-call',action='store_true',
+                        help='external BTS sends plain CC SETUP only after actual native Paging Response')
     parser.add_argument('--provision-records', action='store_true',
                         help='explicit synthetic record fixture; acquired PMM remains unchanged')
     args = parser.parse_args()
+    if args.incoming_call and (args.cell_power_policy!='handset33' or args.page_at is None):
+        parser.error('raw incoming call requires the separate33dBm addressed-page fixture')
     if args.cell_power_policy!='legacy39' and (not args.raw_agch or not args.provision_records or args.scenario!='menu' or args.seconds!=24):
         parser.error('33dBm cell experiment requires the explicit24s raw-AGCH record fixture')
     if args.page_at is not None and (not args.raw_agch or not 16<=args.page_at<=20 or args.seconds!=24):
@@ -190,7 +196,7 @@ def main():
     def execute(phase, scenario, seconds, persist=False):
         directory = run / phase
         directory.mkdir()
-        configure_cell_power(directory,model,args.cell_power_policy)
+        configure_cell_power(directory,model,args.cell_power_policy,incoming_call=args.incoming_call)
         cmd = command.copy()
         cmd[-1] = str(seconds)
         if not persist:
@@ -229,6 +235,9 @@ def main():
             access=check_access(text,(first/'rom6_radio_writes.tsv').read_text(),
                                 require_windows=True,require_releases=True,allow_normal=True)
             report['raw_ua']=check_ua(text,access['normal_control_blocks'])
+            if args.incoming_call:
+                from tools.npe3_raw_call_setup_check import check as check_call_setup
+                report['call_setup']=check_call_setup(text,access['normal_control_blocks'])
             print('Native6210 cell33: PASS native Paging Response from timed port bits; stable_camping=0 calls=0')
         (run/'cell-power-experiment.json').write_text(json.dumps(report,indent=2)+'\n')
         print('Native6210 cell-power experiment captured; other radio/UI outcomes remain unqualified')

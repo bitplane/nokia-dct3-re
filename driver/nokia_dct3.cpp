@@ -1834,6 +1834,9 @@ static INPUT_PORTS_START( npe3_raw_bts )
 	PORT_CONFNAME(0x02, 0x00, "Laboratory GSM900 initial MS power ceiling")
 	PORT_CONFSETTING(0x00, "39 dBm (power-control level 0)")
 	PORT_CONFSETTING(0x02, "33 dBm (power-control level 5)")
+	PORT_CONFNAME(0x04, 0x00, "Laboratory BTS incoming call after paging")
+	PORT_CONFSETTING(0x00, DEF_STR( Off ))
+	PORT_CONFSETTING(0x04, DEF_STR( On ))
 INPUT_PORTS_END
 
 static INPUT_PORTS_START( noki8290 )
