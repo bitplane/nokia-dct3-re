@@ -3,6 +3,14 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "c54x_mvdd_accumulator_destination",
+      "owner": "tms320c54x_generic_cpu",
+      "status": "satisfied",
+      "predicate": "RAM-to-mapped-accumulator MVDD preserves retained Read/Write ownership and zero-conflict mapped readers",
+      "current": "The new section fails before admission and passes152 cases/replays afterward:148 positives cover all six fields,four values,both pointer directions,two pages,source replacement after Read,sibling/status preservation,guard masking,immediate same/sibling ADD reads,MVDK readback and four block-repeat continuations. Four model-limit cases reject mapped source,single-repeat,status/T destinations before bus effects. Real source Read5/mapped Write6 remain unchanged;retained-word forwarding supports the immediate reader without an extra source access. Existing44 mapped-operand limits,12 MVDD-SP and96 mapped-accumulator move cases/replays pass. Own native6210 reaches e556 at6e6f with source0dea/destination0009;no handset address enters CPU logic. General MMR copies,other control/interrupt compositions and physical timing are not qualified.",
+      "evidence": ["cpu/tms320c54x/tms320c54x.cpp", "tests/c54x/sections/mvdd_accumulator_destination.h", "fixtures/c54x_sections.json", "docs/c54x_execution_contracts.md"]
+    },
+    {
       "id": "npe3_native_full_broadcast_set",
       "owner": "native_rom6_reference_adc_laboratory",
       "status": "satisfied",

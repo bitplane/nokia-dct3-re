@@ -94,6 +94,17 @@ neighbouring destination, repeated and different-form exclusions. Status and
 accumulators remain unchanged (SPRU172C 4-107). The asserted bus clocks are
 the model's phase contract, not independent silicon timing measurements.
 
+`mvdd_accumulator_destination` separately qualifies non-single-repeated
+RAM-to-AL/AH/AG/BL/BH/BG copies. Its 148 positive cases/replays check retained
+source after RAM replacement, both pointer directions, sibling-field/status
+preservation, guard masking, immediate same/sibling mapped ADD reads, MVDK
+readback and four block-repeat continuations. Four negative cases/replays
+reject single-repeat, mapped-source, status and T-destination compositions
+before data effects. Source Read remains at 5 and real mapped Write at 6;
+the immediate mapped reader can use the retained word without moving that
+write. This does not relax direct-ALU producer latency or qualify general
+MMR copies, interrupt composition or measured silicon timing.
+
 READA resolves its Read-stage destination DAGEN update before a younger
 Access-stage instruction consumes that AR (SPRU131G 7.1). Its retained PAR
 sample, program-bus hold and Execute publication are unchanged.

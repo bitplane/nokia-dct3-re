@@ -3087,7 +3087,9 @@ void tms320c54x_device::pipeline_step()
 		bool const peripheral_destination = m_pipeline_operand_address[3] >= 0x20 && m_pipeline_operand_address[3] < 0x60;
 		bool const sp_destination = m_pipeline_word[3] == 0xe51a && m_pipeline_operand_address[3] == 0x18 &&
 			m_pipeline_immediate[3] >= 0x60 && !m_pipeline_repeat_active;
-		if ((m_pipeline_operand_address[3] < 0x20 && !sp_destination) ||
+		bool const accumulator_destination = m_pipeline_operand_address[3] >= 8 && m_pipeline_operand_address[3] <= 0x0d &&
+			m_pipeline_immediate[3] >= 0x60 && !m_pipeline_repeat_active;
+		if ((m_pipeline_operand_address[3] < 0x20 && !sp_destination && !accumulator_destination) ||
 			(peripheral_destination && (m_pipeline_repeat_active || m_pipeline_immediate[3] < 0x60)))
 		{
 			logerror("%s: staged MVDD register/peripheral operand is unsupported instruction=%06x word=%04x source=%04x destination=%04x repeated=%u\n", machine().describe_context(), unsigned(m_pipeline_address[3]), m_pipeline_word[3], m_pipeline_immediate[3], m_pipeline_operand_address[3], unsigned(m_pipeline_repeat_active)); m_illegal = true; return;
@@ -4629,7 +4631,7 @@ bool tms320c54x_device::pipeline_mapped_accumulator_write(u16 address) const
 {
 	return address >= 8 && address <= 0x0d && m_pipeline_valid[5] &&
 		(m_pipeline_word[5] == (0x8a00 | address) || m_pipeline_word[5] == (0x7700 | address) ||
-		(staged_store(m_pipeline_word[5]) && m_pipeline_operand_address[5] == address));
+		((staged_store(m_pipeline_word[5]) || staged_mvdd(m_pipeline_word[5])) && m_pipeline_operand_address[5] == address));
 }
 
 u16 tms320c54x_device::pipeline_store_word() const
@@ -4695,11 +4697,11 @@ bool tms320c54x_device::observe_staged_mvdd_write(u16 address, u32 &instruction,
 u16 tms320c54x_device::pipeline_read_data(u16 address, unsigned stage)
 {
 	// SPRU131G 7.5.10/example 7-67: a mapped accumulator write followed
-	// by a mapped read has no conflict. READA already retained the program
-	// word during its bus hold; forward it without moving the real EB write
+	// by a mapped read has no conflict. READA/MVDD already retained their
+	// source word; forward it without moving the real EB write
 	// or relaxing the separate direct-ALU-to-mapped-read latency.
 	if (address >= 8 && address <= 0x0d && m_pipeline_valid[5] &&
-		staged_read_a(m_pipeline_word[5]) && address == m_pipeline_operand_address[5])
+		(staged_read_a(m_pipeline_word[5]) || staged_mvdd(m_pipeline_word[5])) && address == m_pipeline_operand_address[5])
 		return address == 0x0a || address == 0x0d ? u8(m_pipeline_operand[5]) : m_pipeline_operand[5];
 	// SPRU131G 7.3.2: a same-location on-chip read can bypass a pending
 	// write through an internal bus. Preserve the real EB write and flags;
