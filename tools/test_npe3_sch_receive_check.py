@@ -26,6 +26,19 @@ class NativeSchResultTest(unittest.TestCase):
         self.assertFalse(report['physical_capture_qualified'])
         self.assertFalse(report['camping_qualified'])
 
+    def test_later_reacquisition_requires_opt_in_and_its_own_parity_publication(self):
+        text=self.text+'\nnpe3_sch_crc: sequence=2 t=10.694439033 status=0000 remainder=03ff words=00a8,9c89,0001 read_owner=004f5d class=0040 observer_writes=0'
+        packet=dict(self.packet,payload='40000000002900230000a800899c',time='10.694500000')
+        with patch('tools.npe3_sch_receive_check.check_rx_publications',return_value=dict(packets=[self.packet,packet])), \
+                patch('tools.npe3_sch_receive_check.check_program'):
+            with self.assertRaises(ValueError):
+                check(text,self.source,b'',b'',b'',b'')
+            result=check(text,self.source,b'',b'',b'',b'',allow_reacquisition=True)
+            self.assertEqual(result['native_sch_results_checked'],2)
+            for bad in (text.replace('9c89','9c88'),text.replace('sequence=2','sequence=3')):
+                with self.assertRaises(ValueError):
+                    check(bad,self.source,b'',b'',b'',b'',allow_reacquisition=True)
+
     def test_reject_status_parity_source_and_packet_mismatches(self):
         for old, new in [('status=0000', 'status=0001'), ('remainder=03ff', 'remainder=03fe'),
                          ('e40a', 'e60a'), ('00a8', '00ac'), ('read_owner=004f5d', 'read_owner=004f5c'),

@@ -1,9 +1,20 @@
 import unittest
 
-from tools.run_npe3_native import check_execution, check_input_start
+from tools.run_npe3_native import (check_execution, check_input_start, expected_menu_digest,
+    ADC_P09_MENU_SHA256, ADC_BROADCAST_MENU_SHA256, ADC_SCH_MENU_SHA256)
 
 
 class Native6210EvidenceTest(unittest.TestCase):
+    def test_full_broadcast_oracle_does_not_replace_other_profiles(self):
+        from tools.run_noki6210_acceptance import MENU_SHA256
+        self.assertNotEqual(ADC_BROADCAST_MENU_SHA256, ADC_P09_MENU_SHA256)
+        self.assertEqual(expected_menu_digest('fcch-sch-broadcast', 'p09'), ADC_BROADCAST_MENU_SHA256)
+        for source in ('fcch-sch', 'fcch-sch-bcch'):
+            self.assertEqual(expected_menu_digest(source, 'p09'), ADC_P09_MENU_SHA256)
+        self.assertEqual(expected_menu_digest('fcch-sch', 'immediate'), ADC_SCH_MENU_SHA256)
+        for source in (None, 'silence'):
+            self.assertEqual(expected_menu_digest(source, 'p09'), MENU_SHA256)
+
     def test_physical_start_requires_actual_requested_time(self):
         marker = '6210_phonebook_physical: action=names'
         check_input_start(marker + ' t=60.000000', marker, 60)

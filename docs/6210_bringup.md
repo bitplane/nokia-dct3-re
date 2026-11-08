@@ -2942,19 +2942,31 @@ laboratory composition, not camping or Location Updating.
 .venv/bin/python tools/run_npe3_native.py --reference-clock --seconds 24 --adc-source fcch-sch-broadcast --capture-start p09
 ```
 
-The full command intentionally remains fail-closed. Generic CPU tests now
-qualify the mapped-accumulator MVDD and MVPD copies reached after broadcast
-acquisition. The current 24-second capture instead rejects `STLM A,$60`
-inside the block repeat at `80bd..80c7`: ordinary RAM is caught by the
-control-register mutation guard. This is not a passing full UI/transport run.
+The full 24-second command passes legal native execution, physical Menu,
+complete raw transport and the independent SCH/SI checks. Generic CPU tests
+qualify the mapped-accumulator MVDD/MVPD copies and ordinary low-RAM STLM
+inside block repeats; the previous unsupported-form stops are not suppressed.
+The reviewed full-SI Messages frame has grayscale SHA256
+`8c7650fdb0514ec34c85b89795e529de062e6f141268a507bafc7eb77370df65`,
+reproduced in fresh runs. It differs from the older P09 frame only within
+the animated envelope `(25,27)..(49,40)`; other profiles retain their own
+exact oracles. The full-SI observer bound is 256, capturing all 150 native
+RX commits rather than accepting a truncated 64-commit prefix. Both SCH
+results require their own parity/publication checks, while the independent
+sample-aperture proof remains scoped to the first capture. Search code is
+bound to the first-ADC-read program snapshot: a later overlay legitimately
+replaces that upload before the terminal snapshot.
 
 The bounded read-only MCU TX observer sees 34 ring commits between seconds
 2 and 12, with valid producer indices. At 11.591029385 seconds the MCU
 organically publishes `080c,0000,0b66,0000,0000`: IDLE_RA with random-access
-octet `0b`. This proves request submission, not DSP transmission, access
-completion, camping or registration. The source remains untuned and supplies
-no decoded CCCH reply. No fault suppression or firmware-state forcing is
-retained.
+octet `0b`. The native DSP subsequently publishes RA_INFO `0b000a36` at
+12.063616396 seconds, reporting frame 2614, followed by retry reports. This
+establishes the native request/report boundary, not an observed RF burst,
+access grant, camping or registration. The source remains untuned and supplies
+no decoded CCCH reply. The next boundary is the actual uplink burst endpoint
+and standards-derived raw AGCH reception. No fault suppression or firmware-
+state forcing is retained.
 
 `verify-6210-alarm-off-snooze-no` combines the independently validated
 powered-off and Snooze lifecycles: two natural RTC wakes, separately checked

@@ -14,6 +14,15 @@ ROOT = Path(__file__).resolve().parents[1]
 # Keep the ordinary native Menu oracle unchanged.
 ADC_SCH_MENU_SHA256 = '81b207e77820f80f4844daeeebdbd260c1f2590888de1d0274ac67f7d036b586'
 ADC_P09_MENU_SHA256 = '748bea6093d040edebd9141c371983ad858fe1744d6f28403bb6605b79cd8638'
+# Full-SI acquisition changes the envelope animation phase, not menu text.
+ADC_BROADCAST_MENU_SHA256 = '8c7650fdb0514ec34c85b89795e529de062e6f141268a507bafc7eb77370df65'
+
+
+def expected_menu_digest(adc_source, capture_start):
+    from tools.run_noki6210_acceptance import MENU_SHA256
+    if adc_source and adc_source != 'silence' and capture_start == 'p09':
+        return ADC_BROADCAST_MENU_SHA256 if adc_source == 'fcch-sch-broadcast' else ADC_P09_MENU_SHA256
+    return ADC_SCH_MENU_SHA256 if adc_source == 'fcch-sch' else MENU_SHA256
 if __package__ in (None, ''):
     sys.path.insert(0, str(ROOT))
 
@@ -156,15 +165,13 @@ def main():
         print('Native6210 phonebook: PASS bounded own uploads, physical save, cold readback')
     else:
         from PIL import Image
-        from tools.run_noki6210_acceptance import check_frame, MENU_SHA256
+        from tools.run_noki6210_acceptance import check_frame
         if ('npe3_native_physical: key=Menu' not in text
                 or 'npe3_native_key: value=19' not in text):
             raise ValueError('native 6210 physical Menu was not decoded')
         check_input_start(text, 'npe3_native_physical: key=Menu', args.input_at)
         with Image.open(first/'snap/npe3_after_menu.png') as frame:
-            digest = ADC_SCH_MENU_SHA256 if args.adc_source == 'fcch-sch' else MENU_SHA256
-            if args.adc_source and args.adc_source != 'silence' and args.capture_start == 'p09':
-                digest = ADC_P09_MENU_SHA256
+            digest = expected_menu_digest(args.adc_source, args.capture_start)
             check_frame(frame, digest, 'native 6210 Messages menu')
         print('Native6210 Menu: PASS bounded native boot and physical input')
     if args.radio:
@@ -184,8 +191,9 @@ def main():
         broadcast=args.adc_source=='fcch-sch-broadcast'
         bcch=args.adc_source in ('fcch-sch-bcch','fcch-sch-broadcast')
         report = check_adc(text, args.adc_source != 'silence', burst=True, sch=True, bcch=bcch,broadcast=broadcast)
+        processing_program = (first / 'rom6_adc_processing_program.be16').read_bytes()
         report['native_filter'] = check_filter(text,
-            (first / 'rom6_adc_processing_program.be16').read_bytes(), flash,
+            processing_program, flash,
             (ROOT / 'roms/nsm3r6/nsm3_rom6_program.be16').read_bytes(), product='6210')
         report['native_mixer'] = check_mixer(text)
         report['native_rx'] = check_rx_publications(text)
@@ -213,10 +221,12 @@ def main():
                     (first / 'npe3_terminal_program.be16').read_bytes(),
                     (first / 'npe3_terminal_data.be16').read_bytes(),
                     (ROOT / 'roms/nsm3r6/nsm3_rom6_program.be16').read_bytes(),
-                    (ROOT / 'roms/nsm3r6/nsm3_rom6_data.be16').read_bytes())
-            program = (first / 'npe3_terminal_program.be16').read_bytes()
-            report['finite_search'] = check_finite_search_acceptance(text, program, flash, product='6210')
-            report['finite_residual'] = check_finite_peak_accumulation(text, program, flash, product='6210')
+                    (ROOT / 'roms/nsm3r6/nsm3_rom6_data.be16').read_bytes(),
+                    allow_reacquisition=broadcast)
+            # The later receiver overlay replaces the search upload. Bind its
+            # read-only trace to the snapshot taken at the first ADC read.
+            report['finite_search'] = check_finite_search_acceptance(text, processing_program, flash, product='6210')
+            report['finite_residual'] = check_finite_peak_accumulation(text, processing_program, flash, product='6210')
             report['peak_source_clock'] = check_peak_clock(text,
                 index_bias=0 if args.capture_start == 'p09' else 1)
             if report['native_filter']['nonzero_output_words'] == 0:

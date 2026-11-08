@@ -50,7 +50,7 @@ results do not retire the physical request/acknowledgement or tuning contract.
 | Immediate-gate ADC baseline | Native FCCH control acceptance; independently checked raw samples and fault-free provisional staging; first SCH aperture misses its source burst | Physical capture/compare epoch and first-valid-sample ownership |
 | Own 6210 P09-start candidate | Complete source burst, native SCH CRC/information/parity and FN704/BSIC42; legal 65-second UI run; zero-source 24-second transport control | Physical capture policy/capacity and acknowledgement; BCCH/camping |
 | Own 6210 raw-BCCH candidate | SCH plus three four-burst SI3 blocks, exact FIRE input/result and native publications; coherent 24-second Menu/transport acceptance | Complete broadcast schedule, MCU acquisition/camping, fitted timing/tuning |
-| Own 6210 full-SI candidate | SI1..SI4 native decoding, MCU availability `0f`, observed success return and organic IDLE_RA submission; legal eight-second capture | Later block-STLM CPU boundary rejects 24-second gate; access transmission/completion, camping, registration and fitted timing/tuning |
+| Own 6210 full-SI candidate | Legal 24-second physical Menu, SI1..SI4 native decoding, MCU availability `0f`, observed success return, organic IDLE_RA and native RA_INFO | Actual uplink burst/access grant, camping, registration and fitted timing/tuning |
 
 The CPU additions needed by the normal-burst frontend have generic focused
 tests. The rebuilt native ROM6 menu/storage/save-state scenarios, ROM4
