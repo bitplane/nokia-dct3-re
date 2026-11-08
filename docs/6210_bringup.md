@@ -103,6 +103,35 @@ divider's DSP-domain ratio; the 13 MHz RFIclk row describes the output to
 COBBA_GJP, not a measured DSP CLKIN. These are distinct signals, so neither
 row licenses substituting 13 MHz into the generic TI PLL formula.
 
+The retained Nokia training schematic supplies a more specific **board**
+clock path: Version 1.0, 09.02.2001, page 7 labels the oscillator path
+26 MHz REFCLK and the buffered RFC output 13 MHz; page 4 connects RFC to
+D301 MAD2 RFClk, ball K11. Thus the documented package RF input is 13 MHz,
+independent of the separate COBBACK output. It does not expose the internal
+RFClk-to-Lead CLKIN connection or the DSP PLL multiplier. The System Module
+table's unspecified divider is not permission to reinterpret this as a
+26 MHz DSP input. Source: `roms/research/npe3/npe3-schematics-v1.pdf`, SHA256
+`559e9718a9dad703694f17d349383f75af4237b1c26cf94ecdb4aafe641f1e43`.
+
+The two retained schematic versions also disagree on D301's revision suffix:
+the training sheet page 4 names ROM6 V16; the original SD4 v19 CPU sheet
+(printed A-4/PDF 4) names ROM6 V19. The latter PDF has SHA256
+`1e0b057dd6a8ac5d4ef7b030c0f7af8711df044270a18c97fdbed3c31f87b6e6`.
+These establish a documented ROM6 board family, not identification of the
+downloaded candidate bytes or the fitted chip in every 6210.
+
+The complete 65-second reference-clock trace contains two SWWSR writes of
+`2000` and two CLKMD requests of `51ee`, one per loader phase, with no later
+MMR write captured by the retained bus observer. The 8210 uses the same setup
+but its own manual specifies 45.5 MHz. Therefore this observed request alone
+does not select between a Nokia-specific PLL interpretation, internal clock
+division or a manual/revision difference. Generic TI arithmetic would produce
+78 MHz only **if** the unproved internal connection and register semantics
+both hold. Neither 78 MHz nor the working 45.5 MHz reference is promoted to
+the 6210 default. Further clock promotion needs an identified Lead clock
+contract, product-specific internal-rate documentation, or a matched hardware
+timing capture; another successful rate trial would not supply that evidence.
+
 `tools/rom6_counter_trace_check.py` validates the retained observations as
 diagnostics, never handset acceptance. The 13 MHz capture has 63 unequal
 retry pairs; the 45.5 MHz reference has 7 retry pairs and 35 equal adjacent

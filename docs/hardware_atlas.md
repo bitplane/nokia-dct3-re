@@ -504,6 +504,14 @@ product clock; it is not a universal ROM6 rate or measured cycle-accuracy
 certificate. Its partial control-port model and native initialization/UI/storage
 acceptance are defined in [the ROM6 contract](rom6_dsp_bringup.md).
 
+NPE-3's retained Nokia training schematic (Version 1.0, 09.02.2001), pages
+7 and 4, independently labels the 26 MHz oscillator and buffered **13 MHz
+RFC** net to D301 MAD2 RFClk/K11. This is a package-input fact, not a DSP
+multiplier or the internal Lead CLKIN attachment. Its ROM6 V16 label differs
+from ROM6 V19 on the original SD4 v19 CPU sheet. Source hashes, observed
+loader CLKMD requests and the limit on clock promotion are recorded in
+[6210 clock evidence](6210_bringup.md#native-control-readback-and-timing-boundary).
+
 NSE-3 is now tracked as a future product profile rather than only as
 cross-family PCM evidence. Its Nokia system-module parts list names an Intel
 TE28F800 512K x 16 flash and ROM3 MAD2 variant F711604; the memory description

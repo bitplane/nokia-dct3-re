@@ -10,9 +10,15 @@ HLE and staged configurations retain their separate contracts. The separate
 `npe3r6` composition also qualifies bounded native 6210 initialization,
 physical Menu interaction and persistent SIM-contact save/cold readback using
 its own MCU uploads and provisioning; see [6210 bring-up](6210_bringup.md).
-Its fitted mask and DSP multiplier remain unknown, and an MCU-requested reset near
-32 seconds prevents a long-run stability claim. It is not a promoted normal
-machine or a native radio/speech result.
+Its fitted mask and DSP multiplier remain unknown. At the provisional 13 MHz
+rate it stalls in a counter retry and requests reset near 32 seconds. The
+separately labelled `npe3ref` 45.5 MHz reference composition, after removing an
+unsupported CCONT RTC-to-CTSI coupling, completes 65 seconds and late physical
+SIM save/cold readback through 70/67 seconds. This is sustained compatibility
+evidence, not the 6210's established physical rate, normal-machine promotion
+or successful native RF acquisition/speech. The [own board clock evidence](6210_bringup.md#native-control-readback-and-timing-boundary)
+establishes 13 MHz at the MAD2 package input but leaves its internal DSP
+multiplier unresolved.
 
 ## Current native boundary
 
