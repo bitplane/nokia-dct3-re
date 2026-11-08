@@ -69,6 +69,7 @@ DRIVER_COMPONENTS := $(filter-out driver/nokia_dct3_trace_config.h,$(wildcard dr
 	driver/nokia_rf_lab_signal.h \
 	driver/nokia_rf_lab_tx.h \
 	driver/gsm_rach.h \
+	driver/gsm_normal_p27.h \
 	driver/nokia_rf_lab_bcch.h \
 	driver/nokia_dsp_backend.h \
 	driver/gsm_subscription_storage.h \

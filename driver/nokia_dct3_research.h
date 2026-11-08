@@ -78,6 +78,7 @@ private:
 	TIMER_CALLBACK_MEMBER(candidate_receive_start);
 	TIMER_CALLBACK_MEMBER(candidate_transmit_start);
 	void arm_transmit_candidate();
+	void receive_normal_uplink(std::array<u16,15> const &words,u64 frame);
 	emu_timer *m_candidate_timer=nullptr;
 	emu_timer *m_transmit_timer=nullptr;
 	bool m_p05_transmit=false, m_transmit_compare_written=false;
@@ -85,6 +86,12 @@ private:
 	u64 m_agch_start_frame=~u64(0);
 	std::array<u8,23> m_agch_octets{};
 	std::array<std::array<std::array<s16,2>,148*4>,4> m_agch_samples{};
+	u64 m_normal_start_frame=~u64(0),m_ua_start_frame=~u64(0);
+	unsigned m_normal_count=0;
+	std::array<std::array<u8,114>,4> m_normal_bits{};
+	std::array<u8,23> m_contention_sabm{};
+	bool m_contention_active=false;
+	std::array<std::array<std::array<s16,2>,148*4>,4> m_ua_samples{};
 	bool m_compare_start=false, m_candidate_active=false;
 	u16 m_candidate_target=0;
 	bool m_tone = true;

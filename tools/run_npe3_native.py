@@ -286,6 +286,9 @@ def main():
                         print('Native6210 synthetic records: PASS initial validators; complete_record_family='+
                               str(int(report['record_profile']['complete_record_family_qualified'])))
                         print(f"Native6210 port xCCH: PASS blocks={len(report['native_access']['normal_control_blocks'])}; exact convolution/FIRE; physical_transmission=0 registration=0")
+                        from tools.npe3_raw_ua_check import check as check_ua
+                        report['raw_ua']=check_ua(text,report['native_access']['normal_control_blocks'])
+                        print('Native6210 raw UA: PASS native dedicated decode; registration=0')
                     print(f"Native6210 raw AGCH: PASS native_decodes={report['raw_agch']['responses']}; tuned_air_source=0 registration=0")
                     print('Native6210 assigned SDCCH: PASS MCU SABM/Location Updating submission; native_transmission=0 registration=0')
                 elif 'npe3_raw_agch:' in text:

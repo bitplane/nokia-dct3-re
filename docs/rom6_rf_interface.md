@@ -44,7 +44,9 @@ declared counter match without generating any reply. The raw-AGCH profile
 additionally decodes an external access response and makes the MCU configure
 SDCCH and submit SABM/Location Updating. With the explicit synthetic record
 family,the native P27 stream now contains independently valid xCCH blocks,
-including that exact SABM. The acquired PMM still parks at the validation
+including that exact SABM. An external exact normal-burst decoder now
+returns contention-resolution UA as raw I/Q;the native dedicated receiver
+publishes the matching successful class80 result. The acquired PMM still parks at the validation
 gate,described below. These laboratory
 results do not retire the physical request/acknowledgement or tuning contract.
 
@@ -58,7 +60,7 @@ results do not retire the physical request/acknowledgement or tuning contract.
 | Own 6210 full-SI candidate | Legal 24-second physical Menu, SI1..SI4 native decoding, MCU availability `0f`, observed success return, organic IDLE_RA/RA_INFO and independently checked P21/P27 access bits | Physical release timing/access grant, camping, registration and fitted timing/tuning |
 | Own 6210 P05-start candidate | Complete native buffers clocked at the projected P05 matches; same receive/UI checks and exact port-word preservation | Physical pin/timing identity, external network decode/AGCH, camping and registration |
 | Own 6210 raw-AGCH candidate | Exact successful native assignment decode; MCU assigned-SDCCH configuration and SABM containing Location Updating Request | Native dedicated transmission, validation-gate completion, camping/registration and physical timing/tuning |
-| Synthetic-record raw-AGCH run | Ten-slot validation cycle plus final reread; no validation-error writes;40 normal bursts decode to10 exact convolution/FIRE-valid xCCH blocks,including MCU SABM | Standards-coherent BTS configuration,raw dedicated downlink/UA,completed Location Updating and physical timing/tuning |
+| Synthetic-record raw-AGCH run | Ten-slot validation cycle plus final reread; no validation-error writes;combined CCCH;48 normal bursts decode to12 exact xCCH blocks;raw contention-resolution UA reaches successful native dedicated RX | MCU link-establishment completion,completed Location Updating and physical timing/tuning |
 
 The CPU additions needed by the normal-burst frontend have generic focused
 tests. The rebuilt native ROM6 menu/storage/save-state scenarios, ROM4
@@ -304,9 +306,9 @@ SCH proof qualifies progress,not a claim that this initial prefix was nonzero.
 With combined CCCH,native accessRA0b atFN3422 receives raw AGCH
 at3423..3426. After the generic
 circular-logic admission and the FIRE encoding contract below,40 normal P27
-bursts form10 independently exact xCCH blocks. The first is the MCU's SABM/LU
+bursts form10 independently exact xCCH blocks in the no-UA control. The first is the MCU's SABM/LU
 byte-for-byte;later blocks include retransmissions,SACCH reports and idle UI.
-No raw UA or Location Updating Accept is emitted,so retransmission/return
+Without raw UA or Location Updating Accept,retransmission/return
 to search is expected. Port-level coding is qualified,not physical emission
 or registration. The first SCH remains fully source-correlated atFN715.
 The combined-cell run records three successful SCH attempts,including the
@@ -314,8 +316,42 @@ initial result,and three failed attempts: the checker matches every attempt's st
 information words and order to its actual native class40 publication;only
 successful attempts qualify acquisition. Failure rows cannot be dropped,
 promoted to success,or accepted before the initial source-qualified result.
-The next external peer work is contention-resolution UA derived from the
-actual transmitted block.
+The raw UA extension is described below;Location Updating is still incomplete.
+
+### Native raw contention-resolution UA
+
+The external BTS accepts only exact fifteen-word normal serializer buffers
+with unique tails/training and xCCH stealing flags. Four consecutive timed
+SDCCH/4 subchannel0 uplink frames37..40 are deinterleaved and checked using
+the shared convolution/FIRE decoder,with corrected-bit count required to be
+zero. The port adapter uses LSB-first air-interface octets explicitly;the
+older traffic helper's MSB-first packed-block convention is not reused.
+Independent Python vectors test this distinction,including walking bytes,
+SABM,wrong training,corrupted coding and malformed LAPDm headers.
+
+For a complete SAPI0 SABM with P=1 and valid length,the BTS echoes its
+information unchanged in UA with F=1. The first request's information is
+retained;different subsequent contention requests are ignored. Padding is
+not part of the contention identity. This follows
+[TS44.006 sections6.3.2,6.8.8 and8.4.1.4](https://www.etsi.org/deliver/etsi_ts/144000_144099/144006/04.00.00_60/ts_144006v040000p.pdf).
+The reply is encoded with assigned TSC0 and scheduled at the next TS0
+SDCCH/4 downlink22..25,not an AGCH block. Only raw ADC I/Q is supplied;
+neither private memory nor decoded MCU/DSP messages feed the BTS request.
+
+The coherent24s run decodes SABM at uplink3454..3457 and schedules UA at
+3490..3493. Native type80/class80 successfully publishes the exact UA
+`01734905087000f000fffe330809101010325476982b2b` at16.123703494s,
+with frame3493,BSIC42 and ARFCN35. The acceptance checker independently
+joins every BTS uplink to timed port decoding,verifies the response schedule
+and echo,and requires a unique successful native publication. Native uplink
+then contains idle UI rather than SABM retries;48 normal bursts form12
+valid xCCH blocks. UI/Menu,complete record validation and legal execution
+remain intact. This proves dedicated native reception,not MCU link completion
+or Location Updating. The MCU submits idle UI at16.158123769s and later
+reconfigures common control at17.632165538s;the laboratory BTS supplies
+neither SACCH system information nor Location Updating Accept yet. The next
+boundary is to identify the MCU link-completion/release contract and carry
+the corresponding standards-derived network L3/SACCH exchanges over raw I/Q.
 
 ```sh
 .venv/bin/python tools/run_npe3_native.py --reference-clock --seconds 24 --adc-source fcch-sch-broadcast --capture-start p09 --tx-release p05 --raw-agch --provision-records
