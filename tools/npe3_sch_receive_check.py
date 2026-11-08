@@ -1,0 +1,82 @@
+"""Qualify a native laboratory SCH result, not physical RF or camping."""
+import re
+
+from tools.gsm_sch_signal import HYPERFRAME, sch_uncoded_bits
+from tools.rom6_adc_measure_check import check_rx_publications
+from tools.dsp_rom6_candidate_check import PINNED, digest
+
+
+CRC = re.compile(r'npe3_sch_crc: sequence=1 t=([\d.]+) status=0000 remainder=03ff words=([0-9a-f]{4}),([0-9a-f]{4}),([0-9a-f]{4}) read_owner=004f5d class=0040 observer_writes=0')
+DUE = re.compile(r'npe3_capture_due: target=([0-9a-f]{4}) counter=([0-9a-f]{4}) t=([\d.]+) physical_claim=0')
+# Derived from the audited capture; zero initialization outside B000..FFFF
+# is not a claimed hardware reset image.
+DROM_SHA256 = '98bab4bfc75e1dc76bfbd9c9b4d46e8c09198a0b7f99e681651cd505499aadaa'
+
+
+def check_compare_edges(text):
+    due = list(DUE.finditer(text))
+    if not due or len(due) != text.count('npe3_capture_due:') or any(row[1] != row[2] for row in due):
+        raise ValueError('capture candidate missed its declared compare edge')
+    return len(due)
+
+
+def decode_information(words):
+    bits = [(words[index // 16] >> (index % 16)) & 1 for index in range(25)]
+    def field(positions):
+        value = 0
+        for index in positions:
+            value = value * 2 + bits[index]
+        return value
+    # Independently indexed GSM04.08 fields, not the source encoder's packing.
+    bsic = field((7, 6, 5, 4, 3, 2))
+    t1 = field((1, 0, 15, 14, 13, 12, 11, 10, 9, 8, 23))
+    t2 = field((22, 21, 20, 19, 18))
+    t3prime = field((17, 16, 24))
+    if t2 >= 26 or t3prime >= 5:
+        raise ValueError('decoded SCH contains reserved timing fields')
+    t3 = 10 * t3prime + 1
+    frame = 26 * 51 * t1 + 51 * ((t3 - t2) % 26) + t3
+    return frame, bsic, bits
+
+
+def check_program(program, data, resident, drom):
+    if (len(program) != 131072 or len(data) != 131072
+            or digest(resident) != PINNED['working/rom6_program.be16']
+            or digest(drom) != DROM_SHA256
+            or program[0x2000 * 2:] != resident[0x2000 * 2:]
+            or data[0xb000 * 2:] != drom[0xb000 * 2:]):
+        raise ValueError('native SCH resident program or DROM differs from acquired image')
+
+
+def check(text, source, program, data, resident, drom):
+    check_program(program, data, resident, drom)
+    rows = list(CRC.finditer(text))
+    if len(rows) != 1 or text.count('npe3_sch_crc:') != 1:
+        raise ValueError('missing unique successful native SCH CRC observation')
+    stamp, *values = rows[0].groups()
+    words = [int(value, 16) for value in values]
+    frame, bsic, bits = decode_information(words)
+    decoded = sum(word << (16 * index) for index, word in enumerate(words))
+    expected = sum(bit << index for index, bit in enumerate(sch_uncoded_bits(bits)[:35]))
+    if decoded & ((1 << 35) - 1) != expected or bsic != 42:
+        raise ValueError('native SCH parity or source BSIC differs')
+    first, last = source['source_first_tick'], source['source_last_tick']
+    frames = [at for at in range(first // 60000, last // 60000 + 1)
+              if at % HYPERFRAME == frame and first <= at * 60000 and last >= at * 60000 + 7104]
+    if len(frames) != 1:
+        raise ValueError('decoded frame is not the complete captured source SCH')
+    packets = [packet for packet in check_rx_publications(text)['packets']
+               if packet['type'] == 0x80 and packet['payload'].startswith('400000')]
+    if len(packets) != 1:
+        raise ValueError('missing unique native successful class40 publication')
+    packet = packets[0]
+    body = bytes.fromhex(packet['payload'])
+    if (len(body) != 14 or body[10:] != b''.join(word.to_bytes(2, 'little') for word in words[:2])
+            or float(packet['time']) < float(stamp)):
+        raise ValueError('native publication differs from freshly decoded SCH words')
+    edges = check_compare_edges(text)
+    return dict(native_sch_crc_qualified=True, decoded_frame=frame, decoded_bsic=bsic,
+                checked_information_bits=25, checked_parity_bits=10,
+                complete_source_burst_observed=True, compare_edges_checked=edges,
+                physical_capture_qualified=False, fitted_clock_qualified=False,
+                camping_qualified=False, registration_qualified=False)

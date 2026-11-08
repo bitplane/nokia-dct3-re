@@ -70,7 +70,9 @@ def words(value, count):
     return result
 
 
-def check(text):
+def check(text, *, receive_words=960):
+    if receive_words not in (960, 992):
+        raise ValueError('unqualified SCH receive-word contract')
     total, aperture_time = rows(SUMMARY, text, 'npe3_sch_provenance', 1)[0]
     total, aperture_time = int(total), float(aperture_time)
     raw = rows(RAW, text, 'npe3_sch_raw', 1024)
@@ -97,7 +99,7 @@ def check(text):
         epochs[-1].append((sequence, tick, value))
         previous = sequence, tick, time
     current = epochs[-1]
-    if current[0][0] != 1 or current[-1][0] != 960:
+    if current[0][0] != 1 or current[-1][0] != receive_words:
         raise ValueError('last SCH receive epoch is incomplete')
     if not re.search(rf'mfi_rx_epoch: first_tick={current[0][1]} divider=12 physical_clock_claim=0', text):
         raise ValueError('source ticks lack the independently logged enable epoch')
@@ -122,7 +124,7 @@ def check(text):
     start, finish = current[0][1], current[-1][1]
     phase = start % 60000
     sch_frame = start // 60000 % 51 in (1, 11, 21, 31, 41)
-    return dict(raw_words_checked=1024, final_receive_words=960,
+    return dict(raw_words_checked=1024, final_receive_words=receive_words,
                 source_first_tick=start, source_last_tick=finish,
                 source_frame=start // 60000, source_frame_phase=phase,
                 starts_inside_sch=sch_frame and phase < 7104,

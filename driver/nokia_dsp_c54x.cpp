@@ -248,6 +248,15 @@ void nokia_dsp_c54x_device::arm_compare_timer(emu_timer *timer, u16 quarter_symb
 	timer->adjust(m_frame_counter_epoch + absolute - machine().time());
 }
 
+attotime nokia_dsp_c54x_device::lab_receive_deadline(u16 target) const
+{
+	if (!m_reset_released || target>=frame_period()) return attotime::never;
+	using namespace nokia_dsp_compare_clock;
+	auto const edge=nokia_dsp_compare_clock::next((machine().time()-m_frame_counter_epoch).as_ticks(reference_hz),
+		m_frame_counter_base,frame_period(),target);
+	return m_frame_counter_epoch+attotime(edge.reference_ticks/reference_hz,fractional_attoseconds(edge.reference_ticks));
+}
+
 TIMER_CALLBACK_MEMBER(nokia_dsp_c54x_device::transfer_timer_expired)
 {
 	if (!m_reset_released) return;
@@ -712,6 +721,7 @@ void nokia_dsp_c54x_device::io_w(offs_t offset, u16 data)
 					unsigned(m_cpu->state_int(tms320c54x_device::STATE_EXECPC)),
 					machine().time().as_double());
 	}
+	if (m_external_rf_receive && (port==9 || port==0x0d || port==0x0e)) m_rf_control_cb(port,data);
 }
 
 void nokia_dsp_c54x_device::doorbell_w(int state)

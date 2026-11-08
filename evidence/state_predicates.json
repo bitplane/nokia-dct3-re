@@ -3,6 +3,22 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "npe3_p09_laboratory_native_sch_decode",
+      "owner": "native_rom6_reference_adc_laboratory",
+      "status": "satisfied",
+      "predicate": "The separately named whole-sequence P09-start candidate decodes the complete independent source SCH through native code and remains legally interactive through65s",
+      "current": "npe3cp9 retains the explicit45.5MHz reference and source epoch0. The65.016667s run has own uploads/native entries,physical Messages UI,1336369 complete writes,4655264 reconciled raw reads,peak78/96 and9965 counter/compare joins. The final992-word epoch42236400..42248292 covers full SCH FN704; native Read-owned CRC at4f5d returns status0/remainder03ff with00a8/e40a/0002. Independent bit fields and polynomial check all25 information/10 parity bits and BSIC42; actual type80 publication is40000000002900230000a8000ae4. Resident/DROM views are pinned. Both observed index9->26->27 priming sequences require832 reads before the first metric,deriving zero bias;128 retained peaks and8 residual updates ending0 pass. Native class50 next reports frames719/770/821 with errors while the source has no normal bursts. This is laboratory SCH decoding,not fitted clock/mask,MFI timing/capacity,RF tuning,BCCH,camping or registration. The paired zero-source overrun remains unresolved and forbids promoting this candidate as complete hardware.",
+      "evidence": ["driver/nokia_dct3_research.cpp", "driver/nokia_dsp_c54x.cpp", "tools/run_npe3_native.py", "tools/npe3_sch_provenance.lua", "tools/npe3_sch_provenance_check.py", "tools/npe3_sch_receive_check.py", "tools/rom6_adc_detect_check.py", "tools/test_npe3_sch_receive_check.py", "docs/6210_bringup.md"]
+    },
+    {
+      "id": "npe3_p09_zero_source_transport_service_gap",
+      "owner": "native_rom6_reference_adc_laboratory",
+      "status": "unresolved",
+      "predicate": "The capture/flow-control contract remains lossless through native masked-service intervals without an invented physical FIFO capacity",
+      "current": "The unchanged96-word P09-start zero-source control preserves legal execution/Menu and has31 native commits with no successful SCH. Full24s transport acceptance rejects its20.168006769s overrun:produced495200,consumed495104,queue96,ST14903(INTM),IMR035f,IFR0021(INT0 pending),bus-context PC40b2. Capture expiry/backpressure,actual serial staging and the masked-service interval remain unqualified. No capacity bump,source retiming,ignored fault or successful zero-source RX gate is retained. Coded-source65s acceptance and normal-reference SIM save/cold readback are distinct passing scopes.",
+      "evidence": ["driver/nokia_dct3_research.cpp", "driver/nokia_mfi_rx.cpp", "tools/run_npe3_native.py", "tools/rom6_adc_lab_check.py", "docs/6210_bringup.md"]
+    },
+    {
       "id": "c54x_stlm_direct_low_ram",
       "owner": "tms320c54x_generic_cpu",
       "status": "satisfied",

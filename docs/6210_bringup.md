@@ -2788,6 +2788,68 @@ The unchanged-schedule compare bounds become 7908..7932; a first-completed
 block would start at 7536..7560, both still after the envelope. The consistency
 fix does not solve physical capture ownership or synchronization.
 
+### Whole-sequence P09 capture candidate
+
+`npe3cp9` is a separate **laboratory hypothesis**, not the normal machine:
+P03/P21 arm receive, the latest valid P09 compare starts the existing sample
+clock, and disable/reset cancel pending starts. Period/load writes re-evaluate
+an armed compare on the declared counter. This applies to all captures, not
+only the final SCH window. The source still has absolute epoch zero; no decoded
+word, result, message, firmware state or waveform offset is supplied.
+
+```sh
+.venv/bin/python tools/run_npe3_native.py --reference-clock --seconds 65 --adc-source fcch-sch --capture-start p09
+```
+
+The 65.016667-second run has legal native execution, exact own uploads,
+physical Messages input, 1,336,369 complete I/O writes, 4,655,264 reconciled
+P27 reads, peak provisional staging 78/96 and 9,965 exact counter/compare joins.
+All 496 independently convolved FIR outputs match, including 303 nonzero.
+The first 128 of 213 peak writes join both search modes; seven confirmations
+and eight exact residual updates end at residual zero.
+
+The final 992-word epoch spans ticks `42236400..42248292`, covering the whole
+frame-704 SCH burst. Its 192 native aperture words have SHA256
+`e6bcf6b7cf504b52757fbe5302b906a264d3f783c90f6a7aeb2a6dfabda5fe65`.
+At 3.251141275 s, native CRC status is zero, remainder `03ff`, decoded words
+`00a8,e40a,0002`. Independent field decoding recovers **FN 704 / BSIC 42**;
+all 25 information and ten parity bits match. The acquired resident program
+and DROM views are pinned separately. The native publication at 3.251147560 s
+is type `80`, body `40000000002900230000a8000ae4`.
+Software frame `29` in that metadata is not substituted for the decoded FN.
+
+The priming contract differs from immediate capture: firmware writes index
+9, adds 17 before samples arrive, and its first metric finishes after 832
+words (26 blocks). The candidate therefore has index bias zero, not the
+immediate profile's one. The checker requires both observed priming sequences
+before accepting that distinct join. CRC publication is Read-owned MVMD at
+`4f5d`; EXECPC can be invalid at that store and must not select its observer.
+The three subsequently exposed CPU forms have generic tests, not handset
+exceptions: conditional branch at REA, conditional return inside a block,
+and direct STLM to low RAM.
+
+The reviewed candidate Menu hash is
+`748bea6093d040edebd9141c371983ad858fe1744d6f28403bb6605b79cd8638`.
+Its difference from immediate capture is 83 animated-icon pixels, bounds
+`(25,27)..(49,38)`; the ordinary and immediate-profile hashes are unchanged.
+
+This is native **laboratory SCH decoding**, not fitted MFI timing/capacity,
+RF tuning, BCCH, camping or registration. The zero-source `npe3zp9` control
+preserves legal execution/Menu and produces no successful SCH, but the full
+24-second receive gate correctly rejects an overrun at 20.168006769 s:
+produced 495,200, consumed 495,104, provisional queue full at 96, INTM set
+(`ST1=4903`), INT0 pending (`IFR=0021`), bus-context PC `40b2`.
+Do not enlarge staging or suppress this fault to promote the candidate.
+The finite capture/backpressure/service-gap contract remains open.
+
+After SCH, native class-50 reports identify frame fields 719, 770 and 821, each
+51 frames apart, with status 1. The fixture supplies no normal/BCCH bursts,
+so these are a receive frontier, not registered cells. The next source-side
+step is to confirm that request's channel/allocation contract before supplying
+standards-derived normal bursts at the corresponding BCCH schedule;
+the zero-source transport defect remains a separate required fidelity item.
+Independent normal-reference SIM save and cold readback still pass.
+
 `verify-6210-alarm-off-snooze-no` combines the independently validated
 powered-off and Snooze lifecycles: two natural RTC wakes, separately checked
 alarm-only uploads, silent endpoint intervals while powered off, physical

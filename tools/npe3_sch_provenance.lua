@@ -25,6 +25,15 @@ local function in_window()
     return not finished and t>=3 and t<=3.4
 end
 local handles={}
+local seeds=0
+handles[#handles+1]=cpu.spaces.data:install_write_tap(0x2f57,0x2f57,'npe3_search_index_seed',function(_,value)
+    local owner=cpu.state.EXECPC.value
+    if finished or not ((owner==0xb7f and value==9) or (owner==0xb8f and value==26) or (owner==0xbba and value==27)) then return end
+    seeds=seeds+1
+    if seeds>16 then return end
+    machine:logerror(string.format('npe3_search_index_seed: sequence=%d t=%.9f value=%04x local_reads=%d owner=%06x observer_writes=0\n',
+        seeds,machine.time:as_double(),value,consumed:read(0),owner))
+end)
 handles[#handles+1]=cpu.spaces.io:install_read_tap(0x27,0x27,'npe3_sch_raw_provenance',function(_,value)
     if not in_window() then return end
     -- Read taps run after the device handler: the consumed slot precedes head.
@@ -67,3 +76,13 @@ handles[#handles+1]=cpu.spaces.data:install_write_tap(0x10,0x10,'npe3_sch_proven
         total,count,machine.time:as_double()))
 end)
 _G.npe3_sch_provenance=handles
+local crc_writes=0
+handles[#handles+1]=cpu.spaces.data:install_write_tap(0x2f20,0x2f20,'npe3_sch_crc',function(_,value)
+    local owner=cpu.state.READPC.value
+    if owner~=0x4f5d or cpu.spaces.data:read_u16(0x2f02)~=0x40 then return end
+    crc_writes=crc_writes+1
+    if crc_writes>16 then return end
+    -- MVMD publishes this status at Read, not Execute.
+    machine:logerror(string.format('npe3_sch_crc: sequence=%d t=%.9f status=%04x remainder=%04x words=%s read_owner=%06x class=0040 observer_writes=0\n',
+        crc_writes,machine.time:as_double(),value,cpu.state.A.value&0x3ff,words(0x2f80,0x2f82),owner))
+end)

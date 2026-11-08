@@ -58,6 +58,8 @@ public:
 	void nsm3afs(machine_config &config);
 	void npe3afs(machine_config &config);
 	void npe3ad0(machine_config &config);
+	void npe3cp9(machine_config &config);
+	void npe3zp9(machine_config &config);
 protected:
 	void machine_start() override;
 private:
@@ -65,6 +67,10 @@ private:
 	void control_w(offs_t port, u16 data);
 	u16 sample_r(offs_t component);
 	void fault_observe_w(int state);
+	TIMER_CALLBACK_MEMBER(candidate_receive_start);
+	emu_timer *m_candidate_timer=nullptr;
+	bool m_compare_start=false, m_candidate_active=false;
+	u16 m_candidate_target=0;
 	bool m_tone = true;
 	bool m_burst = false;
 	bool m_sch = false;

@@ -66,9 +66,25 @@ void dct3_rf_adc_fixture_state::npe3ad0(machine_config &config)
 	m_tone = false;
 }
 
+void dct3_rf_adc_fixture_state::npe3cp9(machine_config &config)
+{
+	npe3afs(config);
+	m_compare_start=true;
+}
+
+void dct3_rf_adc_fixture_state::npe3zp9(machine_config &config)
+{
+	npe3cp9(config);
+	m_tone=false;
+}
+
 void dct3_rf_adc_fixture_state::machine_start()
 {
 	nokia_dct3_state::machine_start();
+	m_candidate_timer=timer_alloc(FUNC(dct3_rf_adc_fixture_state::candidate_receive_start),this);
+	save_item(NAME(m_candidate_active));
+	save_item(NAME(m_candidate_target));
+	if (m_compare_start) machine().logerror("npe3_capture_candidate: p09_start=1 all_captures=1 physical_claim=0 source_epoch_shift=0\n");
 	save_item(NAME(m_q_latch));
 	save_item(NAME(m_adc_receive_control)); save_item(NAME(m_adc_mfi_control));
 	machine().logerror("rf_adc_lab: direct_adc=1 tuned_air_source=0 tone=%u reference=13000000 source_phase_divider=12 word_divider=%u amplitude=1024 physical_clock_claim=0\n",
@@ -85,8 +101,32 @@ void dct3_rf_adc_fixture_state::control_w(offs_t port, u16 data)
 	// candidate overran before RF work; keep the observed port3 RX window.
 	if (port == 3) m_adc_receive_control = data;
 	if (port == 0x21) m_adc_mfi_control = data;
-	subdevice<nokia_mfi_rx_device>("mfi_rx")->enable_w(BIT(m_adc_receive_control,0)
-		&& BIT(m_adc_mfi_control,10) && !BIT(m_adc_mfi_control,12));
+	if (port == 9) m_candidate_target = data;
+	bool const enabled=BIT(m_adc_receive_control,0) && BIT(m_adc_mfi_control,10) && !BIT(m_adc_mfi_control,12);
+	if (!m_compare_start) subdevice<nokia_mfi_rx_device>("mfi_rx")->enable_w(enabled);
+	else if (!enabled)
+	{
+		m_candidate_timer->adjust(attotime::never);
+		m_candidate_active=false;
+		subdevice<nokia_mfi_rx_device>("mfi_rx")->enable_w(0);
+	}
+	else if (!m_candidate_active)
+	{
+		auto &backend=*subdevice<nokia_dsp_c54x_device>("dsp_c54x");
+		u16 const target=m_candidate_target;
+		auto const deadline=backend.lab_receive_deadline(target);
+		if (deadline==attotime::never) m_candidate_timer->adjust(attotime::never);
+		else m_candidate_timer->adjust(deadline-machine().time());
+		machine().logerror("npe3_capture_arm: target=%04x t=%.9f deadline=%.9f physical_claim=0\n",target,machine().time().as_double(),deadline.as_double());
+	}
+}
+
+TIMER_CALLBACK_MEMBER(dct3_rf_adc_fixture_state::candidate_receive_start)
+{
+	m_candidate_active=true;
+	u16 const counter=subdevice<nokia_dsp_c54x_device>("dsp_c54x")->lab_receive_counter();
+	machine().logerror("npe3_capture_due: target=%04x counter=%04x t=%.9f physical_claim=0\n",m_candidate_target,counter,machine().time().as_double());
+	subdevice<nokia_mfi_rx_device>("mfi_rx")->enable_w(1);
 }
 
 void dct3_rf_adc_fixture_state::fault_observe_w(int state)

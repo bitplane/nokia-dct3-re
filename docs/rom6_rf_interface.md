@@ -10,29 +10,34 @@ bounded FIR/mixer/correlation arithmetic and finite-FCCH **control acceptance**
 have focused checks. These do not qualify a physically timed RF receiver.
 [Native boot acceptance](rom6_dsp_bringup.md) remains separate.
 
-The own-upload 6210 reference-clock [raw ADC comparison](6210_bringup.md#reference-clock-raw-adc-trials)
-now qualifies fault-free sample delivery and 496 independent FIR outputs,
-including 104 nonzero outputs under the coded source. Its first SCH aperture
-is nonzero but the native report still has error status 1. Its queued-source
-and native last-writer provenance are checked: the final capture starts partway
-through SCH. NSM-3's zero-window diagnosis does not transfer unchanged.
+The own-upload 6210 reference-clock [P09-start laboratory candidate](6210_bringup.md#whole-sequence-p09-capture-candidate)
+recovers exact FN 704 / BSIC 42 through the native SCH frontend/CRC and
+publishes its own success report. It remains legal and interactive for 65 s.
+The unchanged immediate-gate control still captures only partial SCH.
+Neither result establishes fitted MFI timing or RF tuning; the P09 zero-source
+control exposes a 96-word staging overrun and is correctly rejected.
 
-The immediate frontier is **capture-edge ownership**: which P09/P0a/P0b
+The hardware frontier remains **capture-edge ownership**: which P09/P0a/P0b
 events start conversion, admit samples and assert MFI INT0, and how those
 events relate to the DSP I/O counter/reload epoch. Under the current declared
 P03-level laboratory gate, the NSM-3 first SCH window contains zeros; the
 6210 window is nonzero but partial. Both fail native decoding.
 Mode-1 product/history and mixer checks do not expose an
 arithmetic defect; the P03 bit-8 poll does not prove a missing hardware clear.
-Organic SCH/BCCH reception and camping remain unqualified. This is now
-distinct from decoder execution: isolated native SCH and BCCH paths recover
+Physical SCH/BCCH reception and camping remain unqualified. This is now
+distinct from laboratory decoder execution: isolated native SCH and BCCH paths recover
 independently generated payloads from filtered I/Q samples.
+The next 6210 receive target is the native class-50 path after successful SCH:
+confirm its channel/allocation contract, then supply standard normal/BCCH
+bursts rather than decoded messages. That experiment does not retire the
+zero-source fault.
 
 | Receive scope | Current evidence | Not established |
 | --- | --- | --- |
 | Isolated SCH | Raw P27 input through native ISR/FIR, frontend, Viterbi and CRC recovers exact FN/BSIC; zero-input control rejects | Physical interrupt/capture timing, organic synchronization |
 | Isolated BCCH | Four independent raw GMSK bursts traverse native ISR/FIR, frontend, deinterleaving, weighting and Viterbi to exact SI3/parity; another payload passes, zero samples reject | Hardware FIRE completion, RF tuning/camping |
-| Organic ADC laboratory boot | Native FCCH control acceptance; independently checked raw samples and fault-free provisional staging; first SCH aperture misses its source burst | Physical capture/compare epoch and first-valid-sample ownership |
+| Immediate-gate ADC baseline | Native FCCH control acceptance; independently checked raw samples and fault-free provisional staging; first SCH aperture misses its source burst | Physical capture/compare epoch and first-valid-sample ownership |
+| Own 6210 P09-start candidate | Complete source burst, native SCH CRC/information/parity and FN704/BSIC42; legal 65-second UI run | Physical capture policy/capacity; zero-source overrun; BCCH/camping |
 
 The CPU additions needed by the normal-burst frontend have generic focused
 tests. The rebuilt native ROM6 menu/storage/save-state scenarios, ROM4

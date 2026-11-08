@@ -1,0 +1,47 @@
+import unittest
+from unittest.mock import patch
+
+from tools.npe3_sch_receive_check import check, decode_information, check_program
+
+
+class NativeSchResultTest(unittest.TestCase):
+    text = ('npe3_sch_crc: sequence=1 t=3.251000000 status=0000 remainder=03ff words=00a8,e40a,0002 read_owner=004f5d class=0040 observer_writes=0\n'
+            'npe3_capture_due: target=1201 counter=1201 t=3.248953000 physical_claim=0')
+    source = dict(source_first_tick=42236400, source_last_tick=42247908)
+    packet = dict(type=0x80, payload='40000000002900230000a8000ae4', time='3.251147560')
+
+    def checked(self, text=None, source=None, packet=None):
+        with patch('tools.npe3_sch_receive_check.check_rx_publications', return_value=dict(packets=[packet or self.packet])), \
+                patch('tools.npe3_sch_receive_check.check_program'):
+            return check(text or self.text, source or self.source, b'', b'', b'', b'')
+
+    def test_code_and_data_provenance_is_required(self):
+        with self.assertRaises(ValueError):
+            check_program(bytes(131072), bytes(131072), bytes(131072), bytes(131072))
+
+    def test_information_is_independently_decoded_and_parity_checked(self):
+        self.assertEqual(decode_information([0x00a8, 0xe40a, 2])[:2], (704, 42))
+        report = self.checked()
+        self.assertTrue(report['native_sch_crc_qualified'])
+        self.assertFalse(report['physical_capture_qualified'])
+        self.assertFalse(report['camping_qualified'])
+
+    def test_reject_status_parity_source_and_packet_mismatches(self):
+        for old, new in [('status=0000', 'status=0001'), ('remainder=03ff', 'remainder=03fe'),
+                         ('e40a', 'e60a'), ('00a8', '00ac'), ('read_owner=004f5d', 'read_owner=004f5c'),
+                         ('counter=1201', 'counter=1200')]:
+            with self.subTest(old=old), self.assertRaises(ValueError):
+                self.checked(text=self.text.replace(old, new))
+        for source in [dict(source_first_tick=42240012, source_last_tick=42247908),
+                       dict(source_first_tick=42236400, source_last_tick=42247000)]:
+            with self.assertRaises(ValueError):
+                self.checked(source=source)
+        for packet in [dict(self.packet, payload='40000100002900230000a8000ae4'),
+                       dict(self.packet, payload='40000000002900230000a8000be4'),
+                       dict(self.packet, time='3.250000000')]:
+            with self.assertRaises(ValueError):
+                self.checked(packet=packet)
+
+
+if __name__ == '__main__':
+    unittest.main()

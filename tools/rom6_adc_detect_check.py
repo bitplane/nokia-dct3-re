@@ -14,9 +14,19 @@ FCCH_ACCUMULATE=re.compile(r'rom6_burst_fcch_accumulate: t=(\d+\.\d{9}) previous
 PEAK=re.compile(r'rom6_burst_peak: sequence=(\d+) t=(\d+\.\d{9}) index=([0-9a-f]{4}) reads=(\d+) mode=([0-9a-f]{4}) producer=([0-9a-f]{4}) consumer=([0-9a-f]{4}) pc=([0-9a-f]{6}) observer_writes=0')
 
 
-def check_peak_clock(text):
+def check_peak_clock(text,*,index_bias=1):
     """Join bounded peak indices to delivered source clocks, not CPU read phase."""
     from tools.rom6_adc_lab_check import ENABLE,EPOCH
+    if index_bias not in (0,1):
+        raise ValueError('unqualified native peak origin')
+    if index_bias==0:
+        seeds=re.findall(r'npe3_search_index_seed: sequence=(\d+) t=(\d+\.\d{9}) value=([0-9a-f]{4}) local_reads=(\d+) owner=([0-9a-f]{6}) observer_writes=0',text)
+        expected=[('0009','0','000b7f'),('001a','0','000b8f'),('001b','832','000bba')]*2
+        if (len(seeds)!=6 or text.count('npe3_search_index_seed:')!=6 or
+                [int(row[0]) for row in seeds]!=list(range(1,7)) or
+                [row[2:] for row in seeds]!=expected or
+                [row[1] for row in seeds]!=sorted(row[1] for row in seeds)):
+            raise ValueError('zero-bias peak origin lacks the two native priming sequences')
     rows=list(PEAK.finditer(text))
     totals=re.findall(r'rom6_burst_peak_complete: writes=(\d+) cap=128 observer_writes=0',text)
     if (len(totals)!=1 or len(rows)!=text.count('rom6_burst_peak:') or
@@ -46,7 +56,7 @@ def check_peak_clock(text):
             index,reads,mode=int(index,16),int(reads),int(mode,16)
             local=reads-closed
             if (not active or epoch is None or local<=0 or local%32 or
-                    index!=local//32+1 or int(sequence)!=len(joined)+1 or mode not in (0,1) or
+                    index!=local//32+index_bias or int(sequence)!=len(joined)+1 or mode not in (0,1) or
                     pc not in ('000bab','000ced')):
                 raise ValueError('native peak index differs from consumed 32-word blocks')
             tick=epoch+(local-1)*12
@@ -55,7 +65,7 @@ def check_peak_clock(text):
             joined.append((tick,mode))
     return dict(checked_peaks=len(joined),observed_peak_writes=int(totals[0]),
                 first_last_source_ticks=[joined[0][0],joined[-1][0]],
-                modes=sorted({row[1] for row in joined}),words_per_index=32,index_bias=1,
+                modes=sorted({row[1] for row in joined}),words_per_index=32,index_bias=index_bias,
                 physical_capture_qualified=False,sch_qualified=False,camping_qualified=False)
 
 

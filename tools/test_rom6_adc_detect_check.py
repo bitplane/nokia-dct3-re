@@ -90,6 +90,18 @@ class NativeComplexProductsTest(unittest.TestCase):
             with self.subTest(old=old),self.assertRaises(ValueError):
                 check_peak_clock(text.replace(old,new,1))
 
+    def test_zero_bias_requires_independent_native_priming_observations(self):
+        text=self.peak_fixture().replace('index=0003','index=0002')
+        with self.assertRaises(ValueError): check_peak_clock(text,index_bias=0)
+        lines=[]
+        for number,(value,reads,owner) in enumerate([('0009',0,'000b7f'),('001a',0,'000b8f'),('001b',832,'000bba')]*2,1):
+            lines.append(f'npe3_search_index_seed: sequence={number} t=0.00000000{number} value={value} local_reads={reads} owner={owner} observer_writes=0')
+        full='\n'.join(lines)+'\n'+text
+        self.assertEqual(check_peak_clock(full,index_bias=0)['index_bias'],0)
+        for old,new in [('local_reads=832','local_reads=800'),('value=001a','value=001b'),('owner=000bba','owner=000bbb')]:
+            with self.subTest(old=old),self.assertRaises(ValueError):
+                check_peak_clock(full.replace(old,new,1),index_bias=0)
+
     def residual_fixture(self):
         program=bytearray(131072)
         for number in range(1,21):

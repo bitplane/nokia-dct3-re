@@ -1,0 +1,13 @@
+diff --git a/src/mame/mame.lst b/src/mame/mame.lst
+--- a/src/mame/mame.lst
++++ b/src/mame/mame.lst
+@@ -49617,7 +49617,9 @@
+ npe3stage
+ npe3r6
+ npe3ref
+ npe3afs
+ npe3ad0
++npe3cp9
++npe3zp9
+ npe3hle
+ npe3mbus
