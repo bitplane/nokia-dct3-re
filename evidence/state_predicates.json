@@ -3,6 +3,22 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "npe3_paging_controller_deferral",
+      "owner": "native_rom6_reference_adc_laboratory",
+      "status": "unresolved",
+      "predicate": "The ordinary RR controller drains an admitted pending page into native paging-response access",
+      "current": "Both native addressed pages return083e through172fa8/3cd1bc to315450. Selector315472 sets context169be8 byte0b,preserves continuation169c14=4,frees the decoded object at+28,and repeats31543e. The current byte+6 is1. Pinned own code shows the separate315816 pending drain and its additional29fe00(1),byte+3 and byte+6 guards before3133b8;the semantic meaning of the active procedure and its complete exit-input surface are not established. The24s capture has no new access/Paging Response. Do not re-inject the event or clear the byte;derive the ordinary procedure completion. Native UI/SIM/LU/raw release remain qualified. This corrects the frontier from missing receive/admission to controller lifecycle without claiming all deferral causes are closed.",
+      "evidence": ["tools/npe3_paging_controller.lua", "tools/npe3_addressed_page_check.py", "tools/test_npe3_addressed_page_check.py", "tools/run_npe3_native.py", "docs/rom6_rf_interface.md"]
+    },
+    {
+      "id": "npe3_legacy_hle_fresh_storage_handoff",
+      "owner": "legacy_npe3_staged_hle_composition",
+      "status": "unresolved",
+      "predicate": "Fresh-storage npe3hle completes verifier/loader execution and reaches its declared runtime HLE handoff",
+      "current": "The current incoming-call composition does not supply a positive paging comparison. A quiet42s launch terminates normally but reports staged outside_uploaded_code pc0fdf and observation_halt with ownership retained;sampled MCU PC waits at426c72,and24/32/40s frames remain blank. A verbose launch was interrupted because repeated shared100 polling generated an excessive log;the quiet control separates that instrumentation overhead from the staged halt. No reset/ownership suppression or completion was added. Historical service contracts do not qualify this current fresh-storage path. The separate native reference composition remains legal and interactive,and a fresh3210 HLE frontier gate passes.",
+      "evidence": ["driver/nokia_dsp_staged.cpp", "driver/nokia_dct3_research.cpp", "tools/run_noki6210_acceptance.py", "docs/6210_bringup.md"]
+    },
+    {
       "id": "npe3_idle_ccch_metadata_and_camping",
       "owner": "native_rom6_reference_adc_laboratory",
       "status": "unresolved",

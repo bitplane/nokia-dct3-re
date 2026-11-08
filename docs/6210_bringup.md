@@ -8,17 +8,16 @@ profile models the independently decoded MAD2 DSP release/ready and GENSIO
 contracts. Final DSP completion is not published. Boot/UI, SIM, network,
 calls/audio and handset save/load are not yet validated on the normal machine.
 
-Separate research compositions establish the own-upload/runtime boundary:
-`npe3stage` executes the acquired verifier/loaders and retains native ownership
-at absent mask routine `2c75`; `npe3hle` explicitly hands transport to HLE there.
-The latter uses the unchanged acquired PMM, request-correlated D0 discovery,
-the own compact self-test consumer and a declared nominal battery sample.
-Acceptance gates prove graphical Menu/SIM PIN interaction, Calculator,
-persistent SIM contacts with cold readback, laboratory registration/operator
-presentation, physical incoming/outgoing call signaling and incoming/outgoing
-SMS. Physical Menu decodes as `19` on the 96x60 display. Measured final silicon
-verdict, speech and full hardware fidelity
-are not claimed. The research phone-service milestone is complete; the normal
+The legacy `npe3stage`/`npe3hle` compositions retain an experimental staged-to-HLE
+handoff,not current whole-phone qualification. A fresh-storage42s `npe3hle`
+comparison reports `outside_uploaded_code pc=0fdf` and
+`observation_halt ownership_retained=1` during the verifier. The MCU is sampled
+waiting at426c72 and its24/32/40s call-fixture frames are blank. HLE runtime
+handoff and the older service gates therefore need revalidation before serving
+as positive oracles. Sections below retain recovered software/HLE contracts;
+they do not override this current execution boundary. The quiet comparison
+removes verbose polling overhead and still reaches the same stage halt.
+Native Menu/SIM acceptance is independently established below. The normal
 machine remains fail-closed pending authentic native DSP completion.
 
 The explicit `npe3r6` research composition uses the captured ROM6 candidate
@@ -61,6 +60,8 @@ some valid empty pages are intentionally filtered before MCU publication.
 Two raw IMSI-addressed pages now decode and pass the MCU's paging-group
 admission;the input identity comes only from actual uplink bits. A native
 Paging Response,complete DRX listening and unique source-frame binding remain unresolved;
+the observed RR controller latches/deallocates the parsed page and repeats its
+state4 receive continuation rather than issuing access;
 stable camping/registered presentation remains open;
 see the [native MM boundary](rom6_rf_interface.md#native-location-updating-acceptance).
 The explicit 13 MHz DSP clock is provisional (the manual establishes RFIclk,

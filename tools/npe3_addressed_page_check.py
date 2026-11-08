@@ -9,6 +9,16 @@ from tools.rom6_adc_measure_check import check_rx_publications
 REQUEST=re.compile(r'npe3_bts_page_request: t=([\d.]+) identity=([0-9a-f]{16}) phase=(\d+) offset=(\d+) multiframes=2 after_frame=(\d+) octets=([0-9a-f]{46}) raw_adc_only=1 port_bits_identity=1 physical_claim=0')
 AIR=re.compile(r'npe3_bts_page_air: start_frame=(\d+) t=([\d.]+) raw_adc_only=1 physical_claim=0')
 
+# Own controller: store/receive,three paging selectors,latch/free/repeat;
+# later pending-page drain and its two context-byte guards.
+CONTROLLER_CODE={
+    0x31543e:'a0d8f15bf8a24648603870a52000f0b7fc9e90022000468149e098024288d00949df98024288d0052021018099024281d000e4c8a02ff15bf888200172e06aa0f0adfaf3200062a020044681e7d8',
+    0x315816:'7ae02801d000e542a055f15afeb272e59801742048579002a043f15afeaa6aa0f0adf917200062a0a041f15afea22001f78afadb2801d10778e02800d10479a02801d001f7fdfdad',
+    0x3133b8:'a0def15df8e575e520807320',
+    0x3157d8:'0000083e0000083f',
+    0x315988:'0000083e',
+}
+
 
 def check(text,requested_time):
     sources=list(re.finditer(r'rf_adc_broadcast_si: index=2 arfcn=35 octets=([0-9a-f]{46}) physical_claim=0',text))
@@ -136,4 +146,57 @@ def check_rr_delivery(text,page):
             raise ValueError('native page did not reach the ordinary RR parser in order')
     return dict(native_rr_paging_parse_qualified=True,parsed=len(parsed),
                 task15_message='0623',task18_message='05eb',parser_event='083e',
+                native_paging_response_qualified=False,stable_camping_qualified=False)
+
+
+def check_controller(text,page,image):
+    """Pin the observed deferral,without inventing the current phase's meaning."""
+    for address,encoded in CONTROLLER_CODE.items():
+        expected=bytes.fromhex(encoded);offset=address-0x200000
+        if image[offset:offset+len(expected)]!=expected:
+            raise ValueError(f'own paging-controller instructions differ at{address:06x}')
+    records=[]
+    for match in re.finditer(r'npe3_paging_wait: ([^\r\n]+)',text):
+        pairs=[token.split('=',1) for token in match[1].split()]
+        if any(len(pair)!=2 for pair in pairs):raise ValueError('malformed paging continuation')
+        row=dict(pairs)
+        required={'entry','hit','t','r0','r4','r7','r9','saved','peer','context','observer_writes'}
+        if len(row)!=len(pairs) or not required<=row.keys() or row['observer_writes']!='0':
+            raise ValueError('incomplete/mutating paging continuation')
+        records.append(row)
+    if len(records)!=text.count('npe3_paging_wait:'):raise ValueError('truncated paging continuation')
+    footers=list(re.finditer(r'npe3_paging_wait_complete: entry=([0-9a-f]{8}) hits=(\d+) cap=64 begin=12 end=24 observer_writes=0',text))
+    entries={0x31543e,0x315450,0x315472,0x314e04,0x3135c2}
+    if (len(footers)!=len(entries) or len(footers)!=text.count('npe3_paging_wait_complete:') or
+            {int(row[1],16) for row in footers}!=entries or
+            any(int(row['entry'],16) not in entries or not 12<=float(row['t'])<=24 for row in records)):
+        raise ValueError('missing paging continuation coverage')
+    for footer in footers:
+        rows=[row for row in records if int(row['entry'],16)==int(footer[1],16)]
+        if (len(rows)!=int(footer[2]) or len(rows)>64 or
+                [int(row['hit']) for row in rows]!=list(range(1,len(rows)+1))):
+            raise ValueError('capped/duplicate paging continuation')
+    deferred=0
+    for stamp in page['native_decode_times']:
+        path=[]
+        for entry in (0x315450,0x315472,0x31543e):
+            hits=[row for row in records if int(row['entry'],16)==entry and stamp<float(row['t'])<=stamp+0.005]
+            if len(hits)!=1:raise ValueError('missing unique page return/latch/receive sequence')
+            row=hits[0];context=bytes.fromhex(row['context'])
+            if (len(context)!=48 or row['r4']!='00169be8' or row['r7']!='00169c14' or
+                    int(row['peer'],16)!=4 or context[6]!=1 or
+                    entry!=0x315450 and int(row['saved'],16)!=0x83e):
+                raise ValueError('page follows a different controller context')
+            path.append((row,context))
+        returned,selected,repeated=path
+        if (not float(returned[0]['t'])<float(selected[0]['t'])<float(repeated[0]['t']) or
+                int(returned[0]['r0'],16)!=0x83e or int(selected[0]['r0'],16)!=0x83e or
+                not int.from_bytes(selected[1][40:44],'big') or
+                repeated[1][11]!=1 or any(repeated[1][40:44]) or int(repeated[0]['r9'],16)!=4):
+            raise ValueError('native page was not latched/freed before state4 receive')
+        deferred+=1
+    if not deferred:raise ValueError('no native paging-controller deferral observed')
+    return dict(deferred_pages=deferred,continuation='31543e',selector='315472',
+                pending_byte='169bf3',context_byte6=1,continuation_state=4,
+                pending_drain='315816',phase_semantics_qualified=False,
                 native_paging_response_qualified=False,stable_camping_qualified=False)

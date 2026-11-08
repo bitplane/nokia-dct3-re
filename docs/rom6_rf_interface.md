@@ -530,6 +530,33 @@ to the preceding no-page checkpoint. Temporary heap-read probes were retired
 after locating the consumer;the retained observations are bounded entry/post/
 parser-return taps,not watches that can misattribute later heap reuse.
 
+### Paging controller continuation
+
+The parser stores083e at172fa8. Helper3cd1bc reads and returns it;the next
+receive iteration clears the field at3cceb0. This is ordinary event delivery,
+not disappearance of the parsed page. Actual return315450,selector315472
+and continuation31543e are joined for both addressed pages.
+
+Controller context169be8 has continuation word169c14=4. Its selector treats
+083e,083f and0840 alike:315472 sets byte+0b (169bf3) to1,frees the decoded
+object at+28,and commits continuation4 before receiving again. The measured
+context byte+6 is1. A separate pending-page drain at315816 clears+0b and
+recreates083e;its path to3133b8 additionally requires29fe00(1)==1,byte+3=0
+and byte+6!=1. Entry3133b8 sets the request field+0c to80. These are recovered
+field/control-flow contracts,not established semantic names for the current
+procedure or a complete census of its exit inputs. No field is changed by
+the observer or BTS source.
+
+The next question is which ordinary procedure/input brings this continuation
+to its pending-page drain,and why the current lifecycle does not do so. Do not
+inject083e again or clear the context byte. Broad heap watches used to locate
+the consumer are retired;bounded return/selector/context observations retain
+the contract. The fresh native capture reproduces UI,SIM,LU and raw release,
+and the3210 HLE semantic/coherent frontier also passes. The legacy6210 staged
+HLE composition does not currently reach runtime in a fresh-storage42s quiet
+control;it is not a usable positive paging oracle until its verifier/loader
+handoff is requalified.
+
 ```sh
 .venv/bin/python tools/run_npe3_native.py --reference-clock --seconds 24 --adc-source fcch-sch-broadcast --capture-start p09 --tx-release p05 --raw-agch --provision-records --page-at 18
 ```

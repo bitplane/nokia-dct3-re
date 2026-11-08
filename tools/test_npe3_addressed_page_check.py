@@ -1,7 +1,7 @@
 import unittest
 from unittest.mock import patch
 
-from tools.npe3_addressed_page_check import check,check_mcu_admission,check_rr_delivery
+from tools.npe3_addressed_page_check import check,check_mcu_admission,check_rr_delivery,check_controller,CONTROLLER_CODE
 
 
 class AddressedPageTest(unittest.TestCase):
@@ -84,6 +84,33 @@ class AddressedPageTest(unittest.TestCase):
                         ('header=0623','header=05eb'),('target=18','target=15'),('t=18.6413','t=18.639'),
                         ('posts=2','posts=1'),('parsed=1','parsed=9'),('observer_writes=0','observer_writes=1')):
             with self.subTest(old=old),self.assertRaises(ValueError):check_rr_delivery(text.replace(old,new),page)
+
+    def test_controller_latches_frees_and_repeats_without_qualifying_answer(self):
+        image=bytearray(0x400000)
+        for address,encoded in CONTROLLER_CODE.items():
+            data=bytes.fromhex(encoded);offset=address-0x200000
+            image[offset:offset+len(data)]=data
+        context=bytearray(48);context[6]=1;context[40:44]=bytes.fromhex('00115b78')
+        text=''
+        for index,entry in enumerate((0x315450,0x315472,0x31543e)):
+            if entry==0x31543e:context[11]=1;context[40:44]=bytes(4)
+            event=4 if entry==0x31543e else 0x83e
+            text+=(f'npe3_paging_wait: entry={entry:08x} hit=1 t={18.6401+index*.0001:.7f} '
+                   f'r0={event:08x} r4=00169be8 r7=00169c14 r9=00000004 saved=0000083e peer=00000004 context={context.hex()} observer_writes=0\n')
+        for entry in (0x315450,0x315472,0x31543e,0x314e04,0x3135c2):
+            text+=f'npe3_paging_wait_complete: entry={entry:08x} hits={int(entry not in (0x314e04,0x3135c2))} cap=64 begin=12 end=24 observer_writes=0\n'
+        page=dict(native_decode_times=[18.64])
+        result=check_controller(text,page,image)
+        self.assertEqual(result['deferred_pages'],1)
+        self.assertFalse(result['phase_semantics_qualified'])
+        self.assertFalse(result['native_paging_response_qualified'])
+        for old,new in (('saved=0000083e','saved=000007d4'),('peer=00000004','peer=00000002'),
+                        ('r9=00000004','r9=00000000'),('hits=1','hits=65'),
+                        ('observer_writes=0','observer_writes=1')):
+            with self.subTest(old=old),self.assertRaises(ValueError):check_controller(text.replace(old,new),page,image)
+        for address in CONTROLLER_CODE:
+            bad=image.copy();bad[address-0x200000]^=1
+            with self.assertRaises(ValueError):check_controller(text,page,bad)
 
 
 if __name__=='__main__':unittest.main()

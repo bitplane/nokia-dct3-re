@@ -8,6 +8,7 @@ if npe3 then
     if machine.system.name=='npe3ap5' then
         dofile(directory..'npe3_bts_page_input.lua')
         dofile(directory..'npe3_paging_observe.lua')
+        dofile(directory..'npe3_paging_controller.lua')
         dofile(directory..'npe3_dedicated_observe.lua')
         dofile(directory..'npe3_idle_observe.lua')
     end
