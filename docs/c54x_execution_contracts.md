@@ -90,6 +90,16 @@ wraps,BK1/13/16,all auxiliary registers,CMPT/ARP selection,two program pages,
 Access publication,absence of data-bus accesses and save/replay. It does not
 resolve the pre-existing BK0 convention or qualify physical issue timing.
 
+### Repeated circular squares
+
+Repeated square add/subtract (38xx..3bxx) admits circular indirect sources
+C0..DF through the existing per-issue DAGEN/Read and live accumulator Execute
+paths. `repeated_circular_square` reproduces the old repeat-admission rejection
+and passes33 save/replay cases: A/B add/subtract,four circular updates,FRCT
+off/on,signed input,wraps,ordered reads,T/RC/pointer/final-result checks,and
+mapped-source rejection before bus/pointer effects. The arithmetic itself is
+unchanged;the ordinary repeated-square section owns its flag/limit cases.
+
 ### Host execution cost
 
 The staged frontend shares immutable opcode-property and compact descriptor
