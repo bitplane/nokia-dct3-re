@@ -5,7 +5,10 @@ local npe3=machine.system.name=='npe3afs' or machine.system.name=='npe3ad0'
 dofile(directory..(npe3 and 'rom6_native_radio.lua' or 'rom6_native_observe.lua'))
 if npe3 then
     dofile(directory..'rom6_rx_ring_observe.lua')
-    if machine.system.name=='npe3afs' then dofile(directory..'npe3_sch_provenance.lua') end
+    if machine.system.name=='npe3afs' then
+        dofile(directory..'npe3_sch_provenance.lua')
+        dofile(directory..'npe3_fcch_schedule.lua')
+    end
 end
 local output_cap=npe3 and 496 or 128
 local cpu=assert(machine.devices[':dsp_c54x:cpu'])

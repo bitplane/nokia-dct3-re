@@ -2746,8 +2746,33 @@ arithmetic state `c100`. This establishes ownership and chronology, not an
 independent numerical qualification of that later builder. The checker
 rejects changed source words, epoch gaps, writer addresses/owners or aperture
 values. Both fresh 24-second provenance runs preserve native UI and complete
-I/O accounting. Next establish how the own FCCH timing residual schedules
-this partial capture, rather than moving the waveform to obtain a CRC pass.
+I/O accounting.
+
+The own search upload at MCU `20de4` has the same pinned `0b40..0d7f`
+code as the mapped NSM-3 search, not the same MCU source address.
+It records seven successive FCCH confirmations and native acceptance at
+3.199068022 s. All eight accumulated table differences match the independent
+signed arithmetic, ending at residual `-2`. The first 128 peak updates
+(of 229 observed) join actual consumed 32-word blocks and source epochs in
+both search modes. These establish search-control progression, not physically
+correct frequency or frame phase.
+
+The base peak is `1325`; `((trunc(-2/7)+4901-18)*32) mod 5000=1256`.
+The complete write journal records correction reload `186f` at 3.201800571 s.
+Before the final capture, P0d returns `1097` at 3.249483648 s, P09 receives
+`1221` at 3.249489714 s and P03 receives `0105` at 3.249490967 s.
+The intervening period is `1387` with no counter reload. Under the declared
+13MHz/12 counter, bounding its unknown fractional phase places that compare
+at source offsets 7992..8016, after the SCH envelope ends at 7104.
+Even treating it as the first completed 32-word block would start at
+7620..7644. These are bounds on this **unchanged schedule**, not physical
+P09 ownership or a falsification of every policy that also changes earlier
+search captures. They do not justify delaying only the final window.
+
+The remaining boundary is the relationship between FCCH capture origin,
+counter/reload phase and the subsequent acquisition edge. Preserve the fixed
+source epoch; distinguish a counter-model consistency defect from an
+unproved hardware compare policy before changing the receive gate.
 
 `verify-6210-alarm-off-snooze-no` combines the independently validated
 powered-off and Snooze lifecycles: two natural RTC wakes, separately checked

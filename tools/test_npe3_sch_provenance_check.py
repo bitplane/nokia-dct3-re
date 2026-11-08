@@ -1,10 +1,36 @@
 import unittest
 
-from tools.npe3_sch_provenance_check import check
+from tools.npe3_sch_provenance_check import check, check_capture_compare
 from tools.rom6_adc_lab_check import reference_word
 
 
 class SchProvenanceTest(unittest.TestCase):
+    def controls(self):
+        lines = []
+        for index in range(64):
+            stamp, address, value = '3.249000000', '000f', '3a98'
+            if index == 60:
+                stamp, address, value = '3.249090901', '000e', '1387'
+            elif index == 61:
+                stamp, address, value = '3.249489714', '0009', '1221'
+            elif index == 62:
+                stamp, address, value = '3.249490967', '0003', '0105'
+            elif index == 63:
+                stamp, address, value = '3.250386813', '0003', '0104'
+            lines.append(f'npe3_fcch_control: ordinal={index+1} t={stamp} kind=port address={address} value={value} owner=003e4a counter=1097 counter_t=3.249483648 frame=0029 offset=0000,0000 shift=0000 observer_writes=0')
+        return '\n'.join(lines)
+
+    def test_compare_hypotheses_are_later_than_sch_under_declared_clock(self):
+        source = dict(source_first_tick=42243384, source_frame_phase=3384)
+        report = check_capture_compare(self.controls(), source)
+        self.assertEqual(report['compare_source_phase_bounds'], [7992, 8016])
+        self.assertEqual(report['completed_block_first_word_phase_bounds'], [7620, 7644])
+        self.assertFalse(report['physical_compare_owner_qualified'])
+        for old, new in [('ordinal=1 ', 'ordinal=2 '), ('value=1221', 'value=1000'),
+                         ('value=1387', 'value=0546'), ('counter_t=3.249483648', 'counter_t=3.249493648')]:
+            with self.subTest(old=old), self.assertRaises(ValueError):
+                check_capture_compare(self.controls().replace(old, new), source)
+
     def fixture(self):
         lines = ['mfi_rx_epoch: first_tick=42243384 divider=12 physical_clock_claim=0']
         for index in range(1024):

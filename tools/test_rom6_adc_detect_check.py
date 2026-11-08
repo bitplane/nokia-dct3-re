@@ -3,10 +3,23 @@ from unittest.mock import patch
 
 from tools.rom6_adc_detect_check import (check,complex_products,normalized_metric,
     check_finite_search_acceptance,check_finite_peak_accumulation,check_peak_clock,
-    check_mode1_products,check_mode1_metrics)
+    check_mode1_products,check_mode1_metrics,check_consumer_program)
 
 
 class NativeComplexProductsTest(unittest.TestCase):
+    def test_own_product_upload_offset_is_not_inherited(self):
+        program = bytearray(131072)
+        program[0xb40*2:0xd80*2] = b'\x12\x34' * (0xd80 - 0xb40)
+        for product, offset in [('6210', 0x20de4), ('8210', 0x1170b0)]:
+            mcu = bytearray(offset + 0x480)
+            mcu[offset:] = program[0xb40*2:0xd80*2]
+            # Isolate address selection here; other tests reject wrong hashes.
+            with patch('tools.rom6_adc_detect_check.hashlib.sha256') as digest:
+                digest.return_value.hexdigest.return_value = '245f696206a75730ab96ea480d5927b1b194533947d8fb732f057d4dbb3ecfb0'
+                check_consumer_program(program, mcu, product=product)
+                with self.assertRaises(ValueError):
+                    check_consumer_program(program, mcu, product='8210' if product == '6210' else '6210')
+
     def metric1_fixture(self):
         lines=[]
         for number in range(1,17):

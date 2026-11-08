@@ -176,9 +176,16 @@ def main():
         report['native_rx'] = check_rx_publications(text)
         if args.adc_source == 'fcch-sch':
             from tools.rom6_adc_lab_check import check_active_burst_window
-            from tools.npe3_sch_provenance_check import check as check_sch_provenance
+            from tools.npe3_sch_provenance_check import check as check_sch_provenance, check_capture_compare
+            from tools.rom6_adc_detect_check import (check_finite_search_acceptance,
+                check_finite_peak_accumulation, check_peak_clock)
             report['active_source_window'] = check_active_burst_window(text, sch=True)
             report['sch_sample_provenance'] = check_sch_provenance(text)
+            report['capture_compare_hypotheses'] = check_capture_compare(text, report['sch_sample_provenance'])
+            program = (first / 'npe3_terminal_program.be16').read_bytes()
+            report['finite_search'] = check_finite_search_acceptance(text, program, flash, product='6210')
+            report['finite_residual'] = check_finite_peak_accumulation(text, program, flash, product='6210')
+            report['peak_source_clock'] = check_peak_clock(text)
             if report['native_filter']['nonzero_output_words'] == 0:
                 raise ValueError('coded raw source has not reached the qualified FIR output prefix')
         (run / 'adc-source.json').write_text(json.dumps(report, indent=2) + '\n')

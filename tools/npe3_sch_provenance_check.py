@@ -3,6 +3,7 @@ import hashlib
 import re
 
 from tools.rom6_adc_lab_check import reference_word
+from tools.rom6_timed_output_check import nanoseconds
 
 
 RAW = re.compile(r'npe3_sch_raw: ordinal=(\d+) t=([\d.]+) value=([0-9a-f]{4}) source_tick=(\d+) capture_sequence=(\d+) owner=([0-9a-f]{6}) observer_writes=0')
@@ -10,6 +11,47 @@ WRITER = re.compile(r'npe3_sch_writer: address=([0-9a-f]{4}) value=([0-9a-f]{4})
 SUMMARY = re.compile(r'npe3_sch_provenance: raw_total=(\d+) raw_cap=1024 writers=192 begin=3 end=3.4 aperture_t=([\d.]+) observer_writes=0')
 APERTURE = re.compile(r'npe3_sch_aperture: t=([\d.]+) owner=([0-9a-f]{6}) pointer=00d8 current=([0-9a-f]{4},[0-9a-f]{4}) next=([0-9a-f]{4},[0-9a-f]{4}) samples=([0-9a-f,]+) observer_writes=0')
 FILTER = re.compile(r'npe3_sch_filter_input: t=([\d.]+) source=0082 samples=([0-9a-f,]+) coefficients=df85,6d1b,df85 history=([0-9a-f,]+) st1=c100 observer_writes=0')
+CONTROL = re.compile(r'npe3_fcch_control: ordinal=(\d+) t=([\d.]+) kind=(port|data) address=([0-9a-f]{4}) value=([0-9a-f]{4}) owner=([0-9a-f]{6}) counter=([0-9a-f]{4}) counter_t=([\d.]+) frame=([0-9a-f]{4}) offset=([0-9a-f]{4},[0-9a-f]{4}) shift=([0-9a-f]{4}) observer_writes=0')
+
+
+def check_capture_compare(text, source):
+    """Bound two compare hypotheses under the declared counter, not silicon."""
+    controls = rows(CONTROL, text, 'npe3_fcch_control', 64)
+    ordinals = [int(row[0]) for row in controls]
+    if ordinals != list(range(ordinals[0], ordinals[0] + 64)):
+        raise ValueError('capture-control suffix is not consecutive')
+    enable = [row for row in controls if row[2:5] == ('port', '0003', '0105')]
+    if len(enable) != 1:
+        raise ValueError('final capture enable is ambiguous')
+    enable = enable[0]
+    before = [row for row in controls if int(row[0]) < int(enable[0])]
+    target = [row for row in before if row[2:4] == ('port', '0009')]
+    reloads = [row for row in before if row[2:4] == ('port', '000e')]
+    if not target or not reloads or reloads[-1][4] != '1387':
+        raise ValueError('capture compare lacks the declared 5000-quarter period')
+    start = source['source_first_tick']
+    counter_time = nanoseconds(enable[7])
+    if not counter_time < nanoseconds(enable[1]) <= (start * 1_000_000_000) // 13_000_000:
+        raise ValueError('capture enable/counter/source ordering differs')
+    if any(row[2] == 'port' and row[3] in ('000d', '000e')
+           and counter_time <= nanoseconds(row[1]) <= start * 1_000_000_000 // 13_000_000
+           for row in controls):
+        raise ValueError('counter was reloaded after the passive read')
+    elapsed = (start * 1_000_000_000 - counter_time * 13_000_000) // (12 * 1_000_000_000)
+    counter_min = int(enable[6], 16) + elapsed
+    counter_max = counter_min + 1
+    compare = int(target[-1][4], 16)
+    if not 0 <= counter_min <= counter_max < compare < 5000:
+        raise ValueError('capture compare would wrap or has an unqualified counter bound')
+    # The passive read does not recover the divider's fractional phase.
+    # Widen by a whole quarter rather than inventing that missing phase.
+    lower = (compare - counter_max - 1) * 12
+    upper = (compare - counter_min) * 12
+    phase = source['source_frame_phase']
+    return dict(counter_at_first_word_bounds=[counter_min, counter_max],
+                compare=compare, compare_source_phase_bounds=[phase + lower, phase + upper],
+                completed_block_first_word_phase_bounds=[phase + lower - 31 * 12, phase + upper - 31 * 12],
+                independent_sch_envelope_end=7104, physical_compare_owner_qualified=False)
 
 
 def rows(pattern, text, prefix, count):

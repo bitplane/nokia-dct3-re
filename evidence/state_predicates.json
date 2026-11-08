@@ -3,6 +3,14 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "npe3_finite_fcch_residual_and_compare_bounds",
+      "owner": "native_rom6_reference_adc_laboratory",
+      "status": "satisfied",
+      "predicate": "Own6210 native finite-search acceptance has independent upload, peak-clock and residual checks, with bounded compare timing for its observed final capture",
+      "current": "The own0b40..0d7f search comes from MCU20de4 and matches the pinned mapped implementation. Seven confirmations precede acceptance3.199068022; all eight table differences match signed residual arithmetic ending-2. All128 retained peaks(of229) join consumed32-word blocks in both search modes. Base1325 yields correction1256 and observed P0e186f at3.201800571. The last passive P0d1097 at3.249483648, P091221 and P030105 bound the compare at source offsets7992..8016 under the declared13MHz/12 counter; a first-completed-block hypothesis starts7620..7644, both after envelope7104. These are conditional bounds for the unchanged earlier search schedule, not physical compare ownership or rejection of every all-capture policy. Successful SCH, BCCH, camping and registration remain unproved; counter/reload phase and capture-origin consistency are the next boundary.",
+      "evidence": ["tools/npe3_fcch_schedule.lua", "tools/rom6_adc_detect_check.py", "tools/npe3_sch_provenance_check.py", "tools/run_npe3_native.py", "tools/test_rom6_adc_detect_check.py", "tools/test_npe3_sch_provenance_check.py", "docs/6210_bringup.md"]
+    },
+    {
       "id": "npe3_sch_partial_capture_source_and_builder_provenance",
       "owner": "native_rom6_reference_adc_laboratory",
       "status": "satisfied",

@@ -59,9 +59,9 @@ def check_peak_clock(text):
                 physical_capture_qualified=False,sch_qualified=False,camping_qualified=False)
 
 
-def check_finite_peak_accumulation(text,program,mcu):
+def check_finite_peak_accumulation(text,program,mcu,*,product='8210'):
     """Join table contents and signed residuals, not a physical phase verdict."""
-    check_consumer_program(program,mcu)
+    check_consumer_program(program,mcu,product=product)
     table=[int.from_bytes(program[2*at:2*at+2],'big') for at in range(0xd76,0xd8a)]
     # Twenty successive FCCH offsets: five per 51-frame multiframe. The
     # firmware represents time in 32-quarter-symbol units. Do not impose a
@@ -93,9 +93,9 @@ def check_finite_peak_accumulation(text,program,mcu):
                 sch_qualified=False,camping_qualified=False)
 
 
-def check_finite_search_acceptance(text,program,mcu):
+def check_finite_search_acceptance(text,program,mcu,*,product='8210'):
     """Observe native control acceptance, not independently decoded FCCH timing."""
-    check_consumer_program(program,mcu)
+    check_consumer_program(program,mcu,product=product)
     rows=list(FCCH_STATE.finditer(text))
     totals=re.findall(r'rom6_burst_fcch_complete: writes=(\d+) cap=256 observer_writes=0',text)
     if (not rows or len(rows)!=text.count('rom6_burst_fcch_state:') or
@@ -134,10 +134,11 @@ def check_finite_search_acceptance(text,program,mcu):
                 sch_qualified=False,camping_qualified=False)
 
 
-def check_consumer_program(program,mcu):
+def check_consumer_program(program,mcu,*,product='8210'):
     block=program[0xb40*2:0xd80*2]
+    offset={'8210':0x1170b0,'6210':0x20de4}[product]
     if (hashlib.sha256(block).hexdigest()!='245f696206a75730ab96ea480d5927b1b194533947d8fb732f057d4dbb3ecfb0' or
-            mcu[0x1170b0:0x1170b0+len(block)]!=block):
+            mcu[offset:offset+len(block)]!=block):
         raise ValueError('search consumer is not the pinned own MCU upload')
 
 
