@@ -3,6 +3,14 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "npe3_native_access_serialization",
+      "owner": "native_rom6_reference_adc_laboratory",
+      "status": "satisfied",
+      "predicate": "Native full-SI access requests produce complete P21/P27 transactions with independently valid GSM access codewords",
+      "current": "After the generic constant-ST/MVDD DAGEN correction,the legal24s full-SI/Menu gate requires four complete15-word P21/P27 transactions. The low12-bit LSB-first lane is derived from the resident serializer shifts. Each has unique access tail/training at offset9,zero tails and an exact36-bit CRC6/BSIC42/convolutional codeword. Independently decoded RA octets0b/08/06/06 agree with separate native RA_INFO frames2614/2671/3726/3782. The prior legal24s capture with RA_INFO but no P27 data fails this stronger check. Six focused tool tests reject every single coded-bit error,wrong BSIC,malformed framing/tails,incomplete/aborted/partial writes and report mismatches. Temporary private-RAM probes were removed. No physical release,event timing,RF power/channel,network decode,access grant,camping or registration is qualified;no message or decoded result is injected.",
+      "evidence": ["tools/gsm_rach_signal.py", "tools/npe3_rach_transmit_check.py", "tools/test_gsm_rach_signal.py", "tools/test_npe3_rach_transmit_check.py", "tools/run_npe3_native.py", "docs/rom6_rf_interface.md", "docs/6210_bringup.md"]
+    },
+    {
       "id": "c54x_constant_postdecrement_copy_dependency",
       "owner": "tms320c54x_generic_cpu",
       "status": "satisfied",

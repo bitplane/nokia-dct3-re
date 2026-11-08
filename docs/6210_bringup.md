@@ -2962,11 +2962,14 @@ The bounded read-only MCU TX observer sees 34 ring commits between seconds
 organically publishes `080c,0000,0b66,0000,0000`: IDLE_RA with random-access
 octet `0b`. The native DSP subsequently publishes RA_INFO `0b000a36` at
 12.063616396 seconds, reporting frame 2614, followed by retry reports. This
-establishes the native request/report boundary, not an observed RF burst,
-access grant, camping or registration. The source remains untuned and supplies
-no decoded CCCH reply. The next boundary is the actual uplink burst endpoint
-and standards-derived raw AGCH reception. No fault suppression or firmware-
-state forcing is retained.
+establishes the native request/report boundary. The generic constant-ST/MVDD
+pointer dependency correction additionally enables four complete P21/P27
+transactions, independently checked as access octets `0b,08,06,06` with BSIC42;
+see [the serialization contract](rom6_rf_interface.md#native-access-serialization).
+This is not a timed RF emission, access grant, camping or registration. The
+source remains untuned and supplies no decoded CCCH reply. The next boundary
+is timed hardware release and standards-derived raw AGCH reception. No fault
+suppression or firmware-state forcing is retained.
 
 `verify-6210-alarm-off-snooze-no` combines the independently validated
 powered-off and Snooze lifecycles: two natural RTC wakes, separately checked

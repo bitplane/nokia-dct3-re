@@ -237,6 +237,10 @@ def main():
         if bcch:
             from tools.npe3_bcch_receive_check import check as check_bcch,check_broadcast
             report['bcch_result']=(check_broadcast if broadcast else check_bcch)(text,(first/'rom6_radio_writes.tsv').read_text())
+            if broadcast:
+                from tools.npe3_rach_transmit_check import check as check_access
+                report['native_access']=check_access(text,(first/'rom6_radio_writes.tsv').read_text())
+                print(f"Native6210 access serialization: PASS attempts={report['native_access']['attempts']}; physical_release=0 registration=0")
             (run/'adc-source.json').write_text(json.dumps(report,indent=2)+'\n')
             print('Native6210 BCCH: PASS '+('complete SI set and MCU acquisition return' if broadcast else 'three raw SI3 blocks')+'; camping=0 registration=0')
         print('Native6210 ADC source: PASS independently checked raw prefix; acquisition_claim=0')

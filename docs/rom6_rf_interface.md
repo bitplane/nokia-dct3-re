@@ -18,10 +18,10 @@ now decodes three complete SI3 blocks in a coherent 24-second UI run: exact
 184-bit information/40-bit parity bus transactions, native FIRE success and
 23-octet ring publications. This is a repeated-SI3 decoder experiment, not
 complete cell broadcast acquisition, camping or registration.
-The separate full-SI candidate now qualifies all four broadcast types and
-their MCU acquisition-success return in a legal eight-second capture. Its
-longer run correctly fails on the later mapped-register MVDD CPU boundary;
-see [the exact scope](6210_bringup.md#complete-si-broadcast-candidate).
+The separate full-SI candidate qualifies all four broadcast types, their MCU
+acquisition-success return, organic random-access submission and native
+RA_INFO in a legal 24-second physical-Menu run; see
+[the exact scope](6210_bringup.md#complete-si-broadcast-candidate).
 The unchanged immediate-gate control still captures only partial SCH.
 Neither result establishes fitted MFI timing or RF tuning. An explicit
 laboratory block-request latch prevents interrupt coalescence from stranding
@@ -39,8 +39,8 @@ arithmetic defect; the P03 bit-8 poll does not prove a missing hardware clear.
 Physical SCH/BCCH reception and camping remain unqualified. This is now
 distinct from laboratory decoder execution: isolated native SCH and BCCH paths recover
 independently generated payloads from filtered I/Q samples.
-The next 6210 target is the generic mapped MVDD contract reached after full
-broadcast acquisition, then native CCCH/camping progression. These laboratory
+The next 6210 target is timed release of its serialized uplink bits, then raw
+AGCH and native CCCH/camping progression. These laboratory
 results do not retire the physical request/acknowledgement or tuning contract.
 
 | Receive scope | Current evidence | Not established |
@@ -50,12 +50,54 @@ results do not retire the physical request/acknowledgement or tuning contract.
 | Immediate-gate ADC baseline | Native FCCH control acceptance; independently checked raw samples and fault-free provisional staging; first SCH aperture misses its source burst | Physical capture/compare epoch and first-valid-sample ownership |
 | Own 6210 P09-start candidate | Complete source burst, native SCH CRC/information/parity and FN704/BSIC42; legal 65-second UI run; zero-source 24-second transport control | Physical capture policy/capacity and acknowledgement; BCCH/camping |
 | Own 6210 raw-BCCH candidate | SCH plus three four-burst SI3 blocks, exact FIRE input/result and native publications; coherent 24-second Menu/transport acceptance | Complete broadcast schedule, MCU acquisition/camping, fitted timing/tuning |
-| Own 6210 full-SI candidate | Legal 24-second physical Menu, SI1..SI4 native decoding, MCU availability `0f`, observed success return, organic IDLE_RA and native RA_INFO | Actual uplink burst/access grant, camping, registration and fitted timing/tuning |
+| Own 6210 full-SI candidate | Legal 24-second physical Menu, SI1..SI4 native decoding, MCU availability `0f`, observed success return, organic IDLE_RA/RA_INFO and independently checked P21/P27 access bits | Physical release timing/access grant, camping, registration and fitted timing/tuning |
 
 The CPU additions needed by the normal-burst frontend have generic focused
 tests. The rebuilt native ROM6 menu/storage/save-state scenarios, ROM4
 coherent boot/RF gate and HLE coherent frontier pass. These regressions guard
 existing behavior; they do not turn a laboratory waveform into received RF.
+
+### Native access serialization
+
+The full-SI run produces four P21 start/commit transactions (`control & 0e00`
+equal to `0a00` / `0600`), each containing fifteen P27 words. The resident's
+12-bit shifts identify the low-12-bit, LSB-first lane. All four streams have
+one access-burst header at bit offset 9, correct trailing zeros and exact
+36-bit codewords for RA `0b,08,06,06` with BSIC 42. Their separately decoded
+octets match native RA_INFO reports for frames `2614,2671,3726,3782`.
+The checker never obtains its decoded octet from those reports.
+
+The independent reference implements the CRC6/BSIC colouring/convolutional
+rules in [TS45.003 4.6](https://www.etsi.org/deliver/etsi_ts/145000_145099/145003/05.08.00_60/ts_145003v050800p.pdf),
+and access tails/training from [TS45.002 5.2.7](https://www.etsi.org/deliver/etsi_ts/145000_145099/145002/15.00.00_60/ts_145002v150000p.pdf).
+Only exact noiseless codewords are accepted; no RF demodulation or error
+correction is claimed. Missing, partial, aborted and malformed transactions
+and report/data mismatches fail the full-SI gate.
+
+The absent serializer was a generic CPU DAGEN dependency: immediate ST
+postdecrement followed by MVDD used the old destination. Own writes at
+`7c5d/7c5f` overwrote the buffer pointer at `2657` with `00e0`, leaving
+readiness `2656` zero. Generic red/green instruction tests now preserve the
+older pointer update before younger Access, without moving data bus clocks;
+the native ready word and complete serialized buffers then appear. The
+temporary firmware-RAM probes were removed. No missing peer completion or
+private-memory repair was supplied.
+
+P05/P06/P07/P08 and P0f are separately programmed around the burst. Buffer
+commit is not evidence of their physical pin meanings, a timed RF emission
+or a network decode. Those release/control semantics remain the next
+software investigation; do not return an assignment merely on RA_INFO.
+
+All four native attempts program P05/P06/P07/P08 as
+`071f/08aa/067c/090e` before serialization; P2f is `3a98`. P06 has exactly
+four writes in the complete capture. Outside these attempts the idle path
+repeatedly writes out-of-range `3a98` to P05/P07 and zero to P08. The first
+P21 buffer commit precedes the subsequent modeled P0f `09c4` match, but
+that ISR compare is not independently identified as an RF release edge.
+The P05..P08 tuple has nested start/end-like ranges within the 5000-count
+period; interpreting them as modulation/power comparators is a hypothesis
+to test against their writers and the existing counter, not a recovered pin
+specification. Preserve the actual control timestamps when testing it.
 
 The original [NSM-3 System Module manual, Issue 1 12/1999](https://www.eserviceinfo.com/preview_html.php?fileid=5456&previewid=3011)
 identifies the 13MHz COBBA clock and separate IData/QData connections
