@@ -52,6 +52,20 @@ and repeated circular arithmetic controls remain separate regressions.
 The tests do not establish physical issue timing or untested peripheral
 semantics.
 
+### Repeated circular stores
+
+Repeated STL/STH accumulator stores admit circular indirect modesC0..DF
+through the existing stage-owned DAGEN/Write path. The decoder previously
+rejected those repeat bodies while accepting ordinary indirect80..9F stores;
+the native ROM6 traffic initializer reaches `RPT / STL A,*AR4+%` (80d4).
+No handset PC or RAM address is special-cased. The mapped-destination guard
+still runs before DAGEN/bus effects on every iteration.
+`repeated_circular_store` reproduces the old rejection and passes32 cases
+with save/replay: A/B low/high stores,four circular updates,count0/6,
+ordered per-clock writes,wraparound and final pointer/RC/source preservation.
+The existing1024-case `repeated_store` control also passes. These are the
+declared staged timing contracts,not new silicon cycle measurements.
+
 ### Host execution cost
 
 The staged frontend shares immutable opcode-property and compact descriptor

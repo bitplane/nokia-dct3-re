@@ -135,7 +135,11 @@ constexpr bool register_product_form(u16 word)
 
 constexpr bool staged_repeat_accumulator_store(u16 word)
 {
-	return (word & 0xfc00) == 0x8000 && u8(word) >= 0x80 && u8(word) < 0xa0;
+	// Circular indirect stores use the same per-iteration DAGEN/Write path
+	// as ordinary indirect stores, including the mapped-destination guard.
+	return (word & 0xfc00) == 0x8000 &&
+		((u8(word) >= 0x80 && u8(word) < 0xa0) ||
+		 (u8(word) >= 0xc0 && u8(word) < 0xe0));
 }
 
 constexpr bool staged_repeat_data_copy(u16 word)
