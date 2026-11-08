@@ -13,6 +13,11 @@ have focused checks. These do not qualify a physically timed RF receiver.
 The own-upload 6210 reference-clock [P09-start laboratory candidate](6210_bringup.md#whole-sequence-p09-capture-candidate)
 recovers exact FN 704 / BSIC 42 through the native SCH frontend/CRC and
 publishes its own success report. It remains legal and interactive for 65 s.
+The separate [raw-BCCH candidate](6210_bringup.md#whole-phone-raw-bcch-laboratory)
+now decodes three complete SI3 blocks in a coherent 24-second UI run: exact
+184-bit information/40-bit parity bus transactions, native FIRE success and
+23-octet ring publications. This is a repeated-SI3 decoder experiment, not
+complete cell broadcast acquisition, camping or registration.
 The unchanged immediate-gate control still captures only partial SCH.
 Neither result establishes fitted MFI timing or RF tuning. An explicit
 laboratory block-request latch prevents interrupt coalescence from stranding
@@ -30,10 +35,9 @@ arithmetic defect; the P03 bit-8 poll does not prove a missing hardware clear.
 Physical SCH/BCCH reception and camping remain unqualified. This is now
 distinct from laboratory decoder execution: isolated native SCH and BCCH paths recover
 independently generated payloads from filtered I/Q samples.
-The next 6210 receive target is the native class-50 path after successful SCH:
-confirm its channel/allocation contract, then supply standard normal/BCCH
-bursts rather than decoded messages. That experiment does not retire the
-unqualified physical request/acknowledgement contract.
+The next 6210 receive target is MCU consumption and the complete broadcast
+schedule after these native class-50 successes. Neither laboratory result
+retires the unqualified physical request/acknowledgement contract.
 
 | Receive scope | Current evidence | Not established |
 | --- | --- | --- |
@@ -41,6 +45,7 @@ unqualified physical request/acknowledgement contract.
 | Isolated BCCH | Four independent raw GMSK bursts traverse native ISR/FIR, frontend, deinterleaving, weighting and Viterbi to exact SI3/parity; another payload passes, zero samples reject | Hardware FIRE completion, RF tuning/camping |
 | Immediate-gate ADC baseline | Native FCCH control acceptance; independently checked raw samples and fault-free provisional staging; first SCH aperture misses its source burst | Physical capture/compare epoch and first-valid-sample ownership |
 | Own 6210 P09-start candidate | Complete source burst, native SCH CRC/information/parity and FN704/BSIC42; legal 65-second UI run; zero-source 24-second transport control | Physical capture policy/capacity and acknowledgement; BCCH/camping |
+| Own 6210 raw-BCCH candidate | SCH plus three four-burst SI3 blocks, exact FIRE input/result and native publications; coherent 24-second Menu/transport acceptance | Complete broadcast schedule, MCU acquisition/camping, fitted timing/tuning |
 
 The CPU additions needed by the normal-burst frontend have generic focused
 tests. The rebuilt native ROM6 menu/storage/save-state scenarios, ROM4

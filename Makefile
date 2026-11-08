@@ -42,6 +42,7 @@ MAME_PATCHES := patches/mame-nokia-dct3-driver-name.patch \
 	patches/mame-npe3-reference-clock.patch \
 	patches/mame-npe3-adc-fixtures.patch \
 	patches/mame-npe3-compare-fixtures.patch \
+	patches/mame-npe3-bcch-fixture.patch \
 	patches/mame-libgsm-build.patch \
 	patches/mame-nse1-external-pcm-fixture.patch \
 	patches/mame-nse2-model.patch \
@@ -63,6 +64,7 @@ DRIVER_COMPONENTS := $(filter-out driver/nokia_dct3_trace_config.h,$(wildcard dr
 	driver/nokia_hagar.cpp driver/nokia_hagar.h driver/nokia_hagar_command_state.h \
 	driver/nokia_mfi_rx.cpp driver/nokia_mfi_rx.h driver/nokia_mfi_rx_state.h \
 	driver/nokia_rf_lab_signal.h \
+	driver/nokia_rf_lab_bcch.h \
 	driver/nokia_dsp_backend.h \
 	driver/gsm_subscription_storage.h \
 	driver/nokia_dsp_c54x.cpp driver/nokia_dsp_c54x.h \

@@ -5,6 +5,7 @@ import subprocess
 import tempfile
 import unittest
 from tools.gsm_sch_signal import HYPERFRAME,sch_information_bits,sch_burst_bits,gmsk_burst_samples
+from tools.gsm_xcch_signal import control_bits,coded_control,check_vector,normal_control_bursts
 
 
 class RfLabSignalTest(unittest.TestCase):
@@ -15,6 +16,7 @@ class RfLabSignalTest(unittest.TestCase):
         binary=Path(directory)/'rf-lab-signal'
         subprocess.run([compiler,'-std=c++17','-Wall','-Wextra','-Werror',
                         '-I',str(root/'driver'),str(root/'tests/unit/test_rf_lab_signal.cpp'),
+                        str(root/'driver/gsm_tch_f_l1.cpp'),
                         '-o',str(binary)],check=True,capture_output=True,text=True)
         return binary
 
@@ -32,6 +34,21 @@ class RfLabSignalTest(unittest.TestCase):
                 actual=tuple(tuple(map(int,line.split())) for line in result.stdout.splitlines())
                 expected=gmsk_burst_samples(sch_burst_bits(sch_information_bits(frame,bsic)))
                 with self.subTest(frame=frame,bsic=bsic): self.assertEqual(actual,expected)
+
+    def test_cpp_bcch_bits_and_iq_match_independent_reference(self):
+        octets=bytes.fromhex('49061b000100f11000014000000000000000002b2b2b2b')
+        bursts=[]
+        with tempfile.TemporaryDirectory() as directory:
+            binary=self.compile_fixture(directory)
+            for burst in range(4):
+                lines=subprocess.run([str(binary),'bcch',str(burst)],check=True,capture_output=True,text=True).stdout.splitlines()
+                bursts.append(lines[0])
+                self.assertEqual(tuple(map(int,lines[0])),normal_control_bursts(octets)[burst])
+                actual=tuple(tuple(map(int,line.split())) for line in lines[1:])
+                self.assertEqual(actual,gmsk_burst_samples(tuple(map(int,lines[0]))))
+        check_vector(dict(octets=octets.hex(),tsc=2,normal_bursts=bursts,
+                          information=''.join(map(str,control_bits(octets)[:184])),
+                          coded=''.join(map(str,coded_control(octets)))))
 
 
 if __name__=='__main__': unittest.main()

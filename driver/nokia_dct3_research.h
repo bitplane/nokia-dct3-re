@@ -60,6 +60,7 @@ public:
 	void npe3ad0(machine_config &config);
 	void npe3cp9(machine_config &config);
 	void npe3zp9(machine_config &config);
+	void npe3bp9(machine_config &config);
 protected:
 	void machine_start() override;
 private:
@@ -74,6 +75,8 @@ private:
 	bool m_tone = true;
 	bool m_burst = false;
 	bool m_sch = false;
+	bool m_bcch = false;
+	std::array<std::array<std::array<s16, 2>, 148 * 4>, 4> m_bcch_samples{};
 	// Pure FN-derived memoization, not independent emulated state. Never
 	// restore its key separately from its table; a time rewind misses/rebuilds it.
 	u32 m_sch_cache_frame = ~u32(0);

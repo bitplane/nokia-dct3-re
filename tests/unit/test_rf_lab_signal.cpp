@@ -1,12 +1,24 @@
 // license:BSD-3-Clause
 // copyright-holders:Gaz
 #include "nokia_rf_lab_signal.h"
+#include "nokia_rf_lab_bcch.h"
 #include <cassert>
 #include <iostream>
 #include <string>
 
 int main(int argc, char **argv)
 {
+	if (argc == 3 && std::string(argv[1]) == "bcch")
+	{
+		gsm::tch_f::packed_control_block const si3{0x49,0x06,0x1b,0x00,0x01,0x00,0xf1,0x10,
+			0x00,0x01,0x40,0,0,0,0,0,0,0,0,0x2b,0x2b,0x2b,0x2b};
+		auto const bursts=nokia_rf_lab::bcch_bits(si3,2);
+		auto const &bits=bursts.at(std::stoul(argv[2]));
+		for (auto bit:bits) std::cout<<bit;
+		std::cout<<'\n';
+		for (auto const &sample:nokia_rf_lab::gmsk_samples(bits)) std::cout<<sample[0]<<' '<<sample[1]<<'\n';
+		return 0;
+	}
 	if (argc == 4 && std::string(argv[1]) == "sch")
 	{
 		auto const samples = nokia_rf_lab::sch_samples(std::stoul(argv[2]), std::stoul(argv[3]));
@@ -42,6 +54,14 @@ int main(int argc, char **argv)
 		assert(!nokia_rf_lab::sch_active(std::uint64_t(frame)*60'000+7104));
 	}
 	assert(sch_bursts==5);
+	for (unsigned frame=0; frame<51; ++frame)
+	{
+		bool const expected=frame>=2 && frame<=5;
+		assert(nokia_rf_lab::bcch_active(std::uint64_t(frame)*60'000)==expected);
+		assert(nokia_rf_lab::bcch_active(std::uint64_t(frame)*60'000+7103)==expected);
+		assert(!nokia_rf_lab::bcch_active(std::uint64_t(frame)*60'000+7104));
+		assert(nokia_rf_lab::bcch_active(std::uint64_t(frame+51)*60'000)==expected);
+	}
 	for (auto const parameters : {std::array<unsigned,2>{0,0},{1,64},{nokia_rf_lab::hyperframe,0}})
 	{
 		bool rejected=false;

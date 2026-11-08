@@ -28,7 +28,7 @@ using sch_iq = std::array<std::array<std::int16_t, 2>, 148 * 4>;
 // Ideal BT=0.3 GMSK source, not a receiver or an RF power-envelope model.
 // Four waveform samples/symbol cover both possible quarter-bit I phases
 // of the two-complex-samples/symbol MFI experiment.
-inline sch_iq sch_samples(std::uint32_t frame, unsigned bsic)
+inline std::array<unsigned, 148> sch_bits(std::uint32_t frame, unsigned bsic)
 {
 	if (frame >= hyperframe || frame % 51 > 41 || frame % 51 % 10 != 1 || bsic >= 64)
 		throw std::invalid_argument("SCH frame/BSIC outside the declared laboratory schedule");
@@ -57,6 +57,11 @@ inline sch_iq sch_samples(std::uint32_t frame, unsigned bsic)
 	std::array<unsigned, 148> burst{};
 	for (unsigned bit = 0; bit < 39; ++bit) { burst[3 + bit] = coded[bit]; burst[106 + bit] = coded[39 + bit]; }
 	for (unsigned bit = 0; bit < 64; ++bit) burst[42 + bit] = (UINT64_C(0xb962040f2d45761b) >> (63 - bit)) & 1;
+	return burst;
+}
+
+inline sch_iq gmsk_samples(std::array<unsigned, 148> const &burst)
+{
 	std::array<unsigned, 149> changes{};
 	unsigned count = 0, previous = 1;
 	for (unsigned bit = 0; bit <= 148; ++bit)
@@ -84,6 +89,11 @@ inline sch_iq sch_samples(std::uint32_t frame, unsigned bsic)
 		result[sample] = {std::int16_t(std::lround(1024 * std::cos(phase))), std::int16_t(std::lround(1024 * std::sin(phase)))};
 	}
 	return result;
+}
+
+inline sch_iq sch_samples(std::uint32_t frame, unsigned bsic)
+{
+	return gmsk_samples(sch_bits(frame, bsic));
 }
 }
 #endif // MAME_NOKIA_NOKIA_RF_LAB_SIGNAL_H

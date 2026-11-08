@@ -34,6 +34,10 @@ The separate reference-clock composition now also completes 65 seconds and
 native scan-result publication after decoupling CTSI from CCONT RTC control;
 see the [qualified experiment](#reference-clock-experiment-and-adc-interrupt-boundary).
 This is compatibility evidence, not identification of the fitted DSP mask.
+The separately named [raw-BCCH laboratory composition](#whole-phone-raw-bcch-laboratory)
+also decodes SCH and three independently checked SI3 blocks in one coherent
+24-second interactive run. This does not yet prove MCU cell selection,
+camping or Location Updating, or promote its clock/capture model to hardware.
 The explicit 13 MHz DSP clock is provisional (the manual establishes RFIclk,
 not the DSP multiplier). A longer run requests MCU software reset near
 32 seconds, despite successful initial port-36 request completion. Timer input
@@ -2867,7 +2871,40 @@ Do not import the isolated fixture's mode `0030` or preinitialized `2616=2`
 as the whole-phone entry contract. The zero normal-burst source still yields
 error reports; allocation alone proves neither frontend completion nor BCCH
 decoding. `tools/npe3_normal_receive.lua` retains bounded passive class
-observations and up to four correlator snapshots for the raw-source work.
+observations and bounded FIRE result reads for the raw-source work.
+
+### Whole-phone raw BCCH laboratory
+
+`npe3bp9` inherits the explicit P09-start/reference-clock experiment and adds
+four standard normal bursts at multiframe positions 2..5, TSC 2. Their raw
+BT=0.3 GMSK samples encode one repeated 23-octet SI3 block; this is not yet a
+complete SI1/SI2/SI3/SI4 broadcast schedule or a tuned RF air source.
+
+```sh
+.venv/bin/python tools/run_npe3_native.py --reference-clock --seconds 24 --adc-source fcch-sch-bcch --capture-start p09
+```
+
+The coherent run preserves own uploads, legal execution, physical Messages
+Menu and its existing P09 pixel hash. It reconciles 5,446,784 P27 reads, peak
+72/96, no transport faults, and 11,490 exact capture/compare joins. SCH remains
+FN 704 / BSIC 42 with the same independently checked aperture.
+
+Three BCCH blocks end at frames 719, 770 and 821. For each, all 184 information
+and 40 complemented FIRE-parity bits match the independent encoder on the
+actual 14-word P39 transaction. The control writes are `3,5,fffc,2`; after
+P38 command 5, the native final reader `3ae7` receives `0025`. The native ring
+publication has status zero and exactly the source's 23 SI3 octets:
+`49061b000100f11000014000000000000000002b2b2b2b`.
+Its odd-byte packet padding is not payload. These joins are checked by
+`npe3_bcch_receive_check.py`, including rejection of every single-bit change
+in the 224-bit input. The FIRE model remains a functional zero-syndrome
+subset, not measured timing or error correction.
+
+The next boundary is MCU consumption and complete broadcast acquisition:
+follow its own SI3 consumer, establish the missing SI request/schedule, then
+provide standards-derived raw broadcasts. No decoded messages, firmware
+fields, carrier selection or registration verdict are supplied. Existing
+SCH-only and zero-source profiles remain distinct controls.
 
 `verify-6210-alarm-off-snooze-no` combines the independently validated
 powered-off and Snooze lifecycles: two natural RTC wakes, separately checked

@@ -3,6 +3,14 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "npe3_native_laboratory_bcch_decode",
+      "owner": "native_rom6_reference_adc_laboratory",
+      "status": "satisfied",
+      "predicate": "Raw standard normal bursts traverse whole-phone native receive processing and publish three exact SI3 blocks after native SCH",
+      "current": "The separately named npe3bp9 reference/P09 composition supplies repeated SI3 only,without decoded-message or firmware-state injection. Coherent24s acceptance preserves own uploads,legal physical Messages Menu and existing P09 hash,SCH FN704/BSIC42,5446784 reconciled P27 reads,peak72/96,no faults and11490 compare joins. At719/770/821 the independent checker matches all184 information/40 complemented parity bits on each14-word P39 transaction,control3/5/fffc/2 then P38 command5,actual final reader3ae7 status0025,and native status-zero type80/class50 publications containing all23 exact SI3 octets. Odd packet padding is excluded. Unit controls reject all224 single-bit transaction changes,failed result,wrong reader/frame and altered payload. This qualifies laboratory decoding and functional FIRE use,not physical clock/mask/capture/tuning,FIRE latency/correction,complete SI scheduling,MCU cell acquisition,camping or registration.",
+      "evidence": ["driver/nokia_rf_lab_bcch.h", "driver/nokia_dct3_research.cpp", "tools/npe3_normal_receive.lua", "tools/npe3_bcch_receive_check.py", "tools/test_npe3_bcch_receive_check.py", "tools/test_rf_lab_signal_cpp.py", "tools/run_npe3_native.py", "docs/6210_bringup.md"]
+    },
+    {
       "id": "npe3_native_bcch_four_burst_allocation",
       "owner": "native_rom6_reference_adc_laboratory",
       "status": "satisfied",

@@ -10,6 +10,7 @@
 #include "nokia_hagar.h"
 #include "nokia_mfi_rx.h"
 #include "nokia_rf_lab_signal.h"
+#include "nokia_rf_lab_bcch.h"
 
 namespace nokia_dct3 {
 
@@ -79,6 +80,12 @@ void dct3_rf_adc_fixture_state::npe3zp9(machine_config &config)
 	m_tone=false;
 }
 
+void dct3_rf_adc_fixture_state::npe3bp9(machine_config &config)
+{
+	npe3cp9(config);
+	m_bcch=true;
+}
+
 void dct3_rf_adc_fixture_state::machine_start()
 {
 	nokia_dct3_state::machine_start();
@@ -86,12 +93,20 @@ void dct3_rf_adc_fixture_state::machine_start()
 	save_item(NAME(m_candidate_active));
 	save_item(NAME(m_candidate_target));
 	if (m_compare_start) machine().logerror("npe3_capture_candidate: p09_start=1 all_captures=1 block_request_latch=1 physical_claim=0 source_epoch_shift=0\n");
+	if (m_bcch)
+	{
+		gsm::tch_f::packed_control_block const si3{0x49,0x06,0x1b,0x00,0x01,0x00,0xf1,0x10,
+			0x00,0x01,0x40,0,0,0,0,0,0,0,0,0x2b,0x2b,0x2b,0x2b};
+		auto const bursts=nokia_rf_lab::bcch_bits(si3,2);
+		for (unsigned burst=0; burst<4; ++burst) m_bcch_samples[burst]=nokia_rf_lab::gmsk_samples(bursts[burst]);
+		machine().logerror("rf_adc_bcch: frames=2,3,4,5 tsc=2 octets=49061b000100f11000014000000000000000002b2b2b2b repeated_si3_only=1 epoch=0 physical_claim=0\n");
+	}
 	save_item(NAME(m_q_latch));
 	save_item(NAME(m_adc_receive_control)); save_item(NAME(m_adc_mfi_control));
 	machine().logerror("rf_adc_lab: direct_adc=1 tuned_air_source=0 tone=%u reference=13000000 source_phase_divider=12 word_divider=%u amplitude=1024 physical_clock_claim=0\n",
 		m_tone,subdevice<nokia_mfi_rx_device>("mfi_rx")->word_divider());
 	if (m_sch)
-		machine().logerror("rf_adc_sync: frame_ticks=60000 multiframe=51 fcch_frames=0,10,20,30,40 sch_frames=1,11,21,31,41 active_ticks=7104 epoch=0 envelope=rectangular bt=0.3 bsic=42 waveform_samples_per_symbol=4 other_slots=zero tuned_air_source=0\n");
+		machine().logerror("rf_adc_sync: frame_ticks=60000 multiframe=51 fcch_frames=0,10,20,30,40 sch_frames=1,11,21,31,41 active_ticks=7104 epoch=0 envelope=rectangular bt=0.3 bsic=42 waveform_samples_per_symbol=4 other_slots=%s tuned_air_source=0\n",m_bcch ? "bcch" : "zero");
 	else if (m_burst)
 		machine().logerror("rf_adc_burst: frame_ticks=60000 multiframe=51 frames=0,10,20,30,40 active_ticks=7104 epoch=0 envelope=rectangular other_slots=zero tuned_air_source=0\n");
 }
@@ -149,6 +164,12 @@ u16 dct3_rf_adc_fixture_state::sample_r(offs_t component)
 	if (!m_tone) return 0;
 	if (component) return u16(m_q_latch);
 	u64 const tick = machine().time().as_ticks(13'000'000);
+	if (m_bcch && nokia_rf_lab::bcch_active(tick))
+	{
+		auto const &sample=m_bcch_samples[(tick/60'000)%51-2][(tick%60'000)/12];
+		m_q_latch=sample[1];
+		return u16(sample[0]);
+	}
 	if (m_sch && nokia_rf_lab::sch_active(tick))
 	{
 		u32 const frame = (tick / 60'000) % nokia_rf_lab::hyperframe;

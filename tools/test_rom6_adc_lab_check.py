@@ -3,6 +3,20 @@ from tools.rom6_adc_lab_check import check,reference_word,continuous_queue_bound
 
 
 class AdcLabCheckTest(unittest.TestCase):
+    def test_bcch_reference_is_four_bursts_with_latched_q(self):
+        from tools.gsm_xcch_signal import normal_control_bursts
+        from tools.gsm_sch_signal import gmsk_burst_samples
+        bursts=normal_control_bursts(bytes.fromhex('49061b000100f11000014000000000000000002b2b2b2b'))
+        for burst in range(4):
+            samples=gmsk_burst_samples(bursts[burst])
+            for index in (0,17,295,591):
+                tick=(2+burst)*60000+index*12
+                self.assertEqual(reference_word(1,tick,True,12,True,True,True),samples[index][0]&0xffff)
+                self.assertEqual(reference_word(2,tick+12,True,12,True,True,True),samples[index][1]&0xffff)
+            self.assertEqual(reference_word(1,(2+burst)*60000+7104,True,12,True,True,True),0)
+        self.assertEqual(reference_word(1,120000,True,12,True,True),0)
+        with self.assertRaises(ValueError): reference_word(1,120000,True,6,True,True,True)
+
     def test_sch_reference_uses_frame_and_latched_iq_epoch(self):
         from tools.gsm_sch_signal import sch_information_bits,sch_burst_bits,gmsk_burst_samples
         samples=gmsk_burst_samples(sch_burst_bits(sch_information_bits(11,42)))

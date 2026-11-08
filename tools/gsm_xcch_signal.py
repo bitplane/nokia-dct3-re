@@ -25,6 +25,19 @@ def coded_control(octets):
     return tuple(result)
 
 
+def normal_control_bursts(octets):
+    """Independent four-burst xCCH interleaving with laboratory TSC2."""
+    bursts=[[0]*148 for _ in range(4)]
+    for burst in bursts:
+        burst[60]=burst[87]=1
+        burst[61:87]=map(int,TSC2)
+    for index,bit in enumerate(coded_control(octets)):
+        position=2*((49*index)%57)+(index%8)//4
+        at=3+position if position<57 else 88+position-57
+        bursts[index%4][at]=bit
+    return tuple(tuple(burst) for burst in bursts)
+
+
 def check_vector(vector):
     octets=bytes.fromhex(vector['octets'])
     expected=coded_control(octets)
