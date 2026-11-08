@@ -1481,6 +1481,21 @@ recording, validated audio or handset boot.
 
 ## Retained recorder execution contracts
 
+### Repeated circular Smem ADD
+
+`repeated_circular_add` qualifies immediate single-repeat ADD to A/B using
+the four short circular addressing modes. Its 64 cases and replays cover
+unit and AR0-strided increment/decrement, one/non-power-of-two/power-of-two
+buffers, zero/short/multi-wrap counts and two program pages. They require
+signed live-accumulator feedback, exact ordered reads one clock apart,
+pointer/BK preservation and a separate continuation marker. The fixture
+fails before circular ADD is admitted to the existing pipelined-repeat path.
+Non-repeated address/arithmetic and repeat-controller controls remain
+independent. This does not newly qualify CMPT aliases, OVM/interrupt
+compositions, mapped operands or physical silicon timing. The acquired
+6210 upload exercises the unit-increment form at `0d71`; no handset address
+is present in CPU admission or the generic test.
+
 Fixture counts below describe focused acceptance. Shared broad-run scope,
 tooling totals and native handset restoration are centralized in the
 [core regression checkpoint](#retained-suite-acceptance).

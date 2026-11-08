@@ -3,6 +3,14 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "c54x_repeated_circular_smem_add",
+      "owner": "tms320c54x_generic_cpu",
+      "status": "satisfied",
+      "predicate": "Immediate single-repeat short circular ADD consumes each ordered operand with live accumulator feedback and resumes its continuation",
+      "current": "The64-case generic section fails before admission and passes with64 save/restore replays afterward. A/B,unit/AR0-strided increment/decrement,one/eight/thirteen-word buffers,zero/short/multi-wrap counts and two program pages check signed40-bit outcomes,exact read ordering at one-clock cadence,pointer/BK state and a distinct continuation marker. Existing14 repeat-prefix,5 basic-repeat and4864 non-repeated Smem arithmetic cases/replays pass. The own6210 upload reaches00d3 at0d71 after complete SI acquisition;CPU admission contains no handset address. CMPT/OVM/interrupt compositions,mapped operands and measured silicon timing are not newly qualified.",
+      "evidence": ["cpu/tms320c54x/tms320c54x_decode.h", "tests/c54x/sections/repeated_circular_add.h", "fixtures/c54x_sections.json", "docs/c54x_execution_contracts.md"]
+    },
+    {
       "id": "npe3_native_mcu_si3_admission",
       "owner": "native_rom6_reference_adc_laboratory",
       "status": "satisfied",

@@ -188,7 +188,8 @@ constexpr bool staged_immediate_loop_register(u16 word)
 constexpr bool decode_staged_pipelined_repeat(u16 word)
 {
 	bool const short_mar = (word & 0xff00) == 0x6d00 && u8(word) >= 0x80 && u8(word) < 0xe0 && (word & 0xf8) != 0x98;
-	bool const short_add = (word & 0xfe00) == 0 && u8(word) < 0x98;
+	bool const short_add = (word & 0xfe00) == 0 &&
+		(u8(word) < 0x98 || (u8(word) >= 0xc0 && u8(word) < 0xe0));
 	bool const short_logic = ((word & 0xfe00) == 0x1800 || (word & 0xfe00) == 0x1a00 || (word & 0xfe00) == 0x1c00) && u8(word) < 0x98;
 	bool const coefficient_repeat = staged_firs(word) || (staged_coefficient_mac(word) && !BIT(word, 9) && u8(word) < 0xe0);
 	// SFTL consumes the live accumulator in Execute, once per retained issue.

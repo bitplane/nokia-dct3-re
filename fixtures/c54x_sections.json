@@ -1,6 +1,7 @@
 {
   "scripted_io": 4,
   "repeated_accumulator_add": 96,
+  "repeated_circular_add": 64,
   "mvmd_accumulator": 144,
   "immediate_store": 8,
   "repeated_double_add": 72,
