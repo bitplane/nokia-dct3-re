@@ -2414,6 +2414,11 @@ void tms320c54x_device::pipeline_step()
 	// Resolve an older store's implicit DAGEN update before a younger
 	// memory Access consumes the same AR. The data write remains in Execute.
 	// This is address ordering, not forwarding an explicit MMR store.
+	if (m_pipeline_valid[4] && (m_pipeline_word[4] & 0xfff8) == 0x7688)
+	{
+		m_pipeline_operand_address[4] = basic_address(4, u8(m_pipeline_word[4]));
+		indirect_modify(u8(m_pipeline_word[4]), false, 4);
+	}
 	if (m_pipeline_valid[4] && staged_read_a(m_pipeline_word[4]))
 	{
 		// READA also writes EAB in Read. Resolve its destination before a
@@ -3390,7 +3395,8 @@ void tms320c54x_device::pipeline_step()
 				m_illegal = true; return;
 			}
 		}
-		else if (!retained_ar_alias && mode != 0xf8 && (m_pipeline_word[4] & 0xfff8) != 0x7690)
+		else if (!retained_ar_alias && mode != 0xf8 && (m_pipeline_word[4] & 0xfff8) != 0x7690 &&
+			(m_pipeline_word[4] & 0xfff8) != 0x7688)
 		{
 			bool const preincrement = BIT(mode, 7) && (mode & 0x78) == 0x18;
 			if (preincrement) indirect_modify(mode, false, 4);

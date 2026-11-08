@@ -3,6 +3,14 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "c54x_constant_postdecrement_copy_dependency",
+      "owner": "tms320c54x_generic_cpu",
+      "status": "satisfied",
+      "predicate": "An immediate ST postdecrement is visible to the next MVDD destination calculation without moving either data write",
+      "current": "The generic decrement fixture fails before correction:copy Write10 targets2000 instead of1fff and overwrites the older constant. Resolving the older constant-ST Read-stage address/update before younger Access fixes16 cases/replays over both pointer directions,four values,two pages,exact bus clocks5/9/9/10 and preserved accumulators/status. Existing13 memory-pair,256 ST/MVMM and600 repeated-ST cases/replays pass. Own native6210 shows the same defect at7c5d/7c5f:AR3 decrements2657 to2656 but MVDD writes00e0 to2657,overwriting2a84 and leaving readiness2656 zero. No firmware address is used by CPU logic;physical timing and other unqualified compositions are not inferred.",
+      "evidence": ["cpu/tms320c54x/tms320c54x.cpp", "tests/c54x/sections/constant_store_pointer_copy.h", "fixtures/c54x_sections.json", "docs/c54x_execution_contracts.md"]
+    },
+    {
       "id": "c54x_block_stlm_low_ram",
       "owner": "tms320c54x_generic_cpu",
       "status": "satisfied",

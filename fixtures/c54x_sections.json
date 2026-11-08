@@ -7,6 +7,7 @@
   "mvdd_accumulator_destination": 152,
   "mvpd_accumulator_destination": 50,
   "block_stlm_ram": 44,
+  "constant_store_pointer_copy": 16,
   "mvmd_accumulator": 144,
   "immediate_store": 8,
   "repeated_double_add": 72,

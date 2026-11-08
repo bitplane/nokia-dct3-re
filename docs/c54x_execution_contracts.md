@@ -124,6 +124,16 @@ and continuation. Eight negative cases/replays preserve the BRC/PMST/
 peripheral and indirect-form exclusions before data effects. No register
 control, interrupt or physical timing behavior is newly qualified.
 
+`constant_store_pointer_copy` checks an immediate ST with postdecrement
+followed by MVDD using that pointer as its destination. Resolve the older
+ST's Read-stage address/update before the younger memory Access, as for
+other retained store addresses; do not move the actual data write. Sixteen
+cases/replays cover decrement and the existing increment control, four
+source words, two program pages, pointer/accumulator/status preservation,
+and exact STM/Read/ST/Copy bus clocks 5/9/9/10. The pre-correction decrement
+case copies to the old pointer and overwrites the constant. This is a generic
+DAGEN dependency, not a handset callback or a physical timing measurement.
+
 READA resolves its Read-stage destination DAGEN update before a younger
 Access-stage instruction consumes that AR (SPRU131G 7.1). Its retained PAR
 sample, program-bus hold and Execute publication are unchanged.
