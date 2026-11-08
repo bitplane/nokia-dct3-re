@@ -254,7 +254,10 @@ def main():
                 if args.raw_agch:
                     from tools.npe3_rach_transmit_check import check_agch
                     report['raw_agch']=check_agch(text)
+                    from tools.npe3_dedicated_check import check as check_dedicated
+                    report['dedicated_submission']=check_dedicated(text)
                     print(f"Native6210 raw AGCH: PASS native_decodes={report['raw_agch']['responses']}; tuned_air_source=0 registration=0")
+                    print('Native6210 assigned SDCCH: PASS MCU SABM/Location Updating submission; native_transmission=0 registration=0')
                 elif 'npe3_raw_agch:' in text:
                     raise ValueError('no-reply control unexpectedly enabled raw AGCH')
                 print(f"Native6210 access serialization: PASS attempts={report['native_access']['attempts']}; physical_release=0 registration=0")

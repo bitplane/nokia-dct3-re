@@ -3,9 +3,12 @@ local machine=manager.machine
 local cpu=assert(machine.devices[':maincpu'])
 local space=cpu.spaces.program
 local commits,invalid=0,0
+local finish=machine.system.name=='npe3ap5' and 24 or 12
+local cap=machine.system.name=='npe3ap5' and 256 or 128
+local begin=machine.system.name=='npe3ap5' and 0 or 2
 local tap=space:install_write_tap(0x100a4,0x100a7,'npe3_mcu_tx_ring',function(address,data,mask)
     local now=machine.time:as_double()
-    if address~=0x100a4 or now<2 or now>12 then return end
+    if address~=0x100a4 or now<begin or now>finish then return end
     local old=space:read_u32(address)
     local previous=(old>>16)&0xffff
     local producer=(((old&~mask)|(data&mask))>>16)&0xffff
@@ -16,7 +19,7 @@ local tap=space:install_write_tap(0x100a4,0x100a7,'npe3_mcu_tx_ring',function(ad
         return
     end
     commits=commits+1
-    if commits>128 then return end
+    if commits>cap then return end
     local words,cursor={},previous
     while cursor~=producer do
         words[#words+1]=string.format('%04x',space:read_u16(0x10000+2*cursor))
@@ -25,6 +28,6 @@ local tap=space:install_write_tap(0x100a4,0x100a7,'npe3_mcu_tx_ring',function(ad
     machine:logerror(string.format('npe3_mcu_tx_commit: sequence=%d t=%.9f previous=%04x producer=%04x words=%s pc_context=%08x observer_writes=0\n',commits,now,previous,producer,table.concat(words,','),cpu.state.PC.value))
 end)
 local stop=emu.add_machine_stop_notifier(function()
-    machine:logerror(string.format('npe3_mcu_tx_complete: commits=%d cap=128 invalid=%d begin=2 end=12 observer_writes=0\n',commits,invalid))
+    machine:logerror(string.format('npe3_mcu_tx_complete: commits=%d cap=%d invalid=%d begin=%d end=%d observer_writes=0\n',commits,cap,invalid,begin,finish))
 end)
 _G.npe3_mcu_tx_observer={tap,stop}

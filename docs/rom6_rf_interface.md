@@ -39,10 +39,11 @@ arithmetic defect; the P03 bit-8 poll does not prove a missing hardware clear.
 Physical SCH/BCCH reception and camping remain unqualified. This is now
 distinct from laboratory decoder execution: isolated native SCH and BCCH paths recover
 independently generated payloads from filtered I/Q samples.
-The separate P05-start candidate now clocks complete native buffers at the
-declared counter match without generating any reply. The next 6210 target
-is externally decoded access followed by raw AGCH and native CCCH/camping
-progression. These laboratory
+The separate P05-start candidate clocks complete native buffers at the
+declared counter match without generating any reply. The raw-AGCH profile
+additionally decodes an external access response and makes the MCU configure
+SDCCH and submit SABM/Location Updating. Native transmission of that block
+parks at a firmware validation gate, described below. These laboratory
 results do not retire the physical request/acknowledgement or tuning contract.
 
 | Receive scope | Current evidence | Not established |
@@ -54,6 +55,7 @@ results do not retire the physical request/acknowledgement or tuning contract.
 | Own 6210 raw-BCCH candidate | SCH plus three four-burst SI3 blocks, exact FIRE input/result and native publications; coherent 24-second Menu/transport acceptance | Complete broadcast schedule, MCU acquisition/camping, fitted timing/tuning |
 | Own 6210 full-SI candidate | Legal 24-second physical Menu, SI1..SI4 native decoding, MCU availability `0f`, observed success return, organic IDLE_RA/RA_INFO and independently checked P21/P27 access bits | Physical release timing/access grant, camping, registration and fitted timing/tuning |
 | Own 6210 P05-start candidate | Complete native buffers clocked at the projected P05 matches; same receive/UI checks and exact port-word preservation | Physical pin/timing identity, external network decode/AGCH, camping and registration |
+| Own 6210 raw-AGCH candidate | Exact successful native assignment decode; MCU assigned-SDCCH configuration and SABM containing Location Updating Request | Native dedicated transmission, validation-gate completion, camping/registration and physical timing/tuning |
 
 The CPU additions needed by the normal-burst frontend have generic focused
 tests. The rebuilt native ROM6 menu/storage/save-state scenarios, ROM4
@@ -176,14 +178,73 @@ and the exact23-octet assignment
 The independently checked response echoes RA and request reference and assigns
 SDCCH/8 subchannel0, timeslot0, non-hopping ARFCN35. The24-second run retains
 legal execution and physical Menu, but produces only the first access attempt
-and no subsequent native RX packets after this assignment. This establishes
-raw native AGCH decoding, not MCU assignment acceptance, dedicated-channel
-service, camping or Location Updating. The next boundary is the own MCU's
-assignment consumer and subsequent native receive/transmit scheduling.
+and no subsequent native RX packets after this assignment. The MCU accepts
+the assignment as established by the ordered submissions below, but native
+dedicated-channel service, camping and completed Location Updating remain
+unqualified.
 
 The source remains untuned at the ADC attachment: broadcast ARFCN35 is a
 declared laboratory cell, not evidence of coherent physical carrier selection
 or fitted P05 pin semantics. `npe3sp9` and `npe3tp5` remain no-reply controls.
+
+### Assigned-channel submission and validation boundary
+
+The complete read-only MCU ring window (0..24s,56 commits,zero invalid indices)
+places two own submissions after the successful AGCH publication:
+
+- At12.098916s, type02 configures a24-byte assigned-channel record with
+  channel80 and non-hopping ARFCN35.
+- At12.156672231s, type1b submits a28-byte SEND_BLOCK. Its channel prefix is
+  `0080`; the23-byte LAPDm block is
+  `013f4905087000f000fffe330809101010325476982b2b`.
+  Address01/control3f/length49 encode SABM with18 information bytes, whose
+  L3 header0508 is a Location Updating Request. Submission is not transmission.
+
+The resident SEND_BLOCK handler calls34b4, where34c6 compares data04fa with7.
+The first fetch of3500 has executing branch owner34ca,04fa=0000 and the
+actual SABM atAR2=083d. The native error tail sets0866 bit6 and enters IDLE3;
+terminalPC350a is this error loop, not ordinary waiting. Therefore an
+`illegal=0` terminal alone cannot qualify dedicated service.
+
+The startup write-watch observes04fa cleared at0.609381143s and written zero
+by all three validation writers45b4/45bc/45e6 at0.741934681/0.742544549/
+0.747797758s. These are actual data writes; speculative program fetches and
+stop-time program snapshots must not be counted as executed setters. Static
+45b2/45ba/45e4 clear bits0/1/2 and conditionally set them from equality tests;
+34c6 requires all three. No validation bit or branch is overridden.
+
+Early own type70 inputs are13/4-byte seed`e1906dcf`,14/12-byte record
+`92af475b873dfecf1ec705d7`,15/20-byte identity record and16/24-byte record.
+The seed is byte-identical to the final four bytes of the acquired MCU image.
+The native MSID response`832445fa5f92b9f7d13be70b52` independently decodes via
+`dct3_msid_codec.py` to`e1906dcf00160010acadabda`: requested seed, modeled
+COBBA serial00160010 and family83 signature. This validates that reply's
+arithmetic, not the persistent security records or every later transform.
+At the bit0 setter the preserved startup fingerprint is`f65a:0d46`, while
+the six-word transform's first pair is`0dfd:5edc`. Their mismatch, the
+bit1 equality and the bit2 record validation are the next bounded contracts.
+
+The offline`dct3_rom6_record_codec.py` now reproduces all six native FAID
+words`0dfd5edca196a316f99c5f96`, not just the rejected checksum pair. From
+the acquired DROM it uses the explicit B74F key, XORs chip00160010 into its
+first four bytes, and applies the resident8555 key preconditioning
+(`reverse_words(linear_mix(key))`) before the twelve-round transform with
+B761 schedule. B755 likewise reproduces the full decoded identity
+`c21e6d4c90c54e5c649e096a`; XORa5a5 yields the observed04ef..04f4 contents.
+B749 reproduces both lock blocks from the native3532 reply, including final
+words294d/e5cd which differ from the B779 marker54c2. This is independently
+checked arithmetic evidence for the actual stored-record/model mismatch,
+not permission to force04fa or to copy a donor provisioning repair. The
+inverse helper accepts explicit plaintext/table/chip only and edits no storage.
+The next experiment must establish a coherent external provisioning contract
+or recover the acquired store's intended hardware identity before revisiting
+native SEND_BLOCK. No additional AGCH or UA can release this local error loop.
+
+The reference project's registration notes independently associate04fa with
+record/identity validation and report a6210 FAID/provisioning repair. That is
+a hypothesis source, not an imported fix: its failed profile had04fa=6,
+whereas this acquired PMM/model combination has04fa=0. Resolve the actual
+inputs and algorithms before changing storage or a hardware identity.
 
 The original [NSM-3 System Module manual, Issue 1 12/1999](https://www.eserviceinfo.com/preview_html.php?fileid=5456&previewid=3011)
 identifies the 13MHz COBBA clock and separate IData/QData connections

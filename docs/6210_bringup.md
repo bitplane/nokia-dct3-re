@@ -42,7 +42,9 @@ The [full-SI candidate](#complete-si-broadcast-candidate) additionally completes
 the MCU's four-type broadcast acquisition, physical Menu and independently
 checked native access serialization in a legal24-second capture. The separate
 P05/raw-AGCH candidate decodes an externally encoded Immediate Assignment
-through native DSP execution. Dedicated-channel service and registration remain
+through native DSP execution, then organically configures SDCCH and submits
+SABM containing a Location Updating Request. The DSP's SEND_BLOCK validation
+gate parks with04fa=0 before dedicated transmission. Dedicated-channel service and registration remain
 unqualified; these laboratory candidates do not replace the normal profile.
 The explicit 13 MHz DSP clock is provisional (the manual establishes RFIclk,
 not the DSP multiplier). A longer run requests MCU software reset near

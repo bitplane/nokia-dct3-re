@@ -3,6 +3,22 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "npe3_record_validation_arithmetic",
+      "owner": "native_rom6_record_contract",
+      "status": "satisfied",
+      "predicate": "Offline recovered word arithmetic reproduces complete native FAID,identity and lock transforms without changing handset state",
+      "current": "Explicit acquired DROM keys B74F/B755/B749 are XORed with the observed chip00160010,linear-preconditioned and bit-reversed as resident8555 does,then use the B761 twelve-round schedule. FAID92af475b873dfecf1ec705d7 yields all six native words0dfd5edca196a316f99c5f96;its checksum pair differs from startupf65a0d46. Identity input yieldsc21e6d4c90c54e5c649e096a and xor-a5a5 exactly matches04ef..04f4. Both lock blocks reproduce native3532 reply fields,including markers294d/e5cd rather thanB779=54c2. MSID independently decodes to the actual seed/chip/signature. Focused native golden and inverse tests pass. No record is replaced,identity promoted,flag written or equality bypassed;coherent provisioning and the bit1 checksum contract remain open.",
+      "evidence": ["tools/dct3_rom6_record_codec.py", "tools/test_dct3_rom6_record_codec.py", "tools/dct3_msid_codec.py", "tools/npe3_dedicated_observe.lua", "docs/rom6_rf_interface.md"]
+    },
+    {
+      "id": "npe3_assigned_sdcch_lu_submission",
+      "owner": "native_rom6_reference_adc_laboratory",
+      "status": "satisfied",
+      "predicate": "After successful raw AGCH the own MCU configures the assigned SDCCH and submits SABM containing a Location Updating Request",
+      "current": "The uncapped0..24s read-only MCU ring capture has56 commits and zero invalid indices. After native AGCH12.094406923,channel80 configuration occurs12.098916 and SEND_BLOCK12.156672231. The latter has channel0080,LAPDm013f49 and18-byte L3 05087000f000fffe33080910101032547698. The checker validates complete ring continuity,packet lengths,ordering,channel,SABM and LU grammar and explicitly does not qualify transmission or registration. Native SEND_BLOCK calls34b4;executing branch34ca enters3500 with04fa=0 and AR2=083d pointing at that SABM. All three startup validation writers publish zero. Terminal350a is an integrity-error IDLE3 loop,despite illegal=0. No flags or code are changed. The actual seed/MSID reply decodes independently to e1906dcf00160010acadabda;record validity and later transforms remain open.",
+      "evidence": ["tools/npe3_tx_ring_observe.lua", "tools/npe3_dedicated_observe.lua", "tools/npe3_dedicated_check.py", "tools/test_npe3_dedicated_check.py", "tools/run_npe3_native.py", "docs/rom6_rf_interface.md"]
+    },
+    {
       "id": "npe3_native_raw_agch_candidate",
       "owner": "native_rom6_reference_adc_laboratory",
       "status": "satisfied",
