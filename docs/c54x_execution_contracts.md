@@ -4829,6 +4829,22 @@ RC,SP,status and continuation are checked. Two negatives retain SP-destination
 and mapped-source rejection before pointer/bus effects. Other repeated mapped
 destination kinds and mapped sources remain outside this contract.
 
+### Reverse-carry MVKD destinations
+
+MVKD admits `*ARx-0B` and `*ARx+0B` destinations (70a0..70a7/70b8..70bf),
+including short RPT. The old destination address is retained before the
+existing reverse-carry DAGEN update;the ordinary source/Write path is unchanged.
+Repeated DMA source literals advance once per copy. BK does not impose circular
+wrapping on this addressing mode.
+
+`reverse_carry_mvkd` passes13 save/replay cases. Single copies and complete
+8/256-word permutations cover addition/subtraction and CMPT/ARP selection,
+using an independent bit-serial carry/borrow reference. Ordered source reads,
+delayed writes,all destination contents,final pointer/RC and BK preservation
+are checked. The mapped-repeat destination guard still rejects before bus or
+pointer effects. The native ROM6 witness sets AR0=0080,AR2=2f00,then repeats
+70ba/3000 for256 copies;no native addresses enter the CPU implementation.
+
 ## Parallel store with ADD/SUB
 
 The staged frontend admits `ST src,Ymem || ADD/SUB Xmem,dst` (`c000..c7ff`).

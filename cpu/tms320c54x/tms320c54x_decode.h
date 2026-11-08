@@ -142,9 +142,14 @@ constexpr bool staged_repeat_accumulator_store(u16 word)
 		 (u8(word) >= 0xc0 && u8(word) < 0xe0));
 }
 
+constexpr bool staged_reverse_carry_mvkd(u16 word)
+{
+	return (word&0xff00)==0x7000 && ((word&0xf8)==0xa0 || (word&0xf8)==0xb8);
+}
+
 constexpr bool staged_repeat_data_copy(u16 word)
 {
-	return (word & 0xfff8) == 0x7210 || ((word & 0xff00) == 0x7000 && u8(word) < 0xa0);
+	return (word & 0xfff8) == 0x7210 || ((word & 0xff00) == 0x7000 && u8(word) < 0xa0) || staged_reverse_carry_mvkd(word);
 }
 
 constexpr bool staged_repeat_destination_copy(u16 word)
@@ -374,7 +379,7 @@ constexpr bool staged_mmr_pop(u16 word)
 
 constexpr bool decode_staged_data_copy(u16 word)
 {
-	return staged_direct_mvdm(word) || ((word & 0xff00) == 0x7000 && (u8(word) < 0xa0 || (u8(word) >= 0xc0 && u8(word) <= 0xf8)));
+	return staged_direct_mvdm(word) || staged_reverse_carry_mvkd(word) || ((word & 0xff00) == 0x7000 && (u8(word) < 0xa0 || (u8(word) >= 0xc0 && u8(word) <= 0xf8)));
 }
 
 constexpr bool staged_delay_copy(u16 word)
