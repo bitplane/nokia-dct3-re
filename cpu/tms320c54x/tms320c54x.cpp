@@ -2091,6 +2091,13 @@ void tms320c54x_device::pipeline_step()
 		}
 		bool const accumulator_status_move = (word == 0x7308 || word == 0x730b) && m_pipeline_immediate[2] == 7;
 		bool const brc_move = direct_move && m_pipeline_immediate[2] == 0x1a;
+		if (m_pipeline_valid[2] && word == 0x721a &&
+			(m_pipeline_block_active || BIT(m_st1,15) || m_pipeline_repeat_active ||
+			 m_pipeline_delay_decode_words || completing_move_delay || m_pipeline_xc_active))
+		{
+			logerror("%s: staged MVDM BRC active-loop or control composition is unsupported\n",machine().describe_context());
+			m_illegal=true;return;
+		}
 		bool const clock_move = staged_clock_destination_move(word, m_pipeline_immediate[2]);
 		if (m_pipeline_valid[2] && clock_move && (completing_move_delay || m_pipeline_delay_decode_words || m_pipeline_xc_active || m_pipeline_block_body[2] || m_pipeline_repeat_active))
 		{
@@ -2631,7 +2638,8 @@ void tms320c54x_device::pipeline_step()
 		u16 const destination = m_pipeline_operand_address[3];
 		bool const accumulator_destination = staged_direct_mvdm(m_pipeline_word[3]) && destination >= 8 && destination <= 0x0d;
 		bool const t_destination = staged_direct_mvdm(m_pipeline_word[3]) && (destination == 0x0e || destination == 0x0f);
-		if (destination < 0x20 && !accumulator_destination && !t_destination && (destination < 0x10 || destination > 0x17))
+		bool const brc_destination = m_pipeline_word[3] == 0x721a && destination == 0x1a;
+		if (destination < 0x20 && !accumulator_destination && !t_destination && !brc_destination && (destination < 0x10 || destination > 0x17))
 		{
 			logerror("%s: staged MVKD control/peripheral destination is unsupported instruction=%06x word=%04x source=%04x destination=%04x\n", machine().describe_context(), unsigned(m_pipeline_address[3]), m_pipeline_word[3], source, destination); m_illegal = true; return;
 		}

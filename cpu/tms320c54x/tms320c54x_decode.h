@@ -356,7 +356,7 @@ constexpr bool decode_staged_move(u16 word)
 
 constexpr bool staged_direct_mvdm(u16 word)
 {
-	return (word & 0xfff8) == 0x7210 || (word >= 0x7208 && word <= 0x720f);
+	return (word & 0xfff8) == 0x7210 || (word >= 0x7208 && word <= 0x720f) || word == 0x721a;
 }
 
 constexpr bool staged_direct_push(u16 word)

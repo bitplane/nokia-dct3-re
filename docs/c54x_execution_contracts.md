@@ -66,6 +66,19 @@ ordered per-clock writes,wraparound and final pointer/RC/source preservation.
 The existing1024-case `repeated_store` control also passes. These are the
 declared staged timing contracts,not new silicon cycle measurements.
 
+### MVDM block counter
+
+MVDM dma,BRC (721a) admits an ordinary RAM source through the existing
+two-word mapped-move path. The source is retained in Read and BRC publishes
+in Execute;the following RPTB consumes the new count. The native ROM6
+traffic initializer reaches721a/2af1 atb79e,not a new ROM hole. Active block
+loops,single-repeat/control-delay/XC composition and control/peripheral
+sources remain rejected before source-read or BRC-write side effects.
+`mvdm_brc` reproduces the old decoder rejection and passes11 save/replay
+cases: eight copied-block/count checks over two program pages and counts
+0/1/7/31,plus three rejection boundaries. No firmware-specific exception is
+part of the CPU implementation.
+
 ### Host execution cost
 
 The staged frontend shares immutable opcode-property and compact descriptor
