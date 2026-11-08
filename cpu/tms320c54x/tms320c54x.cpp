@@ -2713,7 +2713,9 @@ void tms320c54x_device::pipeline_step()
 		// Decode may arm a younger RPT while this older move is in Access.
 		bool const repeat_body = m_pipeline_repeat_active && m_pipeline_repeat_body_latched &&
 			m_pipeline_address[3] == m_pipeline_repeat_address;
-		if (repeat_body && staged_repeat_destination_copy(m_pipeline_word[3]) && destination < 0x60)
+		bool const repeated_ar_destination = (m_pipeline_word[3]&0xff00)==0x7100 &&
+			mode>=0x80 && mode<0x98 && destination>=0x10 && destination<=0x17;
+		if (repeat_body && staged_repeat_destination_copy(m_pipeline_word[3]) && destination < 0x60 && !repeated_ar_destination)
 		{
 			logerror("%s: repeated MVDK mapped destination is unsupported (word=%04x destination=%04x repeat_word=%04x repeat_source=%04x)\n",
 					machine().describe_context(), m_pipeline_word[3], destination,

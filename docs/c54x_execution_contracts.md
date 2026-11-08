@@ -4807,9 +4807,27 @@ retained destination literal. The reference preserves the existing staged
 ordering in which a copy's Access sample precedes the previous copy's Read
 publication. This is not independent silicon validation of overlapping-bus
 ordering. Forty-eight self-indexed source geometries that enter mapped space are
-excluded from positive acceptance. Mapped repeated source/destination
-accesses, interrupts and wider control compositions remain
+excluded from positive acceptance. Mapped repeated sources,indexed mapped
+destinations,interrupts and wider control compositions remain
 unqualified; no firmware-specific address participates in the implementation.
+
+### Repeated RAM-to-AR MVDK
+
+Basic indirect MVDK source modes80..97 can repeat into progressing AR0..AR7
+destinations. Each Access samples ordinary RAM,postmodifies the source AR,
+then publishes the mapped destination through the ordinary move path. A
+destination alias replaces that source pointer after its sample/update and
+therefore controls subsequent iterations;the source is not reread. The
+retained destination literal advances once per issued copy. This preserves
+the declared staged move ordering,not newly measured silicon bus timing.
+
+`repeated_mapped_ar_mvdk` passes14 save/replay cases:four geometries cover
+no alias,final-copy alias,mid-sequence alias and count-zero alias,with
+no-modify/decrement/increment sources. Short/immediate repeat counts,CMPT/ARP,
+pages and in-flight snapshots are distributed. Ordered reads/writes,all ARs,
+RC,SP,status and continuation are checked. Two negatives retain SP-destination
+and mapped-source rejection before pointer/bus effects. Other repeated mapped
+destination kinds and mapped sources remain outside this contract.
 
 ## Parallel store with ADD/SUB
 
