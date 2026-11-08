@@ -64,6 +64,7 @@ public:
 	void npe3bp9(machine_config &config);
 	void npe3sp9(machine_config &config);
 	void npe3tp5(machine_config &config);
+	void npe3ap5(machine_config &config);
 protected:
 	void machine_start() override;
 	void machine_reset() override;
@@ -80,6 +81,10 @@ private:
 	emu_timer *m_candidate_timer=nullptr;
 	emu_timer *m_transmit_timer=nullptr;
 	bool m_p05_transmit=false, m_transmit_compare_written=false;
+	bool m_raw_agch=false;
+	u64 m_agch_start_frame=~u64(0);
+	std::array<u8,23> m_agch_octets{};
+	std::array<std::array<std::array<s16,2>,148*4>,4> m_agch_samples{};
 	bool m_compare_start=false, m_candidate_active=false;
 	u16 m_candidate_target=0;
 	bool m_tone = true;

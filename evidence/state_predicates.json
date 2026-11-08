@@ -3,6 +3,14 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "npe3_native_raw_agch_candidate",
+      "owner": "native_rom6_reference_adc_laboratory",
+      "status": "satisfied",
+      "predicate": "An external decoder of timed native access bits schedules a raw AGCH waveform which the own native DSP publishes successfully",
+      "current": "The separate npe3ap5 composition decodes only released P27 words with external BSIC42 and derives FN2614 from the P05 endpoint time. RA0b schedules a complete CCCH block at2617..2620 through xCCH coding,normal bursts,GMSK and raw ADC input. Native type80/class60 publication at12.094406923 carries status00,FN2620 and exact23-byte Immediate Assignment2d063f002000230b09ae00002b2b2b2b2b2b2b2b2b2b2b. Independent Python checks recompute access bits,request reference,CCCH schedule and successful native payload. The24s legal/Menu/SCH/SI gate passes. Only one access attempt occurs,and no later native RX packet is observed;MCU assignment acceptance,dedicated service,camping and registration are not inferred. The45.5MHz reference,P05 release and untuned ADC cell remain explicitly experimental. No decoded message,result,firmware state or completion is injected;no-reply controls remain separate.",
+      "evidence": ["driver/gsm_rach.h", "driver/nokia_dct3_research.cpp", "driver/nokia_dct3_research.h", "tools/test_gsm_rach_cpp.py", "tools/npe3_rach_transmit_check.py", "tools/test_npe3_rach_transmit_check.py", "tools/run_npe3_native.py", "docs/rom6_rf_interface.md"]
+    },
+    {
       "id": "npe3_p05_timed_transmit_candidate",
       "owner": "native_rom6_reference_adc_laboratory",
       "status": "satisfied",

@@ -39,9 +39,11 @@ also decodes SCH and three independently checked SI3 blocks in one coherent
 24-second interactive run. This does not yet prove MCU cell selection,
 camping or Location Updating, or promote its clock/capture model to hardware.
 The [full-SI candidate](#complete-si-broadcast-candidate) additionally completes
-the MCU's four-type broadcast acquisition in a legal eight-second capture;
-its full 24-second gate remains red at a later unsupported mapped-register
-MVDD. This candidate is not a replacement for the passing UI profile.
+the MCU's four-type broadcast acquisition, physical Menu and independently
+checked native access serialization in a legal24-second capture. The separate
+P05/raw-AGCH candidate decodes an externally encoded Immediate Assignment
+through native DSP execution. Dedicated-channel service and registration remain
+unqualified; these laboratory candidates do not replace the normal profile.
 The explicit 13 MHz DSP clock is provisional (the manual establishes RFIclk,
 not the DSP multiplier). A longer run requests MCU software reset near
 32 seconds, despite successful initial port-36 request completion. Timer input

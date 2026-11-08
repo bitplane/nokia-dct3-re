@@ -3,7 +3,7 @@ local machine=manager.machine
 local cpu=assert(machine.devices[':dsp_c54x:cpu'])
 local handles={}
 local classes,checks=0,0
-local last_time=(machine.system.name=='npe3sp9' or machine.system.name=='npe3tp5') and 8 or 4
+local last_time=(machine.system.name=='npe3sp9' or machine.system.name=='npe3tp5' or machine.system.name=='npe3ap5') and 8 or 4
 local function word(at) return cpu.spaces.data:read_u16(at) end
 handles[#handles+1]=cpu.spaces.data:install_write_tap(0x2f02,0x2f02,'npe3_receive_class',function(_,value)
     local now=machine.time:as_double()

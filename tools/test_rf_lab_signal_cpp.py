@@ -50,5 +50,16 @@ class RfLabSignalTest(unittest.TestCase):
                           information=''.join(map(str,control_bits(octets)[:184])),
                           coded=''.join(map(str,coded_control(octets)))))
 
+    def test_cpp_assignment_bits_and_iq_match_independent_reference(self):
+        octets=bytes.fromhex('2d063f002000230b09ae00002b2b2b2b2b2b2b2b2b2b2b')
+        with tempfile.TemporaryDirectory() as directory:
+            binary=self.compile_fixture(directory)
+            for burst,bits in enumerate(normal_control_bursts(octets)):
+                lines=subprocess.run([str(binary),'agch',str(burst)],check=True,
+                                     capture_output=True,text=True).stdout.splitlines()
+                self.assertEqual(tuple(map(int,lines[0])),bits)
+                actual=tuple(tuple(map(int,line.split())) for line in lines[1:])
+                self.assertEqual(actual,gmsk_burst_samples(bits))
+
 
 if __name__=='__main__': unittest.main()

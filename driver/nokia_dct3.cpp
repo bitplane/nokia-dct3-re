@@ -2950,6 +2950,7 @@ ROM_END
 #define rom_npe3bp9 rom_npe3r6
 #define rom_npe3sp9 rom_npe3r6
 #define rom_npe3tp5 rom_npe3r6
+#define rom_npe3ap5 rom_npe3r6
 #define rom_npe3zp9 rom_npe3r6
 
 // Same own flash/PMM inputs; only the unresolved MBUSTIM/sleep composition differs.
@@ -3255,6 +3256,7 @@ SYST( 2000, npe3zp9, noki6210, 0, npe3zp9, noki6210, dct3_rf_adc_fixture_state, 
 SYST( 2000, npe3bp9, noki6210, 0, npe3bp9, noki6210, dct3_rf_adc_fixture_state, empty_init, "Nokia", "6210 reference-clock P09-start raw BCCH candidate", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2000, npe3sp9, noki6210, 0, npe3sp9, noki6210, dct3_rf_adc_fixture_state, empty_init, "Nokia", "6210 reference-clock P09-start full SI broadcast candidate", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2000, npe3tp5, noki6210, 0, npe3tp5, noki6210, dct3_rf_adc_fixture_state, empty_init, "Nokia", "6210 reference-clock P05 transmit-release candidate", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
+SYST( 2000, npe3ap5, noki6210, 0, npe3ap5, noki6210, dct3_rf_adc_fixture_state, empty_init, "Nokia", "6210 reference-clock raw AGCH candidate", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2000, npe3hle, noki6210, 0, npe3hle, noki6210, nokia_dct3_state, empty_init, "Nokia", "6210 native uploads with runtime HLE (research fixture)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2000, npe3mbus, noki6210, 0, npe3mbus, noki6210, nokia_dct3_state, empty_init, "Nokia", "6210 clocked MBUS and sleep (research fixture)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2000, noki6250, 0,      0,      noki6250, noki6250, nokia_dct3_state, empty_init, "Nokia", "Nokia 6250", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )

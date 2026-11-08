@@ -81,8 +81,8 @@ and report/data mismatches fail the full-SI gate.
 without RA_INFO or private firmware-state inputs. Its standalone test checks
 all 256 access octets at BSIC 0, 42 and 63 against the independent Python
 encoder, the captured native RA `0b` transaction, wrong-BSIC rejection and
-every single-bit corruption of that transaction's coded payload. This helper
-is not yet connected to a network response; the no-reply profiles are unchanged.
+every single-bit corruption of that transaction's coded payload. Only the
+separate raw-AGCH profile connects it to a response; no-reply profiles are unchanged.
 
 The absent serializer was a generic CPU DAGEN dependency: immediate ST
 postdecrement followed by MVDD used the old destination. Own writes at
@@ -95,8 +95,9 @@ private-memory repair was supplied.
 
 P05/P06/P07/P08 and P0f are separately programmed around the burst. Buffer
 commit is not evidence of their physical pin meanings, a timed RF emission
-or a network decode. Those release/control semantics remain the next
-software investigation; do not return an assignment merely on RA_INFO.
+or a network decode. Their physical meanings remain unresolved even though
+the separately named P05 laboratory candidate now completes raw AGCH reception;
+never return an assignment merely on RA_INFO.
 
 All four native attempts program P05/P06/P07/P08 as
 `071f/08aa/067c/090e` before serialization; P2f is `3a98`. P06 has exactly
@@ -120,8 +121,8 @@ The gate binds the logged controls to actual I/O writes and rejects missing
 windows, changed phase, frame disagreement and partial transactions. It
 does not assert that any projected event fired, or that P05 drives TX.
 
-This supports a **separate P05-start laboratory candidate** as the next
-experiment. It must consume only complete native P21/P27 buffers, preserve
+This supports a **separate P05-start laboratory candidate**. It must
+consume only complete native P21/P27 buffers, preserve
 the actual counter deadline, reject/reset/cancel partial work, decode the
 actual access bits outside the DSP and derive any response frame from that
 timed endpoint rather than RA_INFO or private descriptors. Only subsequent
@@ -151,9 +152,38 @@ no-reply control. Logical framing/replacement/reset and mid-load restoration
 have executable C++ tests; runtime buffer/control state and its MAME timer
 are registered, but a timed handset save/restore is not yet qualified.
 Fifteen words is a bounded observed transaction, not a claimed hardware FIFO
-capacity; other transmit lengths/formats remain rejected. The next endpoint
-must decode these timed words independently and
-only then schedule standards-derived raw AGCH samples.
+capacity; other transmit lengths/formats remain rejected.
+
+### Native raw AGCH candidate
+
+The separate `npe3ap5` profile attaches an external exact access decoder to
+the P05 endpoint. It derives RA only from the released P27 bits and derives
+the reception frame from the endpoint time at the declared source epoch.
+Neither RA_INFO nor private DSP/MCU state enters the response. A valid request
+schedules a standards-derived Immediate Assignment in the next complete
+non-combined CCCH block, encoded through FIRE/convolution/interleaving,
+normal bursts and GMSK into the existing raw ADC source. No decoded packet,
+completion or interrupt is supplied directly.
+
+```sh
+.venv/bin/python tools/run_npe3_native.py --reference-clock --seconds 24 --adc-source fcch-sch-broadcast --capture-start p09 --tx-release p05 --raw-agch
+```
+
+The native RA `0b` at frame2614 schedules frames2617..2620. At12.094406923s
+the native type80/class60 publisher carries successful status00, frame2620
+and the exact23-octet assignment
+`2d063f002000230b09ae00002b2b2b2b2b2b2b2b2b2b2b`.
+The independently checked response echoes RA and request reference and assigns
+SDCCH/8 subchannel0, timeslot0, non-hopping ARFCN35. The24-second run retains
+legal execution and physical Menu, but produces only the first access attempt
+and no subsequent native RX packets after this assignment. This establishes
+raw native AGCH decoding, not MCU assignment acceptance, dedicated-channel
+service, camping or Location Updating. The next boundary is the own MCU's
+assignment consumer and subsequent native receive/transmit scheduling.
+
+The source remains untuned at the ADC attachment: broadcast ARFCN35 is a
+declared laboratory cell, not evidence of coherent physical carrier selection
+or fitted P05 pin semantics. `npe3sp9` and `npe3tp5` remain no-reply controls.
 
 The original [NSM-3 System Module manual, Issue 1 12/1999](https://www.eserviceinfo.com/preview_html.php?fileid=5456&previewid=3011)
 identifies the 13MHz COBBA clock and separate IData/QData connections

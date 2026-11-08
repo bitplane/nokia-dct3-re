@@ -45,6 +45,7 @@ MAME_PATCHES := patches/mame-nokia-dct3-driver-name.patch \
 	patches/mame-npe3-bcch-fixture.patch \
 	patches/mame-npe3-broadcast-fixture.patch \
 	patches/mame-npe3-transmit-candidate.patch \
+	patches/mame-npe3-raw-agch.patch \
 	patches/mame-libgsm-build.patch \
 	patches/mame-nse1-external-pcm-fixture.patch \
 	patches/mame-nse2-model.patch \

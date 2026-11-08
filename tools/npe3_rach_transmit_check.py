@@ -8,6 +8,51 @@ from tools.rom6_adc_measure_check import check_rx_publications
 
 WINDOW=re.compile(r'npe3_tx_window: sequence=(\d+) t=([\d.]+) words=(\d+) counter=([0-9a-f]{4}) controls=([0-9a-f,]+) deadlines=([\d.,-]+) observer_writes=0 physical_claim=0')
 RELEASE=re.compile(r'npe3_tx_release: sequence=(\d+) t=([\d.]+) target=([0-9a-f]{4}) counter=([0-9a-f]{4}) words=([0-9a-f,]+) network_reply=0 physical_claim=0')
+AGCH=re.compile(r'npe3_raw_agch: ra=([0-9a-f]{2}) access_frame=(\d+) start_frame=(\d+) octets=([0-9a-f]{46}) raw_adc_only=1 tuned_air_source=0 physical_claim=0')
+
+
+def check_agch(text, *, require_native=True):
+    """Check external response content independently of the C++ decoder/BTS."""
+    releases=list(RELEASE.finditer(text))
+    replies=list(AGCH.finditer(text))
+    if not replies or len(replies)!=len(releases) or len(replies)!=text.count('npe3_raw_agch:'):
+        raise ValueError('raw AGCH lacks one valid response per released access burst')
+    starts=[]
+    expected_native=[]
+    for release,reply in zip(releases,replies):
+        words=[int(word,16) for word in release.group(5).split(',')]
+        ra=decode_p27_access(words,42)['ra']
+        frame=int(float(release.group(2))*13000000)//60000
+        got_ra,got_frame,start,payload=reply.groups()
+        start=int(start)
+        expected_end=frame+4
+        while expected_end%51 not in (9,15,19,25,29,35,39,45,49):expected_end+=1
+        t1=(frame//1326)&31;t2=frame%26;t3=frame%51
+        expected=bytes([0x2d,6,0x3f,0,0x20,0,35,ra,(t1<<3)|(t3>>3),
+                        ((t3<<5)|t2)&255,0,0]+[0x2b]*11)
+        if (reply.start()<release.end() or int(got_ra,16)!=ra or int(got_frame)!=frame or
+                start!=expected_end-3 or bytes.fromhex(payload)!=expected):
+            raise ValueError('raw AGCH differs from independent access bits/time or CCCH grammar')
+        starts.append(start)
+        expected_native.append((start+3,expected,float(release.group(2))))
+    native=[]
+    if require_native:
+        packets=check_rx_publications(text)['packets']
+        for frame,payload,release_time in expected_native:
+            matches=[]
+            for packet in packets:
+                body=bytes.fromhex(packet['payload'])
+                if (packet['type']==0x80 and len(body)==33 and body[0]==0x60 and
+                        body[2]==0 and int.from_bytes(body[3:6],'big')==frame%2715648 and
+                        body[10:]==payload and float(packet['time'])>release_time):
+                    matches.append(packet)
+            if len(matches)!=1:
+                raise ValueError('missing unique successful native raw-AGCH publication')
+            native.append(matches[0]['time'])
+    return dict(external_access_decode_qualified=True,responses=len(replies),
+                agch_start_frames=starts,native_agch_decode_qualified=require_native,
+                native_publication_times=native,
+                tuned_air_source=False,physical_release_qualified=False)
 
 
 def transactions(writes):

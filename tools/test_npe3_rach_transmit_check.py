@@ -1,9 +1,30 @@
 import unittest
-from tools.npe3_rach_transmit_check import check,transactions,check_windows,check_releases
+from tools.npe3_rach_transmit_check import check,transactions,check_windows,check_releases,check_agch
 from tools.test_gsm_rach_signal import WORDS
 
 
 class NativeAccessTransmitTest(unittest.TestCase):
+    def test_external_assignment_uses_only_released_access_bits_and_time(self):
+        release=('npe3_tx_release: sequence=1 t=12.066360308 target=071f counter=071f words='+
+                 ','.join(f'{word:04x}' for word in WORDS)+' network_reply=0 physical_claim=0\n')
+        reply=('npe3_raw_agch: ra=0b access_frame=2614 start_frame=2617 '
+               'octets=2d063f002000230b09ae00002b2b2b2b2b2b2b2b2b2b2b '
+               'raw_adc_only=1 tuned_air_source=0 physical_claim=0')
+        self.assertEqual(check_agch(release+reply,require_native=False)['responses'],1)
+        native=('\nrom6_measure_rx_commit: sequence=1 t=12.094406923 previous=0080 producer=0092 consumer=0080 words='
+                '2180,602a,0000,0a3c,002d,0002,2d06,3f00,2000,230b,09ae,0000,2b2b,2b2b,2b2b,2b2b,2b2b,2b68'
+                ' mask=ffff cpu_pc=002d08 observer_writes=0\n'
+                'rom6_measure_rx_complete: commits=1 cap=64 observer_writes=0')
+        self.assertTrue(check_agch(release+reply+native)['native_agch_decode_qualified'])
+        for bad in (native.replace('602a,0000','602a,0100'),native.replace('0a3c','0a3d'),
+                    native.replace('230b','2308')):
+            with self.assertRaises(ValueError):check_agch(release+reply+bad)
+        for bad in ('',reply,release,reply+release,release+reply+'\n'+reply,
+                    release+reply.replace('ra=0b','ra=08'),
+                    release+reply.replace('2617','2618'),
+                    release+reply.replace('0023','002d')):
+            with self.assertRaises(ValueError):check_agch(bad,require_native=False)
+
     text=('rom6_measure_rx_commit: sequence=1 t=1.000000000 previous=0080 producer=0083 consumer=0080 words=0484,0b00,0a36 mask=ffff cpu_pc=002d08 observer_writes=0\n'
           'rom6_measure_rx_complete: commits=1 cap=64 observer_writes=0')
 

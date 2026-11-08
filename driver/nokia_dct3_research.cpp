@@ -11,6 +11,8 @@
 #include "nokia_mfi_rx.h"
 #include "nokia_rf_lab_signal.h"
 #include "nokia_rf_lab_bcch.h"
+#include "gsm_rach.h"
+#include "nokia_radio_timing.h"
 
 namespace nokia_dct3 {
 
@@ -100,12 +102,21 @@ void dct3_rf_adc_fixture_state::npe3tp5(machine_config &config)
 	m_p05_transmit=true;
 }
 
+void dct3_rf_adc_fixture_state::npe3ap5(machine_config &config)
+{
+	npe3tp5(config);
+	m_raw_agch=true;
+}
+
 void dct3_rf_adc_fixture_state::machine_start()
 {
 	nokia_dct3_state::machine_start();
 	m_candidate_timer=timer_alloc(FUNC(dct3_rf_adc_fixture_state::candidate_receive_start),this);
 	m_transmit_timer=timer_alloc(FUNC(dct3_rf_adc_fixture_state::candidate_transmit_start),this);
 	save_item(NAME(m_transmit_compare_written));
+	save_item(NAME(m_agch_start_frame));
+	save_item(NAME(m_agch_octets));
+	save_item(NAME(m_agch_samples));
 	save_item(NAME(m_lab_tx_compares));
 	save_item(NAME(m_lab_tx.words)); save_item(NAME(m_lab_tx.count));
 	save_item(NAME(m_lab_tx.loading)); save_item(NAME(m_lab_tx.ready)); save_item(NAME(m_lab_tx.overflow));
@@ -138,6 +149,7 @@ void dct3_rf_adc_fixture_state::machine_start()
 void dct3_rf_adc_fixture_state::machine_reset()
 {
 	m_lab_tx_compares.fill(0);
+	m_agch_start_frame=~u64(0);
 	m_lab_tx.reset();
 	m_observed_tx_windows=m_transmit_releases=0;
 	m_transmit_compare_written=false;
@@ -274,6 +286,28 @@ TIMER_CALLBACK_MEMBER(dct3_rf_adc_fixture_state::candidate_transmit_start)
 		machine().logerror("npe3_tx_release: sequence=%u t=%.9f target=%04x counter=%04x words=%s network_reply=0 physical_claim=0\n",
 			++m_transmit_releases,machine().time().as_double(),m_lab_tx_compares[0],
 			subdevice<nokia_dsp_c54x_device>("dsp_c54x")->lab_counter_value(),packed);
+		if (m_raw_agch)
+		{
+			// The external BTS sees only serialized bits and their release time.
+			// RA_INFO, private DSP memory and MCU request state are not inputs.
+			auto const access=gsm::rach::decode_p27(words,42);
+			if (access)
+			{
+				u64 const frame=machine().time().as_ticks(13'000'000)/60'000;
+				auto const assignment=subdevice<nokia_gsm_network_device>("gsm_network")->immediate_assignment(
+					*access,frame%nokia_rf_lab::hyperframe,35);
+				std::copy_n(assignment.begin(),m_agch_octets.size(),m_agch_octets.begin());
+				auto const bursts=nokia_rf_lab::bcch_bits(m_agch_octets,2);
+				for (unsigned burst=0; burst<4; ++burst)
+					m_agch_samples[burst]=nokia_rf_lab::gmsk_samples(bursts[burst]);
+				m_agch_start_frame=nokia::radio::common_control_block_end(frame+4)-3;
+				std::string octets;
+				for (auto byte:m_agch_octets) octets+=util::string_format("%02x",byte);
+				machine().logerror("npe3_raw_agch: ra=%02x access_frame=%u start_frame=%u octets=%s raw_adc_only=1 tuned_air_source=0 physical_claim=0\n",
+					*access,unsigned(frame),unsigned(m_agch_start_frame),octets);
+			}
+			else machine().logerror("npe3_raw_agch: invalid_access=1 response=0\n");
+		}
 	}
 	arm_transmit_candidate();
 }
@@ -305,6 +339,13 @@ u16 dct3_rf_adc_fixture_state::sample_r(offs_t component)
 	if (!m_tone) return 0;
 	if (component) return u16(m_q_latch);
 	u64 const tick = machine().time().as_ticks(13'000'000);
+	u64 const frame=tick/60'000;
+	if (m_raw_agch && frame>=m_agch_start_frame && frame-m_agch_start_frame<4 && tick%60'000<148*48)
+	{
+		auto const &sample=m_agch_samples[frame-m_agch_start_frame][(tick%60'000)/12];
+		m_q_latch=sample[1];
+		return u16(sample[0]);
+	}
 	if (m_bcch && nokia_rf_lab::bcch_active(tick))
 	{
 		unsigned const burst=(tick/60'000)%51-2, position=(tick%60'000)/12;
