@@ -679,6 +679,22 @@ at1:a50d (paired with0:a50d and mapping/control state),or a reliable MAD2
 address-decode contract. A full page1 upper-half capture is preferable for
 continued execution. No fitted-mask/clock conclusion follows from this gap.
 
+The acquisition checker (`dsp_rom6_candidate_check.py`) enumerates raw
+nonzero-page branch/call patterns separately from execution evidence. Across
+65,535 adjacent word pairs it finds 295 candidates, including 60 page-1 call
+patterns. Only `8fba -> 1:a50d` is established here by the traffic trace;
+data and extension words can match the same opcode mask. Nearby delayed-call
+candidates target `1:a54e`, `1:a4f6`, `1:a59c`, `1:a622`, `1:a6e2` and
+`1:a704`, so acquiring only the first target word is unlikely to suffice.
+This is a capture-scope hint, not a reachability claim. All retained sweep
+formats carry four-digit addresses and the prepared program is exactly
+65,536 words: none supplies an extended bank.
+
+The current backend routes HPI writes to shared data RAM; executable overlay
+writes use the configured low RAM window. It has no upper-page program-write
+mapping. This explains why replaying the existing uploads cannot populate
+`1:a50d` in this composition; it does not establish the real MAD2 mapping.
+
 The native checker now rejects every unbacked upper-program read,even if its
 returned word decodes legally. First-escape logging retains read/execute PC,
 XPC and SP;the caller's words are independently recoverable from the acquired

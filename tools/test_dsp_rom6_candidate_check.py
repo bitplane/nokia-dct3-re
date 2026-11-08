@@ -3,10 +3,32 @@ import unittest
 from pathlib import Path
 import tempfile
 
-from tools.dsp_rom6_candidate_check import ALIAS, SWEEP, audit, merge_captures, parse_rows, reconstruct
+from tools.dsp_rom6_candidate_check import (
+    ALIAS, SWEEP, audit, merge_captures, parse_rows, program_page_audit, reconstruct,
+)
 
 
 class Rom6CandidateTests(unittest.TestCase):
+    def test_page_audit_distinguishes_call_branch_delay_and_page(self):
+        program = bytearray(0x20000)
+        # Include all four forms, page zero (excluded), and a final operandless word.
+        for address, opcode, target in ((0, 0xf881, 0xa000), (2, 0xf981, 0xa001),
+                (4, 0xfa82, 0xa002), (6, 0xfb81, 0xa50d), (8, 0xfb80, 0xa003)):
+            program[2*address:2*address+4] = opcode.to_bytes(2, 'big') + target.to_bytes(2, 'big')
+        program[-2:] = bytes.fromhex('fb81')
+        result = program_page_audit(program)
+        self.assertEqual(result['supplied_program_pages'], [0])
+        self.assertFalse(result['higher_program_pages_supplied'])
+        self.assertEqual(result['scanned_word_pairs'], 65535)
+        self.assertEqual(result['nonzero_page_candidates'], [
+            dict(site='0000', opcode='f881', target='01a000', call=False, delayed=False),
+            dict(site='0002', opcode='f981', target='01a001', call=True, delayed=False),
+            dict(site='0004', opcode='fa82', target='02a002', call=False, delayed=True),
+            dict(site='0006', opcode='fb81', target='01a50d', call=True, delayed=True),
+        ])
+        with self.assertRaisesRegex(ValueError, 'one program page'):
+            program_page_audit(program[:-2])
+
     def test_hash_mismatch_and_unbounded_input_fail_before_reconstruction(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

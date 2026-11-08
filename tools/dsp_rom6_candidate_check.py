@@ -27,6 +27,25 @@ def digest(data):
     return hashlib.sha256(data).hexdigest()
 
 
+def program_page_audit(program):
+    """Enumerate raw far-call patterns, not reachable instruction boundaries."""
+    if len(program) != 0x20000:
+        raise ValueError('expected exactly one program page')
+    words = [int.from_bytes(program[at:at+2], 'big')
+             for at in range(0, len(program), 2)]
+    candidates = []
+    for address, opcode in enumerate(words[:-1]):
+        if (opcode & 0xfc80) != 0xf880 or not opcode & 0x7f:
+            continue
+        candidates.append(dict(site=f'{address:04x}', opcode=f'{opcode:04x}',
+            target=f'{((opcode & 0x7f) << 16) | words[address+1]:06x}',
+            call=bool(opcode & 0x100), delayed=bool(opcode & 0x200)))
+    return dict(supplied_program_pages=[0], higher_program_pages_supplied=False,
+        scanned_word_pairs=len(words)-1,
+        scope='raw adjacent-word patterns; includes data and operands; not a control-flow or absence proof',
+        nonzero_page_candidates=candidates)
+
+
 def parse_rows(data, expression, first, last):
     rows = {}
     for number, line in enumerate(data.decode('ascii').splitlines(), 1):
@@ -97,6 +116,7 @@ def audit(root, pins=PINNED):
         program_bytes=len(program), low_capture_words=12288, data_alias_words=20480,
         program_padding='0080..1fff: zeros, not immutable ROM',
         data_initialization='outside B000..FFFF: zeros, not a captured reset state',
+        program_page_coverage=program_page_audit(program),
         fitted_mask_compatibility=False, execution_validated=False)
     return program, data, report
 
