@@ -135,6 +135,7 @@ void dct3_rf_adc_fixture_state::machine_start()
 	save_item(NAME(m_lu_start_frame));save_item(NAME(m_lu_samples));
 	save_item(NAME(m_setup_start_frame));save_item(NAME(m_setup_samples));
 	save_item(NAME(m_service_accept_start_frame));save_item(NAME(m_service_accept_samples));
+	save_item(NAME(m_call_proceeding_start_frame));
 	save_item(NAME(m_assignment_start_frame));save_item(NAME(m_assignment_samples));
 	save_item(NAME(m_call_rr_start_frame));save_item(NAME(m_call_rr_samples));
 	save_item(NAME(m_call_rr_sequence));
@@ -181,6 +182,7 @@ void dct3_rf_adc_fixture_state::machine_reset()
 	m_lu_start_frame=~u64(0);
 	m_setup_start_frame=~u64(0);
 	m_service_accept_start_frame=~u64(0);
+	m_call_proceeding_start_frame=~u64(0);
 	m_assignment_start_frame=~u64(0);
 	m_call_rr_start_frame=~u64(0);
 	m_call_rr_sequence=0xff;
@@ -419,6 +421,7 @@ TIMER_CALLBACK_MEMBER(dct3_rf_adc_fixture_state::candidate_transmit_start)
 				m_ua_start_frame=m_lu_start_frame=m_release_start_frame=m_setup_start_frame=~u64(0);
 				m_assignment_start_frame=~u64(0);
 				m_service_accept_start_frame=~u64(0);
+				m_call_proceeding_start_frame=~u64(0);
 				m_call_rr_start_frame=~u64(0);
 				m_call_rr_sequence=0xff;
 				m_call_release_start_frame=~u64(0);m_call_channel_release_sent=false;
@@ -472,6 +475,41 @@ void dct3_rf_adc_fixture_state::receive_normal_uplink(std::array<u16,15> const &
 	machine().logerror("npe3_bts_uplink: start_frame=%u octets=%s exact_code=1 port_bits_only=1 physical_claim=0\n",
 		unsigned(m_normal_start_frame),packed);
 	bool const late_assignment=bool(ioport("LAB_BTS")->read()&128);
+	if ((ioport("LAB_BTS")->read()&0x200) && m_service_accept_start_frame!=~u64(0) &&
+			m_call_proceeding_start_frame==~u64(0) && m_normal_start_frame>m_service_accept_start_frame+3 &&
+			(*block)[0]==1 && (*block)[1]==0x20 && ((*block)[2]&3)==1 &&
+			((*block)[2]>>2)>=2 && ((*block)[2]>>2)<=20 && (*block)[3]==3 && ((*block)[4]&63)==5)
+	{
+		auto const proceeding=subdevice<nokia_gsm_network_device>("gsm_network")->call_proceeding((*block)[3]);
+		gsm::tch_f::packed_control_block lapdm{};
+		lapdm.fill(0x2b);lapdm[0]=3;lapdm[1]=0x22;lapdm[2]=(proceeding.size()<<2)|1;
+		std::copy(proceeding.begin(),proceeding.end(),lapdm.begin()+3);
+		// Network N(S)=1 follows CM SERVICE ACCEPT; N(R)=1 acknowledges SETUP.
+		m_call_proceeding_start_frame=m_call_rr_start_frame=(frame/51+1)*51+22;
+		auto const encoded=nokia_rf_lab::bcch_bits(lapdm,0);
+		for (unsigned at=0;at<4;++at) m_call_rr_samples[at]=nokia_rf_lab::gmsk_samples(encoded[at]);
+		packed.clear();for (auto byte:lapdm) packed+=util::string_format("%02x",byte);
+		machine().logerror("npe3_raw_call_proceeding: setup_start_frame=%u start_frame=%u octets=%s raw_adc_only=1 physical_claim=0\n",
+			unsigned(m_normal_start_frame),unsigned(m_call_proceeding_start_frame),packed);
+		return;
+	}
+	if ((ioport("LAB_BTS")->read()&0x208)==0x208 && m_call_proceeding_start_frame!=~u64(0) &&
+			m_assignment_start_frame==~u64(0) && m_normal_start_frame>m_call_proceeding_start_frame+3 &&
+			(*block)[0]==3 && (*block)[1]==0x41 && (*block)[2]==1)
+	{
+		auto const assignment=subdevice<nokia_gsm_network_device>("gsm_network")->traffic_assignment(35);
+		gsm::tch_f::packed_control_block lapdm{};
+		// Network N(S)=2, N(R)=1: no further mobile I-frame was received.
+		lapdm.fill(0x2b);lapdm[0]=3;lapdm[1]=0x24;lapdm[2]=(assignment.size()<<2)|1;
+		std::copy(assignment.begin(),assignment.end(),lapdm.begin()+3);
+		m_assignment_start_frame=(frame/51+1)*51+22;
+		auto const encoded=nokia_rf_lab::bcch_bits(lapdm,0);
+		for (unsigned at=0;at<4;++at) m_assignment_samples[at]=nokia_rf_lab::gmsk_samples(encoded[at]);
+		packed.clear();for (auto byte:lapdm) packed+=util::string_format("%02x",byte);
+		machine().logerror("npe3_raw_mo_assignment: ack_start_frame=%u start_frame=%u octets=%s raw_adc_only=1 physical_claim=0\n",
+			unsigned(m_normal_start_frame),unsigned(m_assignment_start_frame),packed);
+		return;
+	}
 	if ((ioport("LAB_BTS")->read()&16) &&
 			(!(ioport("LAB_BTS")->read()&8) || (late_assignment &&
 			 m_assignment_start_frame==~u64(0) && ((*block)[4]&0x3f)!=7)) &&

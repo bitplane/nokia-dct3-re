@@ -9,6 +9,49 @@ CALL_RR=re.compile(r'npe3_raw_call_rr: uplink_start_frame=(\d+) start_frame=(\d+
 CC_RELEASE=re.compile(r'npe3_raw_cc_release: disconnect_start_frame=(\d+) start_frame=(\d+) octets=([0-9a-f]{46}) raw_adc_only=1 physical_claim=0')
 CALL_CHANNEL_RELEASE=re.compile(r'npe3_raw_call_channel_release: complete_start_frame=(\d+) start_frame=(\d+) octets=([0-9a-f]{46}) raw_adc_only=1 physical_claim=0')
 CM_ACCEPT=re.compile(r'npe3_raw_cm_service_accept: uplink_start_frame=(\d+) start_frame=(\d+) octets=([0-9a-f]{46}) policy=plain_test_cell raw_adc_only=1 physical_claim=0')
+PROCEEDING=re.compile(r'npe3_raw_call_proceeding: setup_start_frame=(\d+) start_frame=(\d+) octets=([0-9a-f]{46}) raw_adc_only=1 physical_claim=0')
+MO_ASSIGNMENT=re.compile(r'npe3_raw_mo_assignment: ack_start_frame=(\d+) start_frame=(\d+) octets=([0-9a-f]{46}) raw_adc_only=1 physical_claim=0')
+
+
+def check_outgoing_progress(text,blocks,*,assignment=False):
+    outgoing=check_outgoing(text,blocks,admitted=True)
+    rows=list(PROCEEDING.finditer(text))
+    if len(rows)!=1 or text.count('npe3_raw_call_proceeding:')!=1:
+        raise ValueError('missing unique raw CALL PROCEEDING')
+    row=rows[0];source,start=int(row[1]),int(row[2])
+    proceeding=bytes.fromhex('0322098302'+'2b'*18)
+    if source not in outgoing['setup_frames'] or start!=((source+3)//51+1)*51+22 or bytes.fromhex(row[3])!=proceeding:
+        raise ValueError('CALL PROCEEDING does not acknowledge actual SETUP')
+    acknowledgements=[b['start_frame'] for b in blocks if b['start_frame']>start+3 and
+                      bytes.fromhex(b['octets'])[:3]==b'\x03\x41\x01']
+    if not acknowledgements:raise ValueError('no native RR acknowledges CALL PROCEEDING')
+    expected=[(start,proceeding)]
+    report=dict(native_call_proceeding_decode_qualified=True,native_lapdm_ack_qualified=True,proceeding_start_frame=start,
+                acknowledgement_frames=acknowledgements,native_assignment_decode_qualified=False,
+                traffic_channel_qualified=False,connected_call_qualified=False,speech_transport_qualified=False)
+    if assignment:
+        rows=list(MO_ASSIGNMENT.finditer(text))
+        if len(rows)!=1 or text.count('npe3_raw_mo_assignment:')!=1:
+            raise ValueError('missing unique raw outgoing Assignment Command')
+        row=rows[0];ack,assigned=int(row[1]),int(row[2])
+        command=bytes.fromhex('032421062e094023006301'+'2b'*12)
+        if ack not in acknowledgements or assigned!=(ack//51+1)*51+22 or bytes.fromhex(row[3])!=command:
+            raise ValueError('outgoing assignment does not follow real CALL PROCEEDING acknowledgement')
+        expected.append((assigned,command))
+        report.update(native_assignment_decode_qualified=True,assignment_start_frame=assigned)
+    native=check_rx_publications(text)['packets'];times=[]
+    for frame,octets in expected:
+        matches=[]
+        for packet in native:
+            body=bytes.fromhex(packet['payload'])
+            if (packet['type']==128 and len(body)==33 and body[:3]==b'\x80\x2a\0' and
+                    int.from_bytes(body[3:6],'big')==(frame+3)%2715648 and body[6:8]==b'\0\x23' and
+                    body[10:]==octets and float(packet['time'])>(frame+3)*60000/13000000):
+                matches.append(packet)
+        if len(matches)!=1:raise ValueError('missing unique native outgoing progress decode')
+        times.append(matches[0]['time'])
+    report['native_decode_times']=times
+    return report
 
 
 def check_outgoing(text,blocks,*,admitted=False):

@@ -2,6 +2,16 @@
 
 ## Current boundary
 
+The 6210 reference-clock laboratory composition qualifies native LU/SIM
+persistence, addressed paging/new-link UA, incoming CC admission and physical
+Answer/rejection, SACCH-assisted rejected-call clearing, and outgoing
+CM admission/SETUP/[CALL PROCEEDING](#native-outgoing-cc-progression).
+All tested traffic-assignment dialogues reach the same
+[unbacked program address `1:a50d`](#native-traffic-program-page-boundary).
+Command decoding and one TSC2 burst do not establish traffic completion or
+speech. Physical capture timing, carrier tuning and fitted mask/clock
+identity remain separate open contracts; none is promoted by the lab results.
+
 The acquired-ROM6 **8210 NSM-3 v5.31** composition `nsm3r6` already issues
 native radio-facing work. Compare-edge serial output and partial HAGAR
 command-state reception are modeled; the separate ADC-pin laboratory source
@@ -29,7 +39,7 @@ queued blocks: the P09 zero-source control now passes 24 s, while the coded
 control retains its 65-second SCH result, both without transport faults.
 No physical acknowledgement mechanism or FIFO capacity is claimed.
 
-The hardware frontier remains **capture-edge ownership**: which P09/P0a/P0b
+The physical capture frontier remains **capture-edge ownership**: which P09/P0a/P0b
 events start conversion, admit samples and assert MFI INT0, and how those
 events relate to the DSP I/O counter/reload epoch. Under the current declared
 P03-level laboratory gate, the NSM-3 first SCH window contains zeros; the
@@ -55,7 +65,7 @@ camping/source-frame binding remain open. The acquired PMM still parks at the va
 gate,described below. These laboratory
 results do not retire the physical request/acknowledgement or tuning contract.
 
-| Receive scope | Current evidence | Not established |
+| Radio scope | Current evidence | Not established |
 | --- | --- | --- |
 | Isolated SCH | Raw P27 input through native ISR/FIR, frontend, Viterbi and CRC recovers exact FN/BSIC; zero-input control rejects | Physical interrupt/capture timing, organic synchronization |
 | Isolated BCCH | Four independent raw GMSK bursts traverse native ISR/FIR, frontend, deinterleaving, weighting and Viterbi to exact SI3/parity; another payload passes, zero samples reject | Hardware FIRE completion, RF tuning/camping |
@@ -67,7 +77,9 @@ results do not retire the physical request/acknowledgement or tuning contract.
 | Own 6210 raw-AGCH candidate | Exact successful native assignment decode; MCU assigned-SDCCH configuration and SABM containing Location Updating Request | Native dedicated transmission, validation-gate completion, camping/registration and physical timing/tuning |
 | Synthetic-record raw-AGCH run | Ten-slot validation cycle;combined CCCH;32 normal bursts/8 exact xCCH blocks;native UA/LU Accept and RR acknowledgement;updated SIM EF_LOCI;raw normal release back to common RX | Stable camping/registered presentation and physical timing/tuning |
 | Idle-paging source | All three combined CCCH blocks carry exact no-identity fill;25 native CRC-success publications in a complete60s capture;MM storage and Menu retained | Continuous idle reception,source-FN binding and physical carrier selection |
-| Addressed paging | Uplink-derived IMSI pages pass native admission;the explicit33dBm cell additionally elicits a timed-port-verified native Paging Response | New-link UA,stable camping and physical carrier selection |
+| Addressed paging/new-link setup | Uplink-derived IMSI page, native Paging Response, raw second-link UA and native CC SETUP admission under the explicit33dBm record fixture | Stable camping and physical carrier selection |
+| Native call control with SACCH | Native Alerting, physical Answer-to-CONNECT, complete rejected-call clearing; outgoing physical dial/CM admission/SETUP/CALL PROCEEDING decode and acknowledgement | Connected traffic, speech, arbitrary transactions and loss recovery |
+| Native traffic assignment | Incoming early/late and outgoing command decodes; one outgoing TSC2 normal burst before the shared `1:a50d` program escape | Backed traffic execution, complete traffic blocks, assigned-slot timing, Assignment Complete and speech |
 
 The CPU additions needed by the normal-burst frontend have generic focused
 tests. The rebuilt native ROM6 menu/storage/save-state scenarios, ROM4
@@ -790,14 +802,50 @@ The admission control has 198 independently checked windows/releases and
 completes the full 36-second execution legally, with no unbacked reads.
 Acceptance joins physical input/decode order, established air identity,
 contention UA, exact native CM admission and the actual called-number field.
-SETUP retransmissions are expected because this control supplies no CC
-response. CALL PROCEEDING, outgoing traffic assignment, connected media and
-speech remain unqualified; this is not a completed outgoing call.
+SETUP retransmissions are expected because this admission-only control
+supplies no CC response. It does not qualify CALL PROCEEDING or assignment;
+the separate progression controls below do. Connected media and speech
+remain unqualified; this is not a completed outgoing call.
 
 ```sh
 .venv/bin/python tools/run_npe3_native.py --reference-clock --seconds 36 --scenario outgoing --adc-source fcch-sch-broadcast --capture-start p09 --tx-release p05 --raw-agch --provision-records --cell-power-policy handset33 --sacch
 # Independent raw MM admission, selected only by the actual call request:
 .venv/bin/python tools/run_npe3_native.py --reference-clock --seconds 36 --scenario outgoing --adc-source fcch-sch-broadcast --capture-start p09 --tx-release p05 --raw-agch --provision-records --cell-power-policy handset33 --sacch --accept-outgoing-service
+```
+
+### Native outgoing CC progression
+
+`--proceed-outgoing-call` sends CALL PROCEEDING only after the actual native
+SETUP, using the existing network encoder and its transaction identity.
+Network I-frame 6193 (`0322098302` plus padding) uses N(S)=1/N(R)=1 after
+CM admission. It is decoded natively at 28.599095956 seconds and acknowledged
+by native RR 6208 (`034101` plus padding). This proves native downlink decode
+and LAPDm acknowledgement, not unobserved internal CC-state ownership.
+The 36-second control remains legal with zero unbacked reads, 246 matched
+transmit windows/releases, and 20 successful SACCH blocks with no failures.
+
+Adding `--traffic-assignment` waits for that real acknowledgement, then sends
+Assignment 6244: `032421062e094023006301` plus padding. Network N(S)=2/N(R)=1
+continues the same link. Native decoding completes at 28.834481231 seconds.
+The handset requests traffic configuration and an empty traffic SABM, but
+FCALLD at `8fba` accesses unbacked `1:a50d` at 28.906205429. This is the same
+XPC 1 / SP `02b3` boundary as both incoming variants. The full run is red.
+
+All 65 projected/released transmit transactions precede the first escape;
+the last release is at 28.903862385. Independent decoding yields 15 complete
+TSC0 control blocks, two trailing TSC0 bursts, and one normal burst using
+the assigned TSC2, both xCCH stealing flags set, with 114 payload bits.
+The last burst's P27 words are:
+`51ff 0f55 50ae 1f55 0aaf 0b00 9770 1709 fff5 002f f544 0aef e142 fffe 01ff`.
+This qualifies single-burst framing only: no complete traffic/FACCH block,
+assigned-slot timing, Assignment Complete or speech is established. The
+whole-stream TSC0/four-burst control checker must not be weakened to accept
+this bearer transition as a successful call.
+
+```sh
+.venv/bin/python tools/run_npe3_native.py --reference-clock --seconds 36 --scenario outgoing --adc-source fcch-sch-broadcast --capture-start p09 --tx-release p05 --raw-agch --provision-records --cell-power-policy handset33 --sacch --accept-outgoing-service --proceed-outgoing-call
+# Separate traffic investigation: expected red at the program-backing boundary.
+.venv/bin/python tools/run_npe3_native.py --reference-clock --seconds 36 --scenario outgoing --adc-source fcch-sch-broadcast --capture-start p09 --tx-release p05 --raw-agch --provision-records --cell-power-policy handset33 --sacch --accept-outgoing-service --proceed-outgoing-call --traffic-assignment
 ```
 
 ### Native traffic program-page boundary
@@ -826,8 +874,10 @@ completion. The complete stream also ends with a partial four-burst group;
 its strict whole-stream decoder remains red. Only the explicitly selected
 complete source blocks are used for the bounded assignment proof. Do not
 weaken either gate or interpret the later zero-filled words as instructions.
-Early and late assignment therefore converge on the same missing mapping,
-independent of the prior SACCH-loss and softkey-input errors.
+Early and late incoming assignment and the outgoing progression described
+above converge on the same missing mapping, independent of the prior
+SACCH-loss and softkey-input errors. Outgoing first escape is 28.906205429;
+its 36-second capture also has 23,283 unbacked reads and ends at `1:0065`.
 
 Generic CPU transfer,
 reverse-carry,parallel-repeat and control-delay contracts have focused tests in
@@ -873,7 +923,8 @@ generic extended mapping or permits that read under its ROM-security option.
 The native checker now rejects every unbacked upper-program read,even if its
 returned word decodes legally. First-escape logging retains read/execute PC,
 XPC and SP;the caller's words are independently recoverable from the acquired
-program image. These observations do not substitute for execution. Actual TCH/F serialization,
+program image. These observations do not substitute for execution. A single
+outgoing TSC2 burst is framed above; complete TCH/F transport,
 Assignment Complete and connected speech remain unqualified. Positive UI/SIM/
 LU/release checks belong to separate paging/SETUP-only controls,not this red
 traffic run. Do not inject083e or clear the context byte. The legacy6210 staged

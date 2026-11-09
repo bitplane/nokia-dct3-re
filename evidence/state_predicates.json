@@ -3,6 +3,14 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "npe3_native_outgoing_call_proceeding",
+      "owner": "native_rom6_reference_adc_laboratory",
+      "status": "satisfied",
+      "predicate": "Raw CALL PROCEEDING selected by native outgoing SETUP is decoded and acknowledged by the handset",
+      "current": "SETUP6157 selects network I-frame6193,0322098302 plus padding,N(S)1/N(R)1. Native decode28.599095956s precedes actual RR6208,034101. No-assignment36s control is legal with zero unbacked reads,246 matched windows/releases and20 good SACCH blocks,no failures. This qualifies command decoding/LAPDm acknowledgement,not unobserved internal CC state. Separate assignment6244,N(S)2/N(R)1,decodes28.834481231s before the known traffic program gap. All65 timed releases precede escape;15 complete TSC0 blocks,two trailing TSC0 bursts and one TSC2 normal burst with both stealing flags/114 payload bits are independently distinguished. Single-burst framing is not complete TCH/F or FACCH decoding,assigned-slot timing,Assignment Complete,connected call or speech. Full execution and whole-stream control gates remain red for the assignment case.",
+      "evidence": ["driver/nokia_dct3_research.cpp", "tools/run_npe3_native.py", "tools/npe3_raw_call_setup_check.py", "tools/test_npe3_raw_call_setup_check.py", "tools/gsm_normal_signal.py", "docs/rom6_rf_interface.md"]
+    },
+    {
       "id": "npe3_native_outgoing_service_setup",
       "owner": "native_rom6_reference_adc_laboratory",
       "status": "satisfied",
@@ -39,15 +47,15 @@
       "owner": "native_rom6_reference_adc_laboratory",
       "status": "unresolved",
       "predicate": "Native traffic processing has captured or independently evidenced backing for every program-space access",
-      "current": "Both early assignment and late assignment after physical Answer/CONNECT reach FCALLD fb81/a50d at8fba,requesting01a50d with XPC1,SP02b3. First escapes are19.726205429s and20.427743890s respectively;both24s runs traverse23283 unbacked words before the secondary illegal word010065. The late control has working SACCH and actual native Assignment decode,so softkey ambiguity and associated-channel loss do not explain the escape. Current acquisition/map provides only page0. No higher-page input or preceding upper-program writes were found in the bounded collection/run;this is not a global absence proof or fitted-mask claim. Generic TI page0 ROM/common-low-RAM rules do not establish an alias at1:a50d. Need a full-address program capture there paired with0:a50d and mapping/control state,or an evidenced MAD2 decode contract. Do not mirror page0,ignore XPC,synthesize code or treat post-escape words as ISA evidence. Full execution gates reject the gap;bounded command decode does not override them.",
+      "current": "Early incoming,late incoming after physical Answer/CONNECT,and outgoing after CALL PROCEEDING all reach FCALLD fb81/a50d at8fba,requesting01a50d with XPC1,SP02b3. First escapes are19.726205429,20.427743890,28.906205429s;all traverse23283 unbacked words before secondary illegal word010065. Working SACCH and actual Assignment decode exclude the previous input/link-loss explanations. Outgoing emits one framed TSC2 normal burst before escape,but no complete traffic block is qualified. Current acquisition/map supplies only page0. No higher-page input or preceding upper-program writes were found in the bounded collection/run;this is not global absence or fitted-mask proof. Generic TI ROM/common-low-RAM rules do not establish an alias at1:a50d. Need a full-address program capture there paired with0:a50d and mapping/control state,or an evidenced MAD2 decode contract. Do not mirror page0,ignore XPC,synthesize code or treat post-escape words as ISA evidence. Full execution gates remain red;bounded command/burst observations do not override them.",
       "evidence": ["driver/nokia_dsp_c54x.cpp", "tools/npe3_native_observe.lua", "tools/run_npe3_native.py", "tools/test_run_npe3_native.py", "docs/rom6_rf_interface.md", "docs/rom6_dsp_bringup.md", "roms/README.md"]
     },
     {
       "id": "npe3_native_traffic_assignment_decode",
       "owner": "native_rom6_reference_adc_laboratory",
       "status": "satisfied",
-      "predicate": "The raw network Assignment Command is decoded natively after actual Call Confirmed",
-      "current": "Early control sends Assignment4255,N(S)=1/N(R)=1 after actual Call Confirmed4219;native decode19.654480198s. Late control acknowledges Confirmed/Alerting,then sends Assignment4408,N(S)=1/N(R)=3 after actual physical Answer/CONNECT4372;native decode20.360639714s. Both assign TCH/F slot1 on35,TSC2,speech-v1. Independent complete source-block reconstruction and60/76 timed transmit checks pass respectively;the late final release precedes its first unbacked read. MCU requests the same packet02 traffic configuration and submits an empty traffic SABM. This proves command decode/configuration,not traffic completion. Both full24s execution gates fail at npe3_native_traffic_program_backing;the late whole-stream decoder also rejects a partial final burst group. No TCH serialization,Assignment Complete,connected call or speech claim follows. Independent SDCCH call-control predicates remain separate.",
+      "predicate": "The raw network Assignment Command is decoded natively in the tested incoming and outgoing call dialogues",
+      "current": "Early incoming Assignment4255,N(S)1/N(R)1 after Call Confirmed4219,decodes19.654480198s. Late incoming Assignment4408,N(S)1/N(R)3 after physical Answer/CONNECT4372,decodes20.360639714s. Outgoing Assignment6244,N(S)2/N(R)1 after actual CALL PROCEEDING acknowledgement6208,decodes28.834481231s. All assign TCH/F slot1 on35,TSC2,speech-v1. Independent source-block and60/76/65 timed-release checks are bounded before each escape. MCU requests traffic configuration and submits an empty traffic SABM. Full execution fails at npe3_native_traffic_program_backing. Outgoing single-burst TSC2 framing is recorded separately;no complete TCH/F transport,assigned-slot timing,Assignment Complete,connected call or speech follows from command decode. Whole-stream control checks are not broadened across the bearer transition.",
       "evidence": ["driver/nokia_dct3_research.cpp", "tools/npe3_raw_call_setup_check.py", "tools/test_npe3_raw_call_setup_check.py", "tools/run_npe3_native.py", "docs/rom6_rf_interface.md", "docs/c54x_execution_contracts.md"]
     },
     {

@@ -1,9 +1,31 @@
 import unittest
 from unittest.mock import patch
-from tools.npe3_raw_call_setup_check import check,check_assignment,check_call_rr,check_call_clearing,check_outgoing
+from tools.npe3_raw_call_setup_check import check,check_assignment,check_call_rr,check_call_clearing,check_outgoing,check_outgoing_progress
 
 
 class RawCallSetupTest(unittest.TestCase):
+    def test_outgoing_progress_requires_setup_real_ack_and_native_downlinks(self):
+        proceeding='0322098302'+'2b'*18
+        assignment='032421062e094023006301'+'2b'*12
+        text=f'npe3_raw_call_proceeding: setup_start_frame=6157 start_frame=6193 octets={proceeding} raw_adc_only=1 physical_claim=0\n'
+        extra=f'npe3_raw_mo_assignment: ack_start_frame=6208 start_frame=6244 octets={assignment} raw_adc_only=1 physical_claim=0'
+        blocks=[dict(start_frame=6208,octets='034101'+'2b'*20)]
+        native=[dict(type=128,payload='802a00'+(frame+3).to_bytes(3,'big').hex()+'00230001'+octets,time=str(t))
+                for frame,octets,t in ((6193,proceeding,28.60),(6244,assignment,28.84))]
+        with patch('tools.npe3_raw_call_setup_check.check_outgoing',return_value=dict(setup_frames=[6157])), \
+                patch('tools.npe3_raw_call_setup_check.check_rx_publications',return_value=dict(packets=native)):
+            self.assertTrue(check_outgoing_progress(text,blocks)['native_call_proceeding_decode_qualified'])
+            result=check_outgoing_progress(text+extra,blocks,assignment=True)
+            self.assertTrue(result['native_assignment_decode_qualified'])
+            self.assertFalse(result['traffic_channel_qualified'])
+            for bad in ('',text+text,text.replace('6157','6158'),text.replace('032209','030209')):
+                with self.assertRaises(ValueError):check_outgoing_progress(bad,blocks)
+            for bad in (text,text+extra.replace('032421','032221'),text+extra.replace('6208','6207')):
+                with self.assertRaises(ValueError):check_outgoing_progress(bad,blocks,assignment=True)
+            with self.assertRaises(ValueError):check_outgoing_progress(text,[])
+            with patch('tools.npe3_raw_call_setup_check.check_rx_publications',return_value=dict(packets=native[:1])):
+                with self.assertRaises(ValueError):check_outgoing_progress(text+extra,blocks,assignment=True)
+
     def test_outgoing_service_requires_physical_input_identity_native_accept_and_number(self):
         physical='\n'.join(f'npe3_native_physical: key={name} t={20+i} observer_writes=0\n'
             f'npe3_native_key: value={i+1 if i<7 else 14:02x} observer_writes=0'

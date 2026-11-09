@@ -20,11 +20,13 @@ class Native6210EvidenceTest(unittest.TestCase):
             self.assertNotIn('Native6210 evidence:',result.stdout)
         result=subprocess.run([sys.executable,str(script),'--accept-outgoing-service'],capture_output=True,text=True)
         self.assertEqual(result.returncode,2)
+        result=subprocess.run([sys.executable,str(script),'--proceed-outgoing-call'],capture_output=True,text=True)
+        self.assertEqual(result.returncode,2)
         with tempfile.TemporaryDirectory() as tmp:
             directory=Path(tmp)
-            configure_cell_power(directory,'npe3ap5','handset33',sacch=True,accept_outgoing_service=True)
+            configure_cell_power(directory,'npe3ap5','handset33',sacch=True,accept_outgoing_service=True,proceed_outgoing_call=True,traffic_assignment=True)
             ports=ET.parse(directory/'cfg/npe3ap5.cfg').findall('./system/input/port')
-            self.assertEqual([(p.get('mask'),p.get('value')) for p in ports],[('2','2'),('64','64'),('256','256')])
+            self.assertEqual([(p.get('mask'),p.get('value')) for p in ports],[('2','2'),('8','8'),('64','64'),('256','256'),('512','512')])
 
     def test_call_input_is_separate_and_requires_positive_paging_fixture(self):
         with tempfile.TemporaryDirectory() as tmp:

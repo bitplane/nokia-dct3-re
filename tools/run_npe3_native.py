@@ -22,7 +22,10 @@ ADC_BROADCAST_MENU_SHA256 = '8c7650fdb0514ec34c85b89795e529de062e6f141268a507baf
 ADC_LU_MENU_SHA256 = '5adef93609b763a40d0e3c9dca356d388a910bb393a518e99a53eec2c7184202'
 
 
-def configure_cell_power(directory,model,policy,*,incoming_call=False,traffic_assignment=False,call_ack=False,clear_call=False,sacch=False,assignment_after_connect=False,accept_outgoing_service=False):
+def configure_cell_power(directory,model,policy,*,incoming_call=False,
+                         traffic_assignment=False,call_ack=False,clear_call=False,
+                         sacch=False,assignment_after_connect=False,
+                         accept_outgoing_service=False,proceed_outgoing_call=False):
     if policy=='legacy39':return
     if policy!='handset33':raise ValueError('unsupported cell power policy')
     config=ET.Element('mameconfig',version='10')
@@ -43,6 +46,8 @@ def configure_cell_power(directory,model,policy,*,incoming_call=False,traffic_as
         ET.SubElement(ports,'port',tag=':LAB_BTS',type='CONFIG',mask='128',defvalue='0',value='128')
     if accept_outgoing_service:
         ET.SubElement(ports,'port',tag=':LAB_BTS',type='CONFIG',mask='256',defvalue='0',value='256')
+    if proceed_outgoing_call:
+        ET.SubElement(ports,'port',tag=':LAB_BTS',type='CONFIG',mask='512',defvalue='0',value='512')
     destination=directory/'cfg';destination.mkdir()
     ET.ElementTree(config).write(destination/f'{model}.cfg',encoding='utf-8',xml_declaration=True)
 
@@ -155,11 +160,15 @@ def main():
                         help='separate late assignment after actual physical Answer/CONNECT')
     parser.add_argument('--accept-outgoing-service',action='store_true',
                         help='raw CM SERVICE ACCEPT only after actual identity-matched call service request')
+    parser.add_argument('--proceed-outgoing-call',action='store_true',
+                        help='raw CALL PROCEEDING after actual native outgoing SETUP')
     parser.add_argument('--provision-records', action='store_true',
                         help='explicit synthetic record fixture; acquired PMM remains unchanged')
     args = parser.parse_args()
     if args.accept_outgoing_service and args.scenario!='outgoing':
         parser.error('outgoing service admission requires the bounded outgoing scenario')
+    if args.proceed_outgoing_call and not args.accept_outgoing_service:
+        parser.error('outgoing CALL PROCEEDING requires explicit CM admission')
     if args.scenario=='outgoing' and (args.cell_power_policy!='handset33' or
             args.seconds!=36 or args.input_at!=20 or not args.sacch or
             args.incoming_call or args.page_at is not None):
@@ -176,8 +185,8 @@ def main():
         parser.error('call clearing requires explicit physical Reject and CC acknowledgement')
     if args.sacch and (not args.raw_agch or args.cell_power_policy!='handset33'):
         parser.error('SACCH source requires the separate 33dBm raw BTS fixture')
-    if args.traffic_assignment and not args.incoming_call:
-        parser.error('traffic assignment requires the separate raw incoming-call fixture')
+    if args.traffic_assignment and not (args.incoming_call or args.scenario=='outgoing' and args.proceed_outgoing_call):
+        parser.error('traffic assignment requires incoming call or admitted outgoing CALL PROCEEDING')
     if args.incoming_call and (args.cell_power_policy!='handset33' or args.page_at is None):
         parser.error('raw incoming call requires the separate33dBm addressed-page fixture')
     if args.cell_power_policy!='legacy39' and (not args.raw_agch or not args.provision_records or
@@ -249,7 +258,8 @@ def main():
                              traffic_assignment=args.traffic_assignment,call_ack=args.ack_call_control,
                              clear_call=args.clear_rejected_call,sacch=args.sacch,
                              assignment_after_connect=args.assignment_after_connect,
-                             accept_outgoing_service=args.accept_outgoing_service)
+                             accept_outgoing_service=args.accept_outgoing_service,
+                             proceed_outgoing_call=args.proceed_outgoing_call)
         cmd = command.copy()
         cmd[-1] = str(seconds)
         if not persist:
@@ -290,6 +300,9 @@ def main():
             access=check_access(text,(first/'rom6_radio_writes.tsv').read_text(),
                                 require_windows=True,require_releases=True,allow_normal=True)
             report['outgoing']=check_outgoing(text,access['normal_control_blocks'],admitted=args.accept_outgoing_service)
+            if args.proceed_outgoing_call:
+                from tools.npe3_raw_call_setup_check import check_outgoing_progress
+                report['outgoing_progress']=check_outgoing_progress(text,access['normal_control_blocks'],assignment=args.traffic_assignment)
         if args.page_at is not None:
             from tools.npe3_native_paging_response_check import check as check_native_page_response
             report['paging_response']=check_native_page_response(text,(first/'rom6_radio_writes.tsv').read_text())
