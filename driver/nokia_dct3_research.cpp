@@ -137,6 +137,9 @@ void dct3_rf_adc_fixture_state::machine_start()
 	save_item(NAME(m_assignment_start_frame));save_item(NAME(m_assignment_samples));
 	save_item(NAME(m_call_rr_start_frame));save_item(NAME(m_call_rr_samples));
 	save_item(NAME(m_call_rr_sequence));
+	save_item(NAME(m_call_release_start_frame));
+	save_item(NAME(m_call_channel_release_sent));
+	save_item(NAME(m_sacch_samples));
 	save_item(NAME(m_lu_acknowledged));save_item(NAME(m_release_start_frame));
 	save_item(NAME(m_release_samples));
 	save_item(NAME(m_lab_tx_compares));
@@ -179,6 +182,7 @@ void dct3_rf_adc_fixture_state::machine_reset()
 	m_assignment_start_frame=~u64(0);
 	m_call_rr_start_frame=~u64(0);
 	m_call_rr_sequence=0xff;
+	m_call_release_start_frame=~u64(0);m_call_channel_release_sent=false;
 	m_lu_acknowledged=false;m_release_start_frame=~u64(0);
 	m_normal_count=0;m_contention_active=false;
 	m_page_identity_valid=m_page_pending=false;
@@ -205,6 +209,33 @@ void dct3_rf_adc_fixture_state::machine_reset()
 	}
 	network.use_single_cell();
 	network.set_cell(0,cell);
+	if (m_raw_agch && (ioport("LAB_BTS")->read()&64))
+	{
+		// GSM 04.04 7.1: two L1 octets precede the 21-byte SACCH L2 frame.
+		// SI5 reuses the neighbour list; SI6 reuses the cell's CI/LAI/options.
+		auto const si2=network.system_information(1,35),si3=network.system_information(2,35);
+		for (unsigned kind=0;kind<2;++kind)
+		{
+			gsm::tch_f::packed_control_block block{};
+			block.fill(0x2b);block[0]=cell.ms_txpwr_max_cch;block[1]=0;
+			block[2]=3;block[3]=3;block[5]=6;
+			if (!kind)
+			{
+				block[4]=0x49;block[6]=0x1d;
+				std::copy_n(si2.begin()+3,16,block.begin()+7);
+			}
+			else
+			{
+				block[4]=0x2d;block[6]=0x1e;
+				std::copy_n(si3.begin()+3,7,block.begin()+7);
+				block[14]=si3[13];block[15]=0xff;
+			}
+			auto const encoded=nokia_rf_lab::bcch_bits(block,0);
+			for (unsigned at=0;at<4;++at) m_sacch_samples[kind][at]=nokia_rf_lab::gmsk_samples(encoded[at]);
+			std::string packed;for (auto byte:block) packed+=util::string_format("%02x",byte);
+			machine().logerror("npe3_bts_sacch: index=%u starts=42 period=102 octets=%s tsc=0 raw_adc_only=1 physical_claim=0\n",kind,packed);
+		}
+	}
 	if (m_raw_agch)
 	{
 		auto const fill=network.paging_fill();
@@ -386,6 +417,7 @@ TIMER_CALLBACK_MEMBER(dct3_rf_adc_fixture_state::candidate_transmit_start)
 				m_assignment_start_frame=~u64(0);
 				m_call_rr_start_frame=~u64(0);
 				m_call_rr_sequence=0xff;
+				m_call_release_start_frame=~u64(0);m_call_channel_release_sent=false;
 				u64 const frame=machine().time().as_ticks(13'000'000)/60'000;
 				auto const assignment=subdevice<nokia_gsm_network_device>("gsm_network")->immediate_assignment(
 					*access,frame%nokia_rf_lab::hyperframe,35);
@@ -443,16 +475,42 @@ void dct3_rf_adc_fixture_state::receive_normal_uplink(std::array<u16,15> const &
 			(*block)[3]==0x83 && (((*block)[1]>>1)&7)!=m_call_rr_sequence)
 	{
 		// GSM 04.06 3.8.5: RR N(R) acknowledges the observed N(S).
-		// This finite no-loss fixture supplies no L3 reply or assignment.
+		// This finite no-loss window is independent of optional L3 clearing;
+		// neither path assigns a traffic channel.
 		m_call_rr_sequence=((*block)[1]>>1)&7;
 		gsm::tch_f::packed_control_block rr{};
 		rr.fill(0x2b);rr[0]=3;rr[1]=(((m_call_rr_sequence+1)&7)<<5)|1;rr[2]=1;
 		m_call_rr_start_frame=(frame/51+1)*51+22;
+		char const *reply_kind="call_rr",*source_kind="uplink";
+		if ((ioport("LAB_BTS")->read()&32) && ((*block)[4]&0x3f)==0x25 &&
+				((*block)[2]>>2)>=5 && (*block)[5]>=2 && (*block)[5]<=((*block)[2]>>2)-3 &&
+				m_call_release_start_frame==~u64(0))
+		{
+			// GSM 04.08 5.4.3.2: RELEASE follows the actual mobile DISCONNECT.
+			// Network N(S)=1 follows SETUP; N(R) comes from this uplink.
+			auto const release=subdevice<nokia_gsm_network_device>("gsm_network")->call_release((*block)[3]);
+			rr[1]=(rr[1]&0xe0)|2;rr[2]=(release.size()<<2)|1;
+			std::copy(release.begin(),release.end(),rr.begin()+3);
+			m_call_release_start_frame=m_call_rr_start_frame;
+			reply_kind="cc_release";source_kind="disconnect";
+		}
+		if ((ioport("LAB_BTS")->read()&32) && ((*block)[4]&0x3f)==0x2a &&
+				m_call_release_start_frame!=~u64(0) && m_normal_start_frame>m_call_release_start_frame+3 &&
+				!m_call_channel_release_sent)
+		{
+			auto const release=subdevice<nokia_gsm_network_device>("gsm_network")->channel_release();
+			rr[1]=(rr[1]&0xe0)|4;rr[2]=(release.size()<<2)|1;
+			std::copy(release.begin(),release.end(),rr.begin()+3);
+			m_release_start_frame=m_call_rr_start_frame;m_call_channel_release_sent=true;
+			reply_kind="call_channel_release";source_kind="complete";
+		}
+		// I-frame clearing replies carry the same N(R) as the standalone RR.
 		auto const encoded=nokia_rf_lab::bcch_bits(rr,0);
 		for (unsigned at=0;at<4;++at) m_call_rr_samples[at]=nokia_rf_lab::gmsk_samples(encoded[at]);
+		if (m_call_channel_release_sent) m_release_samples=m_call_rr_samples;
 		packed.clear();for (auto byte:rr) packed+=util::string_format("%02x",byte);
-		machine().logerror("npe3_raw_call_rr: uplink_start_frame=%u start_frame=%u octets=%s raw_adc_only=1 physical_claim=0\n",
-			unsigned(m_normal_start_frame),unsigned(m_call_rr_start_frame),packed);
+		machine().logerror("npe3_raw_%s: %s_start_frame=%u start_frame=%u octets=%s raw_adc_only=1 physical_claim=0\n",
+			reply_kind,source_kind,unsigned(m_normal_start_frame),unsigned(m_call_rr_start_frame),packed);
 		return;
 	}
 	if ((ioport("LAB_BTS")->read()&8) && m_setup_start_frame!=~u64(0) && m_assignment_start_frame==~u64(0) &&
@@ -605,6 +663,13 @@ u16 dct3_rf_adc_fixture_state::sample_r(offs_t component)
 	if (component) return u16(m_q_latch);
 	u64 const tick = machine().time().as_ticks(13'000'000);
 	u64 const frame=tick/60'000;
+	if (m_raw_agch && (ioport("LAB_BTS")->read()&64) && m_contention_active &&
+			frame%102>=42 && frame%102<46 && tick%60'000<148*48)
+	{
+		auto const &sample=m_sacch_samples[(frame/102)&1][frame%102-42][(tick%60'000)/12];
+		m_q_latch=sample[1];
+		return u16(sample[0]);
+	}
 	if (m_raw_agch && frame>=m_call_rr_start_frame && frame-m_call_rr_start_frame<4 && tick%60'000<148*48)
 	{
 		auto const &sample=m_call_rr_samples[frame-m_call_rr_start_frame][(tick%60'000)/12];

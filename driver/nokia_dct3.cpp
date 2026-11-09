@@ -1843,6 +1843,12 @@ static INPUT_PORTS_START( npe3_raw_bts )
 	PORT_CONFNAME(0x10, 0x00, "Laboratory BTS acknowledge CC I-frames without assignment")
 	PORT_CONFSETTING(0x00, DEF_STR( Off ))
 	PORT_CONFSETTING(0x10, DEF_STR( On ))
+	PORT_CONFNAME(0x20, 0x00, "Laboratory BTS clear rejected call")
+	PORT_CONFSETTING(0x00, DEF_STR( Off ))
+	PORT_CONFSETTING(0x20, DEF_STR( On ))
+	PORT_CONFNAME(0x40, 0x00, "Laboratory BTS SACCH/4 system information")
+	PORT_CONFSETTING(0x00, DEF_STR( Off ))
+	PORT_CONFSETTING(0x40, DEF_STR( On ))
 INPUT_PORTS_END
 
 static INPUT_PORTS_START( noki8290 )

@@ -1,4 +1,4 @@
-"""Read-only MCU evidence; submitting L3 to the DSP is not RF transmission."""
+"""Dedicated-channel evidence; submitting L3 to the DSP is not RF transmission."""
 import math
 import re
 
@@ -6,6 +6,38 @@ from tools.npe3_rach_transmit_check import check_agch
 
 COMMIT=re.compile(r'npe3_mcu_tx_commit: sequence=(\d+) t=([\d.]+) previous=([0-9a-f]{4}) producer=([0-9a-f]{4}) words=([0-9a-f,]+) pc_context=([0-9a-f]{8}) observer_writes=0')
 COMPLETE=re.compile(r'npe3_mcu_tx_complete: commits=(\d+) cap=(\d+) invalid=0 begin=0 end=(\d+) observer_writes=0')
+
+
+def check_sacch(text,ms_power_level):
+    from tools.rom6_adc_measure_check import check_rx_publications
+    expected=[]
+    for index in (1,2):
+        rows=re.findall(rf'rf_adc_broadcast_si: index={index} arfcn=35 octets=([0-9a-f]{{46}}) physical_claim=0',text)
+        if len(rows)!=1:raise ValueError('SACCH lacks unique source-cell SI2/SI3')
+        expected.append(bytes.fromhex(rows[0]))
+    si2,si3=expected
+    blocks=[bytes([ms_power_level,0,3,3,0x49,6,0x1d])+si2[3:19],
+            bytes([ms_power_level,0,3,3,0x2d,6,0x1e])+si3[3:10]+bytes([si3[13],0xff])+b'\x2b'*7]
+    pattern=re.compile(r'npe3_bts_sacch: index=([01]) starts=42 period=102 octets=([0-9a-f]{46}) tsc=0 raw_adc_only=1 physical_claim=0')
+    rows=list(pattern.finditer(text))
+    if (len(rows)!=2 or len(rows)!=text.count('npe3_bts_sacch:') or
+            [(int(row[1]),bytes.fromhex(row[2])) for row in rows]!=list(enumerate(blocks))):
+        raise ValueError('SACCH source differs from cell data and physical header policy')
+    good=[];failed=0;types=set()
+    for packet in check_rx_publications(text)['packets']:
+        body=bytes.fromhex(packet['payload'])
+        if packet['type']!=128 or body[:1]!=b'\x70':continue
+        if len(body)!=33 or body[1]!=42:raise ValueError('malformed SACCH publication')
+        if body[2]:failed+=1;continue
+        frame=int.from_bytes(body[3:6],'big');kind=(frame//102)&1
+        if (frame%102!=45 or body[6:8]!=b'\0\x23' or body[10:]!=blocks[kind] or
+                float(packet['time'])<=frame*60000/13000000):
+            raise ValueError('native SACCH differs from the exact scheduled SI5/SI6 waveform')
+        good.append(frame);types.add(kind)
+    if len(good)<2 or types!={0,1}:raise ValueError('native SI5/SI6 SACCH reception incomplete')
+    return dict(native_sacch_decode_qualified=True,successful_end_frames=good,
+                failed_blocks=failed,si_types=[5,6],physical_rf_tuning_qualified=False,
+                stable_camping_qualified=False)
 
 
 def packets(text):

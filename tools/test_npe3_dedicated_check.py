@@ -1,10 +1,31 @@
 import unittest
 from unittest.mock import patch
 
-from tools.npe3_dedicated_check import check,packets
+from tools.npe3_dedicated_check import check,packets,check_sacch
 
 
 class DedicatedSubmissionTest(unittest.TestCase):
+    def test_sacch_binds_cell_content_schedule_and_native_decodes(self):
+        si2=bytes([0x59,6,0x1a])+bytes(20)
+        si3=bytearray(23);si3[:3]=bytes([0x49,6,0x1b]);si3[3:10]=bytes.fromhex('000100f1100001')
+        blocks=[bytes.fromhex('0500030349061d')+bytes(16),
+                bytes.fromhex('050003032d061e000100f110000100ff')+b'\x2b'*7]
+        text=(f'rf_adc_broadcast_si: index=1 arfcn=35 octets={si2.hex()} physical_claim=0\n'
+              f'rf_adc_broadcast_si: index=2 arfcn=35 octets={si3.hex()} physical_claim=0\n')
+        text+='\n'.join(f'npe3_bts_sacch: index={i} starts=42 period=102 octets={b.hex()} tsc=0 raw_adc_only=1 physical_claim=0'
+                         for i,b in enumerate(blocks))
+        native=[dict(type=128,payload='702a00'+frame.to_bytes(3,'big').hex()+'00230001'+block.hex(),time=str(t))
+                for frame,block,t in ((45,blocks[0],0.21),(147,blocks[1],0.68))]
+        with patch('tools.rom6_adc_measure_check.check_rx_publications',return_value=dict(packets=native)):
+            self.assertEqual(check_sacch(text,5)['successful_end_frames'],[45,147])
+            for bad in ('',text+text,text.replace('05000303','04000303'),text.replace('period=102','period=51')):
+                with self.assertRaises(ValueError):check_sacch(bad,5)
+            with self.assertRaises(ValueError):check_sacch(text,0)
+            with patch('tools.rom6_adc_measure_check.check_rx_publications',return_value=dict(packets=native[:1])):
+                with self.assertRaises(ValueError):check_sacch(text,5)
+            with patch('tools.rom6_adc_measure_check.check_rx_publications',return_value=dict(packets=[dict(native[0],time='0.01'),native[1]])):
+                with self.assertRaises(ValueError):check_sacch(text,5)
+
     def text(self):
         return ('npe3_mcu_tx_commit: sequence=1 t=12.098916000 previous=0000 producer=000d '
                 'words=1802,042a,0000,0000,0040,8000,0023,4000,0000,0000,0000,0000,0000 '

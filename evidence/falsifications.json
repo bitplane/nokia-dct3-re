@@ -3,6 +3,13 @@
   "kind": "falsifications",
   "entries": [
     {
+      "id": "npe3_cc_release_absence_is_payload_contract",
+      "status": "disproven",
+      "hypothesis": "A successfully decoded network RELEASE without native RELEASE COMPLETE implies a missing CC payload/state contract",
+      "conclusion": "With raw SACCH absent,four bad class70 blocks at4125,4227,4329,4431 precede local channel loss at20.457066538s. Network RELEASE4408 is decoded correctly at20.360634044s and acknowledged by RR4423,but no CC completion is serialized before loss. The cell advertises RADIO_LINK_TIMEOUT4. Adding standards-derived raw SI5/SI6,without changing counters,timeouts or firmware state,produces seven exact SACCH successes,zero failures,and native RELEASE COMPLETE4474. Full CHANNEL RELEASE/DISC/UA and common-RX return then pass. A separate RR followed one multiframe later by RELEASE misses the receiver entirely;the final fixture uses the normal I-frame piggyback acknowledgement at the next opportunity. Do not guess new RELEASE fields,force CC state,or attribute radio-link expiry to a proven CC parser defect. This does not prove fitted timing or full LAPDm recovery.",
+      "evidence": ["driver/nokia_dct3_research.cpp", "tools/npe3_dedicated_check.py", "tools/npe3_raw_call_setup_check.py", "tools/test_npe3_dedicated_check.py", "tools/test_npe3_raw_call_setup_check.py", "docs/rom6_rf_interface.md"]
+    },
+    {
       "id": "npe3_upper_escape_is_mmr_instruction_gap",
       "status": "disproven",
       "hypothesis": "The traffic run's final MMR/repeated-transfer rejection at010065 identifies the next legitimate CPU instruction to implement",

@@ -379,7 +379,8 @@ The runner retains fixture storage,checks this exact record,and leaves all
 acquired ROM/PMM files untouched. This qualifies native MM acceptance and
 SIM persistence,not stable camping. The LU-only control returns to common
 control without a network RR Channel Release;normal release is qualified
-separately below. SACCH system information is still absent.
+separately below. This LU-only profile does not supply SACCH system
+information; the separate sustained-channel source is qualified below.
 
 The Messages Menu oracle is deliberately re-banked only for the provisioned
 LU composition. The reviewed raw pixel hash is
@@ -679,12 +680,63 @@ after the physical key when rejection is requested.
 
 Without acknowledgements, Call Confirmed retransmits; acknowledging only
 that frame advances to Alerting retransmissions. Neither is evidence of a
-missing handset CC producer. RELEASE/RELEASE COMPLETE and final radio-channel
-clearing are not yet supplied or validated. This proves native alerting and
+missing handset CC producer. This rejection-only control does not supply
+RELEASE or qualify final clearing; the separate full-clearing fixture below
+does. This proves native alerting and
 user rejection signaling, not a connected call, traffic setup or speech.
 
 ```sh
 .venv/bin/python tools/run_npe3_native.py --reference-clock --seconds 24 --adc-source fcch-sch-broadcast --capture-start p09 --tx-release p05 --raw-agch --provision-records --page-at 18 --cell-power-policy handset33 --incoming-call --ack-call-control --reject-call
+```
+
+### Native SACCH and rejected-call clearing
+
+`--sacch` adds raw SI5/SI6 on the assigned SDCCH/4 subchannel's associated
+control channel: four bursts at frames `42..45 mod 102`, TSC 0, alternating
+the two SI types. GSM 04.04 section 7.1 defines the two power/timing octets
+before the 21-byte LAPDm frame
+([ETSI specification](https://www.etsi.org/deliver/etsi_ts/100900_100999/100936/08.01.02_60/ts_100936v080102p.pdf)).
+The header orders the declared cell's power level 5 and TA 0. SI5 reuses
+the advertised SI2 neighbour list; SI6 reuses SI3's CI, LAI and cell options,
+with all NCCs permitted. No radio-link counter, timeout or firmware state is
+changed. Successful native class-70 publications exactly reproduce both
+23-byte source blocks at end frames 2799, 2901, 4125, 4227, 4329, 4431 and
+4533; there are zero failed SACCH publications in the 24-second fixture.
+
+Without this source, four failed SACCH publications at 4125, 4227, 4329 and
+4431 precede local channel loss at 20.457 seconds, even when RELEASE was
+decoded successfully. This is consistent with the cell's RADIO_LINK_TIMEOUT
+of four and GSM 05.08 section 5's SACCH-based failure criterion
+([ETSI specification](https://www.etsi.org/deliver/etsi_gts/05/0508/05.00.00_60/gsmts_0508v050000p.pdf)).
+It is not evidence that RELEASE needs a guessed payload or a forced CC state.
+
+With SACCH enabled, `--clear-rejected-call` responds to the actual mobile
+DISCONNECT using the existing standards-owned RELEASE encoder. Its I-frame
+also acknowledges the uplink; no separate RR delay is inserted. Only an
+actual timed RELEASE COMPLETE permits CHANNEL RELEASE, likewise carrying
+the acknowledgement. This follows GSM 04.08 sections 5.4.3.2-5.4.3.4
+([ETSI specification](https://www.etsi.org/deliver/etsi_gts/04/0408/05.03.00_60/gsmts_0408v050300p.pdf)).
+
+| Air event | Start frame | Independently decoded block prefix |
+| --- | --- | --- |
+| Physical Reject's DISCONNECT | 4372 | `012415832502e091` |
+| Network RELEASE | 4408 | `036209032d` |
+| Native RELEASE COMPLETE | 4474 | `014609836a` |
+| Network CHANNEL RELEASE | 4510 | `03840d060d00` |
+| Native RR acknowledgement | 4525 | `036101` |
+| Native DISC | 4576 | `015301` |
+| Network closing UA | 4612 | `017301` |
+
+Successful native downlink decodes occur at 20.360639714, 20.831403648 and
+21.302173912 seconds. The MCU requests common receive at 21.303837385.
+The complete 24-second execution has zero illegal instructions and zero
+unbacked program reads. Acceptance checks source/sequence identity, exact
+downlink contents, successful native receives, physical input, and the MCU
+return to common receive. This qualifies rejected-call clearing, not stable
+camping, connected traffic, speech, arbitrary transactions or loss recovery.
+
+```sh
+.venv/bin/python tools/run_npe3_native.py --reference-clock --seconds 24 --adc-source fcch-sch-broadcast --capture-start p09 --tx-release p05 --raw-agch --provision-records --page-at 18 --cell-power-policy handset33 --incoming-call --ack-call-control --reject-call --clear-rejected-call --sacch
 ```
 
 ### Native traffic program-page boundary

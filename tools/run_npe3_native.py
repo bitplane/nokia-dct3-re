@@ -22,7 +22,7 @@ ADC_BROADCAST_MENU_SHA256 = '8c7650fdb0514ec34c85b89795e529de062e6f141268a507baf
 ADC_LU_MENU_SHA256 = '5adef93609b763a40d0e3c9dca356d388a910bb393a518e99a53eec2c7184202'
 
 
-def configure_cell_power(directory,model,policy,*,incoming_call=False,traffic_assignment=False,call_ack=False):
+def configure_cell_power(directory,model,policy,*,incoming_call=False,traffic_assignment=False,call_ack=False,clear_call=False,sacch=False):
     if policy=='legacy39':return
     if policy!='handset33':raise ValueError('unsupported cell power policy')
     config=ET.Element('mameconfig',version='10')
@@ -35,6 +35,10 @@ def configure_cell_power(directory,model,policy,*,incoming_call=False,traffic_as
         ET.SubElement(ports,'port',tag=':LAB_BTS',type='CONFIG',mask='8',defvalue='0',value='8')
     if call_ack:
         ET.SubElement(ports,'port',tag=':LAB_BTS',type='CONFIG',mask='16',defvalue='0',value='16')
+    if clear_call:
+        ET.SubElement(ports,'port',tag=':LAB_BTS',type='CONFIG',mask='32',defvalue='0',value='32')
+    if sacch:
+        ET.SubElement(ports,'port',tag=':LAB_BTS',type='CONFIG',mask='64',defvalue='0',value='64')
     destination=directory/'cfg';destination.mkdir()
     ET.ElementTree(config).write(destination/f'{model}.cfg',encoding='utf-8',xml_declaration=True)
 
@@ -135,6 +139,10 @@ def main():
                         help='press physical Right Softkey instead of Left Softkey in the incoming-call fixture')
     parser.add_argument('--ack-call-control',action='store_true',
                         help='separate raw RR acknowledgements of CC I-frames, without traffic assignment')
+    parser.add_argument('--clear-rejected-call',action='store_true',
+                        help='raw RELEASE and CHANNEL RELEASE only after actual native clearing responses')
+    parser.add_argument('--sacch',action='store_true',
+                        help='separate raw SDCCH/4-associated SI5/SI6 source; no radio-link counter changes')
     parser.add_argument('--traffic-assignment',action='store_true',
                         help='separate external TCH/F assignment after actual Call Confirmed')
     parser.add_argument('--provision-records', action='store_true',
@@ -144,6 +152,10 @@ def main():
         parser.error('call rejection requires incoming SETUP without traffic assignment')
     if args.ack_call_control and (not args.incoming_call or args.traffic_assignment):
         parser.error('standalone CC acknowledgement requires SETUP without assignment')
+    if args.clear_rejected_call and not (args.reject_call and args.ack_call_control):
+        parser.error('call clearing requires explicit physical Reject and CC acknowledgement')
+    if args.sacch and (not args.raw_agch or args.cell_power_policy!='handset33'):
+        parser.error('SACCH source requires the separate 33dBm raw BTS fixture')
     if args.traffic_assignment and not args.incoming_call:
         parser.error('traffic assignment requires the separate raw incoming-call fixture')
     if args.incoming_call and (args.cell_power_policy!='handset33' or args.page_at is None):
@@ -213,7 +225,8 @@ def main():
         directory = run / phase
         directory.mkdir()
         configure_cell_power(directory,model,args.cell_power_policy,incoming_call=args.incoming_call,
-                             traffic_assignment=args.traffic_assignment,call_ack=args.ack_call_control)
+                             traffic_assignment=args.traffic_assignment,call_ack=args.ack_call_control,
+                             clear_call=args.clear_rejected_call,sacch=args.sacch)
         cmd = command.copy()
         cmd[-1] = str(seconds)
         if not persist:
@@ -245,6 +258,9 @@ def main():
         report=check_cell_power(text,args.cell_power_policy)
         report['boot_execution_checked']=True
         report['native_radio_outcome_qualified']=False
+        if args.sacch:
+            from tools.npe3_dedicated_check import check_sacch
+            report['sacch']=check_sacch(text,5 if args.cell_power_policy=='handset33' else 0)
         if args.page_at is not None:
             from tools.npe3_native_paging_response_check import check as check_native_page_response
             report['paging_response']=check_native_page_response(text,(first/'rom6_radio_writes.tsv').read_text())
@@ -272,6 +288,9 @@ def main():
                         frame*60000/13000000>args.input_at
                         for frame in report['call_rr']['native_disconnect_frames']):
                     raise ValueError('no timed native DISCONNECT followed physical Reject')
+            if args.clear_rejected_call:
+                from tools.npe3_raw_call_setup_check import check_call_clearing
+                report['call_clearing']=check_call_clearing(text,access['normal_control_blocks'])
             print('Native6210 cell33: PASS native Paging Response from timed port bits; stable_camping=0 calls=0')
         (run/'cell-power-experiment.json').write_text(json.dumps(report,indent=2)+'\n')
         print('Native6210 cell-power experiment captured; other radio/UI outcomes remain unqualified')

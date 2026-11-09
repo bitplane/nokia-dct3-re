@@ -102,6 +102,9 @@ private:
 	u64 m_call_rr_start_frame=~u64(0);
 	u8 m_call_rr_sequence=0xff;
 	std::array<std::array<std::array<s16,2>,148*4>,4> m_call_rr_samples{};
+	u64 m_call_release_start_frame=~u64(0);
+	bool m_call_channel_release_sent=false;
+	std::array<std::array<std::array<std::array<s16,2>,148*4>,4>,2> m_sacch_samples{};
 	bool m_lu_acknowledged=false;
 	u64 m_release_start_frame=~u64(0);
 	std::array<std::array<std::array<s16,2>,148*4>,4> m_release_samples{};

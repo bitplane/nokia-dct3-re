@@ -1,9 +1,43 @@
 import unittest
 from unittest.mock import patch
-from tools.npe3_raw_call_setup_check import check,check_assignment,check_call_rr
+from tools.npe3_raw_call_setup_check import check,check_assignment,check_call_rr,check_call_clearing
 
 
 class RawCallSetupTest(unittest.TestCase):
+    def test_call_clearing_requires_air_complete_and_return_to_common(self):
+        release='036209032d'+'2b'*18
+        channel='03840d060d00'+'2b'*17
+        ua='017301'+'2b'*20
+        text=(f'npe3_raw_cc_release: disconnect_start_frame=4372 start_frame=4408 octets={release} raw_adc_only=1 physical_claim=0\n'
+              f'npe3_raw_call_channel_release: complete_start_frame=4423 start_frame=4459 octets={channel} raw_adc_only=1 physical_claim=0\n'
+              f'npe3_raw_disc_ua: disc_start_frame=4525 start_frame=4561 octets={ua} raw_adc_only=1 physical_claim=0\n')
+        blocks=[dict(start_frame=4372,octets='012415832502e091'+'2b'*15),
+                dict(start_frame=4423,octets='014609832a'+'2b'*18),
+                dict(start_frame=4474,octets='036101'+'2b'*20),
+                dict(start_frame=4525,octets='015301'+'2b'*20)]
+        rr=dict(native_disconnect_frames=[4372],acknowledgements=[
+            dict(source_frame=4372,start_frame=4408),dict(source_frame=4423,start_frame=4459)])
+        packets=[dict(type=128,payload='802a00'+(frame+3).to_bytes(3,'big').hex()+'00230001'+octets,time=str(t))
+                 for frame,octets,t in ((4408,release,20.37),(4459,channel,20.60),(4561,ua,21.07))]
+        body=bytearray(24);body[8]=0x60
+        common=[dict(time=21.08,kind=2,body=body)]
+        with patch('tools.npe3_raw_call_setup_check.check_call_rr',return_value=rr), \
+                patch('tools.npe3_raw_call_setup_check.check_rx_publications',return_value=dict(packets=packets)), \
+                patch('tools.npe3_dedicated_check.packets',return_value=common):
+            result=check_call_clearing(text,blocks)
+            self.assertTrue(result['native_call_clearing_qualified'])
+            self.assertFalse(result['connected_call_qualified'])
+            for bad in ('',text+text,text.replace('036209','034209'),text.replace('4408','4409'),
+                        text.replace('complete_start_frame=4423','complete_start_frame=4424'),
+                        text.replace('017301','017201')):
+                with self.assertRaises(ValueError):check_call_clearing(bad,blocks)
+            with self.assertRaises(ValueError):check_call_clearing(text,blocks[:-1])
+            with self.assertRaises(ValueError):check_call_clearing(text,[blocks[0],dict(blocks[1],octets='0146098308'+'2b'*18),*blocks[2:]])
+            with patch('tools.npe3_dedicated_check.packets',return_value=[]):
+                with self.assertRaises(ValueError):check_call_clearing(text,blocks)
+            with patch('tools.npe3_raw_call_setup_check.check_rx_publications',return_value=dict(packets=packets[:-1])):
+                with self.assertRaises(ValueError):check_call_clearing(text,blocks)
+
     def test_standalone_rr_requires_confirmation_and_native_receive(self):
         octets='032101'+'2b'*20
         text=f'npe3_raw_call_rr: uplink_start_frame=4219 start_frame=4255 octets={octets} raw_adc_only=1 physical_claim=0'
@@ -22,6 +56,17 @@ class RawCallSetupTest(unittest.TestCase):
             packets.append(dict(type=128,payload='802a00'+(4309).to_bytes(3,'big').hex()+'00230001'+'034101'+'2b'*20,time='19.9'))
             self.assertEqual([r['ns'] for r in check_call_rr(text+'\n'+second,[confirmed,alerting])['acknowledgements']],[0,1])
             with self.assertRaises(ValueError):check_call_rr(text+'\n'+second.replace('034101','032101'),[confirmed,alerting])
+            third='npe3_raw_cc_release: disconnect_start_frame=4372 start_frame=4408 octets=036209032d'+'2b'*18+' raw_adc_only=1 physical_claim=0'
+            fourth='npe3_raw_call_channel_release: complete_start_frame=4423 start_frame=4459 octets=03840d060d00'+'2b'*17+' raw_adc_only=1 physical_claim=0'
+            packets.extend(dict(type=128,payload='802a00'+(frame+3).to_bytes(3,'big').hex()+'00230001'+octets,time=str(t))
+                           for frame,octets,t in ((4408,'036209032d'+'2b'*18,20.37),(4459,'03840d060d00'+'2b'*17,20.60)))
+            clearing_blocks=[confirmed,alerting,dict(start_frame=4372,octets='012415832502e091'+'2b'*15),
+                             dict(start_frame=4423,octets='014609832a'+'2b'*18)]
+            clearing_text='\n'.join((text,second,third,fourth))
+            self.assertEqual([r['kind'] for r in check_call_rr(clearing_text,clearing_blocks)['acknowledgements']],
+                             ['call_rr','call_rr','cc_release','call_channel_release'])
+            with self.assertRaises(ValueError):check_call_rr(clearing_text.replace('03840d','03640d'),clearing_blocks)
+            del packets[-2:]
             packets.pop()
             for bad in ('',text+text,text.replace('4255','4256'),text.replace('032101','034101'),text.replace('4219','4218')):
                 with self.assertRaises(ValueError):check_call_rr(bad,blocks)

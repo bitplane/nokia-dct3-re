@@ -3,11 +3,19 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "npe3_native_sacch_and_call_clearing",
+      "owner": "native_rom6_reference_adc_laboratory",
+      "status": "satisfied",
+      "predicate": "Raw SACCH SI5/SI6 sustains the native SDCCH through physical rejection and standards-owned call/channel clearing",
+      "current": "At45.5MHz reference,exact native SACCH successes end at2799,2901,4125,4227,4329,4431,4533;zero SACCH failures. Source has two physical header octets,cell-derived SI5/SI6,and four raw bursts at42..45 mod102. No link counter or firmware state changes. Reject20s -> actual DISCONNECT4372 -> raw RELEASE4408 -> actual RELEASE COMPLETE4474 -> raw CHANNEL RELEASE4510 -> native RR4525/DISC4576 -> raw UA4612. Native downlinks decode20.360639714,20.831403648,21.302173912;MCU common receive21.303837385. Full24s execution has zero illegal/unbacked reads. Source identities,sequence numbers and replies derive only from timed uplink bits. No stable-camping,connected-traffic,speech,arbitrary-TI or loss-recovery claim. Without SACCH,the fourth bad associated block causes local channel loss despite valid RELEASE decoding;see falsification npe3_cc_release_absence_is_payload_contract.",
+      "evidence": ["driver/nokia_dct3_research.cpp", "tools/npe3_dedicated_check.py", "tools/npe3_raw_call_setup_check.py", "tools/run_npe3_native.py", "tools/test_npe3_dedicated_check.py", "tools/test_npe3_raw_call_setup_check.py", "docs/rom6_rf_interface.md"]
+    },
+    {
       "id": "npe3_native_cc_alerting_rejection",
       "owner": "native_rom6_reference_adc_laboratory",
       "status": "satisfied",
       "predicate": "Native SETUP processing emits Alerting and physical Reject emits timed DISCONNECT when the external BTS acknowledges actual CC I-frames",
-      "current": "Call Confirmed4219 -> raw RR4255 -> native Alerting4270 -> raw RR4306 -> physical Right Softkey at20s,decoded1a -> native DISCONNECT4372 (832502e091,cause11) -> raw RR4408,native decode20.360634418s. All RR sequence numbers derive from independently decoded timed port bits; network replies are raw I/Q,not MCU messages. Full24s run is legal with zero unbacked reads. Finite no-loss CC acknowledgement fixture only: arbitrary TI,loss/poll recovery,network RELEASE,RELEASE COMPLETE,RR channel clearing,traffic and speech remain unqualified. Standalone SETUP without RR repeats Confirmed; one RR advances only to Alerting repeats. Do not confuse pending data-link acknowledgement with a missing firmware producer.",
+      "current": "Call Confirmed4219 -> raw RR4255 -> native Alerting4270 -> raw RR4306 -> physical Right Softkey at20s,decoded1a -> native DISCONNECT4372 (832502e091,cause11) -> raw RR4408,native decode20.360634418s. All RR sequence numbers derive from independently decoded timed port bits; network replies are raw I/Q,not MCU messages. Full24s run is legal with zero unbacked reads. This finite no-loss acknowledgement-only control does not qualify final call clearing;the separate npe3_native_sacch_and_call_clearing predicate does. Arbitrary TI,loss/poll recovery,traffic and speech remain unqualified. Standalone SETUP without RR repeats Confirmed; one RR advances only to Alerting repeats. Do not confuse pending data-link acknowledgement with a missing firmware producer.",
       "evidence": ["driver/nokia_dct3_research.cpp", "tools/run_npe3_native.py", "tools/npe3_native_observe.lua", "tools/npe3_raw_call_setup_check.py", "tools/test_npe3_raw_call_setup_check.py", "docs/rom6_rf_interface.md"]
     },
     {
