@@ -4,6 +4,7 @@ from tools.rom6_adc_measure_check import check_rx_publications
 
 SETUP=re.compile(r'npe3_raw_call_setup: uplink_start_frame=(\d+) start_frame=(\d+) octets=([0-9a-f]{46}) policy=plain_test_cell raw_adc_only=1 physical_claim=0')
 ASSIGNMENT=re.compile(r'npe3_raw_assignment: confirmed_start_frame=(\d+) start_frame=(\d+) octets=([0-9a-f]{46}) raw_adc_only=1 physical_claim=0')
+LATE_ASSIGNMENT=re.compile(r'npe3_raw_late_assignment: connect_start_frame=(\d+) start_frame=(\d+) octets=([0-9a-f]{46}) raw_adc_only=1 physical_claim=0')
 CALL_RR=re.compile(r'npe3_raw_call_rr: uplink_start_frame=(\d+) start_frame=(\d+) octets=([0-9a-f]{46}) raw_adc_only=1 physical_claim=0')
 CC_RELEASE=re.compile(r'npe3_raw_cc_release: disconnect_start_frame=(\d+) start_frame=(\d+) octets=([0-9a-f]{46}) raw_adc_only=1 physical_claim=0')
 CALL_CHANNEL_RELEASE=re.compile(r'npe3_raw_call_channel_release: complete_start_frame=(\d+) start_frame=(\d+) octets=([0-9a-f]{46}) raw_adc_only=1 physical_claim=0')
@@ -48,16 +49,19 @@ def check(text,blocks):
                 speech_transport_qualified=False,physical_rf_tuning_qualified=False)
 
 
-def check_assignment(text,blocks):
+def check_assignment(text,blocks,*,after_connect=False):
     setup=check(text,blocks)
-    rows=list(ASSIGNMENT.finditer(text))
-    if len(rows)!=1 or text.count('npe3_raw_assignment:')!=1:
+    pattern=LATE_ASSIGNMENT if after_connect else ASSIGNMENT
+    marker='npe3_raw_late_assignment:' if after_connect else 'npe3_raw_assignment:'
+    rows=list(pattern.finditer(text))
+    if len(rows)!=1 or text.count(marker)!=1:
         raise ValueError('missing unique raw Assignment Command')
     row=rows[0];source,start=int(row[1]),int(row[2])
-    expected=bytes.fromhex('032221062e094023006301'+'2b'*12)
-    if (bytes.fromhex(row[3])!=expected or source not in setup['native_call_confirmed_frames'] or
+    expected=bytes.fromhex(('0362' if after_connect else '0322')+'21062e094023006301'+'2b'*12)
+    sources=setup['native_connect_frames'] if after_connect else setup['native_call_confirmed_frames']
+    if (bytes.fromhex(row[3])!=expected or source not in sources or
             start!=((source+3)//51+1)*51+22):
-        raise ValueError('assignment does not acknowledge actual Call Confirmed on the declared channel')
+        raise ValueError('assignment does not acknowledge its declared actual CC source')
     matches=[]
     for packet in check_rx_publications(text)['packets']:
         body=bytes.fromhex(packet['payload'])
@@ -67,7 +71,7 @@ def check_assignment(text,blocks):
                 float(packet['time'])>(start+3)*60000/13000000):
             matches.append(packet)
     if len(matches)!=1:raise ValueError('missing unique native Assignment Command decode')
-    return dict(native_assignment_decode_qualified=True,start_frame=start,
+    return dict(native_assignment_decode_qualified=True,start_frame=start,after_connect=after_connect,
                 native_decode_time=matches[0]['time'],traffic_channel_qualified=False,
                 assignment_complete_qualified=False,speech_transport_qualified=False)
 

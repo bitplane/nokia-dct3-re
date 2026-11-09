@@ -770,7 +770,29 @@ page,not a newly unsupported opcode. Observed program words8fba..8fbd are
 `fb81 a50d 7717 2f11`:FCALLD to1:a50d with a two-word delay. First access
 to01a50d is19.726205429s,with Read-owned PC8fba,XPC1 and SP02b3. It then
 traverses23283 unbacked program words before a secondary MMR-address rejection.
-That later word is not evidence for extending the ISA. Generic CPU transfer,
+That later word is not evidence for extending the ISA.
+
+The separate late-assignment control reproduces the same boundary after
+physical Answer and actual CONNECT. Call Confirmed/Alerting are acknowledged
+normally; CONNECT 4372 selects Assignment 4408 with N(S)=1/N(R)=3:
+`036221062e094023006301` plus padding. Independent reconstruction of the
+Paging Response, Confirmed, Alerting and CONNECT blocks and all 76 timed
+transmit windows/releases passes. The final release at 20.420208538 seconds
+precedes the first unbacked read. Native Assignment decoding completes at
+20.360639714; the MCU requests the same traffic configuration and submits
+an empty traffic SABM. At 20.427743890, FCALLD at `8fba` again requests
+`1:a50d`, with XPC 1 and SP `02b3`. The 24-second capture again has 23,283
+unbacked reads and ends illegal at `1:0065`.
+
+This is a qualified command decode and a failed execution test, not traffic
+completion. The complete stream also ends with a partial four-burst group;
+its strict whole-stream decoder remains red. Only the explicitly selected
+complete source blocks are used for the bounded assignment proof. Do not
+weaken either gate or interpret the later zero-filled words as instructions.
+Early and late assignment therefore converge on the same missing mapping,
+independent of the prior SACCH-loss and softkey-input errors.
+
+Generic CPU transfer,
 reverse-carry,parallel-repeat and control-delay contracts have focused tests in
 `c54x_execution_contracts.md`;no firmware opcode or return value is replaced.
 
@@ -835,6 +857,8 @@ first-escape address/time and missing-read count above.
 # Add --incoming-call for the separate raw CC SETUP/native confirmation fixture.
 # Add --traffic-assignment to that fixture for the currently failing native
 # traffic-initialization investigation;this is not a green call gate.
+# Separate late-assignment investigation, also expected red until backing exists:
+.venv/bin/python tools/run_npe3_native.py --reference-clock --seconds 24 --adc-source fcch-sch-broadcast --capture-start p09 --tx-release p05 --raw-agch --provision-records --page-at 18 --cell-power-policy handset33 --incoming-call --ack-call-control --sacch --answer-call --traffic-assignment --assignment-after-connect
 ```
 
 Host4a uses the DROM table atb041+4a=b08b,which selects35c5. That handler

@@ -4,6 +4,19 @@ from tools.npe3_raw_call_setup_check import check,check_assignment,check_call_rr
 
 
 class RawCallSetupTest(unittest.TestCase):
+    def test_late_assignment_requires_native_connect_and_its_acknowledgement(self):
+        octets='036221062e094023006301'+'2b'*12
+        text=f'npe3_raw_late_assignment: connect_start_frame=4372 start_frame=4408 octets={octets} raw_adc_only=1 physical_claim=0'
+        packets=[dict(type=128,payload='802a00'+(4411).to_bytes(3,'big').hex()+'00230001'+octets,time='20.37')]
+        with patch('tools.npe3_raw_call_setup_check.check',return_value=dict(native_connect_frames=[4372],native_call_confirmed_frames=[4219])), \
+                patch('tools.npe3_raw_call_setup_check.check_rx_publications',return_value=dict(packets=packets)):
+            self.assertTrue(check_assignment(text,[],after_connect=True)['after_connect'])
+            with self.assertRaises(ValueError):check_assignment(text,[])
+            for bad in ('',text+text,text.replace('036221','032221'),text.replace('4372','4219'),text.replace('4408','4409')):
+                with self.assertRaises(ValueError):check_assignment(bad,[],after_connect=True)
+            with patch('tools.npe3_raw_call_setup_check.check_rx_publications',return_value=dict(packets=[])):
+                with self.assertRaises(ValueError):check_assignment(text,[],after_connect=True)
+
     def test_call_clearing_requires_air_complete_and_return_to_common(self):
         release='036209032d'+'2b'*18
         channel='03840d060d00'+'2b'*17

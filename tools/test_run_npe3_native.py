@@ -34,7 +34,8 @@ class Native6210EvidenceTest(unittest.TestCase):
                      ['--ack-call-control'],['--ack-call-control','--incoming-call','--traffic-assignment'],
                      ['--clear-rejected-call'],['--clear-rejected-call','--reject-call','--incoming-call'],
                      ['--sacch'],['--sacch','--raw-agch'],['--answer-call'],
-                     ['--answer-call','--reject-call','--incoming-call']):
+                     ['--answer-call','--reject-call','--incoming-call'],
+                     ['--assignment-after-connect'],['--assignment-after-connect','--traffic-assignment','--incoming-call']):
             result=subprocess.run([sys.executable,str(script),*args],capture_output=True,text=True)
             self.assertEqual(result.returncode,2)
             self.assertNotIn('Native6210 evidence:',result.stdout)
@@ -43,6 +44,13 @@ class Native6210EvidenceTest(unittest.TestCase):
             configure_cell_power(directory,'npe3ap5','handset33',incoming_call=True,call_ack=True,clear_call=True,sacch=True)
             ports=ET.parse(directory/'cfg/npe3ap5.cfg').findall('./system/input/port')
             self.assertEqual([(p.get('mask'),p.get('value')) for p in ports],[('2','2'),('4','4'),('16','16'),('32','32'),('64','64')])
+        with tempfile.TemporaryDirectory() as tmp:
+            directory=Path(tmp)
+            configure_cell_power(directory,'npe3ap5','handset33',incoming_call=True,
+                                 traffic_assignment=True,call_ack=True,sacch=True,assignment_after_connect=True)
+            ports=ET.parse(directory/'cfg/npe3ap5.cfg').findall('./system/input/port')
+            self.assertEqual([(p.get('mask'),p.get('value')) for p in ports],
+                             [('2','2'),('4','4'),('8','8'),('16','16'),('64','64'),('128','128')])
 
     def test_cell_power_experiment_is_explicit_and_broadcast_in_both_messages(self):
         with tempfile.TemporaryDirectory() as tmp:

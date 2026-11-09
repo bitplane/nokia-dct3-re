@@ -1849,6 +1849,9 @@ static INPUT_PORTS_START( npe3_raw_bts )
 	PORT_CONFNAME(0x40, 0x00, "Laboratory BTS SACCH/4 system information")
 	PORT_CONFSETTING(0x00, DEF_STR( Off ))
 	PORT_CONFSETTING(0x40, DEF_STR( On ))
+	PORT_CONFNAME(0x80, 0x00, "Laboratory BTS defer assignment until CONNECT")
+	PORT_CONFSETTING(0x00, DEF_STR( Off ))
+	PORT_CONFSETTING(0x80, DEF_STR( On ))
 INPUT_PORTS_END
 
 static INPUT_PORTS_START( noki8290 )

@@ -468,7 +468,10 @@ void dct3_rf_adc_fixture_state::receive_normal_uplink(std::array<u16,15> const &
 	for (auto byte:*block) packed+=util::string_format("%02x",byte);
 	machine().logerror("npe3_bts_uplink: start_frame=%u octets=%s exact_code=1 port_bits_only=1 physical_claim=0\n",
 		unsigned(m_normal_start_frame),packed);
-	if ((ioport("LAB_BTS")->read()&16) && !(ioport("LAB_BTS")->read()&8) &&
+	bool const late_assignment=bool(ioport("LAB_BTS")->read()&128);
+	if ((ioport("LAB_BTS")->read()&16) &&
+			(!(ioport("LAB_BTS")->read()&8) || (late_assignment &&
+			 m_assignment_start_frame==~u64(0) && ((*block)[4]&0x3f)!=7)) &&
 			m_setup_start_frame!=~u64(0) &&
 			m_normal_start_frame>m_setup_start_frame+3 &&
 			(*block)[0]==1 && !((*block)[1]&1) && ((*block)[2]&3)==1 &&
@@ -516,21 +519,22 @@ void dct3_rf_adc_fixture_state::receive_normal_uplink(std::array<u16,15> const &
 	}
 	if ((ioport("LAB_BTS")->read()&8) && m_setup_start_frame!=~u64(0) && m_assignment_start_frame==~u64(0) &&
 			m_normal_start_frame>m_setup_start_frame+3 &&
-			(*block)[0]==1 && (*block)[1]==0x20 && ((*block)[2]&3)==1 &&
+			(*block)[0]==1 && (*block)[1]==(late_assignment ? 0x24 : 0x20) && ((*block)[2]&3)==1 &&
 			((*block)[2]>>2)>=2 && ((*block)[2]>>2)<=20 &&
-			(*block)[3]==0x83 && ((*block)[4]&0x3f)==8)
+			(*block)[3]==0x83 && ((*block)[4]&0x3f)==(late_assignment ? 7 : 8))
 	{
-		// Second network I-frame,N(S)=1. Its N(R)=1 acknowledges the
-		// handset's first I-frame (Call Confirmed); no decoded MCU input.
+		// Second network I-frame,N(S)=1; N(R) acknowledges the actual
+		// Call Confirmed or CONNECT. Earlier RR replies do not consume N(S).
 		auto const assignment=subdevice<nokia_gsm_network_device>("gsm_network")->traffic_assignment(35);
 		gsm::tch_f::packed_control_block lapdm{};
-		lapdm.fill(0x2b);lapdm[0]=3;lapdm[1]=0x22;lapdm[2]=(assignment.size()<<2)|1;
+		lapdm.fill(0x2b);lapdm[0]=3;lapdm[1]=(((((*block)[1]>>1)+1)&7)<<5)|2;lapdm[2]=(assignment.size()<<2)|1;
 		std::copy(assignment.begin(),assignment.end(),lapdm.begin()+3);
 		m_assignment_start_frame=(frame/51+1)*51+22;
 		auto const encoded=nokia_rf_lab::bcch_bits(lapdm,0);
 		for (unsigned at=0;at<4;++at) m_assignment_samples[at]=nokia_rf_lab::gmsk_samples(encoded[at]);
 		packed.clear();for (auto byte:lapdm) packed+=util::string_format("%02x",byte);
-		machine().logerror("npe3_raw_assignment: confirmed_start_frame=%u start_frame=%u octets=%s raw_adc_only=1 physical_claim=0\n",
+		machine().logerror("npe3_raw_%s: %s_start_frame=%u start_frame=%u octets=%s raw_adc_only=1 physical_claim=0\n",
+			late_assignment ? "late_assignment" : "assignment",late_assignment ? "connect" : "confirmed",
 			unsigned(m_normal_start_frame),unsigned(m_assignment_start_frame),packed);
 		return;
 	}

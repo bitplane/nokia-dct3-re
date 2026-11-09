@@ -22,7 +22,7 @@ ADC_BROADCAST_MENU_SHA256 = '8c7650fdb0514ec34c85b89795e529de062e6f141268a507baf
 ADC_LU_MENU_SHA256 = '5adef93609b763a40d0e3c9dca356d388a910bb393a518e99a53eec2c7184202'
 
 
-def configure_cell_power(directory,model,policy,*,incoming_call=False,traffic_assignment=False,call_ack=False,clear_call=False,sacch=False):
+def configure_cell_power(directory,model,policy,*,incoming_call=False,traffic_assignment=False,call_ack=False,clear_call=False,sacch=False,assignment_after_connect=False):
     if policy=='legacy39':return
     if policy!='handset33':raise ValueError('unsupported cell power policy')
     config=ET.Element('mameconfig',version='10')
@@ -39,6 +39,8 @@ def configure_cell_power(directory,model,policy,*,incoming_call=False,traffic_as
         ET.SubElement(ports,'port',tag=':LAB_BTS',type='CONFIG',mask='32',defvalue='0',value='32')
     if sacch:
         ET.SubElement(ports,'port',tag=':LAB_BTS',type='CONFIG',mask='64',defvalue='0',value='64')
+    if assignment_after_connect:
+        ET.SubElement(ports,'port',tag=':LAB_BTS',type='CONFIG',mask='128',defvalue='0',value='128')
     destination=directory/'cfg';destination.mkdir()
     ET.ElementTree(config).write(destination/f'{model}.cfg',encoding='utf-8',xml_declaration=True)
 
@@ -147,6 +149,8 @@ def main():
                         help='separate raw SDCCH/4-associated SI5/SI6 source; no radio-link counter changes')
     parser.add_argument('--traffic-assignment',action='store_true',
                         help='separate external TCH/F assignment after actual Call Confirmed')
+    parser.add_argument('--assignment-after-connect',action='store_true',
+                        help='separate late assignment after actual physical Answer/CONNECT')
     parser.add_argument('--provision-records', action='store_true',
                         help='explicit synthetic record fixture; acquired PMM remains unchanged')
     args = parser.parse_args()
@@ -154,8 +158,10 @@ def main():
         parser.error('call rejection requires incoming SETUP without traffic assignment')
     if args.answer_call and (not args.incoming_call or args.reject_call):
         parser.error('physical Answer requires incoming SETUP and excludes Reject')
-    if args.ack_call_control and (not args.incoming_call or args.traffic_assignment):
+    if args.ack_call_control and (not args.incoming_call or (args.traffic_assignment and not args.assignment_after_connect)):
         parser.error('standalone CC acknowledgement requires SETUP without assignment')
+    if args.assignment_after_connect and not (args.traffic_assignment and args.answer_call and args.ack_call_control and args.sacch):
+        parser.error('late assignment requires traffic assignment,physical Answer,CC acknowledgement and SACCH')
     if args.clear_rejected_call and not (args.reject_call and args.ack_call_control):
         parser.error('call clearing requires explicit physical Reject and CC acknowledgement')
     if args.sacch and (not args.raw_agch or args.cell_power_policy!='handset33'):
@@ -230,7 +236,8 @@ def main():
         directory.mkdir()
         configure_cell_power(directory,model,args.cell_power_policy,incoming_call=args.incoming_call,
                              traffic_assignment=args.traffic_assignment,call_ack=args.ack_call_control,
-                             clear_call=args.clear_rejected_call,sacch=args.sacch)
+                             clear_call=args.clear_rejected_call,sacch=args.sacch,
+                             assignment_after_connect=args.assignment_after_connect)
         cmd = command.copy()
         cmd[-1] = str(seconds)
         if not persist:
@@ -278,7 +285,7 @@ def main():
                 report['call_setup']=check_call_setup(text,access['normal_control_blocks'])
             if args.traffic_assignment:
                 from tools.npe3_raw_call_setup_check import check_assignment
-                report['traffic_assignment']=check_assignment(text,access['normal_control_blocks'])
+                report['traffic_assignment']=check_assignment(text,access['normal_control_blocks'],after_connect=args.assignment_after_connect)
             if args.ack_call_control:
                 from tools.npe3_raw_call_setup_check import check_call_rr
                 report['call_rr']=check_call_rr(text,access['normal_control_blocks'])
