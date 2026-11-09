@@ -48,6 +48,32 @@ def capture_start_reference(ar1,lead,length):
     return (value+length if value<0 else value)&0xffff
 
 
+def check_stop_polls(text, writes):
+    polls=[fields(row) for row in re.findall(r'rom6_capture_stop_poll: ([^\r\n]+)',text)]
+    stops=[row for row in writes if (row['port'],row['cpu_pc'])==('000b','0015d0')]
+    if not stops or len(polls)!=len(stops):
+        raise ValueError('missing capture stop counter chronology')
+    expected={'sequence','first','first_pc','first_t','first_mask','last','last_pc','last_t','last_mask','observer_writes'}
+    for poll,stop in zip(polls,stops):
+        # Read-tap contexts are not issuing instruction addresses (3ee4/3eea).
+        if (set(poll)!=expected or poll['sequence']!=stop['sequence'] or
+                poll['observer_writes']!='0' or poll['first_mask']!='ffff' or
+                poll['last_mask']!='ffff' or poll['first_pc'] not in ('003eea','003ef0') or
+                poll['last_pc']!='003ef0'):
+            raise ValueError('capture stop poll ownership differs')
+        if not nanoseconds(poll['first_t'])<nanoseconds(poll['last_t'])<nanoseconds(stop['t']):
+            raise ValueError('capture stop poll timestamp order differs')
+        first,last=(int(poll[name],16)&0x3fff for name in ('first','last'))
+        if first!=last:
+            raise ValueError('capture stop did not use a stable masked counter')
+        value=last+int(stop['tail'],16)
+        length=int(stop['length'],16)
+        if value>=length: value-=length
+        if (value&0xffff)!=int(stop['value'],16):
+            raise ValueError('capture stop counter/addition/wrap differs')
+    return len(polls)
+
+
 def check_capture_program(program,mcu,resident):
     # The stop writer is an own uploaded replacement, not the resident 3e7a.
     block=program[0x15c4*2:0x15d2*2]
@@ -107,10 +133,11 @@ def check_capture_programming(text,stream,program,mcu,resident):
         time,pc,port,value,mask=(item.decode() for item in match.groups())
         if port in ('000a','000b','0011'): actual.append((time,pc,port,value,mask))
     if actual!=observed: raise ValueError('capture programming differs from independent bus stream')
+    stop_polls=check_stop_polls(text,rows)
     return dict(writes=len(rows),writers=dict(sorted(counts.items())),
                 lead_values=dict(sorted(leads.items())),tail_values=dict(sorted(tails.items())),
                 start_operand_qualified=True,stop_accumulator_qualified=True,
-                stop_poll_value_qualified=False,physical_capture_edges_qualified=False,
+                stop_poll_value_qualified=True,stop_polls=stop_polls,physical_capture_edges_qualified=False,
                 p11_capacity_qualified=False)
 
 

@@ -8,6 +8,11 @@ local cap=1024
 local positions,programming=0,0
 local short_frame_captured=false
 local capture_writes=0
+local counter_reads={}
+handles[#handles+1]=cpu.spaces.io:install_read_tap(0x0d,0x0d,'rom6_capture_counter',function(_,value,mask)
+    counter_reads[#counter_reads+1]={value=value,mask=mask,pc=cpu.state.GENPC.value,t=machine.time:as_double()}
+    if #counter_reads>2 then table.remove(counter_reads,1) end
+end)
 for _,port in ipairs({0x0a,0x0b,0x11}) do
     handles[#handles+1]=cpu.spaces.io:install_write_tap(port,port,'rom6_capture_'..port,function(_,value,mask)
         capture_writes=capture_writes+1
@@ -17,6 +22,12 @@ for _,port in ipairs({0x0a,0x0b,0x11}) do
             cpu.state.A.value&0xffffffffff,cpu.state.B.value&0xffffffffff,
             cpu.spaces.data:read_u16(0x3ea7),cpu.spaces.data:read_u16(0x3eb6),
             cpu.spaces.data:read_u16(0x036a),cpu.state.GENPC.value,mask))
+        if port==0x0b and cpu.state.GENPC.value==0x15d0 then
+            assert(#counter_reads==2,'capture stop without two observed counter reads')
+            local first,last=counter_reads[1],counter_reads[2]
+            machine:logerror(string.format('rom6_capture_stop_poll: sequence=%d first=%04x first_pc=%06x first_t=%.9f first_mask=%04x last=%04x last_pc=%06x last_t=%.9f last_mask=%04x observer_writes=0\n',
+                capture_writes,first.value,first.pc,first.t,first.mask,last.value,last.pc,last.t,last.mask))
+        end
     end)
 end
 handles[#handles+1]=cpu.spaces.io:install_write_tap(0x0e,0x0e,'rom6_receive_reload',function(_,value,mask)

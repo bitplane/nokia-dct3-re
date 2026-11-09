@@ -1512,9 +1512,24 @@ proof of the corresponding physical capture edges:
 | P11 / `3fe4` / `3fe5` | 3 | `01fe`; field meaning unknown |
 
 Every observed start lead is `00a3` (163), and every observed stop tail is
-`0020` (32). The checker verifies each start calculation and stop accumulator,
-but does not independently capture each preceding P0d read. The stop formula
-is statically decoded; its counter-input chronology is not yet runtime-qualified.
+`0020` (32). The passive receive observer now retains only the latest two
+P0d reads and joins them to each of the 2,747 uploaded stop writes. All
+stops use two equal readings after masking with `3fff`, add the tail and
+conditionally subtract the raw data-036a modulus once. There are 2,746
+initial read pairs and one repeated poll pair; none of these observed
+additions requires wrapping. Focused tests cover wrap, ignored high status
+bits, unstable readings, missing polls and chronology failures separately.
+
+The read-tap CPU contexts are `3eea/3ef0` (or `3ef0/3ef0` on retry), not
+the issuing PORTR instruction addresses `3ee4/3eea`. This is another reason
+not to recover instruction ownership directly from an I/O callback's PC.
+These observations qualify the stop calculation's counter-input chronology,
+not the counter's physical clock, a capture-stop edge or interrupt ownership.
+The current-binary 60-second control and observed runs have identical complete
+342,473-write journals (SHA-256
+`e535505be8d099d84e22eb65d1eb6d573a75934c08b9a0d2530d69ef439f5978`).
+This non-perturbation comparison is against the unmodified observer on the
+same binary, not the older journal pinned above.
 The uploaded `15c4..15d1` region uniquely matches MCU offset `115a18`, SHA256
 `820291aa03aec557fd522ba30fc3d54adc3689b0e4bafb6f6ff37c3b68d65453`.
 Do not assign these writes to the similar resident `3e7a` instruction.

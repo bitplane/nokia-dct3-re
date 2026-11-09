@@ -2,7 +2,8 @@ import unittest
 from unittest.mock import patch
 
 from tools.rom6_receive_contract import (check,check_program,position_reference,check_programming,
-    check_short_program,capture_start_reference,check_capture_programming,check_capture_program)
+    check_short_program,capture_start_reference,check_capture_programming,check_capture_program,
+    check_stop_polls)
 
 
 class ReceiveContractTest(unittest.TestCase):
@@ -57,6 +58,20 @@ class ReceiveContractTest(unittest.TestCase):
             with self.subTest(ar1=ar1,lead=lead,length=length):
                 self.assertEqual(capture_start_reference(ar1,lead,length),expected)
 
+    def test_stop_poll_masks_status_and_subtracts_raw_length_once(self):
+        for counter,length,expected in ((12,4999,44),(4980,4999,13),
+                                        (1318,1350,0),(0x3fff,1350,15065)):
+            stop=dict(sequence='1',port='000b',cpu_pc='0015d0',t='1.000000003',
+                      tail='0020',length=f'{length:04x}',value=f'{expected:04x}')
+            text=(f'rom6_capture_stop_poll: sequence=1 first={counter:04x} first_pc=003ef0 '
+                  f'first_t=1.000000001 first_mask=ffff last={counter|0xc000:04x} '
+                  'last_pc=003ef0 last_t=1.000000002 last_mask=ffff observer_writes=0')
+            self.assertEqual(check_stop_polls(text,[stop]),1)
+            with self.assertRaises(ValueError):
+                check_stop_polls(text.replace('last_t=1.000000002','last_t=1.000000003'),[stop])
+            with self.assertRaises(ValueError):
+                check_stop_polls('',[stop])
+
     def test_capture_census_rejects_unknown_writers_and_bad_operands(self):
         lines=[]
         stream=[]
@@ -68,6 +83,8 @@ class ReceiveContractTest(unittest.TestCase):
                            ('0011','003fe5','01fe'))[(index-1)%7]
             a='000000002c' if pc=='0015d0' else '0000000000'
             lines.append(f'rom6_capture_write: sequence={index} t={stamp} port={port} value={value} ar1=0000 a={a} b=00000012e4 lead=00a3 tail=0020 length=1387 cpu_pc={pc} mask=ffff observer_writes=0')
+            if pc=='0015d0':
+                lines.append(f'rom6_capture_stop_poll: sequence={index} first=000c first_pc=003eea first_t=0.{index:09d} first_mask=ffff last=400c last_pc=003ef0 last_t=0.{index+1:09d} last_mask=ffff observer_writes=0')
             stream.append(f'{stamp}\t{pc}\t{port}\t{value}\tffff\n'.encode())
         lines.append('rom6_capture_complete: writes=549 cap=32768 observer_writes=0')
         text='\n'.join(lines)
@@ -76,11 +93,15 @@ class ReceiveContractTest(unittest.TestCase):
             self.assertEqual(result['writes'],549)
             self.assertEqual(len(result['writers']),7)
             self.assertFalse(result['physical_capture_edges_qualified'])
+            self.assertTrue(result['stop_poll_value_qualified'])
             for old,new in (('value=12e4','value=12e5'),('lead=00a3','lead=00a4'),
                             ('cpu_pc=003e24','cpu_pc=003e23'),('mask=ffff','mask=00ff'),
                             ('writes=549','writes=550'),('sequence=1 ','sequence=2 '),
                             ('a=000000002c','a=000000002d'),
-                            ('value=3a98','value=3a99'),('value=01fe','value=01ff')):
+                            ('value=3a98','value=3a99'),('value=01fe','value=01ff'),
+                            ('first=000c','first=000d'),('last=400c','last=400d'),
+                            ('last_pc=003ef0','last_pc=003eea'),
+                            ('last_mask=ffff','last_mask=00ff')):
                 with self.subTest(old=old),self.assertRaises(ValueError):
                     check_capture_programming(text.replace(old,new,1),stream,b'',b'',b'')
             with self.assertRaises(ValueError):
