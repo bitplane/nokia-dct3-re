@@ -63,7 +63,7 @@ the MCU to common control. Native no-identity paging also decodes after release,
 and a complete60s run retains updated EF_LOCI and legal execution. Stable
 camping remains open. A separate [unique-page experiment](#unique-source-page-binding)
 now binds decoded page payloads to their source block and confirms the reported
-ending FN, without qualifying four-burst completion time or physical RF timing.
+ending FN, without qualifying physical RF timing.
 The acquired PMM still parks at the validation
 gate,described below. These laboratory
 results do not retire the physical request/acknowledgement or tuning contract.
@@ -80,7 +80,7 @@ results do not retire the physical request/acknowledgement or tuning contract.
 | Own 6210 raw-AGCH candidate | Exact successful native assignment decode; MCU assigned-SDCCH configuration and SABM containing Location Updating Request | Native dedicated transmission, validation-gate completion, camping/registration and physical timing/tuning |
 | Synthetic-record raw-AGCH run | Ten-slot validation cycle;combined CCCH;32 normal bursts/8 exact xCCH blocks;native UA/LU Accept and RR acknowledgement;updated SIM EF_LOCI;raw normal release back to common RX | Stable camping/registered presentation and physical timing/tuning |
 | Idle-paging source | All three combined CCCH blocks carry exact no-identity fill;25 native CRC-success publications in a complete60s capture;MM storage and Menu retained | Continuous idle reception,source-FN binding and physical carrier selection |
-| Uniquely identified laboratory pages | 27 native page payloads match distinct external TMSIs and exact source block-ending FN;20 after common-control return | Complete four-burst reception before publication, continuous DRX/camping and physical carrier selection |
+| Uniquely identified laboratory pages | 27 native page payloads match distinct external TMSIs and exact source block-ending FN;20 after common-control return;five early results use native two-burst erasures | Continuous DRX/camping and physical carrier selection |
 | Addressed paging/new-link setup | Uplink-derived IMSI page, native Paging Response, raw second-link UA and native CC SETUP admission under the explicit33dBm record fixture | Stable camping and physical carrier selection |
 | Native call control with SACCH | Native Alerting, physical Answer-to-CONNECT, complete rejected-call clearing; outgoing physical dial/CM admission/SETUP/CALL PROCEEDING decode and acknowledgement | Connected traffic, speech, arbitrary transactions and loss recovery |
 | Native traffic assignment | Incoming early/late and outgoing command decodes; one outgoing TSC2 normal burst before the shared `1:a50d` program escape | Backed traffic execution, complete traffic blocks, assigned-slot timing, Assignment Complete and speech |
@@ -470,11 +470,11 @@ Five successful publications precede their fourth source burst. Keep that
 timing observation separate from the now-correct FN association. A valid
 decoded payload does not establish that all four complete bursts were
 received; the isolated native experiment below proves that two-burst
-recovery is possible for all five payloads. Actual whole-phone buffer
-provenance is still unverified. The checker rejects payloads predating their first source
+recovery is possible for all five payloads. The whole-phone confidence
+trace below now confirms that erasure pattern. The checker rejects payloads predating their first source
 frame, preserves fourth-burst timing discrepancies, and never fits a clock
-or shifts the source to conceal them. Next establish which source samples
-contribute to those five blocks before changing receive timing.
+or shifts the source to conceal them. This does not identify physical
+capture edges or qualify every sample's analog timing.
 
 #### Native two-erasure control
 
@@ -498,11 +498,63 @@ input hash and confidence preconditions. Soft erasures cannot be combined
 with the ADC/frontend or hardware-FIRE fixture modes.
 
 Thus publication before a fourth burst is **not by itself a timing defect**.
-This is a sufficiency experiment, not proof that the whole phone used these
-exact confidences or that its timing is physically correct. The next
-discriminating observation is the native confidence/buffer state consumed
-by those actual publications; do not delay an interrupt merely to enforce
-a four-burst latency that this decoder does not require.
+This is a sufficiency experiment, not by itself proof of the whole phone's
+confidences or physical timing. Whole-phone observations qualify the
+software erasure decision separately below; do not delay an interrupt
+merely to enforce a four-burst latency that this decoder does not require.
+
+#### Whole-phone confidence selection
+
+The passive `npe3_xcch_weights.lua` observer records actual common-block
+stores at instruction `4e2b` and normalized stores at `4e3b`, using the
+execution owner rather than a prefetched PC. The resident control/weight/formatter region
+`4d20..4f2e` is pinned by SHA-256
+`acc476bedfe0fc4aa225220a97bb49e4f5e9a3b19e5f4b9034f692b9dd6e4bfc`.
+The complete census has 70 collect/normalize operations. All match this
+four-slot firmware rule (BK=4, index=data `261f` in 0..3, pointer=data `264b`):
+
+```text
+if data3eb5.bit9 and data0586.bit1:
+    start = (pointer - index) mod 4
+    available = index if index != 0 else 4
+else:
+    start = pointer mod 4
+    available = 4
+effective[i] = raw[(start+i) mod 4] if i < available else 0
+```
+
+Here `raw` is the aligned four-word confidence ring, not a sample buffer.
+Native `4e12..4e2b` performs the circular selection and zeros unavailable
+entries. All 27 unique page publications join to their preceding native
+operation. The five early pages have flags `0212`, status `000a`, index 2,
+two positive effective weights and two zeros. The raw ring's unused entries
+remain nonzero: the erasures are an explicit firmware decision, not memory
+that was never filled. Normalization preserves both zeros; for source
+frame 1383 the effective vector is `018b,0560,0000,0000`, becoming
+`24be,7fff,0000,0000`.
+
+Together with exact unique-payload/FIRE recovery, this identifies the early
+results as native partial-block erasure decodes. They do not demonstrate
+future samples arriving early and do not justify changing the sample clock,
+MFI interrupt schedule or staging limit. The counter/capture-edge hardware
+contract remains open for independent reasons.
+
+The formatter closes the remaining temporal interpretation in the same
+capture. On a successful index-2 decode, `4d31..4d3c` sets status bits 2/0,
+changing `000a` to `000f`; the observed `4f27/4f28` pair then copies the
+current frame and adds two. For all five early pages the current frame is
+exactly `source_start+1`, and the published frame is `source_start+3`.
+For example, 1383 -> current 1384 -> reported end 1386. The output carries
+the canonical block-ending FN, not a claim that its fourth burst has already
+arrived. The checker joins this pair to the actual confidence operation and
+unique payload publication. No latency shim is needed for this behavior.
+
+The observed and preceding unobserved 24-second compositions have identical
+complete I/O journals, SHA-256
+`bcbe4b4dbe8f1939ee7803c596f3828dae2773071ced42bd03506875153beaf9`.
+The observer is read-only, bounded and limited to these two weighting
+stages; its acceptance consumer is the frame-page diagnostic, not a new
+emulated hardware interface.
 
 ### Native idle paging and extended observation
 

@@ -137,6 +137,111 @@ def check_release(text,blocks):
                 stable_camping_qualified=False,physical_transmission_qualified=False)
 
 
+WEIGHT_CODE_SHA256='acc476bedfe0fc4aa225220a97bb49e4f5e9a3b19e5f4b9034f692b9dd6e4bfc'
+
+
+def effective_weight_reference(raw,pointer,index,flags,status,bk):
+    if len(raw)!=4 or bk!=4 or not 0<=index<4:
+        raise ValueError('common-block confidence left the four-slot contract')
+    masked=bool(flags&0x200 and status&2)
+    start=(pointer-index)%4 if masked else pointer%4
+    valid=(index or 4) if masked else 4
+    return [raw[(start+i)%4] if i<valid else 0 for i in range(4)]
+
+
+def check_page_confidence(text,pages,program):
+    """Join unique native page publications to actual weighting stores."""
+    import hashlib
+    from tools.rom6_tuning_contract import fields
+    from tools.rom6_timed_output_check import nanoseconds
+    if len(program)!=0x20000 or hashlib.sha256(program[0x4d20*2:0x4f2f*2]).hexdigest()!=WEIGHT_CODE_SHA256:
+        raise ValueError('native common-block weighting code is not pinned ROM6')
+    rows=[fields(row) for row in re.findall(r'npe3_xcch_weight: ([^\r\n]+)',text)]
+    count=len(rows)
+    if (not 0<count<4096 or count%8 or text.count('npe3_xcch_weight:')!=count or
+            text.count(f'npe3_xcch_weight_complete: writes={count} cap=4096 observer_writes=0')!=1):
+        raise ValueError('missing, malformed or capped common-block weighting census')
+    expected={'sequence','t','address','value','mask','readpc','execpc','cpu_pc','pointer',
+              'raw','flags','status','ar0','index','bk','ar3','observer_writes'}
+    previous=-1
+    for index,row in enumerate(rows,1):
+        if set(row)!=expected:
+            raise ValueError('common-block weighting metadata incomplete')
+        stamp=nanoseconds(row['t'])
+        if (row['sequence']!=str(index) or row['mask']!='ffff' or
+                row['observer_writes']!='0' or stamp<=previous):
+            raise ValueError('common-block weighting chronology/metadata differs')
+        previous=stamp
+    groups=[]
+    for at in range(0,count,8):
+        group=rows[at:at+8]
+        if [(r['execpc'],r['address']) for r in group]!=[
+                (owner,f'{0x2f00+i:04x}') for owner in ('00004e2b','00004e3b') for i in range(4)]:
+            raise ValueError('weighting stores are not the native collect/normalize sequence')
+        for key in ('pointer','raw','flags','status','index','bk'):
+            if len({r[key] for r in group})!=1:
+                raise ValueError('weighting input changed within one native operation')
+        raw=[int(value,16) for value in group[0]['raw'].split(',')]
+        if len(raw)!=4:raise ValueError('incomplete raw confidence table')
+        effective=[int(r['value'],16) for r in group[:4]]
+        normalized=[int(r['value'],16) for r in group[4:]]
+        source=group[0]
+        reference=effective_weight_reference(raw,int(source['pointer'],16),int(source['index'],16),
+            int(source['flags'],16),int(source['status'],16),int(source['bk'],16))
+        if effective!=reference:
+            raise ValueError('native effective weights differ from circular validity selection')
+        if any(a==0 and b!=0 for a,b in zip(effective,normalized)):
+            raise ValueError('normalization did not preserve an effective erasure')
+        groups.append(dict(time_ns=nanoseconds(group[-1]['t']),effective=effective,normalized=normalized,
+            raw=raw,pointer=group[0]['pointer'],index=int(group[0]['index'],16),
+            flags=int(group[0]['flags'],16),status=int(group[0]['status'],16)))
+    formats=[fields(row) for row in re.findall(r'npe3_idle_format: ([^\r\n]+)',text)]
+    totals=re.findall(r'npe3_idle_observer_complete: formats=(\d+) format_cap=128 ',text)
+    if len(totals)!=1 or not 0<int(totals[0])<128 or len(formats)!=int(totals[0]):
+        raise ValueError('missing or capped native frame-format census')
+    required={'sequence','t','low','mask','owner','selector','primary','secondary','flags','observer_writes'}
+    if any(not required<=r.keys() or r['sequence']!=str(i) or r['observer_writes']!='0'
+           for i,r in enumerate(formats,1)):
+        raise ValueError('native frame-format metadata incomplete')
+    joined=[];used=set()
+    for page in pages['matches']:
+        stamp=round(page['time']*1_000_000_000)
+        candidates=[(i,g) for i,g in enumerate(groups) if g['time_ns']<stamp]
+        if not candidates:raise ValueError('native page lacks a preceding weighting operation')
+        index,group=candidates[-1]
+        if index in used:raise ValueError('weighting operation reused by two page publications')
+        used.add(index)
+        record=dict(source_start_frame=page['source_start_frame'],
+            early=page['before_fourth_source_burst'],publication_delay_ns=stamp-group['time_ns'],**group)
+        if record['early']:
+            pair=[r for r in formats if group['time_ns']<nanoseconds(r['t'])<stamp]
+            if (len(pair)!=2 or [r['owner'] for r in pair]!=['004f27','004f28'] or
+                    any(r['mask']!='ffff' for r in pair) or
+                    int(pair[1]['sequence'])!=int(pair[0]['sequence'])+1 or
+                    pair[0]['flags']!=pair[1]['flags']):
+                raise ValueError('early page lacks its native copy/+2 frame-format pair')
+            before,after=pair
+            flag,status=(int(v,16) for v in before['flags'].split(','))
+            source=before['primary'] if before['selector']=='0000' else before['secondary']
+            high,low=(int(v,16) for v in source.split(','))
+            source_frame=(high<<16)|low
+            if (flag!=group['flags'] or status!=(group['status']|5) or
+                    not flag&0x200 or not status&1 or int(before['low'],16)!=low or
+                    int(after['low'],16)!=(low+2)&0xffff or
+                    source_frame!=(page['source_start_frame']+1)%2715648 or
+                    (source_frame+2)%2715648!=page['reported_end_frame']):
+                raise ValueError('early page frame format is not the canonical two-burst +2')
+            record['current_frame']=source_frame
+            record['reported_end_frame']=page['reported_end_frame']
+        joined.append(record)
+    early=[row for row in joined if row['early']]
+    pattern=bool(early) and all(r['effective'][0]>0 and r['effective'][1]>0 and
+        r['effective'][2:]==[0,0] and r['normalized'][2:]==[0,0] and
+        r['index']==2 and r['flags']&0x200 and r['status']&2 for r in early)
+    return dict(weighting_operations=len(groups),linked_pages=len(joined),early_pages=early,
+                native_two_burst_erasure_pattern=pattern,physical_capture_policy_qualified=False)
+
+
 def check_frame_pages(text,common_configuration_time):
     """Bind native payloads to unique external pages, without fitting frame time."""
     sources={}

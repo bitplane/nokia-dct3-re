@@ -305,11 +305,13 @@ def main():
             from PIL import Image
             from tools.run_noki6210_acceptance import check_frame
             from tools.npe3_rach_transmit_check import check as check_access
-            from tools.npe3_raw_ua_check import check_release,check_frame_pages
+            from tools.npe3_raw_ua_check import check_release,check_frame_pages,check_page_confidence
             access=check_access(text,(first/'rom6_radio_writes.tsv').read_text(),
                                 require_windows=True,require_releases=True,allow_normal=True)
             release=check_release(text,access['normal_control_blocks'])
             report['frame_pages']=check_frame_pages(text,release['common_configuration_time'])
+            report['page_confidence']=check_page_confidence(text,report['frame_pages'],
+                (first/'npe3_terminal_program.be16').read_bytes())
             report['raw_release']=release
             check_input_start(text,'npe3_native_physical: key=Menu',args.input_at)
             if 'npe3_native_key: value=19' not in text:

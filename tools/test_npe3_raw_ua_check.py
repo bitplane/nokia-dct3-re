@@ -1,9 +1,49 @@
 import unittest
+import hashlib
 from unittest.mock import patch
-from tools.npe3_raw_ua_check import check,check_location_update,check_release,check_paging_fill,check_frame_pages
+from tools.npe3_raw_ua_check import (check,check_location_update,check_release,check_paging_fill,
+    check_frame_pages,check_page_confidence,effective_weight_reference)
 
 
 class RawUaCheckTest(unittest.TestCase):
+    def test_effective_weights_follow_circular_index_and_validity_flags(self):
+        raw=[10,20,30,40]
+        self.assertEqual(effective_weight_reference(raw,0x245a,2,0x200,2,4),[10,20,0,0])
+        self.assertEqual(effective_weight_reference(raw,0x2458,2,0x200,2,4),[30,40,0,0])
+        self.assertEqual(effective_weight_reference(raw,0x2458,0,0x200,2,4),raw)
+        self.assertEqual(effective_weight_reference(raw,0x245a,2,0,2,4),[30,40,10,20])
+        self.assertEqual(effective_weight_reference(raw,0x245a,2,0x200,0,4),[30,40,10,20])
+
+    def test_native_weighting_stores_are_pinned_complete_and_joined(self):
+        lines=[]
+        for index,value in enumerate((0x18b,0x560,0,0,0x24be,0x7fff,0,0),1):
+            owner='00004e2b' if index<=4 else '00004e3b'
+            lines.append(f'npe3_xcch_weight: sequence={index} t=1.{index:09d} address={0x2f00+(index-1)%4:04x} value={value:04x} mask=ffff readpc=004e2c execpc={owner} cpu_pc=004e2c pointer=245a raw=018b,0560,0568,0560 flags=0212 status=000a ar0=0000 index=0002 bk=0004 ar3=245a observer_writes=0')
+        lines.append('npe3_xcch_weight_complete: writes=8 cap=4096 observer_writes=0')
+        lines.append('npe3_idle_format: sequence=1 t=1.000009000 low=0568 mask=ffff owner=004f27 selector=0000 primary=0000,0568 secondary=0000,0561 flags=0212,000f observer_writes=0')
+        lines.append('npe3_idle_format: sequence=2 t=1.000009001 low=056a mask=ffff owner=004f28 selector=0000 primary=0000,0568 secondary=0000,0561 flags=0212,000f observer_writes=0')
+        lines.append('npe3_idle_observer_complete: formats=2 format_cap=128 scalars=0')
+        text='\n'.join(lines)
+        pages=dict(matches=[dict(time=1.00001,source_start_frame=1383,reported_end_frame=1386,before_fourth_source_burst=True)])
+        program=bytes(0x20000)
+        digest=hashlib.sha256(program[0x4d20*2:0x4f2f*2]).hexdigest()
+        with patch('tools.npe3_raw_ua_check.WEIGHT_CODE_SHA256',digest):
+            result=check_page_confidence(text,pages,program)
+            self.assertTrue(result['native_two_burst_erasure_pattern'])
+            self.assertFalse(result['physical_capture_policy_qualified'])
+            for old,new in (('mask=ffff','mask=00ff'),('sequence=1 ','sequence=2 '),
+                            ('t=1.000000001 ',''),
+                            ('writes=8','writes=16'),('index=0002','index=0003'),
+                            ('bk=0004','bk=0008'),('execpc=00004e2b','execpc=00004e2c'),
+                            ('raw=018b,0560,0568,0560','raw=018b,0560'),
+                            ('low=056a','low=056b'),('flags=0212,000f','flags=0212,000e'),
+                            ('value=0000','value=0001')):
+                with self.subTest(old=old),self.assertRaises(ValueError):
+                    check_page_confidence(text.replace(old,new),pages,program)
+            with self.assertRaises(ValueError):
+                check_page_confidence(text,dict(matches=pages['matches']*2),program)
+        with self.assertRaises(ValueError):check_page_confidence(text,pages,program)
+
     def test_unique_page_payload_binds_source_without_fitting_reported_fn(self):
         frame=216
         payload=bytes.fromhex('2506211005f4')+(0x80000000|frame).to_bytes(4,'big')+bytes([0x2b])*13
