@@ -1428,16 +1428,26 @@ update. Moreover `1054/4100` and `082a/4100` co-vary with these classes; the
 current evidence does not isolate which physical command owns band selection
 or what other fields the `4a80` payload controls.
 
-## Next implementation boundary
+## Remaining RF qualification boundary
 
-Do not add a second descriptor queue. RX arithmetic and configuration-class
-selection are qualified, and the partial device below receives raw compare
-projections. The next boundary is physical interpretation of the co-varying
-`4100`/`4a80` controls and receive-clock/sample ownership. The complete
-stable-payload capture does not uniquely choose a physical latch edge; the
-device's compare-edge policy is explicit, not a measured silicon conclusion.
-A clocked sample source with provenance follows; no carrier fallback is permitted.
-Native FCCH/SCH/BCCH, camp and registration come after those boundaries.
+The laboratory composition already executes native FCCH/SCH/full SI,
+Location Updating, paging and bounded call control. The counter calculations,
+unique source-FN association and early-decode erasure behavior are qualified
+above. None supplies the missing physical interface specification. Do not
+add another descriptor queue, a carrier fallback, a four-burst latency shim
+or a program-page mirror to turn these results into broader acceptance.
+
+| Remaining claim | Current limit | Smallest useful additional evidence |
+| --- | --- | --- |
+| Physically selected RF carrier | Own firmware's command words/channel arithmetic are known; SCU-to-HAGAR shift, select, enable and settling semantics are not | A matched SCU/HAGAR register/serial contract, or a correlated command/pin capture identifying those fields and edges |
+| Physical receive timing/camping | P09/P0a/P0b/P05 laboratory policies work, but do not identify ADC/transfer/INT0 ownership or the physical counter epoch | Matched MFI/SCU timing documentation or a correlated counter/control/ADC/INT0 capture; a successful decoded payload alone is insufficient |
+| Connected traffic/speech | Incoming early/late and outgoing assignments reach the same unbacked program address `1:a50d` | Full-address program reads at `1:a50d` and `0:a50d`, with PMST/XPC/mask provenance; preferably the complete page-1 upper bank, or a reliable MAD2 program-address decode contract |
+| Fitted 6210 mask/clock identity | The acquired ROM6 and 45.5 MHz are explicitly reference inputs | Product-matched mask/multiplier documentation or measured provenance, not another fitted execution rate |
+
+The existing traces cannot distinguish hardware implementations that share
+these software-visible transactions but differ in those missing electrical
+or address-decode contracts. Keep the reference composition and its scoped
+acceptance; do not promote one such implementation merely because it boots.
 
 ### NPE-3 physical serial boundary
 
@@ -1549,6 +1559,21 @@ rejects missing/extra/reordered destination stores. The full DSP journal
 retains the same hash;native Menu,SIM,LU/release and addressed pages pass.
 This closes numeric formatter reuse,not physical divider-bit semantics,
 configuration-word equivalence,RF enable/gain/settling or tuned reception.
+
+An offline cross-check of the unique-page composition uses the complete
+observed `1054/0502` and `082a/0308` pairs only to invert this own-firmware
+numeric function. It does not add those pairs to the physical device model.
+The receipt trace is a 65,536-entry prefix of 67,803 compare expiries, ending
+at 22.209963308s; all queried page epochs end by 16.511511714s and are
+covered. At the first source-frame boundary, 24 of 27 command states imply
+the same logical key as the page report (three key 35, 21 key 45); three
+are unresolved and none implies a different key. The nearest compare edge
+is at least 23,615ns from these boundary queries. At publication time all
+27 states are unresolved, including `4100ffff` or non-RX numeric words.
+Thus publication-time command state is not a receiver-readiness oracle.
+These correlations support the software key labels, not physical carrier
+selection: the independent ADC source still supplies its waveform untuned.
+Do not gate samples or assign enable/lock semantics from this inversion.
 
 ## Receive interrupt and clock boundary
 
