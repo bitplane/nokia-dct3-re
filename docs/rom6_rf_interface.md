@@ -1309,6 +1309,37 @@ device's compare-edge policy is explicit, not a measured silicon conclusion.
 A clocked sample source with provenance follows; no carrier fallback is permitted.
 Native FCCH/SCH/BCCH, camp and registration come after those boundaries.
 
+### NPE-3 physical serial boundary
+
+The retained **Nokia NPE-3 System Module, issue 1 (09/00)** supplies
+product-owned electrical constraints in table 2, printed pages 13-17:
+
+| Signal | Source named by the manual | Qualified function |
+| --- | --- | --- |
+| SLE / SynthEna | MAD2WD1 | Serial enable for HAGAR band, TX/RX and synthesizer programming |
+| SDATA / SyntData | MAD2WD1 | Serial programming data; listed typical rate 3.25 MHz |
+| SCLK / SynthClk | MAD2WD1 | Serial programming clock; listed typical rate 3.25 MHz |
+| HAGAR RESETX | MAD2WD1 | Separate active-low reset |
+
+Source: `roms/research/npe3/npe3-system-module.pdf`, SHA-256
+`acaf85590cee30a1c8640f7411adf41f14fadf3de58cadb74e92be4d8d506d2e`.
+These are board pins, not decoded DSP I/O registers. In particular, the
+manual does not assign a serial bit count, shift order, latch edge or
+completion interrupt to P30/P31/P32/P04. The listed rate constrains a future
+serializer; it does not make a compare callback a completed physical transfer.
+The separate reset also does not establish that holding the DSP in reset
+resets HAGAR.
+
+Keep three contracts separate: own firmware proves the command words and
+channel arithmetic; this manual identifies the external wires and their
+electrical rate; the missing SCU/HAGAR register specification must connect
+them. Neither the shared low bits of `0502`/`0402` and `0308`/`0208` nor a
+sibling manual's serial-bus description proves configuration equivalence.
+The smallest useful additional evidence is the command-to-pin encoding
+(length, select, order and latch semantics) plus HAGAR's configuration-field
+definition. Capture/INT0 ownership remains a separate MFI contract even if
+that serial encoding is recovered.
+
 ## Partial HAGAR command state
 
 The `nsm3r6` and raw-laboratory `npe3ap5` research compositions attach
