@@ -64,6 +64,8 @@ public:
 	void nse1afs(machine_config &config);
 	void nse1cp9(machine_config &config);
 	void nse1sp9(machine_config &config);
+	void nse1tp5(machine_config &config);
+	void nse1ap5(machine_config &config);
 	void npe3cp9(machine_config &config);
 	void npe3zp9(machine_config &config);
 	void npe3bp9(machine_config &config);

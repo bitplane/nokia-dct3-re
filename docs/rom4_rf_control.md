@@ -838,3 +838,36 @@ LCD frames at 3/20/45/59 s are pixel-identical to the SCH-only `nse1cp9`
 control: no service presentation. Native uplink burst content, transmit
 timing, AGCH/SDCCH response and Location Updating remain open; the ROM6
 `npe3ap5` raw-AGCH responder is the existing reference for that step.
+
+### Native uplink and Location Updating
+
+ROM4 uses the ROM6 transmit grammar unchanged: port `21` bits 9–11 frame a
+load (`0a00`) and commit (`0600`) of exactly 15 twelve-bit port-`27` words,
+and ports 5–8 receive the release compares. `nse1tp5` releases at the port-5
+compare; its four access bursts decode through `gsm::rach::decode_p27` with
+BSIC 42 to RA `0d/00/07/07`, all in the `000xxxxx` location-updating cause
+range.
+
+`nse1ap5` adds the existing ROM6 raw-AGCH laboratory BTS (`nse1_raw_bts`
+inputs share `dct3_lab_bts` with `npe3_raw_bts`). A fresh run completes the
+whole dialogue through the native DSP in both directions:
+
+| Frame | Direction | Content |
+| --- | --- | --- |
+| 3028 | uplink | access burst, RA `0d` |
+| 3066 | downlink | Immediate Assignment, SDCCH/4 |
+| 3097 | uplink | SABM + MM Location Updating Request (`05 08`, IMSI) |
+| 3133 | downlink | UA echoing the request |
+| 3184 | downlink | Location Updating Accept, LAI `00f110`/`0001` |
+| 3199 | uplink | RR acknowledging the Accept |
+| 3235 | downlink | Channel Release |
+| 3250/3301 | uplink | RR, DISC |
+| 3337 | downlink | UA |
+
+Every uplink block decodes with an exact code. A repeated 30-second run
+reproduces the same frames. The 59-second LCD shows operator `DCT3 LAB` and
+full signal bars; the `nse1sp9` control without the responder shows neither.
+This is laboratory registration through native ROM4 code, not promotion of
+the normal machine: port-9 capture, port-5 release, the zero-epoch untuned
+source, MFI timing and RF tuning remain laboratory assumptions, and no
+acceptance gate protects it yet.

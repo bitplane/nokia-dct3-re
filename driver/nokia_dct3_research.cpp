@@ -100,6 +100,18 @@ void dct3_rf_adc_fixture_state::nse1sp9(machine_config &config)
 	m_full_broadcast = true;
 }
 
+void dct3_rf_adc_fixture_state::nse1tp5(machine_config &config)
+{
+	nse1sp9(config);
+	m_p05_transmit = true;
+}
+
+void dct3_rf_adc_fixture_state::nse1ap5(machine_config &config)
+{
+	nse1tp5(config);
+	m_raw_agch = true;
+}
+
 void dct3_rf_adc_fixture_state::npe3ad0(machine_config &config)
 {
 	npe3afs(config);

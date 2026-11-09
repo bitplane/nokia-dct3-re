@@ -1826,8 +1826,7 @@ static INPUT_PORTS_START( noki6210 )
 	PORT_INCLUDE(noki5210)
 INPUT_PORTS_END
 
-static INPUT_PORTS_START( npe3_raw_bts )
-	PORT_INCLUDE(noki6210)
+static INPUT_PORTS_START( dct3_lab_bts )
 	PORT_START("LAB_BTS")
 	PORT_BIT( 0x01, IP_ACTIVE_HIGH, IPT_OTHER ) PORT_NAME("Laboratory BTS page")
 		PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(dct3_rf_adc_fixture_state::bts_page_w), 0)
@@ -1861,6 +1860,11 @@ static INPUT_PORTS_START( npe3_raw_bts )
 	PORT_CONFNAME(0x400, 0x00, "Laboratory BTS uniquely identified paging blocks")
 	PORT_CONFSETTING(0x000, DEF_STR( Off ))
 	PORT_CONFSETTING(0x400, DEF_STR( On ))
+INPUT_PORTS_END
+
+static INPUT_PORTS_START( npe3_raw_bts )
+	PORT_INCLUDE(noki6210)
+	PORT_INCLUDE(dct3_lab_bts)
 INPUT_PORTS_END
 
 static INPUT_PORTS_START( noki8290 )
@@ -2056,6 +2060,11 @@ INPUT_PORTS_START( noki5110 )
 
 	PORT_START("CHARGER")
 	PORT_BIT( 0x01, IP_ACTIVE_HIGH, IPT_OTHER ) PORT_NAME("Charger connected") PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(nokia_dct3_state::charger_irq), 0)
+INPUT_PORTS_END
+
+static INPUT_PORTS_START( nse1_raw_bts )
+	PORT_INCLUDE(noki5110)
+	PORT_INCLUDE(dct3_lab_bts)
 INPUT_PORTS_END
 
 static INPUT_PORTS_START( noki6110 )
@@ -3228,6 +3237,8 @@ ROM_END
 #define rom_nse1afs rom_noki5110
 #define rom_nse1cp9 rom_noki5110
 #define rom_nse1sp9 rom_noki5110
+#define rom_nse1tp5 rom_noki5110
+#define rom_nse1ap5 rom_noki5110
 #define rom_nsm1pcm rom_nsm1r4t
 #define rom_nam2c3 rom_noki2100
 #define rom_nse1bit rom_noki5110
@@ -3261,6 +3272,8 @@ SYST( 2026, nse1adc, noki5110, 0, nse1adc, noki5110, dct3_rf_adc_fixture_state, 
 SYST( 2026, nse1afs, noki5110, 0, nse1afs, noki5110, dct3_rf_adc_fixture_state, empty_init, "Research", "NSE-1 ROM4 FCCH and coded SCH ADC experiment", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2026, nse1cp9, noki5110, 0, nse1cp9, noki5110, dct3_rf_adc_fixture_state, empty_init, "Research", "NSE-1 ROM4 FCCH/SCH ADC experiment with port-9 capture start", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2026, nse1sp9, noki5110, 0, nse1sp9, noki5110, dct3_rf_adc_fixture_state, empty_init, "Research", "NSE-1 ROM4 FCCH/SCH/full-SI ADC experiment with port-9 capture start", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
+SYST( 2026, nse1tp5, noki5110, 0, nse1tp5, noki5110, dct3_rf_adc_fixture_state, empty_init, "Research", "NSE-1 ROM4 full-SI ADC experiment with port-5 transmit release", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
+SYST( 2026, nse1ap5, noki5110, 0, nse1ap5, nse1_raw_bts, dct3_rf_adc_fixture_state, empty_init, "Research", "NSE-1 ROM4 raw AGCH candidate", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2026, nse1bit, noki5110, 0, nse1bit, noki5110, dct3_pcm_fixture_state, empty_init, "Research", "NSE-1 external 1 MHz PCM wire fixture (not product clock wiring)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2026, nse1pin, noki5110, 0, nse1pin, noki5110, dct3_pcm_fixture_state, empty_init, "Research", "NSE-1 clocked boot-loopback fixture (not product clock wiring)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2026, nse1pipe, noki5110, 0, nse1pipe, noki5110, nse1_pipeline_fixture_state, empty_init, "Research", "NSE-1 staged DSP frontend integration probe", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
