@@ -42,10 +42,15 @@ inline std::vector<clocked_register_case> section_cases()
     if(std::getenv("C54X_ROM6_XCCH_BURSTS")) {
         bool const frontend=std::getenv("C54X_ROM6_XCCH_FRONTEND")!=nullptr;
         bool const raw=std::getenv("C54X_ROM6_XCCH_RAW_ADC")!=nullptr;
+        bool const erase_all=std::getenv("C54X_ROM6_XCCH_ERASE_ALL")!=nullptr;
+        bool const erasures=erase_all || std::getenv("C54X_ROM6_XCCH_ERASE_LAST_TWO")!=nullptr;
+        if(erasures && frontend)throw std::runtime_error("soft erasures are not a sample frontend fixture");
         std::ifstream burst_file(std::string(directory)+"/xcch_bursts.le16",std::ios::binary);
         std::vector<unsigned char> burst_bytes((std::istreambuf_iterator<char>(burst_file)),{});
         if(burst_bytes.size()!=912)throw std::runtime_error("four114-word bursts required");
         auto nibble=[&](unsigned i){return u16(burst_bytes[2*i]|(unsigned(burst_bytes[2*i+1])<<8));};
+        if(erasures)for(unsigned i=erase_all ? 0 : 228;i<456;++i)
+            if(nibble(i))throw std::runtime_error("erased soft buffers must contain no information");
         std::vector<unsigned char> samples;
         if(frontend) {
             std::ifstream sample_file(std::string(directory)+(raw ? "/xcch_raw.le16" : "/xcch_samples.le16"),std::ios::binary);
@@ -98,13 +103,13 @@ inline std::vector<clocked_register_case> section_cases()
             for(u16 coefficient:{0x0387,0x11a3,0x2ad6,0x4000,0x4000,0x2ad6,0x11a3,0x0387})
                 initial.data.push_back({0x3ebd+index++,coefficient});
         }
-        // Equal nonzero burst confidence is an isolated test precondition.
+        // Erasures remove both information and confidence, not decoded output.
         initial.data.push_back({0x264b,0x5000});
-        for(unsigned i=0;i<4;++i)initial.data.push_back({0x5000+i,1});
-        auto final=observation("native-four-burst-deinterleaving",{{STATE_GENPC,0x4d14},{r::STATE_IDLE,1},{r::STATE_SP,0x1000}},{{0x261f,0}});
+        for(unsigned i=0;i<4;++i)initial.data.push_back({0x5000+i,u16(erase_all || (erasures && i>=2) ? 0 : 1)});
+        auto final=observation("native-four-burst-deinterleaving",{{STATE_GENPC,0x4d14},{r::STATE_IDLE,1},{r::STATE_SP,0x1000},{r::STATE_ILLEGAL,0}},{{0x261f,0}});
         for(unsigned i=0;i<114;++i) {
             u16 packed=0;
-            for(unsigned j=0;j<4;++j)packed|=(word(4*i+j)==32 ? 3 : 12)<<(4*j);
+            for(unsigned j=0;j<4;++j)packed|=(erase_all || (erasures && j>=2) ? 0 : word(4*i+j)==32 ? 3 : 12)<<(4*j);
             if(!frontend)final.expected_data.push_back({0x2c2+i,packed});
         }
         for(unsigned i=0;i<15;++i)final.expected_data.push_back({0x2f80+i,word(456+i)});

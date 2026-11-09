@@ -469,11 +469,40 @@ ordinary LU oracle only inside the envelope animation at pixels 25..47,
 Five successful publications precede their fourth source burst. Keep that
 timing observation separate from the now-correct FN association. A valid
 decoded payload does not establish that all four complete bursts were
-received; neither erasure recovery nor a timing/staging explanation has
-been established. The checker rejects payloads predating their first source
+received; the isolated native experiment below proves that two-burst
+recovery is possible for all five payloads. Actual whole-phone buffer
+provenance is still unverified. The checker rejects payloads predating their first source
 frame, preserves fourth-burst timing discrepancies, and never fits a clock
 or shifts the source to conceal them. Next establish which source samples
 contribute to those five blocks before changing receive timing.
+
+#### Native two-erasure control
+
+`tools/run_rom6_xcch_kernel.py --entry-dir <passive-entry-directory>`
+accepts `--erase-last-two` for an isolated soft-buffer experiment. This
+uses the same acquired resident code/DROM validation as the ordinary xCCH
+kernel, not the booting phone. The last two 114-word soft buffers are zero
+and the explicitly supplied burst-confidence table is `[1,1,0,0]`.
+Native `5905` still owns interleaving and `4cf7` continues through the
+ordinary weighting, Viterbi and packing code. The fixture checks both
+the exact packed interleaver contents and the decoded payload/FIRE bits;
+no decoded answer or hardware CRC verdict is supplied.
+
+All five early-page payloads (source starts 1383, 1842, 2301, 3321 and
+3576) reproduce the exact expected output with two trailing erasures,
+zero illegal instructions and save/restore replay. The ordinary four-burst
+control also passes. `--erase-all` zeros all soft buffers and confidences;
+it reaches the expected legal halt but correctly fails the payload check
+(`2f80=0000`, expected `0625` for the first page). Reports retain the soft
+input hash and confidence preconditions. Soft erasures cannot be combined
+with the ADC/frontend or hardware-FIRE fixture modes.
+
+Thus publication before a fourth burst is **not by itself a timing defect**.
+This is a sufficiency experiment, not proof that the whole phone used these
+exact confidences or that its timing is physically correct. The next
+discriminating observation is the native confidence/buffer state consumed
+by those actual publications; do not delay an interrupt merely to enforce
+a four-burst latency that this decoder does not require.
 
 ### Native idle paging and extended observation
 
