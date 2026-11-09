@@ -642,9 +642,11 @@ LAPDm link,not another synthetic handset completion. The separately enabled
 speech SETUP for5551234 only after that IMSI-matched Paging Response. Raw
 SETUP4153 decodes successfully at19.183711363s. Actual timed uplink4219
 contains Call Confirmed `8308040460020081150101`;retransmissions occur at
-4270/4321/4372/4423 because the lab BTS does not yet acknowledge this I-frame.
-The reviewed pre-Menu frame shows5551234 calling with Answer/Reject. This
-proves incoming call presentation and native CC admission,not Alerting,
+4270/4321/4372/4423 because this SETUP-only control does not acknowledge the I-frame.
+The reviewed pre-input frame shows 5551234 calling with Options/Reject. Left
+Softkey opens the Answer/Reject options list; it is not itself an Answer
+probe. The explicit `--answer-call` fixture uses the physical Send key. The
+SETUP-only observations prove incoming call presentation and native CC admission,not Alerting,
 answer,connected media or physical tuning.
 
 The separate traffic-assignment switch acknowledges Call Confirmed with
@@ -687,6 +689,28 @@ user rejection signaling, not a connected call, traffic setup or speech.
 
 ```sh
 .venv/bin/python tools/run_npe3_native.py --reference-clock --seconds 24 --adc-source fcch-sch-broadcast --capture-start p09 --tx-release p05 --raw-agch --provision-records --page-at 18 --cell-power-policy handset33 --incoming-call --ack-call-control --reject-call
+```
+
+### Native physical Answer and CONNECT
+
+The explicit `--answer-call` source presses Send at 20 seconds, decoded as
+`0e`. With CC acknowledgements and SACCH active, actual timed uplink frame
+4372 contains `0124098307` plus padding: native CONNECT, not a synthetic
+call-state publication. Raw RR 4408 acknowledges it and is decoded natively
+at 20.360640088 seconds. There are 13 successful SACCH blocks and no failed
+ones through the 24-second horizon. All 170 transmit transactions have
+matching projected windows and timed releases; the bounded observation cap
+is 512 (the old 128-window cap truncated an otherwise legal active run).
+
+Acceptance requires the physical Send marker, subsequent `0e` decode and
+exactly one timed CONNECT after input. The handset's Call 1 display is
+presentation evidence only. No traffic assignment, CONNECT ACKNOWLEDGE or
+speech is supplied or qualified by this control. Actual traffic completion
+still requires the separately unresolved program-bank contract below; do
+not replace assignment with a fabricated connected-media state.
+
+```sh
+.venv/bin/python tools/run_npe3_native.py --reference-clock --seconds 24 --adc-source fcch-sch-broadcast --capture-start p09 --tx-release p05 --raw-agch --provision-records --page-at 18 --cell-power-policy handset33 --incoming-call --ack-call-control --sacch --answer-call
 ```
 
 ### Native SACCH and rejected-call clearing

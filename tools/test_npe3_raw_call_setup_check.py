@@ -104,12 +104,15 @@ class RawCallSetupTest(unittest.TestCase):
             result=check(text,blocks)
             self.assertTrue(result['native_setup_decode_qualified'])
             self.assertFalse(result['native_call_confirmed_qualified'])
+            self.assertFalse(result['native_connect_emission_qualified'])
             self.assertFalse(result['speech_transport_qualified'])
             blocks+= [dict(start_frame=4219,octets='0120098308'+'2b'*18),
                       dict(start_frame=4270,octets='0140098301'+'2b'*18)]
             result=check(text,blocks)
             self.assertTrue(result['native_call_confirmed_qualified'])
             self.assertTrue(result['native_alerting_qualified'])
+            blocks.append(dict(start_frame=4372,octets='0124098307'+'2b'*18))
+            self.assertTrue(check(text,blocks)['native_connect_emission_qualified'])
             for bad in ('',text+text,text.replace('4153','4154'),text.replace('81551532f4','81551532f5')):
                 with self.assertRaises(ValueError):check(bad,blocks)
             with self.assertRaises(ValueError):check(text,blocks[1:])

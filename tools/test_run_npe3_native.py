@@ -33,7 +33,8 @@ class Native6210EvidenceTest(unittest.TestCase):
         for args in (['--reject-call'], ['--reject-call','--incoming-call','--traffic-assignment'],
                      ['--ack-call-control'],['--ack-call-control','--incoming-call','--traffic-assignment'],
                      ['--clear-rejected-call'],['--clear-rejected-call','--reject-call','--incoming-call'],
-                     ['--sacch'],['--sacch','--raw-agch']):
+                     ['--sacch'],['--sacch','--raw-agch'],['--answer-call'],
+                     ['--answer-call','--reject-call','--incoming-call']):
             result=subprocess.run([sys.executable,str(script),*args],capture_output=True,text=True)
             self.assertEqual(result.returncode,2)
             self.assertNotIn('Native6210 evidence:',result.stdout)

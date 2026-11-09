@@ -307,7 +307,8 @@ void dct3_rf_adc_fixture_state::control_w(offs_t port, u16 data)
 	{
 		if (m_lab_tx.control(data))
 		{
-			if (m_observed_tx_windows++<(m_raw_agch ? 128U : 16U))
+			// A sustained 24-second SDCCH includes SACCH and idle uplink blocks.
+			if (m_observed_tx_windows++<(m_raw_agch ? 512U : 16U))
 			{
 				auto &backend=*subdevice<nokia_dsp_c54x_device>("dsp_c54x");
 				std::array<double,4> deadlines{};

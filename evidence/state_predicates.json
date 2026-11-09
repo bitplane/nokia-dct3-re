@@ -3,6 +3,14 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "npe3_native_physical_answer_connect",
+      "owner": "native_rom6_reference_adc_laboratory",
+      "status": "satisfied",
+      "predicate": "Physical Send during native incoming-call alerting produces CONNECT on timed port bits",
+      "current": "With separate33dBm raw BTS,CC acknowledgements and SI5/SI6,physical Send20s decodes0e and actual uplink4372 carries0124098307 plus padding. RR4408 decodes20.360640088s. Full24s execution is legal with zero unbacked reads;13 successful SACCH blocks,zero failures,and170 independently checked projected/transmitted bursts. The observation-only raw window cap is512 because128 truncated the sustained run. Left Softkey19 instead opens Options/Answer/Reject and is not an Answer probe. Call1 presentation and native CONNECT emission do not establish traffic assignment,CONNECT ACKNOWLEDGE,connected media or speech. The native traffic program-backing predicate remains unresolved.",
+      "evidence": ["tools/npe3_native_observe.lua", "tools/run_npe3_native.py", "tools/npe3_raw_call_setup_check.py", "tools/test_npe3_raw_call_setup_check.py", "tools/test_run_npe3_native.py", "docs/rom6_rf_interface.md"]
+    },
+    {
       "id": "npe3_native_sacch_and_call_clearing",
       "owner": "native_rom6_reference_adc_laboratory",
       "status": "satisfied",

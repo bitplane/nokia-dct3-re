@@ -137,6 +137,8 @@ def main():
                         help='external BTS sends plain CC SETUP only after actual native Paging Response')
     parser.add_argument('--reject-call',action='store_true',
                         help='press physical Right Softkey instead of Left Softkey in the incoming-call fixture')
+    parser.add_argument('--answer-call',action='store_true',
+                        help='press physical Send, not the options softkey, in the incoming-call fixture')
     parser.add_argument('--ack-call-control',action='store_true',
                         help='separate raw RR acknowledgements of CC I-frames, without traffic assignment')
     parser.add_argument('--clear-rejected-call',action='store_true',
@@ -150,6 +152,8 @@ def main():
     args = parser.parse_args()
     if args.reject_call and (not args.incoming_call or args.traffic_assignment):
         parser.error('call rejection requires incoming SETUP without traffic assignment')
+    if args.answer_call and (not args.incoming_call or args.reject_call):
+        parser.error('physical Answer requires incoming SETUP and excludes Reject')
     if args.ack_call_control and (not args.incoming_call or args.traffic_assignment):
         parser.error('standalone CC acknowledgement requires SETUP without assignment')
     if args.clear_rejected_call and not (args.reject_call and args.ack_call_control):
@@ -236,7 +240,7 @@ def main():
         env = {k: v for k, v in os.environ.items() if not k.startswith('NOKIA_DCT3_')}
         env['NPE3_NATIVE_SCENARIO'] = scenario
         env['NPE3_NATIVE_INPUT_AT'] = str(args.input_at)
-        env['NPE3_NATIVE_REJECT_CALL'] = '1' if args.reject_call else '0'
+        env['NPE3_NATIVE_CALL_KEY'] = 'Send' if args.answer_call else 'RightSoftkey' if args.reject_call else 'Menu'
         env['NPE3_NATIVE_SECONDS'] = str(seconds)
         env.pop('NPE3_NATIVE_PAGE_AT',None)
         if args.page_at is not None:env['NPE3_NATIVE_PAGE_AT']=str(args.page_at)
@@ -288,6 +292,18 @@ def main():
                         frame*60000/13000000>args.input_at
                         for frame in report['call_rr']['native_disconnect_frames']):
                     raise ValueError('no timed native DISCONNECT followed physical Reject')
+            if args.answer_call:
+                marker='npe3_native_physical: key=Send'
+                check_input_start(text,marker,args.input_at)
+                if 'npe3_native_key: value=0e' not in text.split(marker,1)[1]:
+                    raise ValueError('physical Send was not decoded after input')
+                report['physical_answer_key_decoded']=True
+                if args.ack_call_control and args.sacch:
+                    connects=[frame for frame in report['call_setup']['native_connect_frames']
+                              if frame*60000/13000000>args.input_at]
+                    if len(connects)!=1:
+                        raise ValueError('missing unique timed CONNECT after physical Send')
+                    report['native_answer_to_connect_qualified']=True
             if args.clear_rejected_call:
                 from tools.npe3_raw_call_setup_check import check_call_clearing
                 report['call_clearing']=check_call_clearing(text,access['normal_control_blocks'])

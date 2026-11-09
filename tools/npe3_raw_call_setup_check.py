@@ -29,7 +29,7 @@ def check(text,blocks):
                 float(packet['time'])>(start+3)*60000/13000000):
             packets.append(packet)
     if len(packets)!=1:raise ValueError('missing unique successful native SETUP decode')
-    confirmed=[];alerting=[]
+    confirmed=[];alerting=[];connect=[]
     for block in blocks:
         data=bytes.fromhex(block['octets']);length=data[2]>>2
         if block['start_frame']<=start+3 or data[0]!=1 or data[1]&1 or data[2]&3!=1 or not 2<=length<=20:
@@ -38,9 +38,11 @@ def check(text,blocks):
         if l3[0]!=0x83:continue
         if l3[1]&0x3f==8:confirmed.append(block['start_frame'])
         if l3[1]&0x3f==1:alerting.append(block['start_frame'])
+        if l3[1]&0x3f==7:connect.append(block['start_frame'])
     return dict(native_setup_decode_qualified=True,setup_start_frame=start,
                 native_decode_time=packets[0]['time'],
                 native_call_confirmed_frames=confirmed,native_alerting_frames=alerting,
+                native_connect_frames=connect,native_connect_emission_qualified=bool(connect),
                 native_call_confirmed_qualified=bool(confirmed),
                 native_alerting_qualified=bool(alerting),connected_call_qualified=False,
                 speech_transport_qualified=False,physical_rf_tuning_qualified=False)
