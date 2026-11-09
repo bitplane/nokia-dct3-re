@@ -3,6 +3,14 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "npe3_native_cc_alerting_rejection",
+      "owner": "native_rom6_reference_adc_laboratory",
+      "status": "satisfied",
+      "predicate": "Native SETUP processing emits Alerting and physical Reject emits timed DISCONNECT when the external BTS acknowledges actual CC I-frames",
+      "current": "Call Confirmed4219 -> raw RR4255 -> native Alerting4270 -> raw RR4306 -> physical Right Softkey at20s,decoded1a -> native DISCONNECT4372 (832502e091,cause11) -> raw RR4408,native decode20.360634418s. All RR sequence numbers derive from independently decoded timed port bits; network replies are raw I/Q,not MCU messages. Full24s run is legal with zero unbacked reads. Finite no-loss CC acknowledgement fixture only: arbitrary TI,loss/poll recovery,network RELEASE,RELEASE COMPLETE,RR channel clearing,traffic and speech remain unqualified. Standalone SETUP without RR repeats Confirmed; one RR advances only to Alerting repeats. Do not confuse pending data-link acknowledgement with a missing firmware producer.",
+      "evidence": ["driver/nokia_dct3_research.cpp", "tools/run_npe3_native.py", "tools/npe3_native_observe.lua", "tools/npe3_raw_call_setup_check.py", "tools/test_npe3_raw_call_setup_check.py", "docs/rom6_rf_interface.md"]
+    },
+    {
       "id": "npe3_native_traffic_program_backing",
       "owner": "native_rom6_reference_adc_laboratory",
       "status": "unresolved",
@@ -15,7 +23,7 @@
       "owner": "native_rom6_reference_adc_laboratory",
       "status": "satisfied",
       "predicate": "The raw network Assignment Command is decoded natively after actual Call Confirmed",
-      "current": "Separate traffic-assignment input sends N(S)=1/N(R)=1,acknowledging actual Call Confirmed4219 and assigning TCH/F slot1 on35 with TSC2/speech-v1. Independent four-burst source reconstruction and60 timed release checks pass. Native successful Assignment Command4255 decode is19.654480198s. MCU requests packet02 traffic config042a02000271012fc1000023000000040000000000000000 and submits00b0 empty SABM. This proves decode and MCU configuration,not completed traffic setup. The full24s gate remains red at the separate npe3_native_traffic_program_backing boundary. Actual TCH RF serialization,Assignment Complete,Alerting,connected call and speech remain unqualified.",
+      "current": "Separate traffic-assignment input sends N(S)=1/N(R)=1,acknowledging actual Call Confirmed4219 and assigning TCH/F slot1 on35 with TSC2/speech-v1. Independent four-burst source reconstruction and60 timed release checks pass. Native successful Assignment Command4255 decode is19.654480198s. MCU requests packet02 traffic config042a02000271012fc1000023000000040000000000000000 and submits00b0 empty SABM. This proves decode and MCU configuration,not completed traffic setup. The full24s gate remains red at the separate npe3_native_traffic_program_backing boundary. Actual TCH RF serialization,Assignment Complete,connected call and speech remain unqualified. Independent SDCCH Alerting/rejection is covered by npe3_native_cc_alerting_rejection,not this assignment run.",
       "evidence": ["driver/nokia_dct3_research.cpp", "tools/npe3_raw_call_setup_check.py", "tools/test_npe3_raw_call_setup_check.py", "tools/run_npe3_native.py", "docs/rom6_rf_interface.md", "docs/c54x_execution_contracts.md"]
     },
     {

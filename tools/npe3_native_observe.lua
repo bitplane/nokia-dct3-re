@@ -83,8 +83,9 @@ end
 _G.npe3_native_input=coroutine.create(function()
     if not emu.wait(input_at) then return end
     machine.screens[':screen']:snapshot('npe3_before_menu.png')
-    local key=assert(machine.ioport.ports[':COL.1'].fields['Left Softkey / Menu'])
-    machine:logerror(string.format('npe3_native_physical: key=Menu t=%d observer_writes=0\n',input_at))
+    local reject=os.getenv('NPE3_NATIVE_REJECT_CALL')=='1'
+    local key=assert(machine.ioport.ports[':COL.1'].fields[reject and 'Right Softkey / C' or 'Left Softkey / Menu'])
+    machine:logerror(string.format('npe3_native_physical: key=%s t=%d observer_writes=0\n',reject and 'RightSoftkey' or 'Menu',input_at))
     key:set_value(1)
     if not emu.wait(0.15) then key:set_value(0);return end
     key:set_value(0)

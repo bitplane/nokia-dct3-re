@@ -1840,6 +1840,9 @@ static INPUT_PORTS_START( npe3_raw_bts )
 	PORT_CONFNAME(0x08, 0x00, "Laboratory BTS traffic assignment")
 	PORT_CONFSETTING(0x00, DEF_STR( Off ))
 	PORT_CONFSETTING(0x08, DEF_STR( On ))
+	PORT_CONFNAME(0x10, 0x00, "Laboratory BTS acknowledge CC I-frames without assignment")
+	PORT_CONFSETTING(0x00, DEF_STR( Off ))
+	PORT_CONFSETTING(0x10, DEF_STR( On ))
 INPUT_PORTS_END
 
 static INPUT_PORTS_START( noki8290 )

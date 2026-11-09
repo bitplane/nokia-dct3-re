@@ -1,9 +1,35 @@
 import unittest
 from unittest.mock import patch
-from tools.npe3_raw_call_setup_check import check,check_assignment
+from tools.npe3_raw_call_setup_check import check,check_assignment,check_call_rr
 
 
 class RawCallSetupTest(unittest.TestCase):
+    def test_standalone_rr_requires_confirmation_and_native_receive(self):
+        octets='032101'+'2b'*20
+        text=f'npe3_raw_call_rr: uplink_start_frame=4219 start_frame=4255 octets={octets} raw_adc_only=1 physical_claim=0'
+        confirmed=dict(start_frame=4219,octets='0120098308'+'2b'*18)
+        packets=[dict(type=128,payload='802a00'+(4258).to_bytes(3,'big').hex()+'00230001'+octets,time='19.7')]
+        with patch('tools.npe3_raw_call_setup_check.check',return_value=dict(native_call_confirmed_frames=[4219])), \
+                patch('tools.npe3_raw_call_setup_check.check_rx_publications',return_value=dict(packets=packets)):
+            result=check_call_rr(text,[confirmed])
+            self.assertTrue(result['native_call_rr_decode_qualified'])
+            self.assertFalse(result['native_disconnect_qualified'])
+            blocks=[confirmed,dict(start_frame=4423,octets='0140158325028095'+'2b'*15)]
+            self.assertTrue(check_call_rr(text,blocks)['native_disconnect_qualified'])
+            self.assertFalse(check_call_rr(text,[confirmed,dict(blocks[1],octets='0140118325028095'+'2b'*15)])['native_disconnect_qualified'])
+            second='npe3_raw_call_rr: uplink_start_frame=4270 start_frame=4306 octets=034101'+'2b'*20+' raw_adc_only=1 physical_claim=0'
+            alerting=dict(start_frame=4270,octets='0122098341'+'2b'*18)
+            packets.append(dict(type=128,payload='802a00'+(4309).to_bytes(3,'big').hex()+'00230001'+'034101'+'2b'*20,time='19.9'))
+            self.assertEqual([r['ns'] for r in check_call_rr(text+'\n'+second,[confirmed,alerting])['acknowledgements']],[0,1])
+            with self.assertRaises(ValueError):check_call_rr(text+'\n'+second.replace('034101','032101'),[confirmed,alerting])
+            packets.pop()
+            for bad in ('',text+text,text.replace('4255','4256'),text.replace('032101','034101'),text.replace('4219','4218')):
+                with self.assertRaises(ValueError):check_call_rr(bad,blocks)
+        for bad in ([],packets*2,[dict(packets[0],time='18.0')]):
+            with patch('tools.npe3_raw_call_setup_check.check',return_value=dict(native_call_confirmed_frames=[4219])), \
+                    patch('tools.npe3_raw_call_setup_check.check_rx_publications',return_value=dict(packets=bad)):
+                with self.assertRaises(ValueError):check_call_rr(text,[confirmed])
+
     def test_assignment_requires_real_confirmation_and_exact_native_decode(self):
         octets='032221062e094023006301'+'2b'*12
         text=f'npe3_raw_assignment: confirmed_start_frame=4219 start_frame=4255 octets={octets} raw_adc_only=1 physical_claim=0'

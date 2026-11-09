@@ -656,6 +656,37 @@ at19.654480198s. MCU packet02/body
 configuration and packet1b/body00b0 submits empty SABM. This is not proof of
 actual TCH transmission.
 
+### Native CC alerting and physical rejection
+
+The separate SETUP fixture can continue on SDCCH without assigning traffic.
+`--ack-call-control` enables a finite, no-loss BTS receive window: actual
+timed CC I-frames determine N(S), and raw LAPDm RR acknowledges N(R)=N(S)+1
+modulo eight. It supplies no L3 completion. GSM 04.06 section 3.8.5 defines
+this acknowledgement ([ETSI Release 1999 specification](https://www.etsi.org/deliver/etsi_en/300900_300999/300938/08.00.01_60/en_300938v080001p.pdf)).
+This is still a laboratory peer, not a general LAPDm implementation: loss,
+poll/final recovery and arbitrary transaction identities are not qualified.
+
+The native sequence is Call Confirmed at frame 4219, RR at 4255, Alerting
+at 4270, RR at 4306, then physical Right Softkey at 20 seconds (decoded
+`1a`). The handset serializes DISCONNECT at 4372:
+`012415832502e091` followed by padding; its cause value is `11` (user busy).
+RR at 4408 is decoded natively at 20.360634418 seconds. All three replies
+are generated from decoded uplink bits and delivered only as raw I/Q.
+The 24-second run has zero illegal instructions and zero unbacked program
+reads. The checker independently reconstructs the timed blocks, joins each
+RR to its source and successful native receive, and requires DISCONNECT
+after the physical key when rejection is requested.
+
+Without acknowledgements, Call Confirmed retransmits; acknowledging only
+that frame advances to Alerting retransmissions. Neither is evidence of a
+missing handset CC producer. RELEASE/RELEASE COMPLETE and final radio-channel
+clearing are not yet supplied or validated. This proves native alerting and
+user rejection signaling, not a connected call, traffic setup or speech.
+
+```sh
+.venv/bin/python tools/run_npe3_native.py --reference-clock --seconds 24 --adc-source fcch-sch-broadcast --capture-start p09 --tx-release p05 --raw-agch --provision-records --page-at 18 --cell-power-policy handset33 --incoming-call --ack-call-control --reject-call
+```
+
 ### Native traffic program-page boundary
 
 The current full24s gate is red at an unbacked program
@@ -694,6 +725,15 @@ The current backend routes HPI writes to shared data RAM; executable overlay
 writes use the configured low RAM window. It has no upper-page program-write
 mapping. This explains why replaying the existing uploads cannot populate
 `1:a50d` in this composition; it does not establish the real MAD2 mapping.
+
+For acquisition, retain the complete program address rather than extending
+the old four-digit sweep format implicitly. TI SPRU131G sections 3.2.5 and
+5.3 specify that extended READA uses accumulator A's program-address bits;
+XPC alone is not the requested read address. A ROM-resident readout gadget
+would need to preserve the high accumulator address bits and demonstrate
+paired `0:a50d` / `1:a50d` reads, with PMST, XPC and handset/mask provenance.
+That is a proposed measurement contract, not proof that MAD2 exposes the
+generic extended mapping or permits that read under its ROM-security option.
 
 The native checker now rejects every unbacked upper-program read,even if its
 returned word decodes legally. First-escape logging retains read/execute PC,

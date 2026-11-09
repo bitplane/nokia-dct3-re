@@ -99,6 +99,9 @@ private:
 	std::array<std::array<std::array<s16,2>,148*4>,4> m_setup_samples{};
 	u64 m_assignment_start_frame=~u64(0);
 	std::array<std::array<std::array<s16,2>,148*4>,4> m_assignment_samples{};
+	u64 m_call_rr_start_frame=~u64(0);
+	u8 m_call_rr_sequence=0xff;
+	std::array<std::array<std::array<s16,2>,148*4>,4> m_call_rr_samples{};
 	bool m_lu_acknowledged=false;
 	u64 m_release_start_frame=~u64(0);
 	std::array<std::array<std::array<s16,2>,148*4>,4> m_release_samples{};
