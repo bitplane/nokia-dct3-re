@@ -3227,6 +3227,7 @@ ROM_END
 #define rom_nse1adc rom_noki5110
 #define rom_nse1afs rom_noki5110
 #define rom_nse1cp9 rom_noki5110
+#define rom_nse1sp9 rom_noki5110
 #define rom_nsm1pcm rom_nsm1r4t
 #define rom_nam2c3 rom_noki2100
 #define rom_nse1bit rom_noki5110
@@ -3259,6 +3260,7 @@ SYST( 2026, nse1ad0, noki5110, 0, nse1ad0, noki5110, dct3_rf_adc_fixture_state, 
 SYST( 2026, nse1adc, noki5110, 0, nse1adc, noki5110, dct3_rf_adc_fixture_state, empty_init, "Research", "NSE-1 ROM4 continuous-tone ADC/MFI lab experiment", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2026, nse1afs, noki5110, 0, nse1afs, noki5110, dct3_rf_adc_fixture_state, empty_init, "Research", "NSE-1 ROM4 FCCH and coded SCH ADC experiment", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2026, nse1cp9, noki5110, 0, nse1cp9, noki5110, dct3_rf_adc_fixture_state, empty_init, "Research", "NSE-1 ROM4 FCCH/SCH ADC experiment with port-9 capture start", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
+SYST( 2026, nse1sp9, noki5110, 0, nse1sp9, noki5110, dct3_rf_adc_fixture_state, empty_init, "Research", "NSE-1 ROM4 FCCH/SCH/full-SI ADC experiment with port-9 capture start", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2026, nse1bit, noki5110, 0, nse1bit, noki5110, dct3_pcm_fixture_state, empty_init, "Research", "NSE-1 external 1 MHz PCM wire fixture (not product clock wiring)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2026, nse1pin, noki5110, 0, nse1pin, noki5110, dct3_pcm_fixture_state, empty_init, "Research", "NSE-1 clocked boot-loopback fixture (not product clock wiring)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2026, nse1pipe, noki5110, 0, nse1pipe, noki5110, nse1_pipeline_fixture_state, empty_init, "Research", "NSE-1 staged DSP frontend integration probe", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )

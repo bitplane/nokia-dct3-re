@@ -821,3 +821,20 @@ by hardware measurement. The MCU then requests BCCH blocks each multiframe;
 they report error 1 because this source carries no BCCH. Port-9 capture start,
 physical MFI timing, RF tuning and the zero-epoch source remain laboratory
 assumptions. `nse1afs` is unchanged by the CPU admissions.
+
+### Native SI decoding and random access
+
+`nse1sp9` adds the existing ROM6 full-broadcast source (SI1–SI4 for the
+laboratory cell ARFCN 35/BSIC 42 on the standard BCCH schedule) to `nse1cp9`.
+In a fresh 60-second run the native DSP publishes class-`50` blocks with
+error `00` whose 23 octets equal the generated SI4, SI2, SI3 and SI1 between
+2.61 and 3.79 s; the BCCH fire code makes this a strong representation check.
+The MCU then proceeds as for idle-mode access: a failed class-`60` CCCH read
+(4.28 s), pairs of type-`84` reports (the RA_INFO family in the established
+HLE grammar) at 17.95/18.22, 24.09/24.35 s, each followed by a failed
+class-`60` read, then periodic serving measurements every 0.94 s (204
+frames). The source carries no AGCH, so no Immediate Assignment can follow.
+LCD frames at 3/20/45/59 s are pixel-identical to the SCH-only `nse1cp9`
+control: no service presentation. Native uplink burst content, transmit
+timing, AGCH/SDCCH response and Location Updating remain open; the ROM6
+`npe3ap5` raw-AGCH responder is the existing reference for that step.

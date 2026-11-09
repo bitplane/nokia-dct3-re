@@ -93,6 +93,13 @@ void dct3_rf_adc_fixture_state::nse1cp9(machine_config &config)
 	m_compare_start = true;
 }
 
+void dct3_rf_adc_fixture_state::nse1sp9(machine_config &config)
+{
+	nse1cp9(config);
+	m_bcch = true;
+	m_full_broadcast = true;
+}
+
 void dct3_rf_adc_fixture_state::npe3ad0(machine_config &config)
 {
 	npe3afs(config);
