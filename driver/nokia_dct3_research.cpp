@@ -66,6 +66,27 @@ void dct3_rf_adc_fixture_state::npe3afs(machine_config &config)
 	m_sch = true;
 }
 
+// NSE-1 ROM4 writes the same port-3 bit-0 and port-0x21 bit-10/12 receive
+// controls as ROM6; this attaches the ROM6 lab transport to test that grammar.
+void dct3_rf_adc_fixture_state::nse1ad0(machine_config &config)
+{
+	nse1adc(config);
+	m_tone = false;
+}
+
+void dct3_rf_adc_fixture_state::nse1adc(machine_config &config)
+{
+	noki5110(config);
+	configure_adc_lab(config);
+}
+
+void dct3_rf_adc_fixture_state::nse1afs(machine_config &config)
+{
+	nse1adc(config);
+	m_burst = true;
+	m_sch = true;
+}
+
 void dct3_rf_adc_fixture_state::npe3ad0(machine_config &config)
 {
 	npe3afs(config);

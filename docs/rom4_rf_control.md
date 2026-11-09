@@ -767,3 +767,35 @@ captures constrain consumption scheduling but do not select a receive
 buffer depth, latch policy, lane order or sample-production clock.
 Do not connect read-indexed tone/GMSK data as an operational RF source
 merely because both windows are frame-paced.
+
+## NSE-1 laboratory receive transport
+
+The production `noki5110` composition raises INT0 only from compare timers,
+roughly 2.4 times per TDMA frame. A passive census
+(`tools/c54x_rom4_rf_cadence_observe.lua`, 60 s, fresh profile) shows every
+INT0 drains exactly 32 port-`27` words within 3–6 µs in every `00ac` mode.
+That delivers about 16 complex samples per frame, far below one normal burst,
+so no sample representation can acquire a cell in that composition.
+
+ROM4 writes the same receive controls as the ROM6 laboratory: port 3 = `0105`
+(bit 0 set) and port `21` = `0c82` (bit 10 set, bit 12 clear). The research
+machines `nse1ad0`, `nse1adc` and `nse1afs` attach the unchanged ROM6
+`nokia_mfi_rx` transport (13 MHz / 12 words, 32-word data-available blocks)
+and lab ADC source to the 5110. They do not alter the production machine.
+
+Observed in 60-second fresh-profile runs:
+
+| Machine | Transport | DSP publications |
+| --- | --- | --- |
+| `nse1ad0` (silent) | Window-gated; no overrun/underrun | `008b` RSSI with every entry `ff7c` |
+| `nse1afs` (FCCH + SCH, BSIC 42) | Same | Varied `008b` RSSI; new mode `00ac=000a`; twelve `0080` reports in triplets about 46 ms apart; four port-`38` reads |
+
+The latest `0080` triplets carry self-consistent words such as
+`0034,0000,0001,0001,...`, `003e,000a,000b,0001,...`,
+`0048,0014,0015,0001,...`: FCCH frames 0/10/20 and SCH frames 1/11/21 of
+the generated multiframe, with the fourth word 1. Earlier triplets have that
+word 0 and inconsistent offsets. This is a provisional field reading, not a
+decoded consumer contract. It establishes native FCCH detection and frame
+alignment from the laboratory waveform. No report yet shows BSIC 42 or a
+decoded SCH frame number, and the MCU returns to RSSI scanning, so the sample
+representation is not yet established by a CRC-protected decode.

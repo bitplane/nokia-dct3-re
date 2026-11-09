@@ -59,6 +59,9 @@ public:
 	void nsm3afs(machine_config &config);
 	void npe3afs(machine_config &config);
 	void npe3ad0(machine_config &config);
+	void nse1ad0(machine_config &config);
+	void nse1adc(machine_config &config);
+	void nse1afs(machine_config &config);
 	void npe3cp9(machine_config &config);
 	void npe3zp9(machine_config &config);
 	void npe3bp9(machine_config &config);
