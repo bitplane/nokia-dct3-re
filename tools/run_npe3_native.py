@@ -22,7 +22,7 @@ ADC_BROADCAST_MENU_SHA256 = '8c7650fdb0514ec34c85b89795e529de062e6f141268a507baf
 ADC_LU_MENU_SHA256 = '5adef93609b763a40d0e3c9dca356d388a910bb393a518e99a53eec2c7184202'
 
 
-def configure_cell_power(directory,model,policy,*,incoming_call=False,traffic_assignment=False,call_ack=False,clear_call=False,sacch=False,assignment_after_connect=False):
+def configure_cell_power(directory,model,policy,*,incoming_call=False,traffic_assignment=False,call_ack=False,clear_call=False,sacch=False,assignment_after_connect=False,accept_outgoing_service=False):
     if policy=='legacy39':return
     if policy!='handset33':raise ValueError('unsupported cell power policy')
     config=ET.Element('mameconfig',version='10')
@@ -41,6 +41,8 @@ def configure_cell_power(directory,model,policy,*,incoming_call=False,traffic_as
         ET.SubElement(ports,'port',tag=':LAB_BTS',type='CONFIG',mask='64',defvalue='0',value='64')
     if assignment_after_connect:
         ET.SubElement(ports,'port',tag=':LAB_BTS',type='CONFIG',mask='128',defvalue='0',value='128')
+    if accept_outgoing_service:
+        ET.SubElement(ports,'port',tag=':LAB_BTS',type='CONFIG',mask='256',defvalue='0',value='256')
     destination=directory/'cfg';destination.mkdir()
     ET.ElementTree(config).write(destination/f'{model}.cfg',encoding='utf-8',xml_declaration=True)
 
@@ -114,7 +116,7 @@ def check_execution(text, loader, program, flash, *, reference=False, minimum_se
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--seconds', type=int, default=30)
-    parser.add_argument('--scenario', choices=('menu', 'phonebook'), default='menu')
+    parser.add_argument('--scenario', choices=('menu', 'phonebook', 'outgoing'), default='menu')
     parser.add_argument('--input-at', type=int, default=20,
                         help='physical input start in emulated seconds (20..100)')
     parser.add_argument('--reference-clock', action='store_true',
@@ -151,9 +153,17 @@ def main():
                         help='separate external TCH/F assignment after actual Call Confirmed')
     parser.add_argument('--assignment-after-connect',action='store_true',
                         help='separate late assignment after actual physical Answer/CONNECT')
+    parser.add_argument('--accept-outgoing-service',action='store_true',
+                        help='raw CM SERVICE ACCEPT only after actual identity-matched call service request')
     parser.add_argument('--provision-records', action='store_true',
                         help='explicit synthetic record fixture; acquired PMM remains unchanged')
     args = parser.parse_args()
+    if args.accept_outgoing_service and args.scenario!='outgoing':
+        parser.error('outgoing service admission requires the bounded outgoing scenario')
+    if args.scenario=='outgoing' and (args.cell_power_policy!='handset33' or
+            args.seconds!=36 or args.input_at!=20 or not args.sacch or
+            args.incoming_call or args.page_at is not None):
+        parser.error('outgoing scout requires the separate36s 33dBm/SACCH cell,no page,and physical input at20s')
     if args.reject_call and (not args.incoming_call or args.traffic_assignment):
         parser.error('call rejection requires incoming SETUP without traffic assignment')
     if args.answer_call and (not args.incoming_call or args.reject_call):
@@ -170,8 +180,9 @@ def main():
         parser.error('traffic assignment requires the separate raw incoming-call fixture')
     if args.incoming_call and (args.cell_power_policy!='handset33' or args.page_at is None):
         parser.error('raw incoming call requires the separate33dBm addressed-page fixture')
-    if args.cell_power_policy!='legacy39' and (not args.raw_agch or not args.provision_records or args.scenario!='menu' or args.seconds!=24):
-        parser.error('33dBm cell experiment requires the explicit24s raw-AGCH record fixture')
+    if args.cell_power_policy!='legacy39' and (not args.raw_agch or not args.provision_records or
+            not (args.scenario=='menu' and args.seconds==24 or args.scenario=='outgoing' and args.seconds==36)):
+        parser.error('33dBm cell experiment requires the explicit24s menu or36s outgoing raw-AGCH record fixture')
     if args.page_at is not None and (not args.raw_agch or not 16<=args.page_at<=20 or args.seconds!=24):
         parser.error('addressed-page observation requires raw AGCH,16..20s input and the bounded24s run')
     if args.provision_records and not args.raw_agch:
@@ -189,7 +200,7 @@ def main():
             parser.error('ADC experiments require the explicitly labelled reference clock')
         args.radio = True
     if not 24 <= args.seconds <= 120:
-        parser.error('Menu check duration must be 24..120 seconds')
+        parser.error('native check duration must be 24..120 seconds')
     if not 20 <= args.input_at <= 100:
         parser.error('physical input start must be 20..100 seconds')
     flash = (ROOT / 'roms/noki6210/6210_556c.fls').read_bytes()
@@ -237,7 +248,8 @@ def main():
         configure_cell_power(directory,model,args.cell_power_policy,incoming_call=args.incoming_call,
                              traffic_assignment=args.traffic_assignment,call_ack=args.ack_call_control,
                              clear_call=args.clear_rejected_call,sacch=args.sacch,
-                             assignment_after_connect=args.assignment_after_connect)
+                             assignment_after_connect=args.assignment_after_connect,
+                             accept_outgoing_service=args.accept_outgoing_service)
         cmd = command.copy()
         cmd[-1] = str(seconds)
         if not persist:
@@ -272,6 +284,12 @@ def main():
         if args.sacch:
             from tools.npe3_dedicated_check import check_sacch
             report['sacch']=check_sacch(text,5 if args.cell_power_policy=='handset33' else 0)
+        if args.scenario=='outgoing':
+            from tools.npe3_rach_transmit_check import check as check_access
+            from tools.npe3_raw_call_setup_check import check_outgoing
+            access=check_access(text,(first/'rom6_radio_writes.tsv').read_text(),
+                                require_windows=True,require_releases=True,allow_normal=True)
+            report['outgoing']=check_outgoing(text,access['normal_control_blocks'],admitted=args.accept_outgoing_service)
         if args.page_at is not None:
             from tools.npe3_native_paging_response_check import check as check_native_page_response
             report['paging_response']=check_native_page_response(text,(first/'rom6_radio_writes.tsv').read_text())

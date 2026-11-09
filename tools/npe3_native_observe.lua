@@ -75,6 +75,28 @@ end)
 local scenario=os.getenv('NPE3_NATIVE_SCENARIO') or 'menu'
 local input_at=tonumber(os.getenv('NPE3_NATIVE_INPUT_AT') or '20')
 assert(input_at and input_at>=20 and input_at<=100)
+if scenario=='outgoing' then
+    _G.npe3_native_input=coroutine.create(function()
+        local function press(column,name,label)
+            local key=assert(machine.ioport.ports[':COL.'..column].fields[name])
+            machine:logerror(string.format('npe3_native_physical: key=%s t=%.9f observer_writes=0\n',label,machine.time:as_double()))
+            key:set_value(1)
+            if not emu.wait(0.15) then key:set_value(0);return false end
+            key:set_value(0)
+            return emu.wait(0.85)
+        end
+        if not emu.wait(input_at) then return end
+        for digit=1,7 do
+            if not press(2+(digit-1)%3,'Keypad '..digit,'Digit'..digit) then return end
+        end
+        machine.screens[':screen']:snapshot('npe3_dialed_number.png')
+        if not press(0,'Send','Send') then return end
+        if not emu.wait(3) then return end
+        machine.screens[':screen']:snapshot('npe3_outgoing_call.png')
+    end)
+    assert(coroutine.resume(_G.npe3_native_input))
+    return
+end
 if scenario~='menu' then
     _G.noki6210_phonebook_start=input_at
     dofile(directory..(scenario=='phonebook' and 'noki6210_phonebook_input.lua' or 'noki6210_phonebook_read.lua'))

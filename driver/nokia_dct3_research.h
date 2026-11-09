@@ -96,6 +96,8 @@ private:
 	u64 m_lu_start_frame=~u64(0);
 	std::array<std::array<std::array<s16,2>,148*4>,4> m_lu_samples{};
 	u64 m_setup_start_frame=~u64(0);
+	u64 m_service_accept_start_frame=~u64(0);
+	std::array<std::array<std::array<s16,2>,148*4>,4> m_service_accept_samples{};
 	std::array<std::array<std::array<s16,2>,148*4>,4> m_setup_samples{};
 	u64 m_assignment_start_frame=~u64(0);
 	std::array<std::array<std::array<s16,2>,148*4>,4> m_assignment_samples{};

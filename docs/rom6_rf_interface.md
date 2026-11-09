@@ -763,6 +763,43 @@ camping, connected traffic, speech, arbitrary transactions or loss recovery.
 .venv/bin/python tools/run_npe3_native.py --reference-clock --seconds 24 --adc-source fcch-sch-broadcast --capture-start p09 --tx-release p05 --raw-agch --provision-records --page-at 18 --cell-power-policy handset33 --incoming-call --ack-call-control --reject-call --clear-rejected-call --sacch
 ```
 
+### Native outgoing service and SETUP
+
+The separate 36-second `--scenario outgoing` fixture physically enters
+`1234567` at one-second intervals from 20 seconds and presses Send at 27
+seconds. Key decodes are `01..07`, then `0e`; the dialed-number frame matches
+the input. It uses the same provisioned record profile and 33 dBm raw cell,
+with SACCH active and no incoming page. No call or MM message is injected.
+
+Actual timed SABM 6004 carries the 16-byte CM SERVICE REQUEST
+`05247103331981080910101032547698`; call service type 1 and IMSI match the
+earlier air-originated Location Updating identity. Raw UA 6040 echoes this
+contention request and is decoded natively. The no-service-reply control
+finishes legally at 36 seconds, with 246 independently checked transmit
+windows/releases and zero unbacked program reads.
+
+`--accept-outgoing-service` independently enables plain test-cell admission:
+only that identity-matched call request selects the existing CM SERVICE
+ACCEPT encoder (GSM 04.08 section 9.2.5). The resulting network I-frame
+6091 is `0300090521` plus padding. Successful native decode occurs at
+28.128326747 seconds. The handset then serializes outgoing SETUP 6157:
+`01204903450404600200815e0581214365f7150101` plus padding. Its Called Party
+BCD Number decodes to the physically entered `1234567`.
+
+The admission control has 198 independently checked windows/releases and
+completes the full 36-second execution legally, with no unbacked reads.
+Acceptance joins physical input/decode order, established air identity,
+contention UA, exact native CM admission and the actual called-number field.
+SETUP retransmissions are expected because this control supplies no CC
+response. CALL PROCEEDING, outgoing traffic assignment, connected media and
+speech remain unqualified; this is not a completed outgoing call.
+
+```sh
+.venv/bin/python tools/run_npe3_native.py --reference-clock --seconds 36 --scenario outgoing --adc-source fcch-sch-broadcast --capture-start p09 --tx-release p05 --raw-agch --provision-records --cell-power-policy handset33 --sacch
+# Independent raw MM admission, selected only by the actual call request:
+.venv/bin/python tools/run_npe3_native.py --reference-clock --seconds 36 --scenario outgoing --adc-source fcch-sch-broadcast --capture-start p09 --tx-release p05 --raw-agch --provision-records --cell-power-policy handset33 --sacch --accept-outgoing-service
+```
+
 ### Native traffic program-page boundary
 
 The current full24s gate is red at an unbacked program

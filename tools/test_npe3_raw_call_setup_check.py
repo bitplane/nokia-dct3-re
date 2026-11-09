@@ -1,9 +1,38 @@
 import unittest
 from unittest.mock import patch
-from tools.npe3_raw_call_setup_check import check,check_assignment,check_call_rr,check_call_clearing
+from tools.npe3_raw_call_setup_check import check,check_assignment,check_call_rr,check_call_clearing,check_outgoing
 
 
 class RawCallSetupTest(unittest.TestCase):
+    def test_outgoing_service_requires_physical_input_identity_native_accept_and_number(self):
+        physical='\n'.join(f'npe3_native_physical: key={name} t={20+i} observer_writes=0\n'
+            f'npe3_native_key: value={i+1 if i<7 else 14:02x} observer_writes=0'
+            for i,name in enumerate([f'Digit{j}' for j in range(1,8)]+['Send']))
+        blocks=[dict(start_frame=2740,octets='013f4905087000f000fffe330809101010325476982b2b'),
+                dict(start_frame=6004,octets='013f41052471033319810809101010325476982b2b2b2b')]
+        accept='0300090521'+'2b'*18
+        text=(physical+'\n'+'npe3_raw_ua: uplink_start_frame=6004 start_frame=6040 octets='
+              '017341052471033319810809101010325476982b2b2b2b raw_adc_only=1 physical_claim=0\n'
+              f'npe3_raw_cm_service_accept: uplink_start_frame=6004 start_frame=6091 octets={accept} policy=plain_test_cell raw_adc_only=1 physical_claim=0')
+        native=[dict(type=128,payload='802a00'+(6094).to_bytes(3,'big').hex()+'00230001'+accept,time='28.13')]
+        setup=dict(start_frame=6157,octets='01204903450404600200815e0581214365f71501012b2b')
+        with patch('tools.npe3_raw_ua_check.check',return_value={}), \
+                patch('tools.npe3_raw_call_setup_check.check_rx_publications',return_value=dict(packets=native)):
+            self.assertFalse(check_outgoing(physical,blocks)['native_outgoing_setup_qualified'])
+            result=check_outgoing(text,blocks+[setup],admitted=True)
+            self.assertEqual(result['called_number'],'1234567')
+            self.assertTrue(result['native_outgoing_setup_qualified'])
+            self.assertFalse(result['connected_call_qualified'])
+            for bad in (text.replace('key=Send','key=Menu'),text.replace('value=0e','value=0f'),
+                        text.replace('start_frame=6091','start_frame=6092'),text.replace('0300090521','0300090522')):
+                with self.assertRaises(ValueError):check_outgoing(bad,blocks+[setup],admitted=True)
+            for changed in ([blocks[0],dict(blocks[1],octets=blocks[1]['octets'].replace('052471','052472')),setup],
+                            [*blocks,dict(setup,octets=setup['octets'].replace('81214365','81224365'))],blocks):
+                with self.assertRaises(ValueError):check_outgoing(text,changed,admitted=True)
+            with self.assertRaises(ValueError):check_outgoing(text,blocks)
+            with patch('tools.npe3_raw_call_setup_check.check_rx_publications',return_value=dict(packets=[])):
+                with self.assertRaises(ValueError):check_outgoing(text,blocks+[setup],admitted=True)
+
     def test_late_assignment_requires_native_connect_and_its_acknowledgement(self):
         octets='036221062e094023006301'+'2b'*12
         text=f'npe3_raw_late_assignment: connect_start_frame=4372 start_frame=4408 octets={octets} raw_adc_only=1 physical_claim=0'

@@ -28,9 +28,10 @@ program instruction grammar. Only page zero has an acquired program map.
 The 6210 raw traffic experiment now executes FCALLD to `1:a50d`, outside
 that input; see the [page/mapping boundary](rom6_rf_interface.md#native-traffic-program-page-boundary).
 Do not confuse page-0 completion with acquisition of the full extended ROM.
-The independent SDCCH path now supports native Alerting, physical rejection,
-SACCH SI5/SI6 reception and complete rejected-call clearing; it does not
-enter or qualify the missing traffic bank.
+The independent SDCCH path supports native Alerting, physical rejection,
+SACCH SI5/SI6 reception, complete rejected-call clearing, and physical
+outgoing dial/CM service admission/SETUP. These do not enter or qualify the
+missing traffic bank.
 Its initial IMR is zero, not the backend's ROM4-specific bit-0 seed; fitted
 reset state remains unmeasured. The product's Nokia System Module manual,
 issue 1, 12/1999, printed page 25, specifies a 13 MHz reference multiplied by

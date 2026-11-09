@@ -1852,6 +1852,9 @@ static INPUT_PORTS_START( npe3_raw_bts )
 	PORT_CONFNAME(0x80, 0x00, "Laboratory BTS defer assignment until CONNECT")
 	PORT_CONFSETTING(0x00, DEF_STR( Off ))
 	PORT_CONFSETTING(0x80, DEF_STR( On ))
+	PORT_CONFNAME(0x100, 0x00, "Laboratory BTS accept outgoing call service")
+	PORT_CONFSETTING(0x00, DEF_STR( Off ))
+	PORT_CONFSETTING(0x100, DEF_STR( On ))
 INPUT_PORTS_END
 
 static INPUT_PORTS_START( noki8290 )

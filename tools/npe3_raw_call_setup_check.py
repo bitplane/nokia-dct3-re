@@ -8,6 +8,64 @@ LATE_ASSIGNMENT=re.compile(r'npe3_raw_late_assignment: connect_start_frame=(\d+)
 CALL_RR=re.compile(r'npe3_raw_call_rr: uplink_start_frame=(\d+) start_frame=(\d+) octets=([0-9a-f]{46}) raw_adc_only=1 physical_claim=0')
 CC_RELEASE=re.compile(r'npe3_raw_cc_release: disconnect_start_frame=(\d+) start_frame=(\d+) octets=([0-9a-f]{46}) raw_adc_only=1 physical_claim=0')
 CALL_CHANNEL_RELEASE=re.compile(r'npe3_raw_call_channel_release: complete_start_frame=(\d+) start_frame=(\d+) octets=([0-9a-f]{46}) raw_adc_only=1 physical_claim=0')
+CM_ACCEPT=re.compile(r'npe3_raw_cm_service_accept: uplink_start_frame=(\d+) start_frame=(\d+) octets=([0-9a-f]{46}) policy=plain_test_cell raw_adc_only=1 physical_claim=0')
+
+
+def check_outgoing(text,blocks,*,admitted=False):
+    from tools.npe3_raw_ua_check import check as check_ua,UA
+    from tools.radio_outgoing_call_trace_check import decode_called_digits
+    keys=list(re.finditer(r'npe3_native_physical: key=(\w+) t=([\d.]+) observer_writes=0',text))
+    names=[f'Digit{i}' for i in range(1,8)]+['Send']
+    if len(keys)!=8 or [row[1] for row in keys]!=names:
+        raise ValueError('outgoing physical dial/Send sequence incomplete')
+    for index,row in enumerate(keys):
+        end=keys[index+1].start() if index<7 else len(text)
+        codes=re.findall(r'npe3_native_key: value=([0-9a-f]{2}) observer_writes=0',text[row.end():end])
+        if abs(float(row[2])-(20+index))>0.02 or not codes or set(codes)!={f'{index+1 if index<7 else 14:02x}'}:
+            raise ValueError('outgoing physical key timing/decode differs')
+    check_ua(text,blocks)
+    lu=[bytes.fromhex(b['octets']) for b in blocks if b['octets'].startswith('013f490508')]
+    requests=[b for b in blocks if b['octets'].startswith('013f410524')]
+    if len(lu)!=1 or len(requests)!=1:raise ValueError('outgoing request lacks unique LU/CM identity sources')
+    source=requests[0]['start_frame'];request=bytes.fromhex(requests[0]['octets'])[3:19]
+    if (source*60000/13000000<=27 or request[2]&15!=1 or request[3]!=3 or
+            request[7]!=8 or request[8:]!=lu[0][13:21]):
+        raise ValueError('CM call service request differs from established air identity')
+    report=dict(native_cm_service_request_qualified=True,request_start_frame=source,
+                identity=request[8:].hex(),native_cm_service_accept_qualified=False,
+                native_outgoing_setup_qualified=False,connected_call_qualified=False,
+                speech_transport_qualified=False,physical_rf_tuning_qualified=False)
+    rows=list(CM_ACCEPT.finditer(text))
+    if not admitted:
+        if rows or 'npe3_raw_cm_service_accept:' in text:
+            raise ValueError('CM no-reply control unexpectedly admitted service')
+        return report
+    if len(rows)!=1 or text.count('npe3_raw_cm_service_accept:')!=1:
+        raise ValueError('missing unique raw CM SERVICE ACCEPT')
+    row=rows[0];start=int(row[2]);expected=b'\x03\0\x09\x05\x21'+b'\x2b'*18
+    ua=[match for match in UA.finditer(text) if int(match[1])==source]
+    if len(ua)!=1 or int(row[1])!=source or start!=int(ua[0][2])+51 or bytes.fromhex(row[3])!=expected:
+        raise ValueError('CM admission does not follow actual request/contention UA')
+    native=[]
+    for packet in check_rx_publications(text)['packets']:
+        body=bytes.fromhex(packet['payload'])
+        if (packet['type']==128 and len(body)==33 and body[:3]==b'\x80\x2a\0' and
+                int.from_bytes(body[3:6],'big')==(start+3)%2715648 and body[6:8]==b'\0\x23' and
+                body[10:]==expected and float(packet['time'])>(start+3)*60000/13000000):
+            native.append(packet)
+    if len(native)!=1:raise ValueError('missing unique native CM SERVICE ACCEPT decode')
+    setups=[]
+    for block in blocks:
+        data=bytes.fromhex(block['octets']);length=data[2]>>2
+        if (block['start_frame']>start+3 and data[0]==1 and not data[1]&1 and
+                data[2]&3==1 and 2<=length<=20 and data[3]&15==3 and data[4]&63==5):
+            setups.append((block['start_frame'],data[3:3+length]))
+    if not setups or len({pdu for _,pdu in setups})!=1 or decode_called_digits(setups[0][1])!='1234567':
+        raise ValueError('native outgoing SETUP omits the physically dialed number')
+    report.update(native_cm_service_accept_qualified=True,accept_start_frame=start,
+                  native_accept_time=native[0]['time'],native_outgoing_setup_qualified=True,
+                  setup_frames=[frame for frame,_ in setups],called_number='1234567')
+    return report
 
 
 def check(text,blocks):

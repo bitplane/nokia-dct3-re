@@ -3,6 +3,14 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "npe3_native_outgoing_service_setup",
+      "owner": "native_rom6_reference_adc_laboratory",
+      "status": "satisfied",
+      "predicate": "Physical dialing leads to native CM call-service access and raw MM admission leads to native SETUP carrying the dialed number",
+      "current": "Separate36s scout presses digits1234567 at20..26s and Send27s,decoded01..07/0e. Actual timed SABM6004 carries05247103331981080910101032547698,matching the earlier LU air identity;raw contention UA6040 is decoded natively. No-reply control qualifies246 timed windows/releases. Optional plain-cell CM SERVICE ACCEPT6091 (0300090521 plus padding) is generated only from that request and decodes28.128326747s. Native SETUP6157 carries03450404600200815e0581214365f7150101,including Called Party BCD1234567. Admission control qualifies198 timed windows/releases. Both finish legally36s with zero unbacked reads. SETUP retransmissions reflect the absent network CC response,not a missing handset producer. No CALL PROCEEDING,outgoing assignment,connected call,speech or fitted-RF claim follows.",
+      "evidence": ["driver/nokia_dct3_research.cpp", "tools/npe3_native_observe.lua", "tools/run_npe3_native.py", "tools/npe3_raw_call_setup_check.py", "tools/test_npe3_raw_call_setup_check.py", "docs/rom6_rf_interface.md"]
+    },
+    {
       "id": "npe3_native_physical_answer_connect",
       "owner": "native_rom6_reference_adc_laboratory",
       "status": "satisfied",

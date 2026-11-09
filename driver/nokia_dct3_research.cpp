@@ -134,6 +134,7 @@ void dct3_rf_adc_fixture_state::machine_start()
 	save_item(NAME(m_ua_samples));
 	save_item(NAME(m_lu_start_frame));save_item(NAME(m_lu_samples));
 	save_item(NAME(m_setup_start_frame));save_item(NAME(m_setup_samples));
+	save_item(NAME(m_service_accept_start_frame));save_item(NAME(m_service_accept_samples));
 	save_item(NAME(m_assignment_start_frame));save_item(NAME(m_assignment_samples));
 	save_item(NAME(m_call_rr_start_frame));save_item(NAME(m_call_rr_samples));
 	save_item(NAME(m_call_rr_sequence));
@@ -179,6 +180,7 @@ void dct3_rf_adc_fixture_state::machine_reset()
 	m_normal_start_frame=m_ua_start_frame=~u64(0);
 	m_lu_start_frame=~u64(0);
 	m_setup_start_frame=~u64(0);
+	m_service_accept_start_frame=~u64(0);
 	m_assignment_start_frame=~u64(0);
 	m_call_rr_start_frame=~u64(0);
 	m_call_rr_sequence=0xff;
@@ -416,6 +418,7 @@ TIMER_CALLBACK_MEMBER(dct3_rf_adc_fixture_state::candidate_transmit_start)
 				m_normal_count=0;
 				m_ua_start_frame=m_lu_start_frame=m_release_start_frame=m_setup_start_frame=~u64(0);
 				m_assignment_start_frame=~u64(0);
+				m_service_accept_start_frame=~u64(0);
 				m_call_rr_start_frame=~u64(0);
 				m_call_rr_sequence=0xff;
 				m_call_release_start_frame=~u64(0);m_call_channel_release_sent=false;
@@ -592,6 +595,24 @@ void dct3_rf_adc_fixture_state::receive_normal_uplink(std::array<u16,15> const &
 	// verdict supplied to the handset. Derive identity only from air L3.
 	unsigned const length=(*block)[2]>>2;
 	auto const *request=block->data()+3;
+	if ((ioport("LAB_BTS")->read()&0x100) && m_page_identity_valid &&
+			m_service_accept_start_frame==~u64(0) && length==16 &&
+			request[0]==5 && request[1]==0x24 && (request[2]&15)==1 &&
+			request[3]==3 && request[7]==8 &&
+			std::equal(m_page_identity.begin(),m_page_identity.end(),request+8))
+	{
+		// Plain test-cell admission of the actual air-originated call request.
+		auto const accept=subdevice<nokia_gsm_network_device>("gsm_network")->cm_service_accept();
+		gsm::tch_f::packed_control_block lapdm{};
+		lapdm.fill(0x2b);lapdm[0]=3;lapdm[1]=0;lapdm[2]=(accept.size()<<2)|1;
+		std::copy(accept.begin(),accept.end(),lapdm.begin()+3);
+		m_service_accept_start_frame=m_ua_start_frame+51;
+		auto const encoded=nokia_rf_lab::bcch_bits(lapdm,0);
+		for (unsigned at=0;at<4;++at) m_service_accept_samples[at]=nokia_rf_lab::gmsk_samples(encoded[at]);
+		packed.clear();for (auto byte:lapdm) packed+=util::string_format("%02x",byte);
+		machine().logerror("npe3_raw_cm_service_accept: uplink_start_frame=%u start_frame=%u octets=%s policy=plain_test_cell raw_adc_only=1 physical_claim=0\n",
+			unsigned(m_normal_start_frame),unsigned(m_service_accept_start_frame),packed);
+	}
 	// Accept the response only from the established air identity. No handset
 	// state participates in the external network's call-admission decision.
 	if (m_page_identity_valid && length==16 && request[0]==6 && request[1]==0x27 &&
@@ -668,6 +689,12 @@ u16 dct3_rf_adc_fixture_state::sample_r(offs_t component)
 	if (component) return u16(m_q_latch);
 	u64 const tick = machine().time().as_ticks(13'000'000);
 	u64 const frame=tick/60'000;
+	if (m_raw_agch && frame>=m_service_accept_start_frame && frame-m_service_accept_start_frame<4 && tick%60'000<148*48)
+	{
+		auto const &sample=m_service_accept_samples[frame-m_service_accept_start_frame][(tick%60'000)/12];
+		m_q_latch=sample[1];
+		return u16(sample[0]);
+	}
 	if (m_raw_agch && (ioport("LAB_BTS")->read()&64) && m_contention_active &&
 			frame%102>=42 && frame%102<46 && tick%60'000<148*48)
 	{
