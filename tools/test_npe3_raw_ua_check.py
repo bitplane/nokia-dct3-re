@@ -1,9 +1,30 @@
 import unittest
 from unittest.mock import patch
-from tools.npe3_raw_ua_check import check,check_location_update,check_release,check_paging_fill
+from tools.npe3_raw_ua_check import check,check_location_update,check_release,check_paging_fill,check_frame_pages
 
 
 class RawUaCheckTest(unittest.TestCase):
+    def test_unique_page_payload_binds_source_without_fitting_reported_fn(self):
+        frame=216
+        payload=bytes.fromhex('2506211005f4')+(0x80000000|frame).to_bytes(4,'big')+bytes([0x2b])*13
+        text=f'npe3_bts_frame_page: start_frame={frame} octets={payload.hex()} unmatched_tmsi=1 raw_adc_only=1 physical_claim=0'
+        packet=dict(type=128,payload='602a00'+(frame+2).to_bytes(3,'big').hex()+'002e0001'+payload.hex(),time='1.1')
+        with patch('tools.npe3_raw_ua_check.check_rx_publications',return_value=dict(packets=[packet])):
+            result=check_frame_pages(text,1.05)
+            self.assertEqual(result['matches'][0]['end_frame_delta'],-1)
+            self.assertTrue(result['unique_source_payloads_qualified'])
+            self.assertFalse(result['reported_source_fn_agrees'])
+            self.assertFalse(result['stable_camping_qualified'])
+            packet['time']='1.005'
+            early=check_frame_pages(text,1.0)
+            self.assertTrue(early['matches'][0]['before_fourth_source_burst'])
+            packet['time']='1.1'
+            for changed in ('',text+'\n'+text,text.replace('start_frame=216','start_frame=217')):
+                with self.assertRaises(ValueError):check_frame_pages(changed,1.05)
+            with self.assertRaises(ValueError):check_frame_pages(text,2)
+            packet['time']='0.9'
+            with self.assertRaises(ValueError):check_frame_pages(text,0.8)
+
     def test_disconnect_releases_contention_for_a_different_initial_message(self):
         first='013f4905087000f000fffe330809101010325476982b2b'
         second='013f41062707033319810809101010325476982b2b2b2b'

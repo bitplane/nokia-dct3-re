@@ -61,7 +61,10 @@ Accept also reaches the native receiver;the MCU acknowledges it and persists
 updated test-cell EF_LOCI. A raw Channel Release/DISC/UA exchange returns
 the MCU to common control. Native no-identity paging also decodes after release,
 and a complete60s run retains updated EF_LOCI and legal execution. Stable
-camping/source-frame binding remain open. The acquired PMM still parks at the validation
+camping remains open. A separate [unique-page experiment](#unique-source-page-binding)
+now binds decoded page payloads to their source block and confirms the reported
+ending FN, without qualifying four-burst completion time or physical RF timing.
+The acquired PMM still parks at the validation
 gate,described below. These laboratory
 results do not retire the physical request/acknowledgement or tuning contract.
 
@@ -77,6 +80,7 @@ results do not retire the physical request/acknowledgement or tuning contract.
 | Own 6210 raw-AGCH candidate | Exact successful native assignment decode; MCU assigned-SDCCH configuration and SABM containing Location Updating Request | Native dedicated transmission, validation-gate completion, camping/registration and physical timing/tuning |
 | Synthetic-record raw-AGCH run | Ten-slot validation cycle;combined CCCH;32 normal bursts/8 exact xCCH blocks;native UA/LU Accept and RR acknowledgement;updated SIM EF_LOCI;raw normal release back to common RX | Stable camping/registered presentation and physical timing/tuning |
 | Idle-paging source | All three combined CCCH blocks carry exact no-identity fill;25 native CRC-success publications in a complete60s capture;MM storage and Menu retained | Continuous idle reception,source-FN binding and physical carrier selection |
+| Uniquely identified laboratory pages | 27 native page payloads match distinct external TMSIs and exact source block-ending FN;20 after common-control return | Complete four-burst reception before publication, continuous DRX/camping and physical carrier selection |
 | Addressed paging/new-link setup | Uplink-derived IMSI page, native Paging Response, raw second-link UA and native CC SETUP admission under the explicit33dBm record fixture | Stable camping and physical carrier selection |
 | Native call control with SACCH | Native Alerting, physical Answer-to-CONNECT, complete rejected-call clearing; outgoing physical dial/CM admission/SETUP/CALL PROCEEDING decode and acknowledgement | Connected traffic, speech, arbitrary transactions and loss recovery |
 | Native traffic assignment | Incoming early/late and outgoing command decodes; one outgoing TSC2 normal burst before the shared `1:a50d` program escape | Backed traffic execution, complete traffic blocks, assigned-slot timing, Assignment Complete and speech |
@@ -425,6 +429,51 @@ frame displays `DCT3 LAB`,but the UA-only control also displays that SIM name:
 the label alone is not a registration/camping oracle. Idle paging and the
 longer compatibility run are qualified below;stable camping and fitted RF
 tuning remain separate contracts.
+
+### Unique source-page binding
+
+```sh
+.venv/bin/python tools/run_npe3_native.py --reference-clock --seconds 24 \
+  --adc-source fcch-sch-broadcast --capture-start p09 --tx-release p05 \
+  --raw-agch --provision-records --cell-power-policy handset33 --frame-pages
+```
+
+This separate diagnostic source replaces the repeated empty page with a
+valid Paging Request Type 1 for an unassigned TMSI. The source chooses
+`80000000 | block_start_FN` as its test identity; this is an experiment's
+choice of subscriber address, **not a GSM frame-number field**. The packet
+uses a five-octet TMSI Mobile Identity (`f4` plus four network-order octets),
+normal paging/SDCCH request and spare rest octets. See
+[TS 44.018 9.1.22](https://www.etsi.org/deliver/etsi_ts/144000_144099/144018/05.21.00_60/ts_144018v052100p.pdf)
+and TS 24.008 10.5.1.4. The fixture retains unassigned `ffffffff` in EF_LOCI;
+none of these pages addresses its subscriber.
+
+`LAB_BTS` bit `0400` selects this diagnostic only. Its retirement trigger
+is closure of the source-frame/receive-window question, not production RF
+support. Default fill and addressed-page sources are unchanged. The source
+uses only its independent 13 MHz epoch and combined-CCCH block positions;
+it does not read native messages, PC, frame registers or decoder results.
+The ordinary convolution/FIRE/interleave/GMSK path supplies raw I/Q.
+Focused C++/Python comparisons check encoding, block bounds and identity
+uniqueness, including the hyperframe boundary.
+
+The 24-second capture produces 59 distinct source pages and 27 exact native
+class-60 payload matches, 20 after common-control return at 13.536150385s.
+Every native reported FN equals its uniquely identified source block's
+ending FN (`start+3`). This closes the payload-to-source/FN ambiguity for
+these laboratory pages, not continuous DRX reception or carrier tuning.
+The physical Menu still works; its reviewed exact frame differs from the
+ordinary LU oracle only inside the envelope animation at pixels 25..47,
+29..35. The ordinary oracle is not replaced.
+
+Five successful publications precede their fourth source burst. Keep that
+timing observation separate from the now-correct FN association. A valid
+decoded payload does not establish that all four complete bursts were
+received; neither erasure recovery nor a timing/staging explanation has
+been established. The checker rejects payloads predating their first source
+frame, preserves fourth-burst timing discrepancies, and never fits a clock
+or shifts the source to conceal them. Next establish which source samples
+contribute to those five blocks before changing receive timing.
 
 ### Native idle paging and extended observation
 

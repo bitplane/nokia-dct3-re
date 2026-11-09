@@ -137,6 +137,44 @@ def check_release(text,blocks):
                 stable_camping_qualified=False,physical_transmission_qualified=False)
 
 
+def check_frame_pages(text,common_configuration_time):
+    """Bind native payloads to unique external pages, without fitting frame time."""
+    sources={}
+    for match in re.finditer(r'npe3_bts_frame_page: start_frame=(\d+) octets=([0-9a-f]{46}) unmatched_tmsi=1 raw_adc_only=1 physical_claim=0',text):
+        frame=int(match[1]);payload=bytes.fromhex(match[2])
+        expected=bytes.fromhex('2506211005f4')+(0x80000000|frame).to_bytes(4,'big')+bytes([0x2b])*13
+        if frame>=2715648 or frame%51 not in (6,12,16) or payload!=expected or frame in sources:
+            raise ValueError('invalid or duplicate frame-identified paging source')
+        sources[frame]=payload
+    if not sources or text.count('npe3_bts_frame_page:')!=len(sources):
+        raise ValueError('missing/malformed frame-identified paging source')
+    assignments={bytes.fromhex(row[1]) for row in re.finditer(r'npe3_raw_agch: [^\n]*octets=([0-9a-f]{46}) ',text)}
+    hits=[];failed=0
+    for packet in check_rx_publications(text)['packets']:
+        body=bytes.fromhex(packet['payload'])
+        if packet['type']!=128 or not body or body[0]!=0x60:continue
+        if len(body)!=33 or body[1]!=42:raise ValueError('malformed native common-channel block')
+        if body[2]:failed+=1;continue
+        payload=body[10:]
+        if payload in assignments:continue
+        frame=int.from_bytes(payload[6:10],'big')^0x80000000
+        if sources.get(frame)!=payload:raise ValueError('native page does not match a unique source block')
+        reported=int.from_bytes(body[3:6],'big')
+        stamp=float(packet['time'])
+        if not 0<=reported<2715648 or stamp<frame*60000/13000000:
+            raise ValueError('native page precedes its unique source block or has invalid FN')
+        hits.append(dict(source_start_frame=frame,reported_end_frame=reported,
+                         end_frame_delta=reported-(frame+3),time=stamp,
+                         before_fourth_source_burst=stamp<(frame+3)*60000/13000000,
+                         receiver_arfcn=int.from_bytes(body[6:8],'big')))
+    if not hits or not any(row['time']>common_configuration_time for row in hits):
+        raise ValueError('no uniquely identified native page after normal release')
+    return dict(blocks=len(hits),source_blocks=len(sources),matches=hits,failed_common_blocks=failed,
+                unique_source_payloads_qualified=True,
+                reported_source_fn_agrees=all(row['end_frame_delta']==0 for row in hits),
+                stable_camping_qualified=False,physical_carrier_selection_qualified=False)
+
+
 def check_paging_fill(text,common_configuration_time,*,addressed_octets=None):
     """Qualify native no-identity PCH decoding without inferring camping."""
     from tools.gsm_xcch_signal import paging_fill_octets

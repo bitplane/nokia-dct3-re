@@ -11,6 +11,17 @@ from tools.run_npe3_native import (check_execution, check_input_start, expected_
 
 
 class Native6210EvidenceTest(unittest.TestCase):
+    def test_frame_pages_are_separate_bounded_external_input(self):
+        script=Path(__file__).with_name('run_npe3_native.py')
+        result=subprocess.run([sys.executable,str(script),'--frame-pages'],capture_output=True,text=True)
+        self.assertEqual(result.returncode,2)
+        self.assertNotIn('Native6210 evidence:',result.stdout)
+        with tempfile.TemporaryDirectory() as tmp:
+            directory=Path(tmp)
+            configure_cell_power(directory,'npe3ap5','handset33',frame_pages=True)
+            ports=ET.parse(directory/'cfg/npe3ap5.cfg').findall('./system/input/port')
+            self.assertEqual([(p.get('mask'),p.get('value')) for p in ports],[('2','2'),('1024','1024')])
+
     def test_outgoing_scout_is_bounded_and_excludes_incoming_inputs(self):
         script=Path(__file__).with_name('run_npe3_native.py')
         for args in ([],['--seconds','36'],['--seconds','36','--cell-power-policy','handset33'],

@@ -111,8 +111,10 @@ private:
 	bool m_lu_acknowledged=false;
 	u64 m_release_start_frame=~u64(0);
 	std::array<std::array<std::array<s16,2>,148*4>,4> m_release_samples{};
-	// Immutable waveform derived from the configured no-identity paging fill.
+	// Default fill and separate diagnostic pages for unassigned TMSIs.
 	std::array<std::array<std::array<s16,2>,148*4>,4> m_paging_samples{};
+	std::array<std::array<std::array<s16,2>,148*4>,4> m_frame_paging_samples{};
+	u64 m_frame_page_block=~u64(0);
 	// External BTS state, populated only from an actual decoded uplink IMSI.
 	std::array<u8,8> m_page_identity{};
 	bool m_page_identity_valid=false,m_page_pending=false;

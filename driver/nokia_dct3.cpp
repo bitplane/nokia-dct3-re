@@ -1858,6 +1858,9 @@ static INPUT_PORTS_START( npe3_raw_bts )
 	PORT_CONFNAME(0x200, 0x00, "Laboratory BTS proceed with outgoing call")
 	PORT_CONFSETTING(0x00, DEF_STR( Off ))
 	PORT_CONFSETTING(0x200, DEF_STR( On ))
+	PORT_CONFNAME(0x400, 0x00, "Laboratory BTS uniquely identified paging blocks")
+	PORT_CONFSETTING(0x000, DEF_STR( Off ))
+	PORT_CONFSETTING(0x400, DEF_STR( On ))
 INPUT_PORTS_END
 
 static INPUT_PORTS_START( noki8290 )

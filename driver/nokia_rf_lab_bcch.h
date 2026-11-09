@@ -6,6 +6,21 @@
 #include "gsm_tch_f_l1.h"
 
 namespace nokia_rf_lab {
+// Valid pages for unassigned TMSIs make each laboratory source block unique.
+// TS 44.018 9.1.22 / TS 24.008 10.5.1.4; not a handset timing correction.
+inline gsm::tch_f::packed_control_block frame_paging(unsigned frame)
+{
+	if (frame>=hyperframe || (frame%51!=6 && frame%51!=12 && frame%51!=16))
+		throw std::invalid_argument("frame-tagged page outside combined CCCH block starts");
+	gsm::tch_f::packed_control_block block{};
+	block.fill(0x2b);
+	block[0]=0x25;block[1]=6;block[2]=0x21;block[3]=0x10;
+	block[4]=5;block[5]=0xf4;
+	std::uint32_t const identity=0x80000000U|frame;
+	for (unsigned byte=0;byte<4;++byte) block[6+byte]=identity>>(24-8*byte);
+	return block;
+}
+
 // TS0 BCCH block positions. Payload scheduling belongs to the lab composition.
 constexpr bool bcch_active(std::uint64_t tick)
 {

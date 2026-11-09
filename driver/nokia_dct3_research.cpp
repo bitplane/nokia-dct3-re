@@ -131,6 +131,7 @@ void dct3_rf_adc_fixture_state::machine_start()
 	save_item(NAME(m_page_pending));save_item(NAME(m_page_phase));save_item(NAME(m_page_offset));
 	save_item(NAME(m_page_not_before));save_item(NAME(m_page_last_block));
 	save_item(NAME(m_addressed_page_samples));
+	save_item(NAME(m_frame_page_block));save_item(NAME(m_frame_paging_samples));
 	save_item(NAME(m_ua_samples));
 	save_item(NAME(m_lu_start_frame));save_item(NAME(m_lu_samples));
 	save_item(NAME(m_setup_start_frame));save_item(NAME(m_setup_samples));
@@ -192,6 +193,7 @@ void dct3_rf_adc_fixture_state::machine_reset()
 	m_page_identity_valid=m_page_pending=false;
 	m_page_identity.fill(0);m_page_phase=m_page_offset=0;
 	m_page_not_before=m_page_last_block=~u64(0);
+	m_frame_page_block=~u64(0);
 	m_lab_tx.reset();
 	m_observed_tx_windows=m_transmit_releases=0;
 	m_transmit_compare_written=false;
@@ -793,7 +795,18 @@ u16 dct3_rf_adc_fixture_state::sample_r(offs_t component)
 			machine().logerror("npe3_bts_page_air: start_frame=%u t=%.9f raw_adc_only=1 physical_claim=0\n",
 				unsigned(m_page_last_block),machine().time().as_double());
 		}
-		auto const &samples=addressed ? m_addressed_page_samples : m_paging_samples;
+		bool const frame_page=ioport("LAB_BTS")->read()&0x400;
+		if (!addressed && frame_page && frame-*pch!=m_frame_page_block)
+		{
+			m_frame_page_block=frame-*pch;
+			auto const octets=nokia_rf_lab::frame_paging(m_frame_page_block%nokia_rf_lab::hyperframe);
+			auto const bursts=nokia_rf_lab::bcch_bits(octets,2);
+			for (unsigned at=0;at<4;++at) m_frame_paging_samples[at]=nokia_rf_lab::gmsk_samples(bursts[at]);
+			std::string packed;for (auto byte:octets) packed+=util::string_format("%02x",byte);
+			machine().logerror("npe3_bts_frame_page: start_frame=%u octets=%s unmatched_tmsi=1 raw_adc_only=1 physical_claim=0\n",
+				unsigned(m_frame_page_block),packed);
+		}
+		auto const &samples=addressed ? m_addressed_page_samples : frame_page ? m_frame_paging_samples : m_paging_samples;
 		auto const &sample=samples[*pch][(tick%60'000)/12];
 		m_q_latch=sample[1];
 		return u16(sample[0]);

@@ -50,6 +50,17 @@ class RfLabSignalTest(unittest.TestCase):
                           information=''.join(map(str,control_bits(octets)[:184])),
                           coded=''.join(map(str,coded_control(octets)))))
 
+    def test_frame_tagged_tmsi_pages_match_independent_channel_encoding(self):
+        with tempfile.TemporaryDirectory() as directory:
+            binary=self.compile_fixture(directory)
+            for frame in (6,12,16,1291,HYPERFRAME-35):
+                self.assertIn(frame%51,(6,12,16))
+                page=bytes.fromhex('2506211005f4')+(0x80000000|frame).to_bytes(4,'big')+bytes([0x2b])*13
+                for burst,bits in enumerate(normal_control_bursts(page)):
+                    actual=subprocess.run([str(binary),'pch',str(frame),str(burst)],
+                        check=True,capture_output=True,text=True).stdout.strip()
+                    self.assertEqual(actual,''.join(map(str,bits)))
+
     def test_cpp_assignment_bits_and_iq_match_independent_reference(self):
         octets=bytes.fromhex('2d063f002000230b09ae00002b2b2b2b2b2b2b2b2b2b2b')
         with tempfile.TemporaryDirectory() as directory:

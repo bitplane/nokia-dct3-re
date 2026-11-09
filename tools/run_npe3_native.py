@@ -20,12 +20,15 @@ ADC_BROADCAST_MENU_SHA256 = '8c7650fdb0514ec34c85b89795e529de062e6f141268a507baf
 # Reviewed raw LU-Accept run: only envelope animation pixels25..48,33..39
 # differ from the preceding raw-UA oracle. Ordinary profiles stay unchanged.
 ADC_LU_MENU_SHA256 = '5adef93609b763a40d0e3c9dca356d388a910bb393a518e99a53eec2c7184202'
+# Reviewed frame-page experiment: only envelope animation pixels25..47,29..35
+# differ from the ordinary LU menu. Do not replace its baseline oracle.
+ADC_FRAME_PAGE_MENU_SHA256 = '1c3932a7ea93beb30fa751369fa457c164e6605fda68ab3f904ce4cb6ea84fa2'
 
 
 def configure_cell_power(directory,model,policy,*,incoming_call=False,
                          traffic_assignment=False,call_ack=False,clear_call=False,
                          sacch=False,assignment_after_connect=False,
-                         accept_outgoing_service=False,proceed_outgoing_call=False):
+                         accept_outgoing_service=False,proceed_outgoing_call=False,frame_pages=False):
     if policy=='legacy39':return
     if policy!='handset33':raise ValueError('unsupported cell power policy')
     config=ET.Element('mameconfig',version='10')
@@ -48,6 +51,8 @@ def configure_cell_power(directory,model,policy,*,incoming_call=False,
         ET.SubElement(ports,'port',tag=':LAB_BTS',type='CONFIG',mask='256',defvalue='0',value='256')
     if proceed_outgoing_call:
         ET.SubElement(ports,'port',tag=':LAB_BTS',type='CONFIG',mask='512',defvalue='0',value='512')
+    if frame_pages:
+        ET.SubElement(ports,'port',tag=':LAB_BTS',type='CONFIG',mask='1024',defvalue='0',value='1024')
     destination=directory/'cfg';destination.mkdir()
     ET.ElementTree(config).write(destination/f'{model}.cfg',encoding='utf-8',xml_declaration=True)
 
@@ -138,6 +143,8 @@ def main():
                         help='separate timed native-buffer candidate; no network reply')
     parser.add_argument('--raw-agch', action='store_true',
                         help='separate external access decoder and raw AGCH waveform experiment')
+    parser.add_argument('--frame-pages',action='store_true',
+                        help='valid nonmatching TMSI pages identify source blocks; no clock adjustment')
     parser.add_argument('--page-at', type=int,
                         help='bounded external BTS page at16..20 seconds in a24s raw-AGCH run')
     parser.add_argument('--cell-power-policy',choices=('legacy39','handset33'),default='legacy39',
@@ -194,6 +201,9 @@ def main():
         parser.error('33dBm cell experiment requires the explicit24s menu or36s outgoing raw-AGCH record fixture')
     if args.page_at is not None and (not args.raw_agch or not 16<=args.page_at<=20 or args.seconds!=24):
         parser.error('addressed-page observation requires raw AGCH,16..20s input and the bounded24s run')
+    if args.frame_pages and (args.cell_power_policy!='handset33' or args.page_at is not None or
+                             args.scenario!='menu' or args.seconds!=24):
+        parser.error('frame pages require the separate 24s 33dBm menu fixture without addressed paging')
     if args.provision_records and not args.raw_agch:
         parser.error('synthetic record fixture requires the separate raw AGCH experiment')
     if args.raw_agch and args.tx_release!='p05':
@@ -259,7 +269,7 @@ def main():
                              clear_call=args.clear_rejected_call,sacch=args.sacch,
                              assignment_after_connect=args.assignment_after_connect,
                              accept_outgoing_service=args.accept_outgoing_service,
-                             proceed_outgoing_call=args.proceed_outgoing_call)
+                             proceed_outgoing_call=args.proceed_outgoing_call,frame_pages=args.frame_pages)
         cmd = command.copy()
         cmd[-1] = str(seconds)
         if not persist:
@@ -291,6 +301,22 @@ def main():
         report=check_cell_power(text,args.cell_power_policy)
         report['boot_execution_checked']=True
         report['native_radio_outcome_qualified']=False
+        if args.frame_pages:
+            from PIL import Image
+            from tools.run_noki6210_acceptance import check_frame
+            from tools.npe3_rach_transmit_check import check as check_access
+            from tools.npe3_raw_ua_check import check_release,check_frame_pages
+            access=check_access(text,(first/'rom6_radio_writes.tsv').read_text(),
+                                require_windows=True,require_releases=True,allow_normal=True)
+            release=check_release(text,access['normal_control_blocks'])
+            report['frame_pages']=check_frame_pages(text,release['common_configuration_time'])
+            report['raw_release']=release
+            check_input_start(text,'npe3_native_physical: key=Menu',args.input_at)
+            if 'npe3_native_key: value=19' not in text:
+                raise ValueError('frame-page fixture did not decode physical Menu')
+            with Image.open(first/'snap/npe3_after_menu.png') as frame:
+                check_frame(frame,ADC_FRAME_PAGE_MENU_SHA256,'native Messages menu with frame pages')
+            report['physical_menu_qualified']=True
         if args.sacch:
             from tools.npe3_dedicated_check import check_sacch
             report['sacch']=check_sacch(text,5 if args.cell_power_policy=='handset33' else 0)

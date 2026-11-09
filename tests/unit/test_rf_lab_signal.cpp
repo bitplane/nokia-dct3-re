@@ -9,6 +9,14 @@
 
 int main(int argc, char **argv)
 {
+	if (argc==4 && std::string(argv[1])=="pch")
+	{
+		auto const block=nokia_rf_lab::frame_paging(std::stoul(argv[2]));
+		auto const bursts=nokia_rf_lab::bcch_bits(block,2);
+		for (auto bit:bursts.at(std::stoul(argv[3]))) std::cout<<bit;
+		std::cout<<'\n';
+		return 0;
+	}
 	if (argc == 3 && (std::string(argv[1]) == "bcch" || std::string(argv[1]) == "agch"))
 	{
 		gsm::tch_f::packed_control_block si3{0x49,0x06,0x1b,0x00,0x01,0x00,0xf1,0x10,
@@ -47,6 +55,22 @@ int main(int argc, char **argv)
 		assert(!nokia_rf_lab::fcch_active(std::uint64_t(frame)*60'000+7104));
 	}
 	assert(bursts==5);
+	for (unsigned frame=0;frame<nokia_rf_lab::hyperframe;++frame)
+	{
+		if (frame%51!=6 && frame%51!=12 && frame%51!=16) continue;
+		auto const page=nokia_rf_lab::frame_paging(frame);
+		std::uint32_t const identity=(std::uint32_t(page[6])<<24)|
+			(std::uint32_t(page[7])<<16)|(std::uint32_t(page[8])<<8)|page[9];
+		assert(identity==(0x80000000U|frame));
+		assert(page[0]==0x25 && page[4]==5 && page[5]==0xf4 && page[22]==0x2b);
+	}
+	for (unsigned frame:{0U,7U,11U,nokia_rf_lab::hyperframe})
+	{
+		bool rejected=false;
+		try { nokia_rf_lab::frame_paging(frame); }
+		catch (std::invalid_argument const &) { rejected=true; }
+		assert(rejected);
+	}
 	unsigned sch_bursts=0;
 	for (unsigned frame=0;frame<51;++frame)
 	{
