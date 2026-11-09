@@ -10,6 +10,8 @@
   "repeated_circular_square": 33,
   "call_delay_absolute_dst": 24,
   "count_delay_absolute_dst": 48,
+  "branch_delay_absolute_dst": 18,
+  "block_terminal_delayed_exit": 30,
   "repeated_mapped_ar_mvdk": 14,
   "reverse_carry_mvkd": 13,
   "internal_overflow_branch": 32,

@@ -1858,6 +1858,10 @@ accumulators,taken/untaken paths,no-modify/decrement/increment count forms,
 AR0/AR7 and compatibility register selection. One pair is written on either
 outcome,with the old count selecting the branch and the count update retained.
 Native BANZD6e8f atb939 has absolute DST A atb93b/3376 in its delay words.
+`branch_delay_absolute_dst` adds 18 cases/restores for BD: both accumulators,
+three absolute addresses and three snapshot points. Native NSE-1 BD at `0b9c`
+targets `0bbd` with absolute DST A at `0b9e/1268` in its delay words; it is
+reached only on the laboratory SCH path of `nse1cp9`.
 Other extended DST addressing forms and other delayed-control owners remain
 outside this newly admitted composition. The native NSM-3 witness is RETD at
 `0dfd`, DST B at `0dfe`, absolute destination `2f68` at `0dff`.
@@ -5360,7 +5364,17 @@ The endpoint retains its ordinary Decode-owned BRC decrement even when the
 branch is taken; the existing branch redirect handles the transfer. No hidden
 loop stack or unconditional BRAF clear is added. The admission remains limited
 to conditional forward exits; unconditional/inside-target endpoint branches
-and endpoint-overlapping delayed branches retain their existing exclusions.
+retain their existing exclusions.
+
+A delayed conditional forward exit (A/B signed predicates or TC/NTC) may also
+place its second delay word at REA. The endpoint keeps the same Decode-owned
+BRC decrement and the retained branch redirect wins over the loop-back; the
+delay words execute once on both outcomes. `block_terminal_delayed_exit`
+checks 30 cases plus replay: counts 0/2, first/last/never exits, A/B equality
+and TC predicates and two program pages, with BRC, RSA/REA, both delay-word
+effects, the selected marker and an explicit BRAF clear. It fails before the
+admission. Native NSE-1 BCD TC at `0bee` (target `0c04`) has delay words
+`0bf0/0bf1` inside RPTBD block `0bd8..0bf1`.
 
 `block_terminal_exit` checks 20 independent cases plus replay: counts 0/2,
 first/last/never exits without duplicate zero-count patterns, A/B conditions

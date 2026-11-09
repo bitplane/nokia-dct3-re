@@ -1885,7 +1885,7 @@ void tms320c54x_device::pipeline_step()
 			// These two-word delay spans can hold one absolute DST. Its retained
 			// address/source and two write clocks use the ordinary DST path.
 			bool const delay_dst = staged_extended_dst(word) && u8(word) == 0xf8 &&
-				(m_pipeline_control_word == 0xfe00 || m_pipeline_control_word == 0xf272 || m_pipeline_control_word == 0xf274 ||
+				(m_pipeline_control_word == 0xfe00 || m_pipeline_control_word == 0xf272 || m_pipeline_control_word == 0xf273 || m_pipeline_control_word == 0xf274 ||
 				 (staged_banz(m_pipeline_control_word) && !staged_extended_banz(m_pipeline_control_word) && BIT(m_pipeline_control_word,9)));
 			bool const delay_asm = (word & 0xff00) == 0x3200 &&
 				(u8(word) < 0xa0 || (u8(word) >= 0xe0 && u8(word) <= 0xf8));
@@ -2172,8 +2172,12 @@ void tms320c54x_device::pipeline_step()
 			(m_pipeline_address[2] + 1 < m_pipeline_block_end_address ||
 			 (staged_conditional_branch(word) && m_pipeline_address[2] + 1 == m_pipeline_block_end_address)) &&
 			block_branch_target > m_pipeline_block_end_address;
-		bool const delayed_forward_block_exit = (word == 0xf273 || (staged_accumulator_branch(word) && !staged_conditional_call(word) && BIT(word, 9))) &&
-			m_pipeline_address[2] + 3 < m_pipeline_block_end_address && block_branch_target > m_pipeline_block_end_address;
+		// A conditional BCD may also end its delay words at REA: the endpoint keeps
+		// its Decode-owned BRC decrement and the retained branch redirect wins.
+		bool const delayed_forward_block_exit = ((word == 0xf273 || (staged_accumulator_branch(word) && !staged_conditional_call(word) && BIT(word, 9))) &&
+			m_pipeline_address[2] + 3 < m_pipeline_block_end_address && block_branch_target > m_pipeline_block_end_address) ||
+			((staged_accumulator_branch(word) || staged_tc_branch(word)) && !staged_conditional_call(word) && BIT(word, 9) &&
+			 m_pipeline_address[2] + 3 == m_pipeline_block_end_address && block_branch_target > m_pipeline_block_end_address);
 		bool const internal_delayed_block_branch = (word == 0xf273 || ((staged_accumulator_branch(word) || staged_tc_branch(word) || (word & 0xfdfb) == 0xf808 || (word & 0xfde7) == 0xf860) && !staged_conditional_call(word) && BIT(word, 9))) &&
 			m_pipeline_address[2] + 3 < m_pipeline_block_end_address && block_branch_target >= m_pipeline_block_start && block_branch_target <= m_pipeline_block_end_address;
 		u32 const far_call_target = (u32(word & 0x7f) << 16) | m_pipeline_operand[2];

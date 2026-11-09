@@ -87,6 +87,12 @@ void dct3_rf_adc_fixture_state::nse1afs(machine_config &config)
 	m_sch = true;
 }
 
+void dct3_rf_adc_fixture_state::nse1cp9(machine_config &config)
+{
+	nse1afs(config);
+	m_compare_start = true;
+}
+
 void dct3_rf_adc_fixture_state::npe3ad0(machine_config &config)
 {
 	npe3afs(config);

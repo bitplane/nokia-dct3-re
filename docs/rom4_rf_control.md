@@ -796,6 +796,28 @@ The latest `0080` triplets carry self-consistent words such as
 the generated multiframe, with the fourth word 1. Earlier triplets have that
 word 0 and inconsistent offsets. This is a provisional field reading, not a
 decoded consumer contract. It establishes native FCCH detection and frame
-alignment from the laboratory waveform. No report yet shows BSIC 42 or a
-decoded SCH frame number, and the MCU returns to RSSI scanning, so the sample
-representation is not yet established by a CRC-protected decode.
+alignment from the laboratory waveform, but not SCH decoding.
+
+### Port-9 capture start and native SCH decode
+
+Before each SCH window ROM4 programs port `0a`=`117e`, port `09`=`1221` and
+port `2b`=`02a8`, then sets port 3 bit 0, the same ordering as ROM6. `nse1afs`
+starts sampling at the port-3 write. `nse1cp9` instead uses the existing ROM6
+port-9 compare-start hypothesis (without the ROM6 block-request latch). The
+waveform, source epoch and transport are otherwise unchanged.
+
+That path first exposed two C54x composition gaps, now admitted with focused
+sections: absolute DST in BD delay words (`0b9c`) and a delayed TC exit whose
+delay words end at REA (`0bee` in block `0bd8..0bf1`); see
+[the CPU contracts](c54x_execution_contracts.md). With both, a fresh 60-second
+`nse1cp9` run publishes 14-word received-block reports such as
+`502a 0100 0236 006d ...` from 2.614 s: class `50`, **BSIC `2a` (42)**, error
+1, **FN `000236` (566)**, list entry `006d`. The generator's frame number is
+absolute reference time / 60,000 ticks; 2.614 s is frame 566. Later reports
+advance FN by exactly 51. The DSP has therefore recovered the encoded BSIC
+and FN through its own SCH Viterbi/CRC path, which establishes the laboratory
+sample representation (I/Q at two complex samples per symbol) by decode, not
+by hardware measurement. The MCU then requests BCCH blocks each multiframe;
+they report error 1 because this source carries no BCCH. Port-9 capture start,
+physical MFI timing, RF tuning and the zero-epoch source remain laboratory
+assumptions. `nse1afs` is unchanged by the CPU admissions.
