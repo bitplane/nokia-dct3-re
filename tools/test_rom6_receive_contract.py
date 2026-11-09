@@ -3,7 +3,7 @@ from unittest.mock import patch
 
 from tools.rom6_receive_contract import (check,check_program,position_reference,check_programming,
     check_short_program,capture_start_reference,check_capture_programming,check_capture_program,
-    check_stop_polls)
+    check_stop_polls,check_npe3_stop_polls)
 
 
 class ReceiveContractTest(unittest.TestCase):
@@ -107,6 +107,31 @@ class ReceiveContractTest(unittest.TestCase):
             with self.assertRaises(ValueError):
                 check_capture_programming(text,stream[:-1],b'',b'',b'')
         with self.assertRaises(ValueError): check_capture_program(bytes(0x20000),b'',bytes(0x20000))
+
+    def test_6210_stop_uses_own_upload_and_independent_bus_coverage(self):
+        program=bytearray(0x20000)
+        stop=bytes.fromhex('f0743ee100f83eb66ff8036a0d20f84b163ef640f49575f80008000b')
+        helper=bytes.fromhex('f074063ee80074f80008000df0303ffff54074f80008000df0303ffff520f84c3ee9fc00')
+        program[0x1634*2:0x1642*2]=stop
+        program[0x3ee1*2:0x3ef3*2]=helper
+        mcu=bytearray(0x20000)
+        mcu[0x1f494:0x1f494+len(stop)]=stop
+        text=('npe3_capture_stop: sequence=1 port=000b cpu_pc=001640 t=1.000000003 value=0030 tail=0020 length=1387 a=0000000030 mask=ffff observer_writes=0\n'
+              'rom6_capture_stop_poll: sequence=1 first=0010 first_pc=003eea first_t=1.000000001 first_mask=ffff last=0010 last_pc=003ef0 last_t=1.000000002 last_mask=ffff observer_writes=0\n'
+              'npe3_capture_stop_complete: stops=1 cap=16384 observer_writes=0')
+        stream=[b'1.000000003\t001640\t000b\t0030\tffff\n']
+        result=check_npe3_stop_polls(text,stream,program,mcu,program)
+        self.assertEqual(result['stops'],1)
+        self.assertFalse(result['physical_capture_edges_qualified'])
+        for old,new in (('last=0010','last=0011'),('stops=1','stops=2'),
+                        ('cpu_pc=001640','cpu_pc=0015d0'),('a=0000000030','a=0000000031')):
+            with self.subTest(old=old),self.assertRaises(ValueError):
+                check_npe3_stop_polls(text.replace(old,new),stream,program,mcu,program)
+        for bad_program,bad_mcu,bad_stream in ((bytes(0x20000),mcu,stream),
+                                               (program,b'',stream),(program,mcu,[]),
+                                               (program,mcu,stream*2)):
+            with self.assertRaises(ValueError):
+                check_npe3_stop_polls(text,bad_stream,bad_program,bad_mcu,program)
 
     def test_complete_position_programming_and_mutations(self):
         lines=[]

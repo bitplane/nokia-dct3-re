@@ -458,6 +458,11 @@ def main():
                     report['rf_formatter']=check_formatter(text,processing_program,
                         (first/'npe3_rf_config_prefix.be16').read_bytes(),
                         (first/'rom6_radio_writes.tsv').read_text().splitlines())
+                    from tools.rom6_receive_contract import check_npe3_stop_polls
+                    report['capture_stop']=check_npe3_stop_polls(text,
+                        (first/'rom6_radio_writes.tsv').read_bytes().splitlines(keepends=True),
+                        (first/'npe3_terminal_program.be16').read_bytes(),flash,
+                        (ROOT/'roms/nsm3r6/nsm3_rom6_program.be16').read_bytes())
                     from tools.npe3_rach_transmit_check import check_agch
                     report['raw_agch']=check_agch(text,allow_normal=args.provision_records)
                     from tools.npe3_dedicated_check import check as check_dedicated

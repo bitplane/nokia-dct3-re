@@ -48,9 +48,9 @@ def capture_start_reference(ar1,lead,length):
     return (value+length if value<0 else value)&0xffff
 
 
-def check_stop_polls(text, writes):
+def check_stop_polls(text, writes, *, stop_context='0015d0'):
     polls=[fields(row) for row in re.findall(r'rom6_capture_stop_poll: ([^\r\n]+)',text)]
-    stops=[row for row in writes if (row['port'],row['cpu_pc'])==('000b','0015d0')]
+    stops=[row for row in writes if (row['port'],row['cpu_pc'])==('000b',stop_context)]
     if not stops or len(polls)!=len(stops):
         raise ValueError('missing capture stop counter chronology')
     expected={'sequence','first','first_pc','first_t','first_mask','last','last_pc','last_t','last_mask','observer_writes'}
@@ -72,6 +72,40 @@ def check_stop_polls(text, writes):
         if (value&0xffff)!=int(stop['value'],16):
             raise ValueError('capture stop counter/addition/wrap differs')
     return len(polls)
+
+
+def check_npe3_stop_polls(text, stream, program, mcu, resident):
+    block=program[0x1634*2:0x1642*2]
+    if (len(program)!=0x20000 or len(resident)!=0x20000 or
+            hashlib.sha256(block).hexdigest()!=
+            '44b77e1bf3903dfd4db9f49750ab472319814f8026e287cbed4864e2494f704b' or
+            mcu[0x1f494:0x1f494+len(block)]!=block or mcu.count(block)!=1 or
+            hashlib.sha256(resident[0x3ee1*2:0x3ef3*2]).hexdigest()!=
+            '48aa1cfcdff468cc2fd87c8e7c21bbbdb250385744edb17df6878b29be6dd3c9' or
+            program[0x3ee1*2:0x3ef3*2]!=resident[0x3ee1*2:0x3ef3*2]):
+        raise ValueError('6210 capture stop is not its pinned own upload/resident helper')
+    stops=[fields(row) for row in re.findall(r'npe3_capture_stop: ([^\r\n]+)',text)]
+    count=len(stops)
+    if (not 0<count<16384 or text.count(
+            f'npe3_capture_stop_complete: stops={count} cap=16384 observer_writes=0')!=1):
+        raise ValueError('missing or capped 6210 capture stop census')
+    expected={'sequence','port','cpu_pc','t','value','tail','length','a','mask','observer_writes'}
+    for index,row in enumerate(stops,1):
+        if (set(row)!=expected or row['sequence']!=str(index) or row['port']!='000b' or
+                row['cpu_pc']!='001640' or row['mask']!='ffff' or row['observer_writes']!='0' or
+                int(row['value'],16)!=int(row['a'],16)&0xffff):
+            raise ValueError('6210 capture stop metadata/accumulator differs')
+    observed=[(row['t'],row['cpu_pc'],row['port'],row['value'],row['mask']) for row in stops]
+    actual=[]
+    for line in stream:
+        match=WRITE.fullmatch(line)
+        if not match: raise ValueError('malformed 6210 stop bus source')
+        row=tuple(item.decode() for item in match.groups())
+        if row[1:3]==('001640','000b'): actual.append(row)
+    if actual!=observed:
+        raise ValueError('6210 stop census differs from independent bus stream')
+    return dict(stops=check_stop_polls(text,stops,stop_context='001640'),
+                own_upload=True,stable_counter_input=True,physical_capture_edges_qualified=False)
 
 
 def check_capture_program(program,mcu,resident):

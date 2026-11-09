@@ -1541,6 +1541,33 @@ capture lifecycle rather than immediate P03 level gating. It does not identify
 which compare controls ADC clocks, transfer clocks or interrupt generation.
 In particular, P11=`01fe` is not evidence for a 512-word FIFO.
 
+#### Own 6210 stop calculation
+
+The NPE-3 v5.56 upload places the corresponding stop calculation at
+`1634..1641`, not the NSM-3 `15c4..15d1` range. Its 28 bytes uniquely
+match own MCU offset `1f494`, SHA-256
+`44b77e1bf3903dfd4db9f49750ab472319814f8026e287cbed4864e2494f704b`.
+It calls resident `3ee1`, adds data `3eb6`, conditionally subtracts data
+`036a`, then writes P0b at instruction `163f` (write context `1640`).
+The resident helper's 36 bytes match the acquired page-0 image, SHA-256
+`48aa1cfcdff468cc2fd87c8e7c21bbbdb250385744edb17df6878b29be6dd3c9`.
+
+The raw-AGCH laboratory observer checks this product's actual P0d read
+pairs against its stop writes and independent complete I/O journal. This
+qualifies a firmware calculation, not a physical capture policy; it does
+not transfer the NSM-3 poll count, reload lifecycle or capture aperture to
+the 6210.
+
+The coherent 24-second addressed-page composition checks all 6,481 such
+stops: 6,476 initial read pairs and five repeated poll pairs. Every observed
+tail is `0020` and modulus `1387`; none wraps. The complete 1,468,878-write
+journal retains SHA-256
+`e6f4b9c05d50f08663cc7cbc7fc1c5166a51b1d84c805dd43573c0dbd9118074`,
+including timestamps. Native SCH/full SI, raw UA/LU Accept, persisted
+EF_LOCI, release, addressed paging and physical Menu checks still pass.
+Thus counter-input chronology is no longer the missing contract for these
+stop writes; their physical effect on MFI capture is still unproved.
+
 ### P03 lifecycle status boundary
 
 P03 bit 8 is not merely an unused preserved control bit. Resident
