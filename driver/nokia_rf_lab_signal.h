@@ -91,6 +91,16 @@ inline sch_iq gmsk_samples(std::array<unsigned, 148> const &burst)
 	return result;
 }
 
+// GSM 05.02 5.2.6 dummy burst, transcribed from OsmoTRX GSM::gDummyBurst.
+// A BCCH carrier fills otherwise idle timeslots with it at constant power.
+inline std::array<unsigned, 148> dummy_bits()
+{
+	static constexpr char bits[] = "0001111101101110110000010100100111000001001000100000001111100011100010111000101110001010111010010100011001100111001111010011111000100101111101010000";
+	std::array<unsigned, 148> burst{};
+	for (unsigned bit = 0; bit < 148; ++bit) burst[bit] = bits[bit] - '0';
+	return burst;
+}
+
 inline sch_iq sch_samples(std::uint32_t frame, unsigned bsic)
 {
 	return gmsk_samples(sch_bits(frame, bsic));

@@ -2067,6 +2067,26 @@ static INPUT_PORTS_START( nse1_raw_bts )
 	PORT_INCLUDE(dct3_lab_bts)
 INPUT_PORTS_END
 
+static INPUT_PORTS_START( nse2_raw_bts )
+	PORT_INCLUDE(nse2r4v)
+	PORT_INCLUDE(dct3_lab_bts)
+INPUT_PORTS_END
+
+static INPUT_PORTS_START( nsk1_raw_bts )
+	PORT_INCLUDE(nsk1r4t)
+	PORT_INCLUDE(dct3_lab_bts)
+INPUT_PORTS_END
+
+static INPUT_PORTS_START( nsk3_raw_bts )
+	PORT_INCLUDE(nsk3r4t)
+	PORT_INCLUDE(dct3_lab_bts)
+INPUT_PORTS_END
+
+static INPUT_PORTS_START( nsb3_raw_bts )
+	PORT_INCLUDE(nsb3r4t)
+	PORT_INCLUDE(dct3_lab_bts)
+INPUT_PORTS_END
+
 static INPUT_PORTS_START( noki6110 )
 	PORT_INCLUDE(dct3_network_config)
 
@@ -3239,6 +3259,10 @@ ROM_END
 #define rom_nse1sp9 rom_noki5110
 #define rom_nse1tp5 rom_noki5110
 #define rom_nse1ap5 rom_noki5110
+#define rom_nse2ap5 rom_nse2r4t
+#define rom_nsk1ap5 rom_nsk1r4t
+#define rom_nsk3ap5 rom_nsk3r4t
+#define rom_nsb3ap5 rom_nsb3r4t
 #define rom_nsm1pcm rom_nsm1r4t
 #define rom_nam2c3 rom_noki2100
 #define rom_nse1bit rom_noki5110
@@ -3257,14 +3281,18 @@ SYST( 2026, nam2c3, noki2100, 0, nam2c3, noki2100, nokia_dct3_state, empty_init,
 SYST( 1998, noki5110, 0,      0,      noki5110, noki5110, nokia_dct3_state, empty_init, "Nokia", "Nokia 5110 (NSE-1, ROM4 DSP research)", MACHINE_NOT_WORKING )
 SYST( 2001, noki5110i, 0, 0, noki5110i, noki5110, nokia_dct3_state, empty_init, "Nokia", "Nokia 5110i (NSE-2 v5.53 research)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2001, nse2r4t, noki5110i, 0, nse2r4t, noki5110, nokia_dct3_state, empty_init, "Research", "NSE-2 with NSE-1 ROM4 compatibility input (unproved fitted mask)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
+SYST( 2001, nse2ap5, noki5110i, 0, nse2ap5, nse2_raw_bts, dct3_rf_adc_fixture_state, empty_init, "Research", "NSE-2 on NSE-1 ROM4 with the laboratory BTS (unproved fitted mask)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2001, nse2r4v, noki5110i, 0, nse2r4v, nse2r4v, nokia_dct3_state, empty_init, "Research", "NSE-2 ROM4 nominal VBATT experiment (unmeasured board)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 1998, noki5190, 0, 0, noki5190, noki5110, nokia_dct3_state, empty_init, "Nokia", "5190 own MCU research fixture (no DSP completion)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 1998, noki6190, 0, 0, noki6190, noki5210, nokia_dct3_state, empty_init, "Nokia", "6190 MCU research fixture (no DSP completion)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2026, nsb3r4t, noki6190, 0, nsb3r4t, nsb3r4t, nokia_dct3_state, empty_init, "Research", "NSB-3 with NSE-1 ROM4 compatibility input (unproved fitted mask)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
+SYST( 2026, nsb3ap5, noki6190, 0, nsb3ap5, nsb3_raw_bts, dct3_rf_adc_fixture_state, empty_init, "Research", "NSB-3 on NSE-1 ROM4 with the laboratory BTS (unproved fitted mask)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 1998, nsb1r4t, noki5190, 0, nsb1r4t, nsb1r4t, nokia_dct3_state, empty_init, "Research", "NSB-1 with NSE-1 ROM4 compatibility input (unproved fitted mask)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 1998, nsk1r4t, 0, 0, nsk1r4t, nsk1r4t, nokia_dct3_state, empty_init, "Research", "NSK-1 with NSE-1 ROM4 compatibility input (unproved fitted mask)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
+SYST( 1998, nsk1ap5, nsk1r4t, 0, nsk1ap5, nsk1_raw_bts, dct3_rf_adc_fixture_state, empty_init, "Research", "NSK-1 on NSE-1 ROM4 with the laboratory BTS (unproved fitted mask)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 1998, noki6130, 0, 0, noki6130, noki5110, nokia_dct3_state, empty_init, "Nokia", "6130 own MCU research fixture (no DSP completion)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 1998, nsk3r4t, noki6130, 0, nsk3r4t, nsk3r4t, nokia_dct3_state, empty_init, "Research", "NSK-3 with NSE-1 ROM4 compatibility input (unproved fitted mask)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
+SYST( 1998, nsk3ap5, noki6130, 0, nsk3ap5, nsk3_raw_bts, dct3_rf_adc_fixture_state, empty_init, "Research", "NSK-3 on NSE-1 ROM4 with the laboratory BTS (unproved fitted mask)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2026, nse1pcm, noki5110, 0, nse1pcm, noki5110, dct3_pcm_fixture_state, empty_init, "Research", "NSE-1 external 8 kHz PCM frame fixture (not product clock wiring)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2026, nse1obs, noki5110, 0, nse1obs, noki5110, dct3_pcm_fixture_state, empty_init, "Research", "NSE-1 production composition with passive execution observation", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2026, nse1ad0, noki5110, 0, nse1ad0, noki5110, dct3_rf_adc_fixture_state, empty_init, "Research", "NSE-1 ROM4 silent ADC/MFI lab transport control", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )

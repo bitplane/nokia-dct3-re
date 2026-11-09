@@ -865,9 +865,50 @@ whole dialogue through the native DSP in both directions:
 | 3337 | downlink | UA |
 
 Every uplink block decodes with an exact code. A repeated 30-second run
-reproduces the same frames. The 59-second LCD shows operator `DCT3 LAB` and
-full signal bars; the `nse1sp9` control without the responder shows neither.
+reproduces the same frames (measured before the tuned carrier below). The
+59-second LCD shows operator `DCT3 LAB` and full signal bars; the `nse1sp9`
+control without the responder shows neither.
 This is laboratory registration through native ROM4 code, not promotion of
-the normal machine: port-9 capture, port-5 release, the zero-epoch untuned
-source, MFI timing and RF tuning remain laboratory assumptions, and no
+the normal machine: port-9 capture, port-5 release, the zero-epoch source,
+MFI timing and the tuning decode below remain laboratory assumptions, and no
 acceptance gate protects it yet.
+
+### Tuned laboratory carrier
+
+The untuned source put the cell on every channel. The 5110 happened to try
+ARFCN 35 first; the 5110i (`nse2ap5`) tried 66 and 55, decoded SI describing
+35, correctly refused to camp and showed `NSPS`. The lab now hears only the
+channel ROM4 programs.
+
+ROM4 writes the synthesizer word as two DSP port writes: port 31 holds the
+low half, port 32 the high half. Bits 20–22 tag the transfer; tag 3 is the
+UHF N/A word, and `M = ((word >> 7) & 0x1fff) * 64 + (word & 0x7f)` matches
+the manual's 64/65 prescaler relation. With 200 kHz steps and the RX LO
+71 MHz above the 935 MHz band, `ARFCN = M - 5030`. This decode is inferred,
+not byte-pinned to the SENA1 bus: its support is that the power-up scan sweeps
+`M` exactly over ARFCN 1→124 and that `M = 5030` (ARFCN 0) appears for empty
+neighbour slots. The DSP programs the next window's channel during the current
+capture, so the lab latches the programmed channel when a port-9 capture
+starts (`m_capture_arfcn`) and returns silence for any channel but 35.
+
+A real BCCH carrier transmits on all eight timeslots, so timeslots 1–7 now
+carry the GSM 05.02 §5.2.6 dummy burst (bits from OsmoTRX
+`GSM::gDummyBurst`). Without it some RSSI scans landed in empty slots and
+missed the carrier. With both changes `nse1ap5` still completes Location
+Updating, and its scan reports 35 well above the noise floor. The tuned
+source is enabled only on the `*ap5` laboratory machines (`m_tuned_air`).
+
+### Sibling laboratory machines
+
+`nse2ap5` (5110i), `nsk1ap5` (5130), `nsk3ap5` (6130) and `nsb3ap5` (6190)
+apply the same laboratory BTS to the unproved ROM4 compatibility machines,
+to test whether their reason-68 resets are only missing receive activity.
+
+On the 5110i with its native storage profile, the untuned lab removes the
+31.97 s reset. With the tuned carrier it camps on 35, decodes SI and sends an
+access burst (RA `0f`); the lab answers with an Immediate Assignment. The DSP
+then publishes RA_INFO (`0084`) and waits in its IDLE3 command loop
+(`3e22..3e2c`); the 5110i MCU never sends the next command, receive stops, and
+reason 68 fires at 62 s. The 5110 MCU on the same DSP mask continues past
+this point, so the remaining gap is in the 5110i MCU↔ROM4 protocol, which is
+consistent with ROM4 not being the 5110i's own mask.

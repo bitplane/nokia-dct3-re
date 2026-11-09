@@ -626,7 +626,7 @@ void nokia_dsp_c54x_device::io_w(offs_t offset, u16 data)
 	if (port == 0x38) m_fire.command_w(data);
 	else if (port == 0x39) m_fire.data_w(data);
 	else if (port == 0x3c) m_fire.control_w(data);
-	if (m_external_rf_receive && (port == 3 || (port >= 5 && port <= 8) || port == 0x21))
+	if (m_external_rf_receive && (port == 3 || (port >= 5 && port <= 8) || port == 0x21 || port == 0x31 || port == 0x32))
 		m_rf_control_cb(port, data);
 	if (m_port36_handshake && port == 0 && m_port36.strobe_w(BIT(data, 4)))
 		// Deferred completion, not a read-triggered answer. One backend clock

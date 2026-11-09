@@ -66,6 +66,10 @@ public:
 	void nse1sp9(machine_config &config);
 	void nse1tp5(machine_config &config);
 	void nse1ap5(machine_config &config);
+	void nse2ap5(machine_config &config);
+	void nsk1ap5(machine_config &config);
+	void nsk3ap5(machine_config &config);
+	void nsb3ap5(machine_config &config);
 	void npe3cp9(machine_config &config);
 	void npe3zp9(machine_config &config);
 	void npe3bp9(machine_config &config);
@@ -78,6 +82,7 @@ protected:
 	void machine_reset() override;
 private:
 	void configure_adc_lab(machine_config &config);
+	void configure_nse1_lab_bts(machine_config &config);
 	void control_w(offs_t port, u16 data);
 	void transmit_word_w(u16 data);
 	void rf_reset_w(int released);
@@ -129,6 +134,14 @@ private:
 	u64 m_page_not_before=~u64(0),m_page_last_block=~u64(0);
 	std::array<std::array<std::array<s16,2>,148*4>,4> m_addressed_page_samples{};
 	bool m_compare_start=false, m_candidate_active=false;
+	// NSE-1 UHF synthesizer word (tag 3, M = N*64 + A at 200 kHz) selects
+	// which channel the lab cell is heard on; -1 is untuned. ROM4 programs
+	// the next window's channel during the current capture, so the lab
+	// latches the programmed channel when a capture window opens.
+	bool m_tuned_air=false;
+	u16 m_synth_low=0;
+	s32 m_rx_arfcn=-1, m_capture_arfcn=-1;
+	std::array<std::array<s16,2>,148*4> m_dummy_samples{};
 	u16 m_candidate_target=0;
 	bool m_tone = true;
 	bool m_burst = false;

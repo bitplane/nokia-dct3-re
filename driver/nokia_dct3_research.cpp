@@ -110,6 +110,42 @@ void dct3_rf_adc_fixture_state::nse1ap5(machine_config &config)
 {
 	nse1tp5(config);
 	m_raw_agch = true;
+	m_tuned_air = true;
+}
+
+// Products running NSE-1 ROM4 as an unproved mask input share its receive
+// and transmit grammar; attach the complete nse1ap5 laboratory chain.
+void dct3_rf_adc_fixture_state::configure_nse1_lab_bts(machine_config &config)
+{
+	configure_adc_lab(config);
+	m_burst = m_sch = m_compare_start = true;
+	m_bcch = m_full_broadcast = true;
+	m_p05_transmit = m_raw_agch = true;
+	m_tuned_air = true;
+}
+
+void dct3_rf_adc_fixture_state::nse2ap5(machine_config &config)
+{
+	nse2r4v(config);
+	configure_nse1_lab_bts(config);
+}
+
+void dct3_rf_adc_fixture_state::nsk1ap5(machine_config &config)
+{
+	nsk1r4t(config);
+	configure_nse1_lab_bts(config);
+}
+
+void dct3_rf_adc_fixture_state::nsk3ap5(machine_config &config)
+{
+	nsk3r4t(config);
+	configure_nse1_lab_bts(config);
+}
+
+void dct3_rf_adc_fixture_state::nsb3ap5(machine_config &config)
+{
+	nsb3r4t(config);
+	configure_nse1_lab_bts(config);
 }
 
 void dct3_rf_adc_fixture_state::npe3ad0(machine_config &config)
@@ -197,6 +233,8 @@ void dct3_rf_adc_fixture_state::machine_start()
 	if (m_p05_transmit) machine().logerror("npe3_tx_candidate: p05_start=1 port_buffer_only=1 network_reply=0 physical_claim=0\n");
 	if (m_raw_agch) machine().logerror("npe3_bts_layout: combined_ccch=1 sdcch4=1 timeslot=0 agch_endings=9,15,19 physical_claim=0\n");
 	save_item(NAME(m_candidate_active));
+	if (m_tuned_air) m_dummy_samples=nokia_rf_lab::gmsk_samples(nokia_rf_lab::dummy_bits());
+	save_item(NAME(m_synth_low));save_item(NAME(m_rx_arfcn));save_item(NAME(m_capture_arfcn));
 	save_item(NAME(m_candidate_target));
 	if (m_compare_start) machine().logerror("npe3_capture_candidate: p09_start=1 all_captures=1 block_request_latch=1 physical_claim=0 source_epoch_shift=0\n");
 	if (m_full_broadcast)
@@ -213,8 +251,8 @@ void dct3_rf_adc_fixture_state::machine_start()
 	}
 	save_item(NAME(m_q_latch));
 	save_item(NAME(m_adc_receive_control)); save_item(NAME(m_adc_mfi_control));
-	machine().logerror("rf_adc_lab: direct_adc=1 tuned_air_source=0 tone=%u reference=13000000 source_phase_divider=12 word_divider=%u amplitude=1024 physical_clock_claim=0\n",
-		m_tone,subdevice<nokia_mfi_rx_device>("mfi_rx")->word_divider());
+	machine().logerror("rf_adc_lab: direct_adc=1 tuned_air_source=%u tone=%u reference=13000000 source_phase_divider=12 word_divider=%u amplitude=1024 physical_clock_claim=0\n",
+		m_tuned_air,m_tone,subdevice<nokia_mfi_rx_device>("mfi_rx")->word_divider());
 	if (m_sch)
 		machine().logerror("rf_adc_sync: frame_ticks=60000 multiframe=51 fcch_frames=0,10,20,30,40 sch_frames=1,11,21,31,41 active_ticks=7104 epoch=0 envelope=rectangular bt=0.3 bsic=42 waveform_samples_per_symbol=4 other_slots=%s tuned_air_source=0\n",m_bcch ? "bcch" : "zero");
 	else if (m_burst)
@@ -345,6 +383,18 @@ INPUT_CHANGED_MEMBER(dct3_rf_adc_fixture_state::bts_page_w)
 
 void dct3_rf_adc_fixture_state::control_w(offs_t port, u16 data)
 {
+	if (port==0x31 || port==0x32)
+	{
+		// Port 31/32 carry one accumulator's halves (rom4_rf_control.md).
+		if (port==0x31) { m_synth_low=data; return; }
+		u32 const word=(u32(data)<<16)|m_synth_low;
+		if (!m_tuned_air || ((word>>20)&7)!=3) return;
+		// NSE-1 manual: 64/65 UHF prescaler, 200 kHz steps, LO 71 MHz above
+		// the 935 MHz GSM900 receive band, hence ARFCN = M - 5030.
+		s32 const arfcn=s32(((word>>7)&0x1fff)*64+(word&0x7f))-5030;
+		m_rx_arfcn=arfcn>=1 && arfcn<=124 ? arfcn : -1;
+		return;
+	}
 	if (port>=5 && port<=8)
 	{
 		m_lab_tx_compares[port-5]=data;
@@ -750,6 +800,7 @@ void dct3_rf_adc_fixture_state::receive_normal_uplink(std::array<u16,15> const &
 TIMER_CALLBACK_MEMBER(dct3_rf_adc_fixture_state::candidate_receive_start)
 {
 	m_candidate_active=true;
+	m_capture_arfcn=m_rx_arfcn;
 	u16 const counter=subdevice<nokia_dsp_c54x_device>("dsp_c54x")->lab_counter_value();
 	machine().logerror("npe3_capture_due: target=%04x counter=%04x t=%.9f physical_claim=0\n",m_candidate_target,counter,machine().time().as_double());
 	subdevice<nokia_mfi_rx_device>("mfi_rx")->enable_w(1);
@@ -773,6 +824,11 @@ u16 dct3_rf_adc_fixture_state::sample_r(offs_t component)
 	static constexpr s16 q[16] = {0,392,724,946,1024,946,724,392,0,-392,-724,-946,-1024,-946,-724,-392};
 	if (!m_tone) return 0;
 	if (component) return u16(m_q_latch);
+	if (m_tuned_air && m_capture_arfcn!=35)
+	{
+		m_q_latch=0;
+		return 0;
+	}
 	u64 const tick = machine().time().as_ticks(13'000'000);
 	u64 const frame=tick/60'000;
 	if (m_raw_agch && frame>=m_service_accept_start_frame && frame-m_service_accept_start_frame<4 && tick%60'000<148*48)
@@ -876,6 +932,13 @@ u16 dct3_rf_adc_fixture_state::sample_r(offs_t component)
 		}
 		auto const &sample = m_sch_cache[(tick % 60'000) / 12];
 		m_q_latch = sample[1];
+		return u16(sample[0]);
+	}
+	unsigned const offset=tick%60'000%7'500;
+	if (m_tuned_air && tick%60'000>=7'500 && offset<148*48)
+	{
+		auto const &sample=m_dummy_samples[offset/12];
+		m_q_latch=sample[1];
 		return u16(sample[0]);
 	}
 	unsigned const index = (tick / 12) % 16;
