@@ -1506,6 +1506,9 @@ void nokia_dct3_state::nsb3r4t(machine_config &config)
 	noki6190(config);
 	nokia_product_config research = PRODUCT_6190;
 	research.synthetic_sim_card = true; // Available lab card; tray defaults empty.
+	// Own task-0 sleep arm 2a8ace stops the clock with control 0a and loops
+	// to 2a8a76 without writing 05; only the normal-idle arm restores it.
+	research.mad2_sleep_wake_enable = true;
 	apply_product_config(research);
 	// Explicit acquired NSE-1 mask input, not a fitted NSB-3 identity claim.
 	// Keep own firmware, erased storage, ADC configuration and empty SIM tray.
@@ -1572,6 +1575,8 @@ void nokia_dct3_state::nsk3r4t(machine_config &config)
 	noki6130(config);
 	nokia_product_config research = m_product;
 	research.synthetic_sim_card = true;
+	// Own sleep arm 2a02fe -> 2ac704(1) has no control-05 write (as NSB-3).
+	research.mad2_sleep_wake_enable = true;
 	apply_product_config(research);
 	// Own boot4 payload calls resident 8023/802b. NSE-1 ROM4 and its
 	// 52-MHz clock are explicit compatibility inputs, not a fitted NSK-3 dump.
@@ -1608,6 +1613,8 @@ void nokia_dct3_state::nsk1r4t(machine_config &config)
 	// Own 291830 selects 22 at 28, commands at 2a, polls 29 bit 2,
 	// receives at 2d; LCD command/data use 2c/2b at 292182/2921d8.
 	research.gensio_wiring = GENSIO_NSE1;
+	// Own sleep arm 28940a -> 2951dc(1) has no control-05 write (as NSB-3).
+	research.mad2_sleep_wake_enable = true;
 	apply_product_config(research);
 	config.device_remove("dsp_hle");
 	// Explicit NSE-1 resident mask/clock compatibility input. No NSK-1

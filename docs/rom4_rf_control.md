@@ -912,3 +912,16 @@ then publishes RA_INFO (`0084`) and waits in its IDLE3 command loop
 reason 68 fires at 62 s. The 5110 MCU on the same DSP mask continues past
 this point, so the remaining gap is in the 5110i MCU↔ROM4 protocol, which is
 consistent with ROM4 not being the 5110i's own mask.
+
+The 5130 and 6130 are DCS 1800 products and the 6190 is PCS 1900. Their
+scans report ARFCNs 884 and 808 at about -148/-145 dBm, so the 900 MHz
+laboratory carrier is inaudible to them. Their results do not test reason 68;
+that needs a band-aware synthesiser decode and a carrier on their own bands.
+The DSP's empty scan reports still let each task-0 idle loop choose its
+deep-sleep arm. Without delivery restoration that arm starves the OS timers
+and the CCONT watchdog resets the phone. These machines select the opt-in
+MAD2 contract in
+[MAD2 fidelity](mad2_fidelity.md#rom4-sibling-wake-delivery-opt-in). With it
+they run 120 s without a restart, and the 6190 accepts its phone code. The
+missing reason-68 reset reflects receive-activity bookkeeping from those
+scan reports, not camping on a cell.

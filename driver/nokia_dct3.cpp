@@ -224,6 +224,7 @@ void nokia_dct3_state::apply_product_config(nokia_product_config const &product)
 	m_mad2->set_dsp_reset_wiring_contract(product.dsp_reset_wiring);
 	m_mad2->set_clock_stop_enabled(product.mad2_clock_stop);
 	m_mad2->set_sleep_wake_irq3(product.mad2_sleep_wake_irq3);
+	m_mad2->set_sleep_wake_enable(product.mad2_sleep_wake_enable);
 	m_mbus->set_timer_clock_enabled(product.mbus_timer_enabled);
 	m_mbus_terminal->set_enabled(product.mbus_terminal);
 	m_kbgpio->set_wiring_contract(product.keypad_wiring);

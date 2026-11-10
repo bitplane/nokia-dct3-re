@@ -211,6 +211,58 @@ silicon timing. In NAM-2, restarting the clock alone still leaves global
 delivery disabled and does not make its security editor consume keys.
 The firmware's subsequent interrupt-restoration contract remains open;
 the device must not silently write control `05` as a boot workaround.
+The opt-in sibling contract below is a product-scoped exception with its own
+firmware evidence and runtime tests, not a default.
+
+### ROM4 sibling wake delivery (opt-in)
+
+`mad2_sleep_wake_enable` makes leaving clock stop set both global enables,
+exactly as a firmware write of control `05` would. A clock-stop request
+refused because a locally unmasked source is already pending is treated as a
+zero-length stop and restores delivery the same way. It does not raise the
+separate IRQ3 wake report, so the 3310/3330 notification contract is
+unchanged. Only the NSB-3 (`nsb3r4t`), NSK-3 (`nsk3r4t`) and NSK-1
+(`nsk1r4t`) research configurations and their `*ap5` laboratory machines
+select it. Every other product, including NAM-2, keeps wake without service.
+
+Firmware evidence. The three task-0 idle loops share one shape. The loop top
+writes control `0a` and evaluates the idle predicates. The normal-idle arm
+writes `05` and spins until an interrupt clears its flag. The sleep arm acks
+IRQ3 (`09 = 08`), unmasks it (`0b &= f7`) and requests clock stop, then
+returns to the loop top without writing `05`. The only clock-stop writer
+observed in each 45-120 s laboratory run is that arm:
+
+| Product | Loop top | Normal idle (`05`) | Sleep arm | Stop helper |
+| --- | --- | --- | --- | --- |
+| NSB-3 6190 v6.13 | `2a8a76` | `2a8abc` | `2a8ace` | `2b4c0c(1)` |
+| NSK-3 6130 v5.61 | `2a02a6` | `2a02ec` | `2a02fe` | `2ac704(1)` |
+| NSK-1 5130 v5.61 | `2893b2` | `2893f8` | `28940a` | `2951dc(1)` |
+
+Any FIQ that arrives between the `0a` write and the stop request, such as a
+Timer 0 compare, would otherwise stay pending under disabled delivery. With
+the predicates unchanged, the loop would re-enter the sleep arm indefinitely.
+The arm's own IRQ3 preparation is only useful if the wake is later serviced.
+This is a firmware-derived inference, not a silicon measurement of control
+readback after wake; that remains a hardware capture item.
+
+Runtime evidence. Without the contract, all three laboratory machines spin
+in the sleep arm with control `0a`. Starved OS timers stop the supervisor's
+CCONT reload, so the watchdog resets the phone at 49 s (6190/5130) or 80 s
+(6130). The 5130 shows the refused-request case directly: from about 30 s
+every request finds FIQ `13` pending with FIQ mask `02` and control `0a`. A
+wake-only variant still reset the 5130 at 80 s. With the contract, all three
+run 120 s without a restart. The 6190 accepts its physical phone code and
+renders the Messages menu, matching a guest-write diagnostic that was used
+only to confirm the cause. The `*r4t` baselines never take the sleep arm and
+reproduce their reason-68 requests at 93.977/93.975/93.974 s.
+
+NAM-2 cross-check. Enabling the flag on `noki2100 -bios 521sharp` restores
+delivery at its 12.0 s and 12.2 s wakes. Its deep-sleep guard then declines,
+however, and the ordinary loop never requests another stop. The late-input
+security fixture therefore still renders no digits. NAM-2's open boundary is
+the guard-declined arm (`304c2e(0)`, no `05`), not clock-stop wake. NPE-3's
+documented late no-sleep loop has the same shape. Neither product selects
+the flag, and this result neither supports nor refutes the contract for them.
 
 ### Archived interrupt reference
 

@@ -324,7 +324,8 @@ void nokia_mad2_device::update_fiq_line()
 	m_fiq_line_state = active;
 	if (pending)
 		leave_sleep("FIQ");
-	m_fiq_cb(active);
+	// A wake that restores global delivery has already rerouted this line.
+	m_fiq_cb(m_fiq_line_state);
 }
 
 void nokia_mad2_device::update_irq_line()
@@ -337,7 +338,8 @@ void nokia_mad2_device::update_irq_line()
 	m_irq_line_state = active;
 	if (pending)
 		leave_sleep("IRQ");
-	m_irq_cb(active);
+	// A wake that restores global delivery has already rerouted this line.
+	m_irq_cb(m_irq_line_state);
 }
 
 void nokia_mad2_device::enter_sleep()
@@ -349,6 +351,10 @@ void nokia_mad2_device::enter_sleep()
 		if (m_clock_trace && m_clock_trace_count++ < 4096)
 			LOGMASKED(LOG_MAD2, "mad2_sleep: event=request_blocked fiq=%03x irq=%03x t=%.9f\n",
 					m_fiq_status, m_irq_status, machine().time().as_double());
+		// A source that is already pending makes the stop zero-length. NSK-1
+		// otherwise spins here once FIQ0/FIQ4 arrive after its 0a write.
+		if (m_sleep_wake_enable && !m_sleeping)
+			restore_delivery();
 		return;
 	}
 	m_sleeping = true;
@@ -374,6 +380,18 @@ void nokia_mad2_device::leave_sleep(const char *domain)
 				domain, m_fiq_status, m_irq_status, m_timer0_counter,
 				m_timer1_counter, machine().time().as_double(), m_regs[0x0c]);
 	m_sleep_cb(0);
+	if (m_sleep_wake_enable)
+		restore_delivery();
+}
+
+void nokia_mad2_device::restore_delivery()
+{
+	// Opt-in product contract: leaving clock stop sets both global enables,
+	// as a firmware write of control 05 would. ROM4 sibling idle loops stop
+	// the clock with control 0a and have no restoration path of their own.
+	m_regs[0x0c] = (m_regs[0x0c] & ~0x0f) | FIQ_ENABLE | IRQ_ENABLE;
+	update_fiq_line();
+	update_irq_line();
 }
 
 void nokia_mad2_device::restore_outputs()

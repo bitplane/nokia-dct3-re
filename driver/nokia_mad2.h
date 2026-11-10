@@ -45,6 +45,7 @@ public:
 	void set_timer0_catchup(bool value) { m_timer0_catchup = value; }
 	void set_clock_stop_enabled(bool value) { m_clock_stop_enabled = value; }
 	void set_sleep_wake_irq3(bool value) { m_sleep_wake_irq3 = value; }
+	void set_sleep_wake_enable(bool value) { m_sleep_wake_enable = value; }
 	void set_external_status(u8 value) { m_external_status = value & 0x07; }
 	void set_dsp_reset_wiring_contract(dsp_reset_wiring_contract contract);
 
@@ -85,6 +86,7 @@ private:
 	bool timer0_compare_due() const;
 	void enter_sleep();
 	void leave_sleep(const char *domain);
+	void restore_delivery();
 	void restore_outputs();
 
 	devcb_write_line m_fiq_cb;
@@ -119,6 +121,7 @@ private:
 	bool m_timer0_catchup = false;
 	bool m_clock_stop_enabled = true;
 	bool m_sleep_wake_irq3 = false;
+	bool m_sleep_wake_enable = false;
 	dsp_reset_wiring_contract m_dsp_reset_wiring;
 	bool m_timer_trace = false;
 	bool m_interrupt_trace = false;

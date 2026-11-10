@@ -151,6 +151,7 @@ struct nokia_product_config
 	bool mbus_terminal = false;
 	bool mad2_clock_stop = true;
 	bool mad2_sleep_wake_irq3 = false;
+	bool mad2_sleep_wake_enable = false;
 	u32 flash_persistent_start = 0;
 	nokia_ccont_board_profile ccont_board = ADC_DEFAULT;
 };
