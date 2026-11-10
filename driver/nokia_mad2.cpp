@@ -19,6 +19,7 @@ constexpr u8 EXT_IRQ_STATUS = 0x20;
 constexpr u8 EXT_IRQ_ACK = 0x40;
 constexpr u8 FIQ8_MASK = 0x04;
 constexpr u16 TIMER0_FIQ = u16(1) << 4;
+constexpr u16 TIMER1_FIQ = u16(1) << 5;
 }
 
 nokia_mad2_device::nokia_mad2_device(
@@ -277,7 +278,9 @@ void nokia_mad2_device::ack_fiq(u16 mask)
 	if (m_interrupt_trace && m_interrupt_trace_count++ < 4096)
 		LOGMASKED(LOG_MAD2, "mad2_interrupt: event=ack domain=FIQ mask=%03x pending_before=%03x pending_after=%03x t=%.9f\n",
 				mask, before, m_fiq_status, machine().time().as_double());
-	if (m_timer_trace && m_timer_trace_count++ < 4096)
+	// Timer-1 fires about once every 31 s, long after FIQ0/FIQ4 traffic has
+	// spent the shared budget; its destination and acknowledgement stay visible.
+	if (m_timer_trace && ((mask & TIMER1_FIQ) || m_timer_trace_count++ < 4096))
 		LOGMASKED(LOG_MAD2, "mad2_timer: event=ack mask=%03x pending_before=%03x pending_after=%03x t=%.9f\n",
 				mask, before, m_fiq_status, machine().time().as_double());
 }
@@ -447,7 +450,7 @@ TIMER_CALLBACK_MEMBER(nokia_mad2_device::timer1_tick)
 	if (m_timer1_counter == m_timer1_destination)
 	{
 		assert_fiq(5);
-		if (m_timer_trace && m_timer_trace_count++ < 4096)
+		if (m_timer_trace)
 			LOGMASKED(LOG_MAD2, "mad2_timer1: event=destination counter=%04x destination=%04x pending=%03x t=%.9f\n",
 					m_timer1_counter, m_timer1_destination, m_fiq_status,
 					machine().time().as_double());

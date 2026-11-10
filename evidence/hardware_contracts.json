@@ -15,12 +15,12 @@
     {
       "id": "c54x_interrupt_decode_before_stack_access", "subsystem": "c54x_cpu", "status": "partial", "confidence": "strong",
       "boundary": "SPRU131G example 7-18 places INTR Decode and return-PC capture before stack Access, vector Fetch/IACK and the continuation stack write. The isolated one-clock checkpoints require SP and stack unchanged after acceptance and after Decode, then save before Access and replay the accepted source across an IMR change. The former Access-first implementation fails the Decode checkpoint. IRQ and NMI retain one cycle between vector Fetch and stack write. The atomic backend retains its calibrated aggregate entry model and instruction-atomic foreground execution. The opt-in staged backend separately covers retained foreground drain, entry and return for its accepted instruction subset, including older Read-owned SP updates before interrupt stack reservation. Those staged fixtures do not establish physical source-recognition latency or a complete pipeline. Recorder completion, RF acquisition and handset speech remain unestablished",
-      "evidence": ["docs/c54x_execution_contracts.md", "cpu/tms320c54x/tms320c54x.cpp", "tests/c54x/tms320c54x_test_interrupt_entry.cpp", "tests/c54x/tms320c54x_test_interrupts.cpp", "tools/run_c54x_core.py"]
+      "evidence": ["docs/c54x_execution_contracts.md", "cpu/tms320c54x/tms320c54x.cpp", "tests/c54x/sections/interrupt_entry.h", "tests/c54x/sections/stack_interrupt_order.h", "tools/run_c54x_core.py"]
     },
     {
       "id": "c54x_maskable_interrupt_acknowledgement", "subsystem": "c54x_cpu", "status": "partial", "confidence": "strong",
       "boundary": "SPRU131G 6.10.4 associates selective IFR clearance with vector Fetch/IACK; 6.10.8 associates maskable INTM setting with acknowledgement. The isolated accepted-entry checkpoint requires both original IFR bits and clear INTM before IACK, retains the selected source across a later IMR change, and checks selective IFR clearance plus set INTM inside the acknowledgement callback. Saving before Access and replaying reproduces that ordering, one continuation stack write and no source reselection. NMI acceptance and the atomic backend's aggregate entry model are unchanged. The opt-in staged backend has additional bounded foreground-drain and entry/return replay fixtures; it is not absent merely because the atomic backend remains instruction-atomic. Complete physical pipeline and source-recognition timing remain unvalidated. MAME's external-source acknowledgement callback is not independent validation of a physical IACK pin",
-      "evidence": ["docs/c54x_execution_contracts.md", "cpu/tms320c54x/tms320c54x.cpp", "tests/c54x/tms320c54x_test_interrupt_entry.cpp", "tests/c54x/tms320c54x_test_interrupts.cpp", "tools/run_c54x_core.py"]
+      "evidence": ["docs/c54x_execution_contracts.md", "cpu/tms320c54x/tms320c54x.cpp", "tests/c54x/sections/interrupt_entry.h", "tools/run_c54x_core.py"]
     },
     {
       "id": "mu4_native_tone_buffer_arithmetic", "subsystem": "5510_mu4", "status": "partial", "confidence": "strong",
@@ -60,17 +60,17 @@
     {
       "id": "c54x_software_interrupt_instruction", "subsystem": "c54x", "status": "validated", "confidence": "strong",
       "boundary": "SPRU172C p. 4-65 encodes INTR K as f7c0..f7df. It pushes the following PC, selects IPTR:4*K, sets INTM, clears the selected maskable IFR bit where applicable, ignores IMR and prior INTM and costs three cycles. XPC is retained. Sixty-four executable red/green cases cover all encodings with INTM clear/set, IMR zero, two vector bases, exact stack/PC/page/status/IFR outcomes and port-measured timing. Core and ROM4 warm/cold regressions pass. VC5410A SPRS139I table 3-21 identifies K=25 as HPI interrupt/SINT9: original MU4 f7d9 at 02:9c74 selects vector 2064, whose original branch targets 02:9a32. This is instruction/dispatch correctness, not proven native audio or a physical host transaction",
-      "evidence": ["cpu/tms320c54x/tms320c54x.cpp", "tests/c54x/tms320c54x_test.cpp", "docs/5510_bringup.md", "Makefile"]
+      "evidence": ["cpu/tms320c54x/tms320c54x.cpp", "tests/c54x/sections/software_interrupt.h", "docs/5510_bringup.md", "Makefile"]
     },
     {
       "id": "c54x_stack_operation_address_latency", "subsystem": "c54x", "status": "partial", "confidence": "strong",
       "boundary": "SPRU131G 7.5.5.1 table 7-9 gives one-cycle SP latency from ordinary POPM, PSHM and FRAME to category-I compiler-mode direct addressing; extended-shift operands (category II) see updated SP. The core retains a saved preceding-SP DAGEN snapshot for this implemented producer group while architectural SP updates normally. Executable red/green conformance covers all three producers, immediate versus NOP-separated basic and extended-shift stores, and CPL clear/set (24 variants). Native MU4 timer context now places 4044 at reserved stack slot 127a and resumes 02:6d4e rather than corrupting XPC/PC. This is not complete DAGEN timing: other table-7-9 producer groups, longer SP-write latencies and interrupt-overlap hazards remain unvalidated",
-      "evidence": ["cpu/tms320c54x/tms320c54x.cpp", "cpu/tms320c54x/tms320c54x.h", "tests/c54x/tms320c54x_test.cpp", "tests/firmware/mu4_storage_test.cpp", "docs/5510_bringup.md"]
+      "evidence": ["cpu/tms320c54x/tms320c54x.cpp", "cpu/tms320c54x/tms320c54x.h", "tests/c54x/sections/stack_address_dependency.h", "tests/firmware/mu4_storage_test.cpp", "docs/5510_bringup.md"]
     },
     {
       "id": "c54x_conditional_return_alt", "subsystem": "c54x", "status": "validated", "confidence": "strong",
       "boundary": "SPRU172C pp. 4-133--4-134 encodes RC ALT as fc43: test signed 40-bit A, pop the return PC and increment SP only when negative, leaving XPC unchanged. Original MU4 executes it at 02:3e44 after the timer-context latency correction. Five executable red/green cases cover minus one, minimum signed 40-bit value, zero, one and maximum positive value, exact PC/SP outcomes and page preservation. Core and ROM4 warm/cold fixtures pass. Complete native application or speech execution is not established",
-      "evidence": ["cpu/tms320c54x/tms320c54x.cpp", "tests/c54x/tms320c54x_test.cpp", "docs/5510_bringup.md", "Makefile"]
+      "evidence": ["cpu/tms320c54x/tms320c54x.cpp", "tests/c54x/sections/conditional_return.h", "docs/5510_bringup.md", "Makefile"]
     },
     {
       "id": "npm5_mu4_startup_timer_context_sp_latency", "subsystem": "c54x", "status": "partial", "confidence": "strong",
@@ -115,7 +115,7 @@
     {
       "id": "c54x_immediate_dp_load", "subsystem": "c54x", "status": "validated", "confidence": "strong",
       "boundary": "TI SPRU172C pp. 4-70--4-71 syntax 3 encodes LD #k9,DP as ea00..ebff, replacing only ST0 bits 8--0 in one cycle. Original MU4 startup executes ea00 at 02:3d7e after storage initialization. The previously unsupported encoding is implemented and executable conformance checks all 512 immediate values in two CPL/SXM configurations, preservation of other ST0/ST1 bits and both accumulators, and one-cycle timing between two-cycle port probes. Core conformance and existing warm/cold ROM4 fixtures pass. This is an ISA contract, not a claim of complete native application or speech execution",
-      "evidence": ["cpu/tms320c54x/tms320c54x.cpp", "tests/c54x/tms320c54x_test.cpp", "docs/5510_bringup.md", "Makefile"]
+      "evidence": ["cpu/tms320c54x/tms320c54x.cpp", "tests/c54x/sections/immediate_dp_forwarding.h", "docs/5510_bringup.md", "Makefile"]
     },
     {
       "id": "npm5_mu4_storage_startup_completion_and_underrun", "subsystem": "mu4", "status": "partial", "confidence": "strong",
@@ -205,7 +205,7 @@
     {
       "id": "npm5_mu4_original_program_entry", "subsystem": "mu4", "status": "partial", "confidence": "strong",
       "boundary": "After exact original-loader destination verification, isolated mu4nand invokes unchanged InitData 3538 with descriptor index zero. Original firmware reloads MCUSI16, writes PMST 2028 and branches to program 2000; loaded code transfers to logical page 2 address 6d62. Read-only program-bus taps observe both entries. TI SPRU131G 3.2.5 specifies OVLY common lower 32K CPU accesses; physical page-zero words supplied by original DMA are used while logical XPC remains 2. DMA does not use the CPU overlay translation. Core fixtures cover overlay-on fetch/READA/WRITA, unique upper pages and overlay-off control/save/repeat tests. Original code exposes documented LD immediate ARP and LD Smem DP forms. Entry execution is not full startup, music playback or handset boot; DA150 RAM aliases, physical extents and peripherals remain unresolved",
-      "evidence": ["docs/5510_bringup.md", "docs/rom4_dsp_loader.md", "tests/firmware/mu4_storage_test.cpp", "tests/c54x/tms320c54x_test.cpp", "cpu/tms320c54x/tms320c54x.cpp", "cpu/tms320c54x/tms320c54x.h", "Makefile"]
+      "evidence": ["docs/5510_bringup.md", "docs/rom4_dsp_loader.md", "tests/firmware/mu4_storage_test.cpp", "cpu/tms320c54x/tms320c54x.cpp", "cpu/tms320c54x/tms320c54x.h", "Makefile"]
     },
     {
       "id": "npm5_mu4_original_dma_loader", "subsystem": "mu4", "status": "partial", "confidence": "strong",
@@ -220,12 +220,12 @@
     {
       "id": "npm5_mu4_original_segment_transfer", "subsystem": "mu4", "status": "partial", "confidence": "strong",
       "boundary": "After original InitDisk provisions erased NAND, isolated mu4nand supplies all 741916 original R060 container bytes through receive register 0031 and IRQ6 at test-only 1ms cadence, pausing on external XF busy. Unchanged ISR, ring consumer, seven marker selections, raw/file write paths and payload-only XOR comparisons execute; final checksum is 0040, state zero and ring drained. Original InitData mounts the retained populated medium successfully. Both acquired R060/R061 containers statically match payload-only checksum for all seven segments. Original 9488 in file writer independently exposes compact LD Xmem,SHFT,A; 16 core fixtures cover sign, destination, shifts and postincrement. Independent file-content readback, DMA-backed load, serial physical timing, full MU4 boot and native handset services remain unvalidated",
-      "evidence": ["docs/5510_bringup.md", "docs/rom4_dsp_loader.md", "tests/firmware/mu4_storage_test.cpp", "tests/c54x/tms320c54x_test.cpp", "cpu/tms320c54x/tms320c54x.cpp", "tools/noki5510_a00_inventory.py", "Makefile"]
+      "evidence": ["docs/5510_bringup.md", "docs/rom4_dsp_loader.md", "tests/firmware/mu4_storage_test.cpp", "cpu/tms320c54x/tms320c54x.cpp", "tools/noki5510_a00_inventory.py", "Makefile"]
     },
     {
       "id": "npm5_mu4_original_erased_provisioning", "subsystem": "mu4", "status": "partial", "confidence": "strong",
       "boundary": "Isolated mu4nand supplies independent erased NAND and clean test RAM, loads original InitDisk C globals, and executes unchanged 346a/30de(057e). Firmware scans and writes metadata then reaches its empty-ring receive loop with nine descriptors initialized, state/completion zero and no received words. After soft reset and original InitData library/global restoration, unchanged partition-aware 308e mount returns zero with balanced SP and NAND busy waits on the retained firmware-written medium. Original 6fe1/60e1 bytes independently correct long shifted Smem/CMPM extension ordering; carry C/NC branches have eight core fixtures. No disk image, BPB, directory or return success is injected. Firmware-file transfer, full MU4 boot, physical mapping/timing and native handset services remain unvalidated",
-      "evidence": ["docs/5510_bringup.md", "docs/rom4_dsp_loader.md", "tests/firmware/mu4_storage_test.cpp", "tests/c54x/tms320c54x_test.cpp", "cpu/tms320c54x/tms320c54x.cpp", "Makefile"]
+      "evidence": ["docs/5510_bringup.md", "docs/rom4_dsp_loader.md", "tests/firmware/mu4_storage_test.cpp", "cpu/tms320c54x/tms320c54x.cpp", "Makefile"]
     },
     {
       "id": "npm5_mu4_initdisk_serial_ingress", "subsystem": "mu4", "status": "partial", "confidence": "strong",
@@ -255,7 +255,7 @@
     {
       "id": "npm5_mu4_original_erased_mount", "subsystem": "mu4", "status": "partial", "confidence": "strong",
       "boundary": "Isolated mu4nand executes unchanged InitData R060 mount 308e through original 2080..20ad trampolines, with startup ABI context 3aea and partition-aware flag one. Erased boot-sector reads use GPIO/NAND/live BIO and return failure one with balanced SP. Original 6be6/76e1 context operations corroborate displacement-before-immediate ordering for long-offset ADDM and ST. No successful filesystem, directory population, file placement or full MU4/handset boot is claimed",
-      "evidence": ["docs/5510_bringup.md", "docs/rom4_dsp_loader.md", "tests/firmware/mu4_storage_test.cpp", "tests/c54x/tms320c54x_test.cpp", "cpu/tms320c54x/tms320c54x.cpp", "Makefile"]
+      "evidence": ["docs/5510_bringup.md", "docs/rom4_dsp_loader.md", "tests/firmware/mu4_storage_test.cpp", "cpu/tms320c54x/tms320c54x.cpp", "Makefile"]
     },
     {
       "id": "npm5_mu4_file_dma_loader", "subsystem": "mu4", "status": "mapped", "confidence": "strong",
@@ -265,7 +265,7 @@
     {
       "id": "npm5_mu4_original_nand_flush", "subsystem": "mu4", "status": "partial", "confidence": "strong",
       "boundary": "Isolated mu4nand fixture executes unchanged InitData R060 dirty-cache flush 0725 with declared ABI cache/base/dirty inputs. Original GPIO/BIO code erases block 2, programs 32 pages, writes ff spare fill and verifies each page against the cache. Independent device reads verify 8192 patterned words and 512 spare bytes; return zero, balanced SP, cleared dirty flag and preserved CPL are required. Test-only program/data maps, clock and ADD_H remain assumptions; no filesystem, full DA150 startup or handset boot is claimed",
-      "evidence": ["docs/5510_bringup.md", "tests/firmware/mu4_storage_test.cpp", "cpu/tms320c54x/tms320c54x.cpp", "tests/c54x/tms320c54x_test.cpp", "Makefile"]
+      "evidence": ["docs/5510_bringup.md", "tests/firmware/mu4_storage_test.cpp", "cpu/tms320c54x/tms320c54x.cpp", "Makefile"]
     },
     {
       "id": "npm5_mu4_original_nand_read", "subsystem": "mu4", "status": "partial", "confidence": "strong",
@@ -275,7 +275,7 @@
     {
       "id": "c54x_live_bio_input", "subsystem": "dsp", "status": "partial", "confidence": "strong",
       "boundary": "Core BIO callback reads the board pin, defaulting high when unconnected. SPRU172C defines BIO low/NBIO high. Executable conformance covers 28 pin-level variants of BC/BCD/CC/RC/RCD/XC plus a live busy-loop release. MU4 sheet 4 wires NAND R/B to DA150 BIO, but no handset currently executes that storage attachment; this validates CPU pin semantics rather than DA150 memory mapping or media provisioning",
-      "evidence": ["docs/5510_bringup.md", "cpu/tms320c54x/tms320c54x.cpp", "tests/c54x/tms320c54x_test.cpp"]
+      "evidence": ["docs/5510_bringup.md", "cpu/tms320c54x/tms320c54x.cpp", "tests/c54x/sections/bio_pipeline.h"]
     },
     {
       "id": "npm5_mu4_nand_strobe_decode", "subsystem": "mu4", "status": "mapped", "confidence": "strong",

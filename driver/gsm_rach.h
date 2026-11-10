@@ -61,4 +61,4 @@ inline std::optional<std::uint8_t> decode_p27(std::array<std::uint16_t, 15> cons
 	return std::nullopt;
 }
 } // namespace gsm::rach
-#endif
+#endif // MAME_NOKIA_GSM_RACH_H

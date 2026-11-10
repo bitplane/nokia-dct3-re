@@ -4,8 +4,8 @@ from tools.c54x_rom4_control_source_check import check
 from tools.test_c54x_rom4_rf_boundary_check import summary
 
 
-def capture():
-    text = summary()
+def capture(**fields):
+    text = summary(**fields)
     for hit in (1, 2):
         text += (f'rom4_rf_control_table: hit={hit} base=1920 '
                  'words=2a04,0006,0041,0040,27a2,0030,0041,0020 '
@@ -45,7 +45,7 @@ class ControlSourceCheckTest(unittest.TestCase):
 
     def test_requires_existing_rf_boundary(self):
         with self.assertRaises(ValueError):
-            check(capture().replace('rf_reads=26752', 'rf_reads=0'))
+            check(capture(reads=0))
 
 
 if __name__ == '__main__':
