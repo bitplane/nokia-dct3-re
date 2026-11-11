@@ -308,7 +308,7 @@
       "status": "disproven",
       "hypothesis": "The generic STLM-to-T recommendation makes an adjacent register MPYA/MACA/MASA consumer use old T, so every such multiplier needs a separating word",
       "conclusion": "SPRU131G 7.5.6 and table 7-13 restrict the T hazard to the listed shift/bit-test and related Category-I consumers; other consumers have zero latency. Register MPYA and MACA/MASA are not Category I. An oracle derived only from table 7-3's conservative summary falsely accepted old T. The corrected adjacent-STLM fixture fails that implementation; retaining T after older Execute and before younger Read publication passes the 69120-case dependency bank. A following STM-to-T case prevents replacing this with a live Execute read. These are functional ordering checks, not measured silicon phases. Smem multiplier/POLY and other immediate T-input composition need their own category audit rather than inheriting either rule blindly.",
-      "evidence": ["docs/5510_bringup.md", "docs/research_cleanup.md", "cpu/tms320c54x/tms320c54x.cpp", "tests/c54x/sections/stlm_register.h", "tools/run_c54x_core.py", "tools/test_run_c54x_core.py"]
+      "evidence": ["docs/5510_bringup.md", "docs/research_cleanup.md", "cpu/tms320c54x/tms320c54x.cpp", "tests/c54x/sections/stlm_register.h", "tools/run_c54x_section.py", "tools/test_c54x_section_catalog.py"]
     },
     {
       "id": "mu4_clear_adts_chain_is_plaintext_recording_oracle",
@@ -336,7 +336,7 @@
       "status": "disproven",
       "hypothesis": "An active C54x repeat block belongs to its setup XPC, so a matching low PC on a foreign program page cannot consume its count or reload RSA",
       "conclusion": "TI SPRA599A section 2 page 4 explicitly documents an unintended repeat when another thread's foreign-page low PC matches REA. The comparator is 16-bit; an RSA reload changes PC without restoring the setup XPC. The old staged page qualifier hides this hardware hazard, while the atomic frontend already exposes it. A paired 384-case replay fixture covers BRC 0/1/2/7, caller pages 0/2/127, foreign-page collisions and safe controls with FCALL and FCALLD. Its minimal failing staged case has BRC=1: the old model calls twice from the original page, whereas the documented comparator consumes the loop in one foreign callee and executes its prefix once. The corrected staged path matches the independent counts and balances every PC/page frame through replay. This does not certify silicon phases or unrestricted far-call/repeat compositions, and does not justify copying the C55x compatibility mode's BRAF-clearing rule. Comparator acceptance remains separate from instruction/delay composition coverage.",
-      "evidence": ["docs/rom4_dsp_loader.md", "docs/5510_bringup.md", "cpu/tms320c54x/tms320c54x.cpp", "tests/c54x/sections/block_repeat_pages.h", "tools/run_c54x_core.py", "tools/test_run_c54x_core.py"]
+      "evidence": ["docs/rom4_dsp_loader.md", "docs/5510_bringup.md", "cpu/tms320c54x/tms320c54x.cpp", "tests/c54x/sections/block_repeat_pages.h", "tools/run_c54x_section.py", "tools/test_c54x_section_catalog.py"]
     },
     {
       "id": "mu4_recorder_first_zero_mvdd_source_is_staged_only",
@@ -357,7 +357,7 @@
       "status": "disproven",
       "hypothesis": "Publishing SP through staged POPM SP, STM/MVDK SP or FRAME makes the new value immediately usable by a basic compiler-mode LD/ST",
       "conclusion": "TI SPRU131G table 7-9 distinguishes the architectural stack pointer from Category-I compiler-addressing visibility: POPM SP needs two cycles, STM/MVDK SP and FRAME need one, and a DAGEN-bank conflict adds one to POPM SP. The staged frontend now retains the prior compiler SP separately, with saved visibility-window state, while stack operations use architectural SP directly. The 320 replay cases distinguish zero through three NOPs for LD/ST, including an intermediate postincrement and deferred publication, with no duplicate reads or writes. Four additional cases execute the original POPM SP/NOP/NOP/RET idle-wrapper suffix and consume the caller return from the restored stack. This closes the tested basic consumers, not general multiword/Category-II consumers or all conflict chains; atomic handset execution remains unchanged.",
-      "evidence": ["docs/rom4_dsp_loader.md", "cpu/tms320c54x/tms320c54x.cpp", "cpu/tms320c54x/tms320c54x.h", "tests/c54x/sections/compiler_stack.h", "tools/run_c54x_core.py"]
+      "evidence": ["docs/rom4_dsp_loader.md", "cpu/tms320c54x/tms320c54x.cpp", "cpu/tms320c54x/tms320c54x.h", "tests/c54x/sections/compiler_stack.h", "tools/run_c54x_section.py"]
     },
     {
       "id": "mu4_complete_staged_isr_alone_removes_short_timer_starvation",
@@ -371,7 +371,7 @@
       "status": "disproven",
       "hypothesis": "The staged logical-operation matrix's ST1 0200 toggle establishes both SXM states",
       "conclusion": "ST1 bit 9 is OVM; SXM is bit 8. The test incorrectly labeled overflow-mode coverage as sign-extension coverage. Its toggle and expected status were corrected to 0100, and all 576 logical replay cases rerun. The 48 complete original-worker cases also use the actual SXM bit while independently varying saved INTM and the CMPR conditional-store outcome. No CPU arithmetic semantics or atomic handset configuration were changed. The historical marker alone did not establish the claimed SXM coverage.",
-      "evidence": ["docs/rom4_dsp_loader.md", "cpu/tms320c54x/tms320c54x.cpp", "tests/c54x/sections/memory_logic.h", "tools/run_c54x_core.py"]
+      "evidence": ["docs/rom4_dsp_loader.md", "cpu/tms320c54x/tms320c54x.cpp", "tests/c54x/sections/memory_logic.h", "tools/run_c54x_section.py"]
     },
     {
       "id": "mu4_worker_1892_1a8a_are_memory_add_sub",
@@ -385,14 +385,14 @@
       "status": "disproven",
       "hypothesis": "Staged POPM writes every supported MMR destination in Execute after its Read-stage stack sample",
       "conclusion": "TI SPRU131G table 7-4 explicitly assigns POPM writes to ARx/BK to Read. Those destinations now publish with the stack sample unless an older Execute-stage store occupies the DAGEN write bank; table 7-5 requires a one-clock deferral in that case. The 114 destination/page/replay cases distinguish DAGEN Read publication from other supported destinations' Execute publication. Twelve conflict/control replay cases require one stack read and increment, exactly one older store and one POPM write, with an independently changed stack source after Read unable to alter the retained result. This is bounded manual-derived timing coverage, not measured silicon or a global producer-latency proof. Atomic firmware execution remains unchanged.",
-      "evidence": ["docs/rom4_dsp_loader.md", "cpu/tms320c54x/tms320c54x.cpp", "tests/c54x/sections/indirect_popm.h", "tools/run_c54x_core.py"]
+      "evidence": ["docs/rom4_dsp_loader.md", "cpu/tms320c54x/tms320c54x.cpp", "tests/c54x/sections/indirect_popm.h", "tools/run_c54x_section.py"]
     },
     {
       "id": "c54x_daram_return_bypasses_same_clock_push",
       "status": "disproven",
       "hypothesis": "A staged RET/RETE/RETD stack read automatically consumes an older PSHM value written to the same DARAM address in that clock",
       "conclusion": "TI SPRU131G table 7-2 assigns DB reads to the first half-cycle and EB writes to the second. The old adjacent-push fixture encoded a prototype late-read assumption, not hardware bypass evidence. Stack return samples now precede Execute writes. Thirty-six RET/RETE replay cases require the old RAM target for an adjacent push and the new target after one NOP, with twelve RETD ordering controls establishing the same distinction. Both words remain observable and the sampled route survives restoration without duplicate accesses. Existing original MU4 context, worker and delayed-XC gates remain green. This closes the bounded DARAM ordering assumption; physical memory kind/bank arbitration and other late-read families remain separate unvalidated contracts.",
-      "evidence": ["docs/rom4_dsp_loader.md", "cpu/tms320c54x/tms320c54x.cpp", "tests/c54x/sections/stack_control.h", "tools/run_c54x_core.py"]
+      "evidence": ["docs/rom4_dsp_loader.md", "cpu/tms320c54x/tms320c54x.cpp", "tests/c54x/sections/stack_control.h", "tools/run_c54x_section.py"]
     },
     {
       "id": "nsb6_alarm_code_rejection_requires_wake_cause_override",
@@ -1242,43 +1242,43 @@
       "id": "c54x_short_mod3_is_a_valid_accumulator_load_source", "status": "disproven",
       "hypothesis": "Short single-operand MOD=3 preincrement is a valid LD or DLD source because the address helper and positive replay fixtures can implement it",
       "conclusion": "SPRU131G table 5-4 and section 5.5.3.1 restrict short MOD=3 to write accesses, including paired accesses. LD, LDU, LD TS, LDR, LD shift-16, variable-shift LD and DLD now reject this encoding before data, pointer or arithmetic-result effects in both frontends. The variable-shift guard classifies the operation extension, preserving write-side forms; long MOD=13 remains read-capable. A 9728-case rejection/replay bank spans all ARs, destinations, CMPT settings, pages, frontends and snapshots, with all 32 variable shifts. Positive source fixtures omit the forbidden encoding instead of replacing it with duplicate valid cases. The legacy 569b DLD and 629b immediate-MPY checks are rejection controls, not positive timing evidence. This does not certify other read families, MMR-source legality, circular inputs outside TI's buffer/step constraints, or a silicon trap mechanism.",
-      "evidence": ["docs/5510_bringup.md", "docs/rom4_dsp_loader.md", "cpu/tms320c54x/tms320c54x.cpp", "tests/c54x/sections/source_admission.h", "tools/run_c54x_core.py", "tools/test_run_c54x_core.py"]
+      "evidence": ["docs/5510_bringup.md", "docs/rom4_dsp_loader.md", "cpu/tms320c54x/tms320c54x.cpp", "tests/c54x/sections/source_admission.h", "tools/run_c54x_section.py", "tools/test_c54x_section_catalog.py"]
     },
     {
       "id": "c54x_short_mod3_is_a_valid_compare_or_bitfield_source", "status": "disproven",
       "hypothesis": "CMPM and BITF can use short MOD=3 preincrement because the shared address helper and positive fixtures implement the encoded source",
       "conclusion": "SPRU172C pages 4-22 and 4-33 define read-only Smem operands and a TC result; SPRU131G table 5-4 restricts short MOD=3 to writes. Both frontends now reject these CMPM/BITF source encodings before data, pointer or status effects. Each positive Smem bank omits 3072 invalid cases, retaining 52224 read-capable encoding cases/restores with stable raw IDs. A separate 512-case replay bank covers both operations, both initial TC states, all ARs, CMPT settings, pages, frontends and before/after-rejection snapshots. Mapped/peripheral reads, immediate TC consumers and delayed comparisons retain focused acceptance. This does not establish a silicon trap, permit generalizing the restriction to long MOD=13, settle read/modify/write sources, or validate older circular inputs outside TI's buffer/step constraints.",
-      "evidence": ["docs/5510_bringup.md", "docs/rom4_dsp_loader.md", "cpu/tms320c54x/tms320c54x.cpp", "tests/c54x/sections/source_admission.h", "tools/run_c54x_core.py", "tools/test_run_c54x_core.py"]
+      "evidence": ["docs/5510_bringup.md", "docs/rom4_dsp_loader.md", "cpu/tms320c54x/tms320c54x.cpp", "tests/c54x/sections/source_admission.h", "tools/run_c54x_section.py", "tools/test_c54x_section_catalog.py"]
     },
     {
       "id": "c54x_short_mod3_is_a_valid_scalar_arithmetic_source", "status": "disproven",
       "hypothesis": "The mechanically decoded short MOD=3 source is valid for scalar ADD/SUB families and their variable-shift extensions",
       "conclusion": "SPRU131G table 5-4 restricts short MOD=3 to writes; the encoded operands in these arithmetic forms are reads. Both frontends now reject before data, pointer or arithmetic-result effects. A 35840-case replay bank covers all 24 scalar opcode classes in 00..0f and 3c..43, eight variable-shift operation/source/destination selectors with all 32 shifts, all ARs, CMPT settings, pages, frontends and two scheduler checkpoints. Scalar positive banks omit forbidden forms while retaining raw case IDs: ADD/SUB 104448, ADDS and SUBS 52224 each, shift-16 208896, and TS arithmetic 153984 (6528 address plus 147456 numeric cases). The 245760-case variable-shift bank already excluded the form and is unchanged. Producer, mapped-register, write-side and prior rejection controls pass. This does not add positive staged ADC/SUBB support, validate circular inputs outside TI's constraints, classify read/modify/write or packed operand grammars, or claim a silicon trap mechanism.",
-      "evidence": ["docs/5510_bringup.md", "docs/rom4_dsp_loader.md", "cpu/tms320c54x/tms320c54x.cpp", "tests/c54x/sections/source_admission.h", "tools/run_c54x_core.py", "tools/test_run_c54x_core.py"]
+      "evidence": ["docs/5510_bringup.md", "docs/rom4_dsp_loader.md", "cpu/tms320c54x/tms320c54x.cpp", "tests/c54x/sections/source_admission.h", "tools/run_c54x_section.py", "tools/test_c54x_section_catalog.py"]
     },
     {
       "id": "c54x_short_mod3_is_a_valid_multiply_or_status_load_source", "status": "disproven",
       "hypothesis": "Multiply/MAC, T/ASM/DP loads, POLY, BITT and atomic RPT may read short MOD=3 because their shared address helper implements preincrement",
       "conclusion": "SPRU131G table 5-4 restricts short MOD=3 to writes; SPRU172C defines these operands as reads, including POLY's Smem-to-B load. Both frontends reject applicable forms before operand or result effects. A 4352-case bank covers 34 opcode classes, all ARs, CMPT settings, pages, frontends and two snapshots, preserving data, pointers, accumulators, T, status/ASM and RC. Four multiply/T-load banks omit the forbidden RAM form with stable raw IDs, retaining 52224 cases each (27648 RAM plus 24576 mapped), totaling 208896. The legacy 649b MAC fixture is a rejection control. Fifteen neighboring profiles retain legal MAC, ASM, repeat, T-load and write-side behavior. This adds no otherwise unsupported positive staged forms, validates no silicon trap, and leaves MMR grammar, implicit copies, read/modify/write and older circular input constraints for independent audit. Long MOD=13 remains read-capable.",
-      "evidence": ["docs/5510_bringup.md", "docs/rom4_dsp_loader.md", "cpu/tms320c54x/tms320c54x.cpp", "tests/c54x/sections/source_admission.h", "tools/run_c54x_core.py", "tools/test_run_c54x_core.py"]
+      "evidence": ["docs/5510_bringup.md", "docs/rom4_dsp_loader.md", "cpu/tms320c54x/tms320c54x.cpp", "tests/c54x/sections/source_admission.h", "tools/run_c54x_section.py", "tools/test_c54x_section_catalog.py"]
     },
     {
       "id": "c54x_short_mod3_is_a_valid_mmr_load_or_push_source", "status": "disproven",
       "hypothesis": "LDM and PSHM may read short-preincrement MMR sources, and PSHD may read short-preincrement Smem, because the shared address helpers implement the pointer update",
       "conclusion": "SPRU131G table 5-4 and section 5.5.3.1 restrict short MOD=3 to writes; section 5.6 retains the indirect grammar for MMR with separate long-form exclusions. Atomic LDM/PSHM/PSHD now reject before operand effects, matching the staged exclusions. The legacy 489a positive test is a rejection control preserving the complete high-bit AR value, not a seven-bit-masked result. A bounded gate runs the legacy atomic prefix and 512 rejection/replay cases over four opcode classes, all ARs, CMPT settings, pages, frontends and snapshots. It requires no data access, pointer masking/modification, accumulator/T/status change or SP allocation. Twelve neighboring profiles preserve legal pushes, long MOD=13 Smem reads, stack interrupt composition, POPD and write-side preincrement. This is not a full staged-suite rerun, a silicon-trap claim, or closure of MMR long-form handling, implicit-copy/read-modify-write semantics or circular input constraints.",
-      "evidence": ["docs/5510_bringup.md", "docs/rom4_dsp_loader.md", "cpu/tms320c54x/tms320c54x.cpp", "tests/c54x/sections/source_admission.h", "tools/run_c54x_core.py", "tools/test_run_c54x_core.py"]
+      "evidence": ["docs/5510_bringup.md", "docs/rom4_dsp_loader.md", "cpu/tms320c54x/tms320c54x.cpp", "tests/c54x/sections/source_admission.h", "tools/run_c54x_section.py", "tools/test_c54x_section_catalog.py"]
     },
     {
       "id": "c54x_short_mod3_is_a_valid_paired_arithmetic_source", "status": "disproven",
       "hypothesis": "The shared paired-word address path makes short-preincrement Lmem legal for DADD, DSUB, DRSUB and their T variants",
       "conclusion": "SPRU172C defines these Lmem operands as reads, while SPRU131G table 5-4 reserves short MOD=3 for writes, including paired accesses. The atomic paired-read families and staged DADD/DSUB/DRSUB classifier reject before operand effects. Positive fixtures omit form 4 with stable raw IDs, retaining 6144 DSUB, 12288 DADD and 6144 DRSUB cases/restores over eight forms. Both focused gates additionally require 3584 rejection/replay cases over all 14 opcode classes, all ARs, CMPT and C16 settings, pages, frontends and snapshots, with unchanged data, pointers and arithmetic state. The legacy atomic prefix, DLD and write-side preincrement controls pass. This does not admit positive staged T variants, reject paired stores or long MOD=13 reads, decide implicit-copy/read-modify-write grammar, validate physical timing or constitute a fresh full staged-suite run.",
-      "evidence": ["docs/5510_bringup.md", "docs/rom4_dsp_loader.md", "cpu/tms320c54x/tms320c54x.cpp", "tests/c54x/sections/source_admission.h", "tools/run_c54x_core.py", "tools/test_run_c54x_core.py"]
+      "evidence": ["docs/5510_bringup.md", "docs/rom4_dsp_loader.md", "cpu/tms320c54x/tms320c54x.cpp", "tests/c54x/sections/source_admission.h", "tools/run_c54x_section.py", "tools/test_c54x_section_catalog.py"]
     },
     {
       "id": "c54x_short_mod3_is_a_valid_logic_or_transfer_source", "status": "disproven",
       "hypothesis": "Short MOD=3 can feed logical operations or source-side transfers because the transfer eventually writes a different memory space",
       "conclusion": "SPRU172C defines AND/OR/XOR, MVDK, MVMD, PORTW and WRITA's encoded operands as reads. SPRU131G table 5-4 restricts short MOD=3 to write accesses. Their atomic entry points now reject before operand effects, matching their staged exclusions. The logic-short gate retains 576 positive cases and requires 2560 rejection/replay cases across ten opcode classes, ARs, CMPT settings, initial TC states, pages, frontends and snapshots. Independent data, program and I/O taps require no operand/output transactions, pointer or arithmetic effects. Thirteen neighboring profiles and three external-I/O controls pass. Destination-side MVKD/MVDM, PORTR and MVPD must not inherit the source restriction. This does not settle implicit-copy/RMW instructions, MMR long-form handling, circular fixture domains or physical timing; it is not a fresh full staged-suite run. POPD's encoded operand remains a destination.",
-      "evidence": ["docs/5510_bringup.md", "cpu/tms320c54x/tms320c54x.cpp", "tests/c54x/sections/source_admission.h", "tools/run_c54x_core.py", "tools/test_run_c54x_core.py"]
+      "evidence": ["docs/5510_bringup.md", "cpu/tms320c54x/tms320c54x.cpp", "tests/c54x/sections/source_admission.h", "tools/run_c54x_section.py", "tools/test_c54x_section_catalog.py"]
     },
     {
       "id": "mu4_playback_fetch_hits_establish_bootstrap_restarts", "status": "disproven",
@@ -1308,13 +1308,13 @@
       "id": "c54x_short_source_fixture_pmst_selects_cmpt", "status": "disproven",
       "hypothesis": "The shared short-source rejection fixture exercises both compatibility modes by toggling PMST bit 14",
       "conclusion": "CMPT is ST1 bit 5; the previous setup varied PMST while holding ST1.CMPT clear. Its cmpt=2 markers therefore overstated mode coverage, without invalidating the observed noncompatibility rejection results. The shared helper now varies ST1 bit 5 and asserts its preservation. All twelve documented source-rejection profiles pass again, including LTD/DELAY, MACP/MACD, loads, arithmetic, multiply, stack and transfers. This repair does not establish mode coverage for unrelated fixture helpers.",
-      "evidence": ["docs/5510_bringup.md", "cpu/tms320c54x/tms320c54x.cpp", "tests/c54x/sections/source_admission.h", "tools/run_c54x_core.py"]
+      "evidence": ["docs/5510_bringup.md", "cpu/tms320c54x/tms320c54x.cpp", "tests/c54x/sections/source_admission.h", "tools/run_c54x_section.py"]
     },
     {
       "id": "c54x_delay_successor_write_permits_short_preincrement_source", "status": "disproven",
       "hypothesis": "LTD/DELAY may read short *+ARx because they also perform an implicit write to the successor address",
       "conclusion": "SPRU131G table5-4/5.5.3.1 limits short MOD3 to write operands, while SPRU172C4-41/4-81 defines the encoded Smem as a read source and the successor as a distinct implicit write. The previous default4d9b assertion encoded the same mistaken premise as the handler, not independent silicon evidence. The new no-effect matrix fails the unchanged atomic core at case58688; source admission now rejects before address or operand effects. Legal long-MOD13 preincrement is distinct and retained as4deb0001. This is a fail-closed emulator legality contract, not measurement of an invalid-opcode hardware trap or a claim about every RMW family.",
-      "evidence": ["docs/5510_bringup.md", "cpu/tms320c54x/tms320c54x.cpp", "fixtures/c54x_sections.json", "tools/run_c54x_core.py", "tools/test_run_c54x_core.py"]
+      "evidence": ["docs/5510_bringup.md", "cpu/tms320c54x/tms320c54x.cpp", "tools/run_c54x_section.py", "tools/test_c54x_section_catalog.py", "tests/c54x/sections/source_admission.h"]
     },
     {
       "id": "nsm3_unlisted_mode4_silent_peer_is_sufficient", "status": "disproven",
@@ -1332,7 +1332,7 @@
       "id": "c54x_mpy_decoder_exclusion_implies_atomic_nonadmission", "status": "disproven",
       "hypothesis": "Memory/immediate MPY modes f9..ff already have no operand effects because the decoder and staged path leave them unsupported",
       "conclusion": "The unchanged atomic control reaches case56 for62f9, performs a data transaction and changes A to zero: prepare_smem_address treated every mode>=f8 as an absolute address. An early MPY-family guard now aligns atomic admission with the existing decoder/staged limit. The224-case matrix covers all seven aliases, both destinations, CMPT settings, pages, frontends and two save points, requiring no data transaction and unchanged A/B/T/status/ARs. This is a fail-closed emulator policy for unvalidated aliases, not evidence of a silicon trap, an exclusion of documented f8/long-MOD13, or an all-family legality closure.",
-      "evidence": ["docs/5510_bringup.md", "cpu/tms320c54x/tms320c54x.cpp", "tests/c54x/sections/source_admission.h", "tools/run_c54x_core.py", "tools/test_run_c54x_core.py"]
+      "evidence": ["docs/5510_bringup.md", "cpu/tms320c54x/tms320c54x.cpp", "tests/c54x/sections/source_admission.h", "tools/run_c54x_section.py", "tools/test_c54x_section_catalog.py"]
     },
     {
       "id": "nsm3_p04_requires_hardware_descriptor_fifo", "status": "unsupported",

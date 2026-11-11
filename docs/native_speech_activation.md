@@ -76,7 +76,9 @@ on disk and accept `--output-root`; they no longer default to tmpfs.
 The full-scale variant `--mixed-full-scale` supplies32 words repeating
 `0000,7fff,8000,ffff,7ffe,8001,1234,edcb`; every one of48 output words
 matches the same independent convolution with rounding after accumulation.
-Explicit `--machine` selection now qualifies these CPU/bus compositions:
+Explicit `--machine` selection qualified these CPU/bus compositions. The
+atomic rows predate the single-engine retirement: `nse1astd` can no longer be
+run, and `noki5110` now uses the stage-owned engine with standard SWWSR.
 
 | Machine | Frontend / bus | Input | Current capture |
 | --- | --- | --- | --- |
@@ -84,6 +86,12 @@ Explicit `--machine` selection now qualifies these CPU/bus compositions:
 | `nse1astd` | atomic / standard | full-scale mixed | `tmp/run_rom4_rf_impulse_mwaa4emo` |
 | `nse1pipe` | staged / standard | full-scale mixed | `tmp/run_rom4_rf_impulse_rjlndfg2` |
 | `nse1pipe` | staged / standard | bounded mixed | `tmp/run_rom4_rf_impulse_phbhtxr1` |
+
+Rerun at `93a6cb11` after the observer's owner fix, the single-engine
+compositions pass again: `noki5110` mixed (`tmp/run_rom4_rf_impulse__7m2d4x4`)
+and full-scale (`tmp/run_rom4_rf_impulse_7a4onsqs`), and `nse1pipe` full-scale
+(`tmp/run_rom4_rf_impulse_oqa_spr3`) and bounded (`tmp/run_rom4_rf_impulse_b7z3016l`).
+`nse1plg` still stops at its separate legacy-SWWSR loader boundary.
 
 Each capture records the actual binary, ROM/input identities and profile,
 and requires a unique matching machine marker and clear illegal-opcode state.
@@ -95,10 +103,12 @@ slot addresses (or`ffffffff` when absent). The fixture admits input owners
 advanced PC, while retaining exact destination/value ordering. No pipeline,
 register or sample value is changed by these derived getters.
 
-The existing `run_c54x_core.py --profile portr-block` independently checks
-these owner getters at real I/O-read and data-write callbacks across1728
-cases and1728 save/load replays, two program pages and three snapshot phases;
-empty pipeline slots must report no owner. Capture: `tmp/run_c54x_core_g4hbuvkp`.
+The retired `run_c54x_core.py --profile portr-block` checked these owner
+getters at real I/O-read and data-write callbacks across 1728 cases and 1728
+save/load replays, two program pages and three snapshot phases; empty pipeline
+slots had to report no owner (capture `tmp/run_c54x_core_g4hbuvkp`). The
+`circular_portr_block` section now owns the getter checks with 288
+cases/restores; its empty-slot sentinels are retained.
 This is numerical/observer qualification, not all accumulator modes, physical
 bus timing, arbitrary filter state or RF acquisition. It does not supersede
 the separate failed rotating-score acceptance.

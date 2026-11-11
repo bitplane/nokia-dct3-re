@@ -249,10 +249,12 @@ switch is not reopened by these coarse samples.
 
 ## Native 5110 Frontend
 
-The ordinary `noki5110` native DSP composition now selects staged execution and
-standard SWWSR decoding. `verify-5110-menu`, late-input, power-lifecycle and
-save-state gates exercise that default, including passive staged health checks.
-`nse1astd` and `nse1aclk` explicitly retain atomic comparison coverage.
+The ordinary `noki5110` native DSP composition uses the single stage-owned
+engine with standard SWWSR decoding. `verify-5110-menu`, late-input,
+power-lifecycle and save-state gates exercise that default, including passive
+health checks. The atomic comparison machines `nse1astd` and `nse1aclk` are
+retired with the atomic engine; `nse1plg` retains the legacy SWWSR bus
+comparison.
 The native PCM runner's `nse1obs` control adds only a passive instruction
 observer to ordinary 5110: no external clocks or firmware-state modification.
 Its execution-owned helper observations replace fetch-time argument sampling.

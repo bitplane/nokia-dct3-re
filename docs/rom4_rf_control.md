@@ -384,9 +384,11 @@ the per-case command and generated storage identity in `invocation.json`.
 
 ### Frontend observation boundary
 
-The RF runner accepts four explicit research compositions: `noki5110`
-(atomic/legacy SWWSR), `nse1astd` (atomic/standard), `nse1plg`
-(staged/legacy) and `nse1pipe` (staged/standard). Each has isolated own
+The RF runner accepts three live compositions, all on the single stage-owned
+engine: `noki5110` and `nse1pipe` (standard SWWSR) and `nse1plg` (legacy
+SWWSR). The parser still recognizes archived `nse1astd` (atomic/standard)
+captures, but that machine and the atomic engine are retired, and the
+`noki5110` atomic/legacy results below predate the change. Each has isolated own
 NVRAM, recorded frontend/bus metadata and a unique observed machine header.
 The final DSP illegal flag is independently checked: a normal MAME exit does
 not prove that the CPU continued executing. These choices do not identify the
@@ -416,9 +418,10 @@ zero/DC negative control and strict rotating-input criterion. Instruction-entry
 observation is not proof that a store subsequently completed or that a physical
 signal was acquired.
 
-A fresh matched comparison uses `--machine noki5110 --execution-probes`,
+The matched comparison below used `--machine noki5110 --execution-probes`,
 `--machine nse1astd --execution-probes` and `--machine nse1pipe`, each with
-`--repeats 1`.
+`--repeats 1`, before the atomic engine was retired; `nse1astd` cannot be
+rerun.
 Recorded binary, observer, generator and loose-ROM hashes are identical; only
 the machine/frontend/bus profile differs. Each case consumes 991,360 input words
 over 60 emulated seconds and ends with the illegal flag clear.

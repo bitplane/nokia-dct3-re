@@ -2,7 +2,6 @@
 local machine = manager.machine
 local cpu = assert(machine.devices[":dsp_c54x:cpu"])
 machine:logerror('rom4_rf_profile: system='..machine.system.name..'\n')
-local staged=machine.system.name=='nse1pipe' or machine.system.name=='nse1plg'
 local impulse = tonumber(os.getenv("ROM4_RF_IMPULSE_INDEX") or "0")
 assert(impulse and impulse >= 0 and impulse < 32 and impulse % 1 == 0)
 local start = tonumber(os.getenv("ROM4_RF_IMPULSE_TIME") or "1.6402")
@@ -20,7 +19,8 @@ taps[#taps + 1] = cpu.spaces["io"]:install_read_tap(0x27, 0x27,
         if machine.time:as_double() < start then return 0 end
         -- Clock/core changes can move the first eligible read into another
         -- consumer. Start at the filter's first IN, not a wall-time accident.
-        local owner=staged and cpu.state['READPC'].value or cpu.state['PC'].value-2
+        -- Execution is stage-owned on every live machine; PC runs ahead of the bus owner.
+        local owner=cpu.state['READPC'].value
         if inputs == 0 and owner ~= 0x330a then return 0 end
         local value = inputs == impulse and amplitude or 0
         if mixed then
@@ -38,7 +38,7 @@ taps[#taps + 1] = cpu.spaces["io"]:install_read_tap(0x27, 0x27,
 taps[#taps + 1] = cpu.spaces["data"]:install_write_tap(0x1a48, 0x1a57,
     "rf_filter_output", function(offset, value)
         local pc = cpu.state["PC"].value
-        local owner=staged and cpu.state['EXECPC'].value or pc-1
+        local owner=cpu.state['EXECPC'].value
         if inputs == 0 or owner < 0x330a or owner > 0x3325 then return end
         if outputs >= 48 then return end
         machine:logerror(string.format(

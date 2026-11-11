@@ -2,6 +2,8 @@
 
 Original-application CPU composition, bus and atomic negative-control maps. [C54x execution contracts](c54x_execution_contracts.md) owns instruction qualification and the complete regression checkpoint. These application observations do not promote handset or waveform acceptance.
 
+`tms54test -bios ...`, `tms54xtra` and `run_c54x_core.py` profile or flag commands below name the retired generic harness and record when a result was measured; they are not current commands. The sections in `fixtures/c54x_sections.json` now own those contracts ([suite guide](c54x_test_suite.md)).
+
 ## Current composition
 
 `mu4nand` uses staged execution and C5416-compatible SWWSR/BSCR/SWCR decoding.

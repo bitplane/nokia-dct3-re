@@ -225,6 +225,16 @@ covering 163 frames with zero reference mismatches and exact replay. Default
 and coherent 3210 HLE acceptance remain green. These renewed results do not
 extend the ISA, physical timing or native-radio claims beyond their fixtures.
 
+The 2026-11-10 ledger revalidation at `93a6cb11` reran the complete catalogue:
+**528 sections and 1,464,127 cases and restores** in 2,926.7 seconds
+(`python3 tools/run_c54x_section.py all --scope all --jobs 8`). The same pass
+reran the ROM4 context, FR/EFR, RF bitmap/pairs, backend BSP/request, clocked
+boot, RF filter and MU4 storage/NAND gates. The strict EFR erasure, homing-error
+and lost-SID comparisons still reproduce their documented divergences
+unchanged. The RF filter observer had kept atomic `PC` ownership for
+`noki5110` after its promotion to the stage-owned engine and captured no
+input. It now uses `READPC`/`EXECPC` on every live machine.
+
 The ROM4 uploaded-program verifier and handset qualifications not listed above
 remain earlier results, not renewed certificates from this pass. Native 8210
 acceptance has its own [ROM6 contract](rom6_dsp_bringup.md). These results do

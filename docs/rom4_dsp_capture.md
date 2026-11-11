@@ -561,8 +561,9 @@ frame-driven port-27 reads with no port-38/39 reads. The exact current scan
 snapshot is specified in the BRAF contract above. This preserves the existing
 no-cell boundary, not radio acquisition.
 
-`make probe-c54x-timer-boundary` runs a separate, firmware-free observation
-profile (`tms54test -bios timer`). It reloads PRD through indirect stores,
+`make probe-c54x-timer-boundary` now runs the firmware-free `timer_irq_mask`
+section. The observations below came from its predecessor, the retired
+`tms54test -bios timer` profile. It reloaded PRD through indirect stores,
 then sets AR1 to IMR and masks TINT. The ISR consists only of `PSHM XPC`
 and `FRETE`. With PRD 1 the atomic core repeatedly returns to `01:0608`,
 before the mask, with IMR/IFR `0008`; the observation deadline may fall
@@ -795,9 +796,11 @@ It does not replace the separate optional profiles, provide an exact-opcode
 execution inventory, or establish fitted silicon, RF acquisition or speech.
 Large replay matrices make this a long-running gate:
 
+That default run is retired. Its generic contracts now run in the section
+catalogue:
+
 ```sh
-.venv/bin/python tools/run_c54x_core.py --mame mame/mame \
-  --rompath mame/roms --output-root tmp
+python3 tools/run_c54x_section.py all --scope all --jobs 8
 ```
 
 ## Isolated simulator setup boundary

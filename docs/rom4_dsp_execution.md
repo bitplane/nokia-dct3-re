@@ -2,6 +2,8 @@
 
 Address-level native-loader execution, staged/atomic comparisons and bus/timing evidence. [C54x execution contracts](c54x_execution_contracts.md) owns current processor qualification; [the ROM4 loader](rom4_dsp_loader.md) owns handset lifecycle. Older bounded captures are not renewed by a later focused test.
 
+`tms54test -bios ...`, `tms54xtra` and `run_c54x_core.py` profile or flag commands below name the retired generic harness and record when a result was measured; they are not current commands. The sections in `fixtures/c54x_sections.json` now own those contracts ([suite guide](c54x_test_suite.md)).
+
 Execution is now staged-only; atomic comparisons below are archived evidence,
 not selectable engines or current machine configurations. The
 [retirement contract](c54x_frontend_retirement.md) owns migration acceptance.
@@ -151,9 +153,10 @@ regression, not a silicon timing measurement or permission to admit every
 far-call/repeat composition.
 
 ```sh
-python3 tools/run_c54x_core.py --profile rptb-page \
-  --mame mame/mame --rompath roms --output-root tmp
+python3 tools/run_c54x_section.py block_repeat_pages
 ```
+
+(This was the retired `rptb-page` profile.)
 
 The focused repeat/control profiles, native 5110 save-state gate and
 MU4 cold saved-track catalogue gate pass. Delayed far-call/loop composition
@@ -1229,10 +1232,8 @@ case identities and standard-mode ARP zero. IDLE in a control-delay window
 and reserved NN=11 remain excluded. Physical clock/restart latency is not
 established by this fixture.
 
-```sh
-.venv/bin/python tools/run_c54x_core.py --mame mame/mame \
-  --rompath mame/roms --profile power-idle --output-root tmp/c54x-power-idle
-```
+The retired `power-idle` profile's cases now run in the section catalogue
+(`python3 tools/run_c54x_section.py all --scope all --jobs 8`).
 
 The original AA22 instruction `028922: f5e1` is a concrete native consumer
 after a serial playback-control transition; AA99 has different contents at
@@ -1867,8 +1868,8 @@ read, unchanged source and no replay duplication. Gap-zero TRN behavior
 remains a stage projection, not a measured silicon guarantee. Spaced consumers
 have distinct acceptance coverage; other non-DAGEN MMR destinations and
 indirect STLM forms remain outside this extension.
-The focused `stlm-t` runner uses the separate `tms54xtra` fixture namespace
-because `tms54test` has exhausted its eight-bit BIOS index. It also checks
+The retired focused `stlm-t` runner used the separate `tms54xtra` fixture namespace
+because `tms54test` had exhausted its eight-bit BIOS index. It also checked
 3,072 STLM BRC/LDM cases and restores; neither bank substitutes for an
 interrupt or block-repeat composition test.
 
@@ -2604,16 +2605,10 @@ still belongs to Execute; explicit MMR-store forwarding is unchanged.
 These checks prove the straight-line iteration join without inserting a
 gap, not RPTB count, endpoint, interrupt or control-flow behavior.
 
-Reproduce the isolated fixture in a disk-backed working directory:
-
-```sh
-/absolute/path/to/mame tms54test -bios swap-body -video none -sound none \
-  -nothrottle -noreadconfig -log -seconds_to_run 5
-```
-
-Require the single `staged original swap body: PASS cases=1536` marker and
-terminal `Fatal error: TMS320C54x isolated swap body complete` (exit 3).
-Another exit-3 exception is failure, not completion.
+The `tms54test -bios swap-body` fixture is retired. The copied-firmware
+`byte_swap` section now owns the body with 512 cases/restores
+(`python3 tools/run_c54x_section.py byte_swap`); the join belongs to
+`block_swap`.
 
 For the join, use `-bios swap-join` and require its single
 `staged original swap join: PASS cases=1536` marker and terminal
@@ -3655,7 +3650,7 @@ optional differential oracle; it does not block this software implementation.
 Native acquisition, recorder finalization and handset speech remain unpromoted
 until their own end-to-end gates pass.
 
-The passive foreground-fetch tap in `probe-c54x-timer-boundary` narrows that
+The passive foreground-fetch tap in the retired `tms54test -bios timer` probe narrowed that
 implementation boundary: both period-one cases accept 108 entries with
 return PC `0608`, but never fetch the opcode at `010608` and never write the
 IMR mask. Long-period controls fetch that opcode exactly once. Indirect

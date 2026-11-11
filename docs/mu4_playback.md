@@ -2,6 +2,8 @@
 
 Original file selection, decoding, serial-word ownership, refill and pending-tail maps. [AAC validation](aac_validation.md) owns the accepted bounded waveform/conformance claims. Reference-valid pending RAM is not committed media or a fully drained native track.
 
+`tms54test -bios ...`, `tms54xtra` and `run_c54x_core.py` profile or flag commands below name the retired generic harness and record when a result was measured; they are not current commands. The sections in `fixtures/c54x_sections.json` now own those contracts ([suite guide](c54x_test_suite.md)).
+
 ## Saved-Track Playback Boundary
 
 `bootplaystage` starts from the same saved endpoint with the recorder's
@@ -999,21 +1001,13 @@ bank timing, all legal/illegal operand domains or decoded audio.
 The external request, saved file and peer replies remain unchanged. The
 original REL diagnostic fails closed with `audio_acceptance=0`.
 
+These seven checks were the retired `run_c54x_core.py` profiles `mvkd-sp`,
+`rptb-fcalld`, `mvkd-forward`, `rpt-smem`, `rpt-ld`, `stlm-pmst` and
+`pshd-long`. Their contracts now run, with the documented checkpoint
+redistribution, in the section catalogue:
+
 ```sh
-python3 tools/run_c54x_core.py --profile mvkd-sp \
-  --mame mame/mame --rompath roms --output-root tmp
-python3 tools/run_c54x_core.py --profile rptb-fcalld \
-  --mame mame/mame --rompath roms --output-root tmp
-python3 tools/run_c54x_core.py --profile mvkd-forward \
-  --mame mame/mame --rompath roms --output-root tmp
-python3 tools/run_c54x_core.py --profile rpt-smem \
-  --mame mame/mame --rompath roms --output-root tmp
-python3 tools/run_c54x_core.py --profile rpt-ld \
-  --mame mame/mame --rompath roms --output-root tmp
-python3 tools/run_c54x_core.py --profile stlm-pmst \
-  --mame mame/mame --rompath roms --output-root tmp
-python3 tools/run_c54x_core.py --profile pshd-long \
-  --mame mame/mame --rompath roms --output-root tmp
+python3 tools/run_c54x_section.py all --scope all --jobs 8
 ```
 
 ```sh
@@ -2284,7 +2278,7 @@ shows the first RET taking that stub, then restoration of XPC `2`, PC
 `98de`, and the pre-interrupt SP `1272`. The following TINT repeats the
 same frame; no cumulative stack loss or substituted return target is seen.
 The temporary stack probe is removed after harvesting this conclusion.
-The firmware-free `probe-c54x-timer-boundary` reproduces starvation with
+The firmware-free `tms54test -bios timer` probe (since retired) reproduced starvation with
 just indirect PRD/TCR stores and a `PSHM XPC; FRETE` ISR; its long-period
 control reaches the IMR mask. This excludes NAND, codec and serial work as
 necessary causes of the stall, but is not proof of the exact physical

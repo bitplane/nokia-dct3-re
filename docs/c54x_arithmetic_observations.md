@@ -2,6 +2,8 @@
 
 TI instruction-family and original-firmware arithmetic maps. Independent operand/result controls are retained here; [C54x execution contracts](c54x_execution_contracts.md) owns processor admission and the full regression checkpoint.
 
+`tms54test -bios ...`, `tms54xtra` and `run_c54x_core.py` profile or flag commands below name the retired generic harness and record when a result was measured; they are not current commands. The sections in `fixtures/c54x_sections.json` now own those contracts ([suite guide](c54x_test_suite.md)).
+
 ## TI Arithmetic Family Audit
 
 This is a syntax-level comparison against SPRU172C tables 2-1 through 2-6,
@@ -1324,12 +1326,10 @@ extension (`run_c54x_asm_core_retry_20261009.log`). This asserts one positive
 left-shift outcome, not all ASM values, saturation, Nokia RF behavior or
 native speech. The suite deliberately exits via its completion exception
 after printing `TMS320C54x core conformance: PASS`.
-`check-c54x-core` uses `tools/run_c54x_core.py` to retain independent
-`run_c54x_core_*` directories containing `console.log` and the opcode
-assertions in `error.log`. Acceptance requires every current marker in
-`run_c54x_core.REQUIRED`, exit status3 and the terminal test-completion
-exception; a marker followed by an unrelated crash or interruption is not
-success. Earlier smaller marker sets are not current full-core acceptance.
+At the time, `check-c54x-core` used `tools/run_c54x_core.py` to retain
+`run_c54x_core_*` directories with `console.log` and opcode assertions in
+`error.log`. It now runs the section catalogue through
+`tools/run_c54x_section.py`; see the [suite guide](c54x_test_suite.md).
 Four additional ASM=0 `f480` vectors cover positive and negative 32-bit
 overflow with OVM clear/set: guard-preserving 40-bit results versus signed
 32-bit saturation, A-owned sticky overflow, low-word carry, unchanged B and

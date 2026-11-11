@@ -502,7 +502,7 @@ help:
 	@echo "make verify-3410-radio-paging check NHM-2 PCH access and Paging Response"
 	@echo "make verify-3310-frontier boot local v6.39 to its deterministic idle frame"
 	@echo "make verify-5110-menu boot ROM4/C54x and open the NSE-1 Phone book menu (staged CPU by default; NSE1_MACHINE overrides composition)"
-	@echo "make probe-c54x-timer-boundary observe synthetic timer reload/mask timing (not a fidelity gate)"
+	@echo "make probe-c54x-timer-boundary run the timer_irq_mask section (no exact latency claim)"
 	@echo "make verify-5110-late-input open the NSE-1 menu after the later idle interval (staged CPU by default; NSE1_MACHINE overrides composition)"
 	@echo "make verify-5110-power-lifecycle check short and sustained NSE-1 power presses (staged CPU by default; NSE1_MACHINE overrides composition)"
 	@echo "make verify-5110-save-state restore ROM4/C54x idle then open the menu (staged CPU by default; NSE1_MACHINE overrides composition)"
@@ -1540,20 +1540,19 @@ check-c54x-rom4-fr-encoder: build prepare-c54x-rom4-fixture
 .PHONY: check-c54x-rom4-fr-encoder-staged
 check-c54x-rom4-fr-encoder-staged: check-c54x-rom4-fr-encoder
 
-# Diagnostic observation only: the short-period outcome is deliberately not
-# asserted until interrupt recognition/drain timing has an independent oracle.
+# The retired tms54test timer profile became the timer_irq_mask section: a real
+# short-period IRQ3 and masked foreground marker, without an exact latency claim.
 .PHONY: probe-c54x-timer-boundary
-C54X_TIMER_PROBE_RUN_DIR ?= tmp/c54x-timer-boundary
-probe-c54x-timer-boundary: build
-	mkdir -p $(C54X_TIMER_PROBE_RUN_DIR)
-	cd $(C54X_TIMER_PROBE_RUN_DIR) && $(abspath $(MAME_DIR)/mame) tms54test \
-		-bios timer -video none -sound none -nothrottle -seconds_to_run 1 \
-		-rompath $(abspath $(MAME_DIR)/roms) -cfg_directory cfg -nvram_directory nvram
+probe-c54x-timer-boundary:
+	$(PYTHON) tools/run_c54x_section.py timer_irq_mask
 
-# Assert TRB/PSC register behavior before the non-asserting short-period
-# interrupt observations. This is deliberately not an interrupt-latency gate.
+# Assert TRB/PSC register behavior before the short-period interrupt
+# observation. This is deliberately not an interrupt-latency gate.
 .PHONY: check-c54x-timer-registers
-check-c54x-timer-registers: probe-c54x-timer-boundary
+check-c54x-timer-registers:
+	$(PYTHON) tools/run_c54x_section.py stopped_timer_reload
+	$(PYTHON) tools/run_c54x_section.py timer_prescaler
+	$(MAKE) --no-print-directory probe-c54x-timer-boundary
 
 .PHONY: check-c54x-rom4-rf-filter-mixed
 check-c54x-rom4-rf-filter-mixed: build

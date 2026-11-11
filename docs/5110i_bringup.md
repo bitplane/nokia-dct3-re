@@ -1327,26 +1327,21 @@ runner return code 0). Its 5,690 distinct `[opassert]` records include all
 564 forms observed here, with no missing opcode. This is actual completed
 fixture assertion coverage, not a source-text inventory or full ISA proof.
 The word-contract gate itself still does not run that expensive fixture.
-Reproduce the separate baseline with:
-
-```sh
-python3 tools/run_c54x_core.py --mame mame/mame --rompath roms --output-root tmp
-```
-
-Allow approximately 35 minutes on the current host; large groups report only
-after tens or hundreds of thousands of save/load cases. Require the runner's
-terminal PASS, not elapsed time or partial markers, before using its
-`error.log` assertion inventory. Compare exact opcode sets against the
+This baseline came from the retired default `tms54test` run, which emitted
+the `[opassert]` records. The section catalogue does not emit them, so the
+assertion inventory cannot currently be reproduced. That run took about
+35 minutes and its inventory was used only after the runner's terminal PASS.
+Compare exact opcode sets against the
 bounded service log; an assertion for a neighboring encoding does not cover
 the observed form. Neither this comparison nor the fixture establishes
 physical port timing, a fitted NSE-2 mask/clock, native RF operation or
 sustained handset stability.
-For focused CPU controls, use the same runner with `--core-controls`.
-It additionally runs isolated `instr-observer` and `portr-bypass` fixtures.
+Focused CPU controls used the same retired runner with `--core-controls`.
+It additionally ran isolated `instr-observer` and `portr-bypass` fixtures.
 The former distinguishes execute-owned callbacks from ordinary memory reads,
 repeats and annulled fetches across atomic/staged frontends and save/load;
 the latter checks 6,656 volatile-PORTR consumer/restore cases, including
-512 dispatcher cases. These controls pass on the current build and are
+512 dispatcher cases. These controls passed on the build of that time and are
 recorded separately in `acceptance.json`. They do not prove all 564 observed
 forms, physical peripheral banks, port-`36` semantics or a silicon clock.
 

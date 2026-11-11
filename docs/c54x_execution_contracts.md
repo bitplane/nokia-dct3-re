@@ -848,140 +848,39 @@ preservation; exact opcode/literal fetches, literal poison and no data bus
 traffic are retained. The old 131,504-case owner, scheduler/digest and
 enumeration-only host test are removed. No physical pipeline phase is claimed.
 
-The CLI test exercises every isolated profile's machine/BIOS selection and
-result checking using simulated process output. The inventory is a structural
-preservation check, not executed coverage, an independent arithmetic oracle
-or evidence of silicon timing. Native conformance and affected handset gates
-remain necessary. Never automatically regenerate the baseline to make a
-refactor pass; `--write` is reserved for an explicitly reviewed contract change.
-Expected arithmetic/timing results must remain independent of CPU execution
-helpers and shared profile-selection metadata.
-
-Literal `instruction_case` records own `reset_before` and `reset_initial`.
-The CPU-only runner applies reset-only seeds after its common CPU reset setup;
-ordinary `prepare_case` ignores that metadata, so legacy adapters preserve
-their predecessor state. Scalar continuation boundaries and the product/memory
-groups therefore have one data owner, not a parallel reset vector or BIOS-name
-seed branches. An old/new comparison preserves all 134 literal records and 55
-reset groups, including every program/data/register/mask/marker field.
-
-`tms320c54x_test_snapshot.h` centralizes buffer reset, rewind and MAME
-serialization. The three-argument restore cancels the check timer before
-loading; the two-argument overload leaves scheduling with its caller. Do not
-substitute one for the other: zero-time and peripheral-triggered restores have
-distinct timer ownership. Assertions, counter rewinds, CPU suspension and
-continuation stay explicit in each family; neither helper saves or restores
-host observations. Consolidating 47 captures and 82 loads across 13 modules
-removes 7,001 C++ bytes/85 lines without changing guest setup, expectations,
-phase routing or result records. Compiled helper tests check cursor/error
-state, serialization failures and both timer-ordering contracts.
-
-Runner unit tests exercise the acceptance grammar across every declared
-isolated profile and named scope: exact marker multiplicity, every `key=value`
-field, terminal completion and scope separation. They do not restate CPU
-semantics per profile. Named-case and ordered-digest validation have separate
-negative tests in `test_c54x_case_fixture.py`. Consolidating these checker tests
-reduces host-test source only; it does not retire native CPU cases or shorten
-the native regression.
-
-`tools/c54x_profiles.py` reads literal BIOS ownership from the C++ declarations;
-the runner does not maintain a second machine/profile list. Unsupported or
-ambiguous declarations fail closed. Exact expected results live separately in
-`tools/c54x_test_oracles.py`, without imports from the CPU or profile decoder.
-`tools/run_c54x_core.py` owns CLI selection, process execution and result
-validation, retaining its established checker/import API. The seven named
-scopes share one selection table; the frozen baseline independently checks
-their result contracts and every declared isolated machine/BIOS selection.
-
 The bench is separate from the processor implementation. Its current source
 boundaries are:
 
 | Source | Responsibility |
 | --- | --- |
-| `tests/c54x/tms320c54x_test.cpp` | Synthetic core/extended conformance-machine declarations; no private ROM inputs or Nokia backend compositions |
-| `tests/devices/nokia_dsp_c54x_test.cpp` | Synthetic Nokia backend/COBBA/CCONT/DSPIF integration, not CPU-only ISA conformance |
-| `tests/firmware/tms320c54x_test_verifier.cpp` | Stock staged-verifier programs and product flash inputs; peripheral sensitivity, not fitted handset identity |
-| `tests/firmware/tms320c54x_test_rom4_machine.cpp` | Private ROM4/ETSI vector declarations and firmware-machine registration |
-| `tests/c54x/tms320c54x_test_state.h` | Shared bench state, fixture types and method declarations; no CPU execution implementation |
-| `tests/c54x/tms320c54x_test_state.cpp` | Bench lifecycle, address maps, assertions and device wiring |
-| `tests/c54x/tms320c54x_test_isa.cpp` | CPU-only examples/admission bench with explicit reset groups and no Nokia/firmware dependencies |
-| `tests/c54x/tms320c54x_test_case.h` | Generic stimulus loading and independent register/bus comparisons; no instruction semantics |
-| `tests/c54x/tms320c54x_test_square.h` | Reviewed literal SQUR/SQURA/SQURS cases shared by generic and default-sequence entries |
-| `tests/c54x/tms320c54x_test_parallel.h` | Reviewed parallel store/arithmetic vectors, including same-cell ordering and circular pointer controls |
-| `tests/c54x/tms320c54x_test_dual_reference.h` | Ordered dual/parallel MAC literal references with explicit partial setup and status masks |
-| `tests/c54x/tms320c54x_test_dual_operand_section.h` | Explicit MPY/ADD/SUB/MACSU/MAC-family/parallel-store cases using common clocked execution and replay |
-| `tests/c54x/tms320c54x_test_dual_input.h` | Shared fixture-owned integer inputs/expectations; no CPU implementation helpers or Nokia dependencies |
-| `tests/c54x/tms320c54x_test_memory_continuations.h` | Ordered literal continuations with inherited RAM, partial masks and coefficient/address ordering |
-| `tests/c54x/tms320c54x_test_shift_examples.h` | Ordered TS/Xmem shifts, signed comparisons, normalization and one-cycle rounding/saturation references |
-| `tests/c54x/tms320c54x_test_normalization.h` | CPU-only staged NORM/EXP observations and shared snapshot continuation |
-| `tests/c54x/tms320c54x_test_normalization_input.h` | Independent bit-position/leading-bit expectations, shared with legacy EXP-product controls |
-| `tests/c54x/tms320c54x_test_normalization_schedule.h` | Unique normalization/exponent inputs with balanced replay checkpoints |
-| `tests/c54x/tms320c54x_test_register_sequence.h` | CPU-only clocked register observations and snapshot continuation; no instruction arithmetic |
-| `tests/c54x/tms320c54x_test_address_mode_section.h` | Address-mode/DP section inputs and observations; programming-state limitations remain explicit |
-| `tests/c54x/sections/frame_stack_consumers.h` | CPU-only FRAME/push and safely separated compiler-SP inputs |
-| `tests/firmware/tms320c54x_test_rom4_context.cpp` | Copied Nokia context/worker/timer integration; separate profile, legal standard-mode status seeds |
-| `tests/c54x/tms320c54x_test_register_pairs.h` | SAT and carry/TC rotate pairs with independent expected register states |
-| `tests/c54x/tms320c54x_test_composition_limits.h` | CPU-only CLKMD/interrupt-POPM and control-span admission limits; fixed inputs, replay and frozen guard clocks |
-| `tests/c54x/tms320c54x_test_register_alu.h` | Signed40 MIN/MAX and signed17 SQUR expectations, retained inputs and explicit late operand writes |
-| `tests/c54x/tms320c54x_test_port_case.h` | Common PORTW stimulus construction; no instruction arithmetic or reset policy |
-| `tests/c54x/tms320c54x_test_scalars.h` | Literal scalar boundaries with explicit reset/continuation groups, shared with the legacy basic adapter |
-| `tests/c54x/tms320c54x_test_memory_examples.h` | Ordered literal memory arithmetic/multiply/T examples, with original partial setup and assertion masks |
-| `tests/c54x/tms320c54x_test_domains.h` | Independent single-memory admission fixture: catalogue, preserved state, bus observers and replay |
-| `tests/c54x/tms320c54x_test_dispatch.cpp` | Ordered callback routing and the initial-program completion tail |
-| `tests/c54x/sections/product_dependencies.h` | Independent product operand/producer dependency cases; numeric product owners remain separate |
-| `tests/c54x/tms320c54x_test_modified_mvdk_section.h` | Independent circular/indexed move geometry, mapped aliases and raw payload contracts |
-| `tests/c54x/tms320c54x_test_domains.h` | CPU-only admission fixture with owned progress, observations, taps and snapshots |
-| `tests/c54x/tms320c54x_test_register_unary.h` | Independent register-logic, shift, NEG/ABS inputs, balanced replay keys and explicit clocked observations |
-| `tests/c54x/tms320c54x_test_domain_schedule.h` | Independent instruction inventory and explicit admission-control schedule; no legacy phase routing |
-| `tests/c54x/tms320c54x_test_delayed_memory_section.h` | Independent delayed-memory capture/continuation cases; no shared phase-chain state |
-| `tests/c54x/sections/xc_return.h` | Selected/annulled XC return, resumed-word protection and interrupt deferral |
-| `tests/c54x/tms320c54x_test_counted_copy_section.h` | Independent memory-count copy, chaining and PC-wrap contracts |
-| `tests/c54x/sections/frontend_drain.h` | Decoded/empty frontend entry, flush timing and case-owned acknowledgement checks |
-| `tests/c54x/tms320c54x_test_observer.cpp` | Instruction identity, ordinary-read exclusion and XC annulment observations |
-| `tests/c54x/tms320c54x_test_block_repeat.cpp` | Delayed-block-repeat layout, exclusions, IRQ acknowledgement and replay |
-| `tests/c54x/tms320c54x_test_pipeline_state.h` | Family-owned frontend, observer and delayed-block-repeat storage |
-| `tests/c54x/tms320c54x_test_interrupts.cpp` | Interrupt composition, returns, status masks and PLL/XC continuations |
-| `tests/c54x/tms320c54x_test_interrupt_entry.cpp` | Vector prefetch, entry spacing, accepted-source retention, stage restoration and their acknowledgement checks |
-| `tests/c54x/tms320c54x_test_entry_state.h` | Entry-family observations, taps and replay storage; predecessor tap cleanup remains explicit |
-| `tests/c54x/tms320c54x_test_peripherals.cpp` | Bus, clock, serial, DMA and timer fixtures |
-| `tests/c54x/tms320c54x_test_restore.cpp` | Atomic far-transfer replay and extended program-memory continuations |
-| `tests/c54x/tms320c54x_test_repeat_restore.cpp` | Saved/body IRQ repeats, active-context restoration and delayed far-call/return replay |
-| `tests/c54x/tms320c54x_test_snapshot_state.h` | Active-repeat and cross-module far-transfer checkpoint storage; peripheral checkpoint streams remain family-specific bench members |
-| `tests/c54x/tms320c54x_test_repeat_state.h` | Independent case inputs, observation types and per-family replay storage; no generic rewind policy |
-| `tests/c54x/tms320c54x_test_disassembler.cpp` | Bounded decoding and operand-domain matrices |
-| `tests/firmware/tms320c54x_test_rom4.cpp` | Acquired-ROM routine execution and independent reference comparisons |
-| `tests/c54x/tms320c54x_test_atomic.cpp` | Routes atomic phases to their owning sequence without a global result scan |
-| `tests/c54x/tms320c54x_test_atomic_basic.cpp` | Remaining synthetic basic sequence, scalar case adapter and legacy transport-save integration |
-| `tests/c54x/tms320c54x_test_atomic_corpus.cpp` | Independently asserted instruction words observed in the ROM4 corpus, without loading the acquired image |
-| `tests/c54x/tms320c54x_test_atomic_reference.cpp` | TI instruction examples and arithmetic boundaries |
-| `tests/c54x/tms320c54x_test_atomic_control.cpp` | Extended program flow, RTN and pending-transfer restoration |
+| `fixtures/c54x_sections.json` | Section names and expected case counts; registration, not instruction correctness |
+| `tools/run_c54x_section.py` | Builds and runs one section, a compatible batch or the whole catalogue; `test_c54x_section_catalog.py` checks discovery and counts |
+| `tests/c54x/sections/runner.cpp` | Single CPU-only clocked runner with per-section peripheral wiring |
+| `tests/c54x/sections/*.h` | One generic CPU section each: stimulus, independent expectations, bus/state observations and restore points |
+| `tests/c54x/tms320c54x_test_*.h` | Shared case builders and larger section bodies (`*_section.h`), the source-domain schedule, disassembly matrices, snapshots and register-sequence observation |
+| `tests/firmware/c54x_*.h` | Copied-firmware sections in the same catalogue (`--scope firmware`) |
+| `tests/firmware/tms320c54x_test_*.cpp/.h` | `tms54test` `rom4-context`, the acquired-ROM `tms54rom4` machine (cold, CRC, FR/EFR, RF bitmap/pairs) and the stock verifier programs |
+| `tests/devices/nokia_dsp_c54x_test.cpp` | Synthetic Nokia backend/COBBA/CCONT/DSPIF integration (`tms54bsp`), not CPU-only ISA conformance |
+| `tools/run_c54x_core.py` | Firmware `rom4-context` and `cold` selection only; `tools/c54x_profiles.py` reads those BIOS declarations |
 
-The result dispatcher preserves phase-check order, including paths that update
-the phase and fall through within one callback. Family extraction must retain
-that ordering and distinguish callback returns from returns inside observers'
-lambdas. Source grouping does not establish independent fixture state; moving
-a case does not authorize changing its inputs, expected values or observation
-boundaries. The dispatcher delegates consecutive clauses to ordered handlers,
-not an unordered subsystem sweep. A handler returning false permits subsequent
-clauses to run even if an earlier clause changed the phase. Atomic routing
-has a separate exhaustive guard-partition check and a compiled host control;
-the three inter-sequence boundaries explicitly schedule the next timer callback.
-The sequential regression still inherits state between steps. The source split
-does not turn those steps into independent reset fixtures or remove their
-cross-instruction checks.
+Every section seeds its own state; there is no phase chain, result
+dispatcher or predecessor-state inheritance. Literal `instruction_case`
+records own `reset_before` and `reset_initial`. `tms320c54x_test_snapshot.h`
+centralizes buffer reset, rewind and MAME serialization; the three-argument
+restore cancels the check timer before loading, the two-argument overload
+leaves scheduling with its caller. Assertions and host observations are never
+part of the saved state.
 
 Test ownership and build selection are defined in [the test contracts](../tests/README.md).
-Shared setup helpers write only stimulus; expected results remain in the test
-and independent runner oracles. Historical checkpoint hashes retain their
-original source paths: relocation does not renew their runtime qualification.
+Shared setup helpers write only stimulus; expected results remain in the case.
 Constant-only setup may use ordered `set_registers`/`write_words` batches;
 values that depend on preceding guest writes must remain sequential calls.
-`resume_atomic_at` preserves inherited state while setting PC, clearing IDLE,
-and scheduling the existing 100-microsecond atomic observer, in that order.
-Neither helper resets the CPU, computes expectations, or makes sequential
-legacy cases independent.
-`begin_atomic_case` likewise retains predecessor state; reset-only metadata
-belongs to the standalone runner, not the legacy case-start helper.
+Historical checkpoint hashes, BIOS profile names (`tms54test -bios ...`,
+`tms54xtra`) and `run_c54x_core.py --profile ...` commands elsewhere in these
+documents name the retired harness. They record when a result was measured,
+not a current command. Current owners are the named sections in
+`fixtures/c54x_sections.json`; the [suite guide](c54x_test_suite.md) gives the
+commands.
 
 Register-only logic/CMPL (`register_logic`), SFTA/SFTL (`accumulator_shifts`), `negate` and `absolute`
 share the clocked CPU-only runner and independent integer case builders.
@@ -1003,13 +902,12 @@ consumer interaction. Repeat, IRQ and memory-operand compositions stay separate.
 The basis is [TI SPRU172C](https://www.ti.com/lit/ug/spru172c/spru172c.pdf);
 publication clocks and the documented left-carry policy are not silicon measurements.
 
-The absolute-alias fixtures share declarative family/count/status profiles in
-`tests/c54x/tms320c54x_test_profiles.h`; the CPU model does not consume this test
-metadata. `test_c54x_alias_profiles.py` executes the host C++ decoder and
-compares all10,304 encoded cases/status inputs with their retained domains.
-All ten separate MAME rejection matrices also pass with the original markers
-and restoration counts. These focused matrices do not extend the separately
-qualified default-suite population or change silicon admission claims.
+The absolute-alias rejection matrices were consolidated into the
+`source_admission` section, whose independent instruction inventory lives in
+`tests/c54x/tms320c54x_test_domain_schedule.h`; the CPU model does not consume
+that test metadata. The retired per-family profile header and its host
+decoder comparison are gone. This consolidation does not change silicon
+admission claims.
 
 Handset/MU4 state and media acceptance remain in
 [5510 bring-up](5510_bringup.md), [AAC validation](aac_validation.md)
@@ -1034,9 +932,10 @@ The exhaustive matrix distinguishes 108,992 valid and 5,696 invalid operand
 tuples, each tested at two program-page positions, separately from reserved
 operation extensions. It checks instruction claims and bounded word fetches,
 not execution timing or completion of the remaining source/RMW audit.
-`tools/run_c54x_core.py --mame mame/mame --rompath mame/roms --profile xorm
---output-root tmp` runs this matrix before its separate 1,024 XORM execution
-and restoration cases. Accepted evidence: `tmp/run_c54x_core_45tucxku`.
+The `disassembly` section now owns this matrix and the `xorm` section the
+XORM execution and restoration cases (`python3 tools/run_c54x_section.py
+disassembly`). The original evidence, `tmp/run_c54x_core_45tucxku`, came from
+the retired `--profile xorm` runner.
 The [full-core checkpoint](#retained-suite-acceptance) covers the current
 source-admission guards; optional profiles retain their separate scopes below.
 
@@ -4119,7 +4018,9 @@ Staged DTX encoding and decoding pass all 518 frames: 29,526 parameters,
 eight SID frames, 135 erased frames and 46 nonzero comfort-noise frames match
 on decoding. Both check full 65,440-word RAM replay for every frame.
 Acceptance targets: `check-c54x-rom4-efr-dtx-encoder-staged` and
-`check-c54x-rom4-efr-dtx-decoder-staged`. Atomic runs remain controls.
+`check-c54x-rom4-efr-dtx-decoder-staged`. The atomic controls were retired
+with the atomic engine; the `-staged` targets now delegate to the canonical
+ones.
 
 The independent invalid/bad-SID conversation also passes all 518 frames on
 the staged frontend: 82,880 PCM samples, four invalid codewords, one bad valid
