@@ -5010,6 +5010,80 @@ aliased AR. Both aliased reads retain the original address and X's update wins
 (SPRU131G 5.5.4). This is representative repeat addressing, not a fresh census
 of all 4,096 non-repeated encodings.
 
+## Repeated SQDST/ABDST
+
+SQDST and ABDST (`e2xx`/`e3xx`) are admitted to the same per-copy repeat
+issue path. Each copy retains both RAM reads in Read and consumes the previous
+copy's A in Execute before replacing it with the X/Y difference. NSE-1 ROM4
+needs this after the traffic-channel assignment: `RPT *AR6+` repeats
+`ABDST *AR4+0%,*AR2` (`e3e0` at `abb3`) inside an RPTBD block.
+
+`repeated_distance` owns 1056 cases/restores: both operations, fixed,
+post-increment, decrement/increment and the ROM's circular `*AR4+0%`/`*AR2`
+address forms, four operand/accumulator
+patterns and sixteen FRCT/OVM/SMUL/SXM combinations at one and eight copies,
+plus 256 copies per form and operation. Expectations chain A through every
+copy and check final carry, sticky OVA/OVB, OVM clamping and that each copy
+reads its own operands once. ABDST's FRCT doubling and carry are the existing
+arithmetic model, not new silicon evidence; ABDST had no non-repeated section.
+
+## ROM4 traffic-channel forms
+
+After the Assignment Command, NSE-1 ROM4's traffic-channel code uses T, TRN,
+BL/BH and AR0/AR1 as scratch and coefficient registers and repeats several
+two-word or indexed forms. Each admission below was first rejected by the
+staged core, then backed by its own section before the live run moved on.
+
+`trn_immediate_store` (36 cases/restores): `STM #k,TRN` (`770f`) publishes in
+Execute with the accumulator-word STMs; T keeps its separate early path. A
+live TRN replacement before Execute is overwritten, and an adjacent CMPS shifts
+the literal. The MVMD readback sits one NOP later because same-clock mapped
+read/write order for TRN is not documented; only mapped accumulators are.
+
+Older stores no longer trip the repeated-store mapped-destination guard when a
+younger RPT has already decoded; the guard now requires the latched body, as
+the neighbouring repeat guards do (ROM4 `abc8`: `STH B,*AR4` with AR4 = T,
+then `RPT #15`). SUBC never writes T/TRN, so repeated SUBC may read `000e`/
+`000f` as plain per-issue samples; other mapped SUBC sources stay rejected.
+A non-repeated parallel store may target TRN, which no parallel family reads.
+`mapped_t_scratch` (100) runs that exact ROM sequence: `STH B,*AR4`, `RPT #15;
+SUBC *AR4,A` and `ST A,*AR5 || LD *AR2+,B` with AR4 = T and AR5 = TRN, over
+five dividends, five divisors and SXM. Reverting any one of the three
+admissions makes it fail at that guard.
+
+`repeated_xmem_add` (384): `RPT; ADD/SUB Xmem,SHFT,src` (`90xx..93xx`) over
+the four Xmem modes including `*AR3+0%`, four shifts, SXM and both
+accumulators. Each issue reads its own word once in consecutive clocks and
+Execute consumes the live accumulator.
+
+`mapped_dual_multiply` (640): MPY/MAC/MACR/MAS Xmem,Ymem with X on AR0/AR1/
+AR4..AR7, or on the accumulator the instruction neither accumulates from nor
+writes. These share the mapped dual-ALU Read path; X is published to T, and
+replacing the mapped source after Read cannot change the product. Mapped words
+of the instruction's own accumulators remain rejected.
+
+`delayed_immediate_multiply` (160): two-word `MPY Smem,#lk` filling a BD,
+BCD (taken/not taken), CALLD or FCALLD delay. Read publishes Smem to T;
+Execute uses the retained word and literal. As in `memory_immediate_product`,
+SMUL does not clamp a plain MPY; OVM saturates and sets OV.
+
+`repeated_extended_shift` (1440): `RPT; ADD/SUB/LD Smem,SHIFT,src,dst`
+(`6fxx` + extension) with `*AR3`, `*AR3+`, `*AR3+0`, `*AR3-0`, five shifts,
+SXM and all selectors. The extension is fetched once and retained for every
+issue; the repeat resumes after both words. Shifted STH/STL extensions are
+rejected as repeat bodies. The two-word repeat bodies now share one helper
+for count ownership, literal retention and resume address; the MVDK/MVKD/
+MVMD/FIRS repeat sections pass unchanged.
+
+`repeated_indexed_store` (448): `RPT; STL/STH *ARx+0/*ARx-0` with two AR0
+strides, derived from `repeated_store`'s live-accumulator and saturation
+matrix.
+
+`xc_overflow` (336): XC with a group-1 OV/NOV test, alone or ANDed with a
+compare on the same accumulator (ROM4 `a0ad`: `XC 1,BGT+BOV`, `fd7e`). As for
+BC and CC, testing OVA/OVB consumes that flag whether or not XC executes; the
+other flag is preserved.
+
 The independent arithmetic expectation checks every accumulator/ST0 clock,
 rounding, product clamp and destination saturation. Source words change after
 each paired read, the opcode is poisoned after capture, and a newer T follows

@@ -919,12 +919,17 @@ deterministic.
 
 The whole call stays on SDCCH; the lab does not send CONNECT ACKNOWLEDGE.
 With traffic assignment (bit 8) the BTS sends an Assignment Command to TCH/F
-on timeslot 1 after CALL CONFIRMED. The handset shows `Call 1` after Answer,
-but its last port-5 release is 0.08 s after the assignment, and nothing
-further is decoded. The lab captures, releases and synthesises only
-timeslot 0. A traffic channel needs a timeslot-1 downlink in the sample source
-(TCH/FACCH/SACCH bursts from `gsm_tch_f_l1`) and release and decode of the
-handset's timeslot-1 uplink; the 6210 stops at the same lab boundary.
+on timeslot 1 after CALL CONFIRMED. An earlier note blamed the lab for the
+DSP falling silent 0.08 s later. The real cause was the staged core: its
+traffic-channel code stopped on a repeated `ABDST` (`e3e0` at `abb3`), then
+on nine further unadmitted forms. They are now admitted with their own
+sections ([ROM4 traffic-channel forms](c54x_execution_contracts.md#rom4-traffic-channel-forms)),
+and a 36-second run has no core stop. The handset then releases a transmit
+window every TDMA frame until 24.29 s, about 2.5 s after the assignment. It
+hears nothing more, abandons the call and shows `Missed 1: 5551234`. The lab
+captures, releases and synthesises only timeslot 0. A traffic channel needs a
+timeslot-1 downlink in the sample source (TCH/FACCH/SACCH bursts from
+`gsm_tch_f_l1`) and release and decode of the handset's timeslot-1 uplink.
 
 ### Tuned laboratory carrier
 

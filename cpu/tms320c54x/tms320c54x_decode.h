@@ -113,6 +113,11 @@ constexpr bool staged_distance(u16 word)
 	return (word & 0xfe00) == 0xe200; // SQDST/ABDST Xmem, Ymem.
 }
 
+constexpr bool staged_repeat_extension_shift(u16 word)
+{
+	return (word & 0xff00) == 0x6f00; // ADD/SUB/LD/STH/STL Smem,SHIFT + extension.
+}
+
 constexpr bool staged_mvdd(u16 word)
 {
 	return (word & 0xff00) == 0xe500;
@@ -137,8 +142,9 @@ constexpr bool staged_repeat_accumulator_store(u16 word)
 {
 	// Circular indirect stores use the same per-iteration DAGEN/Write path
 	// as ordinary indirect stores, including the mapped-destination guard.
+	// *ARx-0/*ARx+0 step by AR0 per issue through the same DAGEN path.
 	return (word & 0xfc00) == 0x8000 &&
-		((u8(word) >= 0x80 && u8(word) < 0xa0) ||
+		((u8(word) >= 0x80 && u8(word) < 0xa0) || (u8(word) >= 0xa8 && u8(word) < 0xb8) ||
 		 (u8(word) >= 0xc0 && u8(word) < 0xe0));
 }
 
@@ -167,9 +173,10 @@ constexpr bool staged_mvmd_cleared_source(u16 move, u16 producer)
 	return (move == 0x7308 && producer == 0xf071) || (move == 0x730b && producer == 0xf171);
 }
 
-constexpr bool staged_accumulator_stm(u16 word)
+constexpr bool staged_execute_mmr_stm(u16 word)
 {
-	return word >= 0x7708 && word <= 0x770d;
+	// AL..BG and TRN publish in Execute; T keeps its separate early path.
+	return (word >= 0x7708 && word <= 0x770d) || word == 0x770f;
 }
 
 constexpr bool staged_indirect_ram_stm(u16 word)
@@ -209,7 +216,13 @@ constexpr bool decode_staged_pipelined_repeat(u16 word)
 	bool const short_double_add = (word & 0xfc00) == 0x5000 && u8(word) < 0x98;
 	bool const square_repeat = square_accumulate(word) &&
 		(u8(word) < 0x98 || (u8(word) >= 0xc0 && u8(word) < 0xe0));
-	return accumulator_add_sub || short_double_add || logical_shift || coefficient_repeat || short_add || shifted_circular_add || short_logic || short_mar || staged_repeat_data_copy(word) || staged_repeat_destination_copy(word) || staged_repeat_accumulator_store(word) || staged_poly(word) || decode_staged_parallel_load(word) || staged_parallel_alu(word) || staged_parallel_mpy(word) || square_repeat || ((word & 0xf800) == 0x2800 && u8(word) < 0x98) || (word & 0xf000) == 0xb000 || staged_mvdd(word) || (((word & 0xff00) == 0x4b00 || (word & 0xff00) == 0x8b00) && u8(word) < 0x98);
+	// ADD/SUB/LD Smem,SHIFT retain their extension; *ARx+-0 and circular modes
+	// use the same per-issue DAGEN as the linear ones. Store extensions stay rejected.
+	bool const extended_shift = staged_repeat_extension_shift(word) &&
+		(u8(word) < 0x98 || (u8(word) >= 0xa8 && u8(word) < 0xb8) || (u8(word) >= 0xc0 && u8(word) < 0xe0));
+	// SQDST/ABDST and ADD/SUB Xmem,SHFT re-read Xmem per issue and consume
+	// the previous issue's accumulator in Execute.
+	return staged_distance(word) || staged_xmem_arithmetic(word) || extended_shift || accumulator_add_sub || short_double_add || logical_shift || coefficient_repeat || short_add || shifted_circular_add || short_logic || short_mar || staged_repeat_data_copy(word) || staged_repeat_destination_copy(word) || staged_repeat_accumulator_store(word) || staged_poly(word) || decode_staged_parallel_load(word) || staged_parallel_alu(word) || staged_parallel_mpy(word) || square_repeat || ((word & 0xf800) == 0x2800 && u8(word) < 0x98) || (word & 0xf000) == 0xb000 || staged_mvdd(word) || (((word & 0xff00) == 0x4b00 || (word & 0xff00) == 0x8b00) && u8(word) < 0x98);
 }
 
 constexpr bool staged_repeat_accumulator_load(u16 word)
@@ -437,6 +450,14 @@ constexpr bool staged_banz(u16 word)
 	return ((word & 0xfd00) == 0x6c00 && u8(word) >= 0x80 && u8(word) < 0x98) || staged_extended_banz(word);
 }
 
+// Two-word pipelined repeat bodies: copies and FIRS advance their address
+// literal per issue; ADD/SUB/LD Smem,SHIFT keep one constant extension
+// (staged_repeat_extension_shift).
+constexpr bool staged_repeat_advancing_literal(u16 word)
+{
+	return staged_repeat_data_copy(word) || staged_repeat_destination_copy(word) || staged_program_coefficient(word);
+}
+
 constexpr unsigned staged_repeat_body_words(u16 word)
 {
 	return word == 0xf495 || staged_repeat_accumulator_load(word) || ((word & 0xfe00) == 0x1e00 && u8(word) < 0x98) || (staged_write_a(word) && u8(word) < 0xe0) || (staged_read_a(word) && u8(word) != 0xf8) ? 1 : 2;
@@ -643,8 +664,10 @@ constexpr bool staged_shifted_memory_arithmetic(u16 extension)
 constexpr bool decode_staged_xc(u16 word)
 {
 	u16 const form = word & ~u16(0x0200);
+	// Group 1 may AND an OV/NOV test with a compare on the same accumulator.
+	bool const overflow = (form & 0xffe0) == 0xfd60 && (form & 7) != 1;
 	return form == 0xfd00 || form == 0xfd02 || form == 0xfd03 || form == 0xfd08 || form == 0xfd0c || form == 0xfd20 || form == 0xfd30 ||
-		(form >= 0xfd42 && form <= 0xfd47) || (form >= 0xfd4a && form <= 0xfd4f);
+		(form >= 0xfd42 && form <= 0xfd47) || (form >= 0xfd4a && form <= 0xfd4f) || overflow;
 }
 
 constexpr bool decode_staged_rmw(u16 word)
@@ -891,7 +914,7 @@ inline u8 decode_staged_extensions(u16 word)
 		(word & 0xfeff) == 0xf062 || staged_extended_pop(word) || staged_immediate_multiply(word) ||
 		staged_extended_store(word) || staged_extended_dst(word) || staged_extended_long_arithmetic(word) ||
 		staged_data_copy(word) || staged_program_coefficient(word) || staged_immediate_repeat(word) || staged_block_repeat(word) || word == 0xf073 ||
-		word == 0xf273 || word == 0x46f8 || staged_ram_stm(word) || staged_accumulator_stm(word) || word == 0x7707 ||
+		word == 0xf273 || word == 0x46f8 || staged_ram_stm(word) || staged_execute_mmr_stm(word) || word == 0x7707 ||
 		word == 0x771d || word == 0x771e || staged_immediate_loop_register(word) || word == 0x7700 ||
 		((word >= 0x7724 && word <= 0x7726) || (word == 0x7721 || word == 0x7722) || (word == 0x7758)) || word == 0x770e ||
 		((word & 0xff00) == 0x7700 && u8(word) >= 0x10 && u8(word) <= 0x19) ||
@@ -980,7 +1003,7 @@ inline bool decode_staged_supported(u16 word, bool extended_program)
 	bool const dagen_immediate = (word & 0xff00) == 0x7700 && u8(word) >= 0x10 && u8(word) <= 0x19;
 	bool const immediate_loop = staged_immediate_loop_register(word);
 	bool const immediate_t = word == 0x770e;
-	bool const immediate_control = staged_ram_stm(word) || staged_accumulator_stm(word) || word == 0x7707 || word == 0x771d || word == 0x771e ||
+	bool const immediate_control = staged_ram_stm(word) || staged_execute_mmr_stm(word) || word == 0x7707 || word == 0x771d || word == 0x771e ||
 		word == 0x7700 || ((word >= 0x7724 && word <= 0x7726) || (word == 0x7721 || word == 0x7722) || (word == 0x7758));
 	return staged_cmps(word) || software_intr || staged_port_write(word) || staged_absolute_add(word) || staged_memory_repeat(word) ||
 		staged_immediate_arp(word) || staged_immediate_asm(word) || staged_immediate_repeat(word) || word == 0xf495 ||
