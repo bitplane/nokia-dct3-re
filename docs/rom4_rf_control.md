@@ -873,8 +873,19 @@ reproduces the same frames (measured before the tuned carrier below). The
 control without the responder shows neither.
 This is laboratory registration through native ROM4 code, not promotion of
 the normal machine: port-9 capture, port-5 release, the zero-epoch source,
-MFI timing and the tuning decode below remain laboratory assumptions, and no
-acceptance gate protects it yet.
+MFI timing and the tuning decode below remain laboratory assumptions.
+
+`make verify-5110-lab-registration` protects the result on the tuned carrier
+(22 seconds, staged CPU, `tools/run_rom4_lab_registration.py nse1ap5`).
+`tools/rom4_lab_registration_check.py` requires one location-updating access
+burst answered by Immediate Assignment, a SABM carrying the MM Location
+Updating Request, the UA, Accept, Release and closing UA each bound to the
+uplink block that caused it, every uplink decoded with an exact code, strictly
+increasing frames, a single power-on DSP reset cycle (no MCU restart), no
+illegal DSP execution, and the final LCD frame (operator `DCT3 LAB`, full bars,
+`Menu`). The uplink contents are the BTS's decode of the native port-27 bits;
+unlike the ROM6 checks, it does not yet bind each downlink to a native DSP
+ring publication.
 
 ### Tuned laboratory carrier
 

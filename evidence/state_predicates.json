@@ -2577,6 +2577,12 @@
       "evidence": ["docs/cobba_control_boundary.md", "docs/rom4_dsp_loader.md", "tools/run_c54x_rom4_rf_delivery.py", "tools/test_run_c54x_rom4_rf_delivery.py", "tools/c54x_rom4_rf_score_check.py", "tools/test_c54x_rom4_rf_score_check.py", "tools/c54x_rom4_rf_delivery_check.py", "tools/c54x_rom4_rf_consumption_check.py"]
     },
     {
+      "id": "nse1_native_lab_location_updating", "owner": "native_dsp_rf", "status": "satisfied",
+      "predicate": "Native NSE-1 ROM4 DSP and MCU complete Location Updating against the laboratory BTS and present the laboratory operator",
+      "current": "On nse1ap5 under the gate's staged-menu observer the native DSP sends a location-updating access burst (RA 0d, frame 3181), receives Immediate Assignment (3219), transmits SABM with the MM Location Updating Request (3250), and completes UA, Accept (3337), RR, Release (3388), DISC and closing UA (3490); other observers shift these frames but not the dialogue. Every uplink decodes with an exact code, the DSP is reset only by power-on, and the MCU then shows operator DCT3 LAB with full bars. make verify-5110-lab-registration checks dialogue binding and order, the single DSP reset cycle and the final LCD hash, and reproduced identically in repeated runs on 2026-11-11. Laboratory assumptions remain: port-9 capture start, port-5 release, zero-epoch direct-ADC source, MFI timing and the ROM4 tuning decode. Downlinks are not yet bound to native DSP ring publications as the ROM6 checks do, so this does not promote native_nse1_rf_acquisition or the normal noki5110 machine.",
+      "evidence": ["driver/nokia_dct3_research.cpp", "tools/run_rom4_lab_registration.py", "tools/rom4_lab_registration_check.py", "tools/test_rom4_lab_registration_check.py", "tools/npe3_raw_ua_check.py", "docs/rom4_rf_control.md"]
+    },
+    {
       "id": "mu4_native_coefficient_cache_publication",
       "owner": "mu4_native_dsp",
       "status": "satisfied",
