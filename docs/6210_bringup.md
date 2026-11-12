@@ -249,7 +249,7 @@ writes firmware state or publishes packets. Frame-driven ADC service itself
 remains a partial timing model, not a measured physical sample-ready source.
 The additional 30-second ROM4 processing gate is requalified with execution-entry
 observations rather than ambiguous fetch counters. Its [processing contract](rom4_dsp_loader.md#executed-no-cell-processing-contract)
-requires 1,027 passes, 8,216 filter iterations, ordered hook returns, four
+requires 1,028 passes, 8,224 filter iterations, ordered hook returns, four
 continuations, exact operands and independent RF transaction/read accounting.
 
 The literal census covers the complete `3a0000`-byte own MCU image in

@@ -6,10 +6,10 @@ from tools.c54x_rom4_rf_consumers_check import FAMILIES, DISPATCH_SIGNATURES, SE
 def fixture():
     groups = {
         'initial_filter': [(0, 0, 2480), (0, 0x100, 8), (4, 0x104, 18032),
-                           (4, 0x105, 48320), (9, 0x105, 16), (12, 0x105, 24176)],
-        'unfiltered_history': [(1, 0x105, 32), (2, 0x105, 16), (4, 0x105, 24168),
-                               (9, 0x105, 24), (12, 0x105, 36264)],
-        'scan_filter': [(1, 0, 8000), (1, 0x100, 8), (1, 0x105, 208)],
+                           (4, 0x105, 48320), (9, 0x105, 16), (12, 0x105, 24168)],
+        'unfiltered_history': [(1, 0x105, 32), (2, 0x105, 16), (4, 0x105, 24160),
+                               (9, 0x105, 24), (12, 0x105, 36248)],
+        'scan_filter': [(1, 0, 8008), (1, 0x100, 8), (1, 0x105, 208)],
         'capture_filter': [(2, 0x104, 40), (2, 0x105, 200)],
     }
     rows = [f'rom4_rf_consumer: xpc=00 owner={address:06x} mode={mode:04x} control={control:04x} '
@@ -17,15 +17,15 @@ def fixture():
             for name, addresses in FAMILIES.items() for address in addresses
             for mode, control, count in groups[name]]
     return '\n'.join(rows + [
-        'rom4_rf_consumer_summary: reads=647968 buckets=64 physical_rate_claim=0 t=30.016666667',
-        'rom4_interface_summary: rf_reads=647968'])
+        'rom4_rf_consumer_summary: reads=647872 buckets=64 physical_rate_claim=0 t=30.016666667',
+        'rom4_interface_summary: rf_reads=647872'])
 
 
 class RfConsumerTests(unittest.TestCase):
     def test_complete_census_has_no_physical_format_claim(self):
         report = check(fixture())
-        self.assertEqual(report['families']['scan_filter']['control_clear_reads'], 32032)
-        self.assertEqual(report['control_clear_reads'], 114272)
+        self.assertEqual(report['families']['scan_filter']['control_clear_reads'], 32064)
+        self.assertEqual(report['control_clear_reads'], 114304)
         for key in ('physical_rate_claim', 'iq_lane_claim', 'acquisition_claim'):
             self.assertFalse(report[key])
 
@@ -46,7 +46,7 @@ class RfConsumerTests(unittest.TestCase):
         for old, new in [('count=2480', 'count=2481'), ('control=0104', 'control=0105'),
                          ('holdoff=1', 'holdoff=0'), ('holdoff=0', 'holdoff=1'),
                          ('mode=0002', 'mode=0001'),
-                         ('buckets=64', 'buckets=63'), ('rf_reads=647968', 'rf_reads=647967'),
+                         ('buckets=64', 'buckets=63'), ('rf_reads=647872', 'rf_reads=647871'),
                          ('physical_rate_claim=0', 'physical_rate_claim=1'),
                          ('t=30.016666667', 't=8.0')]:
             with self.subTest(old=old), self.assertRaises(ValueError):

@@ -19,8 +19,8 @@ FAMILIES = {
     'scan_filter': (0x330a, 0x3310, 0x3316, 0x331c),
     'capture_filter': (0x33c9, 0x33cf, 0x33d5, 0x33db),
 }
-EXPECTED_TOTALS = dict(initial_filter=372128, unfiltered_history=242016,
-                       scan_filter=32864, capture_filter=960)
+EXPECTED_TOTALS = dict(initial_filter=372096, unfiltered_history=241920,
+                       scan_filter=32896, capture_filter=960)
 DISPATCH_SIGNATURES = ('frame_entry_port21_set', 'receive_holdoff_before_mode_dispatch',
                        'receive_holdoff_history_and_commit')
 
@@ -93,7 +93,7 @@ def check(text):
             value for (_, control), value in groups[0].items() if not int(control, 16) & 1),
             mode_controls=[dict(mode=mode, control=control, reads=value * 4)
                            for (mode, control), value in sorted(groups[0].items())])
-    if sum(row['reads'] for row in families.values()) != total or clear_reads != 114272:
+    if sum(row['reads'] for row in families.values()) != total or clear_reads != 114304:
         raise ValueError('RF control-clear accounting changed')
     return dict(schema=3, reads=total, buckets=buckets, families=families,
                 control_clear_reads=clear_reads, resident_read_sites=16,

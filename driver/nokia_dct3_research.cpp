@@ -1061,6 +1061,21 @@ INPUT_PORTS_START( nsb3r4t )
 	PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(nokia_dct3_state::sim_removed_changed), 0)
 INPUT_PORTS_END
 
+INPUT_PORTS_START( nse1hs )
+	PORT_INCLUDE(noki5110)
+	// The native PCM fixtures were derived while selector 0 and CTSI+0e
+	// bit 1 were both low, which 25ab2c..25ab72 classifies as 10/Headset.
+	// They keep that accessory path explicitly; it is not the board default.
+	PORT_START("RESEARCH_ADC0")
+	PORT_CONFNAME(0x03ff, 0, "Research CCONT ADC0 source")
+	PORT_CONFSETTING(0, "Headset control (0)")
+	PORT_CONFSETTING(0x03ff, "Unattached input (1023)")
+	PORT_START("RESEARCH_EXT_STATUS")
+	PORT_CONFNAME(0x07, 0, "Research MAD2 external status")
+	PORT_CONFSETTING(0, "Headset control (0)")
+	PORT_CONFSETTING(2, "Unattached input (2)")
+INPUT_PORTS_END
+
 INPUT_PORTS_START( nse2r4v )
 	PORT_INCLUDE(noki5110)
 	PORT_MODIFY("SIM_REMOVED")

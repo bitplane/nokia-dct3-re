@@ -37,7 +37,7 @@ class C54xRom4RfBoundaryCheckTest(unittest.TestCase):
             check(text.replace(' owner=004025',''))
 
     def scan_summary(self):
-        text = '\n'.join(line for line in summary(frames=20272, reads=647968, pairs=1536).splitlines()
+        text = '\n'.join(line for line in summary(frames=20269, reads=647872, pairs=1536).splitlines()
                          if not line.startswith('rom4_rf_port32:')) + '\n'
         burst = [(0x2a04, 6, 0xa240), (0x41, 0x40, 0x3712),
                  (0x27a2, 0x30, 0x3712), (0x41, 0x20, 0x3712),
@@ -77,24 +77,24 @@ class C54xRom4RfBoundaryCheckTest(unittest.TestCase):
 
     def test_rejects_previous_private_latch_snapshot(self):
         with self.assertRaisesRegex(ValueError, "snapshot changed"):
-            check(self.scan_summary().replace("frame_expiries=20272", "frame_expiries=20280")
-                  .replace("rf_reads=647968", "rf_reads=648224"), scan_30s=True)
+            check(self.scan_summary().replace("frame_expiries=20269", "frame_expiries=20280")
+                  .replace("rf_reads=647872", "rf_reads=648224"), scan_30s=True)
 
     def test_rejects_payload_alias_and_missing_transfer_snapshots(self):
         for count in (1520, 1518):
             with self.assertRaises(ValueError):
-                check(self.scan_summary().replace('frame_expiries=20272', 'frame_expiries=20277')
-                      .replace('rf_reads=647968', 'rf_reads=648128')
+                check(self.scan_summary().replace('frame_expiries=20269', 'frame_expiries=20277')
+                      .replace('rf_reads=647872', 'rf_reads=648128')
                       .replace('rf_port32_writes=1536', f'rf_port32_writes={count}'), scan_30s=True)
 
     def test_snapshot_failure_reports_current_drift_without_accepting_it(self):
-        text = (self.scan_summary().replace("frame_expiries=20272", "frame_expiries=20274")
-                .replace("rf_reads=647968", "rf_reads=648032")
+        text = (self.scan_summary().replace("frame_expiries=20269", "frame_expiries=20274")
+                .replace("rf_reads=647872", "rf_reads=648032")
                 .replace("rf_port32_writes=1536", "rf_port32_writes=1519"))
         with self.assertRaises(ValueError) as caught:
             check(text, scan_30s=True)
-        for detail in ("frames=20274 expected=20272 delta=+2",
-                       "rf_reads=648032 expected=647968 delta=+64",
+        for detail in ("frames=20274 expected=20269 delta=+5",
+                       "rf_reads=648032 expected=647872 delta=+160",
                        "rf_port32_writes=1519 expected=1536 delta=-17"):
             self.assertIn(detail, str(caught.exception))
 

@@ -14,8 +14,8 @@ FAULT = re.compile(r'rom4_reset_request|TMS320C54x.*illegal|unsupported.*staged|
 # Power-on holds, releases, resets and re-releases the DSP once; an MCU
 # restart (such as a reason-68 reset) repeats that cycle.
 BOOT_RESET_LINES = 3
-# nse1ap5 final LCD: operator "DCT3 LAB", full bars, Menu softkey.
-NSE1_LCD_SHA256 = '377631960815d6cffd94ca5a2991ababca1d763050a1766d1579450e808599af'
+# nse1ap5 final LCD: operator "DCT3 LAB", no accessory title, full bars, Menu softkey.
+NSE1_LCD_SHA256 = 'b7aba0c6e5cb3c488833b9295d818962a9f3f920364d73b27e0080d01e8e0c6f'
 
 
 def check(text):

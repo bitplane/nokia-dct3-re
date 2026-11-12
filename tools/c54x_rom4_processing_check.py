@@ -51,7 +51,7 @@ def check(text, *, scan_30s=False):
             expected_a = 0xfa0 if address == 0x3385 else 0
             if (row['a'], row['b']) != (expected_a, 0):
                 raise ValueError('hook/comparison accumulator changed')
-    if len(groups) != 1027:
+    if len(groups) != 1028:
         raise ValueError('30-second executed mode-1 snapshot changed')
     counts = Counter(row['address'] for group in groups for row in group)
     for group in groups:
@@ -73,7 +73,7 @@ def check(text, *, scan_30s=False):
                 raise ValueError('executed filter addressing changed')
     if any(row['st1'] != 0xc900 for row in groups[0][1:5]):
         raise ValueError('initial executed filter status changed')
-    if (counts[0x332b], counts[0x3347], counts[0x3385], counts[0x33ac]) != (22, 1005, 514, 4):
+    if (counts[0x332b], counts[0x3347], counts[0x3385], counts[0x33ac]) != (22, 1006, 514, 4):
         raise ValueError('executed reduction/continuation snapshot changed')
     coefficients = re.findall(r'rom4_processing_coefficients: words=(\S+)', text)
     if coefficients != [COEFFICIENTS] * counts[0x330a]:

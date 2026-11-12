@@ -14,7 +14,7 @@ def fixture():
     comparisons = set(range(510)) | {1021, 1023, 1025, 1026}
     continuations = {0: (0, 0x83a, 0x27), 2: (0, 0x83a, 0x2d),
                      1023: (1, 0x832, 0x27), 1025: (1, 0x832, 0x2d)}
-    for index in range(1027):
+    for index in range(1028):
         if index in (2, 22):
             lines.append(f'rom4_comparison_write: t=1.0 pc=312c address=06fd data={int(index == 22):04x}')
         addresses = [0x32f4] + [0x330a] * 8
@@ -43,13 +43,13 @@ def fixture():
                 f'{name}={row[name]:0{width}x}' for name, width in zip(FIELDS, WIDTHS)))
             if address == 0x330a:
                 lines.append('rom4_processing_coefficients: words=' + COEFFICIENTS)
-    lines.append('rom4_comparison_input: reads=647968 nonzero=0 reduction_nonzero=0')
+    lines.append('rom4_comparison_input: reads=647872 nonzero=0 reduction_nonzero=0')
     return '\n'.join(lines)
 
 
 class ProcessingCheckTest(unittest.TestCase):
     def test_complete_executed_pipeline(self):
-        self.assertEqual(check(fixture(), scan_30s=True), 1027)
+        self.assertEqual(check(fixture(), scan_30s=True), 1028)
 
     def test_fetch_only_or_wrong_observer_cannot_pass(self):
         for old, new in [('phase=instruction_entry', 'phase=fetch'),

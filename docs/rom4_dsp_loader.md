@@ -518,6 +518,27 @@ not wake from suspended ARM execution. The NSE-1 profile still disables the
 ROM6-derived clock-stop action until a ROM4 path actually requesting it and
 its wake contract are characterized.
 
+Until 2026-11-12 the idle display read `Headset` under the operator name
+although nothing was attached. The v5.30 accessory state machine
+(`25ab2c..25ab72`, state byte `10b57b`) reads CCONT selector 0 and CTSI
+external-status (`2000e`) bit 1. A low sample selects state `10` (Headset); a
+sample of at least `0390` with bit 1 low selects `20` (Car); only the high
+sample with bit 1 high leaves `0f`, the unattached display. The other
+external-status read, at boot (`28dd02`), tests bit 3. The board default
+was selector 0 = 0 and the bank at 0, which is the Headset branch. Lab runs
+reproduce all three idle titles: Headset with the old default, Car with only
+selector 0 high, and none with both high. `PRODUCT_5110` now sets selector 0 to
+`3ff` and external status to `2` (`mad2_external_status`, a new board field).
+These are nominal unattached levels chosen by the firmware branch an
+unattached phone takes. They are not measured pin voltages, and which NSE-1
+net drives bit 1 is still unidentified. The same two-input decision appears in
+the NSB-3 firmware ([6190 accessory inputs](6190_bringup.md#accessory-analog-and-external-status-inputs)).
+The 5110i keeps its own unchanged default. The native PCM fixtures
+(`nse1pcm`, `nse1bit`, `nse1pin`) were derived on the Headset path and keep
+it explicitly through their own `nse1hs` input set; with unattached inputs
+their key-tone run no longer sustains native serial traffic, which is not yet
+characterized. Their results describe the headset audio route only.
+
 The backend maps C54x data `0x20/0x21/0x22` to BSP receive, transmit and
 control state. The observed `c008 -> c0c8` words reset/release the serial
 engines; their upper nibble is not evidence of a COBBA register-C write.
@@ -613,13 +634,14 @@ address twice or snapshot a filter before its Read-stage address updates.
 The shared fetch observer remains a diagnostic consumed by the separate
 NSE-2 investigation; it is not the NSE-1 execution oracle.
 
-After removing the unsupported CCONT RTC-to-CTSI gate, the fixed composition
-has 20,272 frame expiries, 647,968 port-27 reads and 1,536 port-32 programming
-pairs. Executed mode 1 makes 1,027 passes, each with eight filter iterations
+After removing the unsupported CCONT RTC-to-CTSI gate and presenting the
+unattached accessory inputs, the fixed composition has 20,269 frame expiries,
+647,872 port-27 reads and 1,536 port-32 programming pairs. Executed mode 1
+makes 1,028 passes, each with eight filter iterations
 and one ordered call/return through each hook `3360 -> 2400 -> 3362` and
 `336c -> 2402 -> 336e`. Both hooks remain `fc00` (RET), preserving zero
 A/B. Selector `06fd` has CPU-bus writes zero, zero, one; 22 executed passes
-use the alternate reduction and 1,005 use the steady reduction.
+use the alternate reduction and 1,006 use the steady reduction.
 
 The steady reduction at `3347..3356` consumes sixteen words at `1a48`.
 Ignoring saturation/guard effects, its linear combinations are
@@ -644,8 +666,8 @@ reduction-output words remain zero.
 full-width operands, circular pointers, coefficient order, selector lifecycle
 and zero input/output alongside the independent RF transaction/cadence gate.
 The RF read observer uses Read-stage instruction ownership at all sixteen
-static port-27 sites. Counts are 372,128 initial-filter, 242,016 circular-history,
-32,864 scan-filter and 960 capture-filter reads across 64 buckets. Nonzero
+static port-27 sites. Counts are 372,096 initial-filter, 241,920 circular-history,
+32,896 scan-filter and 960 capture-filter reads across 64 buckets. Nonzero
 `00aa` selects history before `00ac` selects the other mode-specific readers.
 This is model regression and source-priority evidence, not physical sample
 cadence, packing, acquisition or handset speech.

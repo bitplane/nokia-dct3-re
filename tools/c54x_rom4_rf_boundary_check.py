@@ -87,13 +87,13 @@ def check(text: str, minimum_frames: int = 800, *, scan_30s: bool = False) -> di
         prefix = burst * 2 + [(0x2813, 0x30, 0x4028)] + burst * 2
         prefix += [(value, 0x30, 0x4028) for value in range(0x2727, 0x272e)]
         expected_writes = [(i, *row) for i, row in enumerate(prefix, 1)]
-        if (result["frame_expiries"], result["rf_reads"]) != (20272, 647968):
+        if (result["frame_expiries"], result["rf_reads"]) != (20269, 647872):
             raise ValueError(
                 "30-second scan frame/read snapshot changed: "
-                f"frames={result['frame_expiries']} expected=20272 "
-                f"delta={result['frame_expiries'] - 20272:+d}; "
-                f"rf_reads={result['rf_reads']} expected=647968 "
-                f"delta={result['rf_reads'] - 647968:+d}; "
+                f"frames={result['frame_expiries']} expected=20269 "
+                f"delta={result['frame_expiries'] - 20269:+d}; "
+                f"rf_reads={result['rf_reads']} expected=647872 "
+                f"delta={result['rf_reads'] - 647872:+d}; "
                 f"rf_port32_writes={result['rf_port32_writes']} expected={expected_count} "
                 f"delta={result['rf_port32_writes'] - expected_count:+d}"
             )

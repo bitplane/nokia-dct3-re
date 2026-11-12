@@ -152,6 +152,8 @@ struct nokia_product_config
 	bool mad2_clock_stop = true;
 	bool mad2_sleep_wake_irq3 = false;
 	bool mad2_sleep_wake_enable = false;
+	// Board level of the CTSI+0e three-bit external status input at reset.
+	u8 mad2_external_status = 0;
 	u32 flash_persistent_start = 0;
 	nokia_ccont_board_profile ccont_board = ADC_DEFAULT;
 };
@@ -793,6 +795,13 @@ inline constexpr nokia_product_config make_5110_config()
 	// The separate teardown setter has no validated wake contract yet.
 	result.mad2_clock_stop = false;
 	result.ccont_board = ADC_5110;
+	// Own accessory state machine 25ab2c..25ab72 (state byte 10b57b) reads
+	// CCONT selector 0 and CTSI+0e bit 1. A low sample selects 10/Headset,
+	// a sample of at least 0390 with bit 1 low selects 20/Car, and only the
+	// high sample with bit 1 high leaves 0f, the unattached idle display.
+	// Nominal unattached inputs, not measured pin voltages or polarity.
+	result.ccont_board.channel_defaults[0] = 0x3ff;
+	result.mad2_external_status = 0x02;
 	result.boot_rom_hle = true;
 	// NSE-1 System Module 03/98, p. 3-32: COBBA divides 13 MHz by 13,
 	// then by 125, supplying 1 MHz data and 8 kHz PCM frame clocks. The
