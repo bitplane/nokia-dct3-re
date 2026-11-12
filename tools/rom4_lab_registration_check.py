@@ -57,6 +57,78 @@ def check(text):
                 closing_ua_frame=rows['disc_ua'][1], uplinks=len(uplinks))
 
 
+PAGE_ACCESS = re.compile(r'npe3_bts_page_access: t=[\d.]+ ra=([0-9a-f]{2}) last_page_frame=(\d+) port_bits_only=1 physical_claim=0')
+PAGE_REQUEST = re.compile(r'npe3_bts_page_request: t=[\d.]+ identity=([0-9a-f]{16}) ')
+SETUP = re.compile(r'npe3_raw_call_setup: uplink_start_frame=(\d+) start_frame=(\d+) ')
+REPLY = re.compile(r'npe3_raw_(call_rr|cc_release|call_channel_release|disc_ua): \w+_start_frame=(\d+) start_frame=(\d+) ')
+# Mobile-terminated call control in uplink order (GSM 04.08 table 9.54, N(SD) masked).
+CALL_MESSAGES = (('call_confirmed', 0x08), ('alerting', 0x01), ('connect', 0x07),
+                 ('disconnect', 0x25), ('release_complete', 0x2a))
+
+
+def check_incoming_call(text):
+    """Check an answered and cleared mobile-terminated call after registration.
+
+    Registration must already have been checked on the text before the page.
+    """
+    marker = text.find('npe3_bts_page_request:')
+    if marker < 0:
+        raise ValueError('laboratory BTS never paged the handset')
+    text = text[marker:]
+    if FAULT.search(text) or 'native_dsp_reset_line:' in text:
+        raise ValueError('native run reset or faulted during the call')
+    request = PAGE_REQUEST.search(text)
+    access = PAGE_ACCESS.findall(text)
+    agch = list(AGCH.finditer(text))
+    if not request or len(access) != 1 or len(agch) != 1 or agch[0][1] != access[0][0]:
+        raise ValueError('paging was not answered by one access burst and assignment')
+    if int(access[0][0], 16) >> 4 != 1:
+        raise ValueError('access burst cause is not an answer to paging')
+    uplinks = [(int(row[1]), bytes.fromhex(row[2])) for row in UPLINK.finditer(text)]
+    if len(uplinks) != text.count('npe3_bts_uplink:'):
+        raise ValueError('uplink block without an exact convolutional decode')
+    response = [frame for frame, block in uplinks
+                if block[1] == 0x3f and block[3:5] == b'\x06\x27' and block[11:19].hex() == request[1]]
+    setup = SETUP.findall(text)
+    if len(response) != 1 or len(setup) != 1 or int(setup[0][0]) != response[0]:
+        raise ValueError('SETUP is not bound to a Paging Response carrying the paged identity')
+    frames = {}
+    for frame, block in uplinks:
+        length = block[2] >> 2
+        if block[2] & 3 != 1 or length < 2 or block[3] != 0x83:
+            continue
+        for name, kind in CALL_MESSAGES:
+            if block[4] & 0x3f == kind:
+                frames.setdefault(name, frame)
+    if list(frames) != [name for name, _ in CALL_MESSAGES]:
+        raise ValueError(f'call control messages missing or out of order: {list(frames)}')
+    replies = {kind: (int(source), int(start)) for kind, source, start in REPLY.findall(text)
+               if kind != 'call_rr'}
+    if (replies.get('cc_release', (0,))[0] != frames['disconnect'] or
+            replies.get('call_channel_release', (0,))[0] != frames['release_complete'] or
+            'disc_ua' not in replies or replies['disc_ua'][0] <= replies['call_channel_release'][1]):
+        raise ValueError('network clearing is not bound to DISCONNECT, RELEASE COMPLETE and DISC')
+    order = [int(access[0][1]), int(agch[0][3]), response[0], int(setup[0][1]), *frames.values()]
+    if order != sorted(order):
+        raise ValueError('incoming call dialogue is out of order')
+    return dict(page_frame=int(access[0][1]), response_frame=response[0], setup_frame=int(setup[0][1]),
+                **{f'{name}_frame': frame for name, frame in frames.items()},
+                call_closing_ua_frame=replies['disc_ua'][1])
+
+
+def check_lcd_sequence(directory, required, final):
+    """Require each frame in order among the LCD captures, and the final frame."""
+    digests = [hashlib.sha256(path.read_bytes()).hexdigest()
+               for path in sorted(Path(directory).glob('nokia_dct3_lcdmirror_*.pgm'))]
+    position = 0
+    for digest in required:
+        if digest not in digests[position:]:
+            raise ValueError(f'LCD never showed {digest[:12]} in order')
+        position = digests.index(digest, position) + 1
+    if not digests or digests[-1] != final:
+        raise ValueError('final LCD differs from the registered idle frame')
+
+
 def check_lcd(directory, expected):
     frames = sorted(Path(directory).glob('nokia_dct3_lcdmirror_*.pgm'))
     if not frames:

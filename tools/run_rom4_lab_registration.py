@@ -11,15 +11,33 @@ if __package__ in (None, ''):
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from tools.make_5110_eeprom_profile import build_profile
 from tools.process_runner import run_emulator
-from tools.rom4_lab_registration_check import NSE1_LCD_SHA256, check, check_lcd
+from tools.rom4_lab_registration_check import (NSE1_LCD_SHA256, check, check_incoming_call, check_lcd,
+                                              check_lcd_sequence)
 from tools.run_nse2_native import prepare_native
 
 HEADLESS = ['-noreadconfig', '-midiprovider', 'none', '-keyboardprovider', 'none',
             '-mouseprovider', 'none', '-lightgunprovider', 'none', '-joystickprovider', 'none',
             '-video', 'none', '-sound', 'none', '-log', '-verbose', '-skip_gameinfo', '-nothrottle']
+# Laboratory BTS options: incoming SETUP, RR acknowledgement of call control,
+# network clearing, and SACCH.
+CALL_BTS_BITS = (4, 16, 32, 64)
+# The page follows Location Updating; Answer and End are physical left-softkey presses.
+CALL_INPUTS = {'NPE3_NATIVE_PAGE_AT': '20', 'NOKIA_DCT3_POST_READY_KEYS': 'menu,menu',
+               'NOKIA_DCT3_POST_READY_KEY_DELAY_MS': '23000', 'NOKIA_DCT3_POST_READY_KEY_DURATION_MS': '220',
+               'NOKIA_DCT3_POST_READY_KEY_GAP_MS': '4000'}
+RINGING_LCD_SHA256 = '12fbdc9400c3ca1fc46e4769c9eac25eb40f97ec79f766bc3c2383515a00952c'
+CALL_LCD_SHA256 = 'd74c752eb952af734ca6ab0243080daf1bc1a86b370d852da7205e3c611313ff'
 
 
-def command(root, run, machine, mame):
+def write_bts_config(run, machine, bits):
+    ports = ''.join(f'<port tag=":LAB_BTS" type="CONFIG" mask="{bit}" defvalue="0" value="{bit}" />' for bit in bits)
+    (run / 'cfg').mkdir()
+    (run / 'cfg' / f'{machine}.cfg').write_text(
+        f'<?xml version="1.0"?>\n<mameconfig version="10"><system name="{machine}"><input>{ports}'
+        '</input></system></mameconfig>\n')
+
+
+def command(root, run, machine, mame, call=False):
     if machine == 'nse1ap5':
         nvram = run / 'nvram/nse1ap5'
         nvram.mkdir(parents=True)
@@ -27,10 +45,13 @@ def command(root, run, machine, mame):
         nvram.joinpath('eeprom').write_bytes(build_profile(
             (root / 'roms/noki5110/nse-1.bin').read_bytes(),
             (root / 'roms/noki5110/5110f530.fls').read_bytes()))
+        if call:
+            write_bts_config(run, machine, CALL_BTS_BITS)
+            os.environ.update(CALL_INPUTS)
         # The staged menu script adds the LCD mirror and the staged-CPU end marker.
-        script = root / 'tools/c54x_rom4_staged_menu.lua'
+        script = root / ('tools/rom4_lab_call_input.lua' if call else 'tools/c54x_rom4_staged_menu.lua')
         return [str(mame), machine, '-rompath', str(root / 'mame/roms'), '-nvram_directory', str(run / 'nvram'),
-                '-cfg_directory', str(run / 'cfg'), '-seconds_to_run', '22', *HEADLESS,
+                '-cfg_directory', str(run / 'cfg'), '-seconds_to_run', '36' if call else '22', *HEADLESS,
                 '-autoboot_script', str(script)]
     # The 5110i runs past its former 62-second reason-68 reset.
     prepare_native(root, run, record_checksum=True, nominal_vbat=True, insert_sim=True,
@@ -43,14 +64,18 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('machine', choices=('nse1ap5', 'nse2ap5'))
     parser.add_argument('--mame', type=Path)
+    parser.add_argument('--incoming-call', action='store_true',
+                        help='page after registration, answer, then end the call (nse1ap5)')
     args = parser.parse_args()
+    if args.incoming_call and args.machine != 'nse1ap5':
+        parser.error('the incoming-call scenario is defined for nse1ap5')
     root = Path(__file__).resolve().parents[1]
     scratch = root / 'tmp/native-gates'
     scratch.mkdir(parents=True, exist_ok=True)
     run = Path(tempfile.mkdtemp(prefix=f'{args.machine}-registration.', dir=scratch))
     os.rmdir(run)  # prepare_native requires a new directory
     try:
-        cmd = command(root, run, args.machine, (args.mame or root / 'mame/mame').resolve())
+        cmd = command(root, run, args.machine, (args.mame or root / 'mame/mame').resolve(), args.incoming_call)
         run.mkdir(exist_ok=True)
         os.environ['NOKIA_DCT3_SNAPSHOT_DIR'] = str(run / 'snap')
         with open(run / 'console.log', 'wb') as output:
@@ -58,15 +83,23 @@ def main():
         if status:
             raise ValueError(f'emulator exited {status}')
         text = (run / 'error.log').read_text(errors='replace')
-        result = check(text)
+        if args.incoming_call:
+            page = text.find('npe3_bts_page_request:')
+            result = check(text[:page] if page >= 0 else text)
+            result.update(check_incoming_call(text))
+            check_lcd_sequence(run / 'snap', (RINGING_LCD_SHA256, CALL_LCD_SHA256), NSE1_LCD_SHA256)
+        else:
+            result = check(text)
         if args.machine == 'nse1ap5':
             if 'rom4_staged_end:' not in text or 'illegal=0' not in text.split('rom4_staged_end:', 1)[1].split('\n', 1)[0]:
                 raise ValueError('staged ROM4 execution did not end cleanly')
-            check_lcd(run / 'snap', NSE1_LCD_SHA256)
+            if not args.incoming_call:
+                check_lcd(run / 'snap', NSE1_LCD_SHA256)
     except Exception as error:
         raise SystemExit(f'FAIL - {error}; evidence retained: {run}')
     print(' '.join(f'{key}={value}' for key, value in result.items()))
-    print(f'NSE ROM4 {args.machine} native laboratory Location Updating: PASS')
+    scenario = 'incoming call' if args.incoming_call else 'Location Updating'
+    print(f'NSE ROM4 {args.machine} native laboratory {scenario}: PASS')
     shutil.rmtree(run)
 
 

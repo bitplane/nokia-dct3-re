@@ -2589,6 +2589,12 @@
       "evidence": ["tools/make_5110_eeprom_profile.py", "tools/test_make_5110_eeprom_profile.py", "tools/run_nse2_native.py", "tools/run_rom4_lab_registration.py", "tools/rom4_lab_registration_check.py", "docs/rom4_rf_control.md", "docs/5110i_bringup.md"]
     },
     {
+      "id": "nse1_native_lab_incoming_call", "owner": "native_dsp_rf", "status": "satisfied",
+      "predicate": "The native NSE-1 handset answers a laboratory page, rings, connects and clears a mobile-terminated call on SDCCH",
+      "current": "After native Location Updating on nse1ap5 the lab BTS pages the air-derived IMSI at 20 s. The native DSP answers with a paging-cause access burst (RA 17), sends RR Paging Response, decodes SETUP, and the MCU sends CALL CONFIRMED and ALERTING while the LCD shows 5551234 calling. A physical Answer press gives CONNECT and the Call 1 screen; End gives DISCONNECT (normal clearing), RELEASE COMPLETE after the network RELEASE, and DISC after Channel Release, then the idle DCT3 LAB frame. make verify-5110-lab-incoming-call checks the dialogue binding and order, no DSP restart, and the ringing, connected and idle LCD frames; it reproduced identically on 2026-11-11. The lab sends no CONNECT ACKNOWLEDGE and no traffic channel: with traffic assignment the handset stops releasing uplink 0.08 s after the TCH/F timeslot-1 Assignment Command because the lab releases, captures and synthesises timeslot 0 only. Speech, TCH/FACCH framing and the laboratory RF assumptions of nse1_native_lab_location_updating remain open.",
+      "evidence": ["driver/nokia_dct3_research.cpp", "tools/run_rom4_lab_registration.py", "tools/rom4_lab_registration_check.py", "tools/test_rom4_lab_registration_check.py", "tools/rom4_lab_call_input.lua", "tools/npe3_bts_page_input.lua", "docs/rom4_rf_control.md"]
+    },
+    {
       "id": "mu4_native_coefficient_cache_publication",
       "owner": "mu4_native_dsp",
       "status": "satisfied",

@@ -887,6 +887,45 @@ illegal DSP execution, and the final LCD frame (operator `DCT3 LAB`, full bars,
 unlike the ROM6 checks, it does not yet bind each downlink to a native DSP
 ring publication.
 
+### Native incoming call
+
+The laboratory BTS options already used on the 6210 also drive the 5110. After
+Location Updating the BTS knows the IMSI from the air request; its page input
+(`npe3_bts_page_input.lua`, now admitted on `nse1ap5` from 18 s) pages it on
+PCH. With SETUP, call-control RR, clearing and SACCH enabled (`LAB_BTS` bits
+4, 16, 32, 64), a page at 20 s gives:
+
+| Frame | Direction | Content |
+| --- | --- | --- |
+| 4341 | downlink | Paging Request, IMSI |
+| 4456 | uplink | access burst, RA `17` (answer to paging) |
+| 4494 | downlink | Immediate Assignment |
+| 4525 | uplink | SABM + RR Paging Response (`06 27`, IMSI) |
+| 4612 | downlink | SETUP from `5551234` |
+| 4678 | uplink | CALL CONFIRMED (`83 08`) |
+| 4729 | uplink | ALERTING; the LCD shows `5551234 calling` / `Answer` |
+| 5035 | uplink | CONNECT, after the physical Answer softkey at 23 s; LCD `Call 1` / `End` |
+| 5953 | uplink | DISCONNECT, normal clearing, after End at 27.2 s |
+| 5989 | downlink | RELEASE |
+| 6055 | uplink | RELEASE COMPLETE |
+| 6091 | downlink | Channel Release |
+| 6157/6193 | up/down | DISC / UA |
+
+The phone then returns to the `DCT3 LAB` idle frame. Every uplink decodes with
+an exact code and the DSP is not restarted. `make verify-5110-lab-incoming-call`
+(`run_rom4_lab_registration.py nse1ap5 --incoming-call`) checks the dialogue
+binding and order and the ringing, connected and idle LCD frames. The run is
+deterministic.
+
+The whole call stays on SDCCH; the lab does not send CONNECT ACKNOWLEDGE.
+With traffic assignment (bit 8) the BTS sends an Assignment Command to TCH/F
+on timeslot 1 after CALL CONFIRMED. The handset shows `Call 1` after Answer,
+but its last port-5 release is 0.08 s after the assignment, and nothing
+further is decoded. The lab captures, releases and synthesises only
+timeslot 0. A traffic channel needs a timeslot-1 downlink in the sample source
+(TCH/FACCH/SACCH bursts from `gsm_tch_f_l1`) and release and decode of the
+handset's timeslot-1 uplink; the 6210 stops at the same lab boundary.
+
 ### Tuned laboratory carrier
 
 The untuned source put the cell on every channel. The 5110 happened to try
