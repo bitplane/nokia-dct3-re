@@ -12,6 +12,7 @@ if __package__ in (None, ''):
 from tools.make_5110_eeprom_profile import build_profile
 from tools.process_runner import run_emulator
 from tools.rom4_lab_registration_check import NSE1_LCD_SHA256, check, check_lcd
+from tools.run_nse2_native import prepare_native
 
 HEADLESS = ['-noreadconfig', '-midiprovider', 'none', '-keyboardprovider', 'none',
             '-mouseprovider', 'none', '-lightgunprovider', 'none', '-joystickprovider', 'none',
@@ -19,28 +20,35 @@ HEADLESS = ['-noreadconfig', '-midiprovider', 'none', '-keyboardprovider', 'none
 
 
 def command(root, run, machine, mame):
-    nvram = run / 'nvram/nse1ap5'
-    nvram.mkdir(parents=True)
-    (run / 'snap').mkdir()
-    nvram.joinpath('eeprom').write_bytes(build_profile(
-        (root / 'roms/noki5110/nse-1.bin').read_bytes(),
-        (root / 'roms/noki5110/5110f530.fls').read_bytes()))
-    # The staged menu script adds the LCD mirror and the staged-CPU end marker.
-    script = root / 'tools/c54x_rom4_staged_menu.lua'
-    return [str(mame), machine, '-rompath', str(root / 'mame/roms'), '-nvram_directory', str(run / 'nvram'),
-            '-cfg_directory', str(run / 'cfg'), '-seconds_to_run', '22', *HEADLESS,
-            '-autoboot_script', str(script)]
+    if machine == 'nse1ap5':
+        nvram = run / 'nvram/nse1ap5'
+        nvram.mkdir(parents=True)
+        (run / 'snap').mkdir()
+        nvram.joinpath('eeprom').write_bytes(build_profile(
+            (root / 'roms/noki5110/nse-1.bin').read_bytes(),
+            (root / 'roms/noki5110/5110f530.fls').read_bytes()))
+        # The staged menu script adds the LCD mirror and the staged-CPU end marker.
+        script = root / 'tools/c54x_rom4_staged_menu.lua'
+        return [str(mame), machine, '-rompath', str(root / 'mame/roms'), '-nvram_directory', str(run / 'nvram'),
+                '-cfg_directory', str(run / 'cfg'), '-seconds_to_run', '22', *HEADLESS,
+                '-autoboot_script', str(script)]
+    # The 5110i runs past its former 62-second reason-68 reset.
+    prepare_native(root, run, record_checksum=True, nominal_vbat=True, insert_sim=True,
+                   phone_retry_zero=True, security_records=True, lab=True)
+    return [str(mame), machine, '-rompath', str(run / 'roms'), '-nvram_directory', str(run / 'nvram'),
+            '-cfg_directory', str(run / 'cfg'), '-seconds_to_run', '70', *HEADLESS]
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('machine', choices=('nse1ap5',))
+    parser.add_argument('machine', choices=('nse1ap5', 'nse2ap5'))
     parser.add_argument('--mame', type=Path)
     args = parser.parse_args()
     root = Path(__file__).resolve().parents[1]
     scratch = root / 'tmp/native-gates'
     scratch.mkdir(parents=True, exist_ok=True)
     run = Path(tempfile.mkdtemp(prefix=f'{args.machine}-registration.', dir=scratch))
+    os.rmdir(run)  # prepare_native requires a new directory
     try:
         cmd = command(root, run, args.machine, (args.mame or root / 'mame/mame').resolve())
         run.mkdir(exist_ok=True)

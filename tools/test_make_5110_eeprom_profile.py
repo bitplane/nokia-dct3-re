@@ -15,6 +15,7 @@ from make_5110_eeprom_profile import (
     TUNE_CHECKSUM_OFFSET,
     build_profile,
     decode_msid,
+    provision_nse2_records,
 )
 
 
@@ -45,6 +46,16 @@ class Make5110EepromProfileTest(unittest.TestCase):
                          int.from_bytes(image[RECORD_CHECKSUM_OFFSET:RECORD_CHECKSUM_OFFSET + 2], "big"))
         tune = (sum(image[0x040:0x11E]) - image[0x074] - image[0x075]) & 0xFFFF
         self.assertEqual(tune, int.from_bytes(image[TUNE_CHECKSUM_OFFSET:TUNE_CHECKSUM_OFFSET + 2], "big"))
+
+    def test_nse2_layout_carries_own_flash_checksum_and_unpadded_locks(self):
+        image = bytearray([0xFF]) * 0x2000
+        provision_nse2_records(image)
+        self.assertEqual(bytes.fromhex("e37069457c7457265d647bc949054410901987ff"), image[0x00:0x14])
+        self.assertEqual(bytes.fromhex("322ff260f05203bd5f817d45"), image[0x18:0x24])
+        lock = bytes.fromhex("d6fb4394e437da169668964f5cd432fe5be2dba6964382d7")
+        self.assertEqual(lock * 20, image[0x44:0x224])
+        self.assertEqual(b"\xff" * 4, image[0x14:0x18])  # checksums are the caller's
+        self.assertEqual(b"\xff" * 0x1c, image[0x28:0x44])
 
 
 if __name__ == "__main__":

@@ -919,13 +919,43 @@ apply the same laboratory BTS to the unproved ROM4 compatibility machines,
 to test whether their reason-68 resets are only missing receive activity.
 
 On the 5110i with its native storage profile, the untuned lab removes the
-31.97 s reset. With the tuned carrier it camps on 35, decodes SI and sends an
-access burst (RA `0f`); the lab answers with an Immediate Assignment. The DSP
-then publishes RA_INFO (`0084`) and waits in its IDLE3 command loop
-(`3e22..3e2c`); the 5110i MCU never sends the next command, receive stops, and
-reason 68 fires at 62 s. The 5110 MCU on the same DSP mask continues past
-this point, so the remaining gap is in the 5110i MCU↔ROM4 protocol, which is
-consistent with ROM4 not being the 5110i's own mask.
+31.97 s reset. With the tuned carrier it camps on 35, decodes SI, sends an
+access burst (RA `0f`) and decodes the Immediate Assignment; its MCU then
+queues the SABM (ring message kind `1b`). An earlier note here said the MCU
+never sent that command. It does; the DSP halts while handling it.
+
+Kind `1b` calls `3de6`, which compares DSP word `1f11` with 7. On mismatch it
+ORs `0x40` into `0866` and loops on `IDLE 3` at `3e22..3e2c` forever, with
+the MCU ring unconsumed and INT2 masked by the in-service accept mask. Word
+`1f11` is the boot security-validation state: the DSP sets bit 0 when the
+flash record (MCU message `70`/13, the flash checksum, XORed with
+`17ca6089`) matches, bit 1 when the IMEI record decodes to its `a5a5`-padded
+key at `1f06..1f0b`, and bit 2 when the SIM-lock record decodes. The 5110
+profile passes all three; the 5110i fixture's erased EEPROM passes none.
+
+`provision_nse2_records` writes the 5110 profile's records, encrypted for the
+substituted NSE-1 mask, in the 5110i layout:
+
+| Record (message `70` sub) | 5110 EEPROM | 5110i EEPROM |
+| --- | --- | --- |
+| IMEI record + identity (15) | `000..013` | `000..013`, checksum `014` |
+| flash record (14) | `014..01f` | `018..023`, checksum `024`; own checksum `80a66581` |
+| SIM-lock record (16) | `020..037`, XORed with an IMEI-derived pad | twenty 24-byte slots `044..223`, unpadded; checksum `224` |
+
+The 5110i MCU sends every SIM-lock slot (`0x44 + 24 * index`, routine
+`259d70`), and each one re-runs validation, so a single valid slot followed by
+an erased one leaves `1f11` at 3. With all twenty provisioned, `1f11` ends at
+7, the DSP transmits the SABM, and `nse2ap5` completes the same Location
+Updating dialogue as `nse1ap5`. It then runs 90 s without the 62 s reason-68
+reset. After the physical phone code it shows its field-test display, camped
+on 35 (`CCCH`). `make verify-5110i-lab-registration` protects the dialogue and
+the absence of a restart over 70 s.
+
+These records are the 5110 profile's identity and lock contents, not a 5110i
+factory profile, and they are encrypted for the NSE-1 mask the machine
+substitutes; a real 5110i on its own mask would need records for that mask.
+The halt confirms that ROM4 enforces this check on dedicated-channel
+transmission, not that the 5110i fitted mask behaves the same.
 
 The 5130 and 6130 are DCS 1800 products and the 6190 is PCS 1900. Their
 scans report ARFCNs 884 and 808 at about -148/-145 dBm, so the 900 MHz

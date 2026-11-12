@@ -21,6 +21,10 @@ SECURITY_LEVEL = 0x2C7
 FACTORY_KEY_FLASH_OFFSET = 0xAADB4
 MSID = bytes.fromhex("8264b000eb8f457e168bd2d32a")
 IMEI14 = "49054410901987"
+LOCK_PART1 = bytes.fromhex("ffffffffff0f0000007854c2")
+LOCK_PART2 = bytes.fromhex("0000000000000000087c54c2")
+# Flash checksum the 5110i v5.53a MCU sends as DSP security message 13.
+NSE2_FLASH_CRC = bytes.fromhex("80a66581")
 
 ENCOD = bytes.fromhex("b173e65aab478e0d1a34680b")
 DECOD = bytes.fromhex("d0162c58b071e2d55a67ce8d")
@@ -120,8 +124,9 @@ def _simlock_pad(imei_record: bytes) -> bytes:
     return bytes(_bit_reverse((~work[23 - index]) & 0xFF) for index in range(12))
 
 
-def provision_low_records(image: bytearray) -> None:
-    flash_crc, cobba, identity_hash = decode_msid(MSID)
+def provision_low_records(image: bytearray, flash_crc: bytes | None = None) -> None:
+    msid_crc, cobba, identity_hash = decode_msid(MSID)
+    flash_crc = flash_crc or msid_crc
     imei_record = _imei_record(IMEI14, cobba)
     image[0x00:0x0C] = imei_record
 
@@ -134,12 +139,30 @@ def provision_low_records(image: bytearray) -> None:
     image[0x14:0x20] = encode_record(flash_plain, FLASH_ENC_82, cobba)
 
     pad = _simlock_pad(imei_record)
-    part1 = bytes.fromhex("ffffffffff0f0000007854c2")
-    part2 = bytes.fromhex("0000000000000000087c54c2")
-    encoded1 = encode_record(part1, LOCK_ENC_82, cobba)
-    encoded2 = encode_record(part2, LOCK_ENC_82, cobba)
+    encoded1 = encode_record(LOCK_PART1, LOCK_ENC_82, cobba)
+    encoded2 = encode_record(LOCK_PART2, LOCK_ENC_82, cobba)
     image[0x20:0x2C] = bytes(a ^ b for a, b in zip(encoded1, pad))
     image[0x2C:0x38] = bytes(a ^ b for a, b in zip(encoded2, pad))
+
+
+def provision_nse2_records(image: bytearray) -> None:
+    """Write the same DSP security records in the 5110i (NSE-2 v5.53) layout.
+
+    The 5110i keeps the flash record at 0x18, and the SIM-lock records in a
+    table of twenty 24-byte slots at 0x44. Every slot is sent to the DSP, and
+    each one resets its validation state. Its MCU sends the stored lock bytes
+    as they are, so they are not XORed with the IMEI pad as on the 5110.
+    Checksums cover these blocks and are not updated here.
+    """
+    low = bytearray(0x38)
+    provision_low_records(low, NSE2_FLASH_CRC)
+    _, cobba, _ = decode_msid(MSID)
+    image[0x00:0x0C] = low[0x00:0x0C]
+    image[0x0C:0x14] = bytes.fromhex(IMEI14 + "ff")
+    image[0x18:0x24] = low[0x14:0x20]
+    lock = encode_record(LOCK_PART1, LOCK_ENC_82, cobba) + encode_record(LOCK_PART2, LOCK_ENC_82, cobba)
+    for slot in range(20):
+        image[0x44 + 24 * slot:0x5C + 24 * slot] = lock
 
 
 def build_profile(eeprom: bytes, flash: bytes) -> bytearray:

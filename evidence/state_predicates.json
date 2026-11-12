@@ -2583,6 +2583,12 @@
       "evidence": ["driver/nokia_dct3_research.cpp", "tools/run_rom4_lab_registration.py", "tools/rom4_lab_registration_check.py", "tools/test_rom4_lab_registration_check.py", "tools/npe3_raw_ua_check.py", "docs/rom4_rf_control.md"]
     },
     {
+      "id": "nse2_native_lab_location_updating", "owner": "native_dsp_rf", "status": "satisfied",
+      "predicate": "The 5110i MCU on the substituted NSE-1 ROM4 DSP completes native Location Updating on the laboratory BTS without its reason-68 restart",
+      "current": "The earlier nse2ap5 stall was a DSP security halt, not a missing MCU command: message kind 1b calls 3de6, which requires validation state 1f11 = 7 and otherwise loops on IDLE 3 at 3e22..3e2c. The erased 5110i fixture fails all three boot checks (flash record against the MCU's own checksum 80a66581, IMEI record key, SIM-lock record). provision_nse2_records writes the 5110 profile's records in the 5110i layout (flash record at 018, twenty unpadded 24-byte SIM-lock slots at 044, own block checksums); the MCU sends every slot and each re-runs validation. With all twenty provisioned 1f11 ends at 7 and the native dialogue completes: access 3014, assignment 3015, SABM/LU Request 3046, Accept 3133, Release 3184, closing UA 3286, every uplink exact. The phone runs 90 s without the former 62 s reason-68 reset and, after the physical phone code, shows its field-test display camped on ARFCN 35. make verify-5110i-lab-registration checks the dialogue and the single DSP reset cycle over 70 s, reproduced identically on 2026-11-11. The records carry the 5110 profile's identity and lock contents encrypted for the NSE-1 mask; they are not 5110i factory data, the fitted 5110i mask remains unproved, and the same laboratory RF assumptions as nse1ap5 apply.",
+      "evidence": ["tools/make_5110_eeprom_profile.py", "tools/test_make_5110_eeprom_profile.py", "tools/run_nse2_native.py", "tools/run_rom4_lab_registration.py", "tools/rom4_lab_registration_check.py", "docs/rom4_rf_control.md", "docs/5110i_bringup.md"]
+    },
+    {
       "id": "mu4_native_coefficient_cache_publication",
       "owner": "mu4_native_dsp",
       "status": "satisfied",

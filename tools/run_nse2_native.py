@@ -11,6 +11,8 @@ from PIL import Image
 
 if __package__ in (None, ''):
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from tools.make_5110_eeprom_profile import provision_nse2_records
+from tools.nse2_boot_check import NV_BLOCKS
 from tools.run_nse2_boundary import prepare
 from tools.process_runner import run_emulator
 from tools.nse2_native_check import verify_native, verify_menu_probe, verify_nominal_voltage
@@ -31,13 +33,18 @@ MASK_INPUTS = (
 )
 
 
-def prepare_native(root, run, *, record_checksum=False, nominal_vbat=False, insert_sim=False, phone_retry_zero=False):
+def prepare_native(root, run, *, record_checksum=False, nominal_vbat=False, insert_sim=False, phone_retry_zero=False,
+                   security_records=False, lab=False):
     if run.exists():
         raise ValueError('NSE-2 native experiment requires a new run directory')
     if insert_sim and not nominal_vbat:
         raise ValueError('NSE-2 inserted card requires the nominal-voltage research socket')
     if phone_retry_zero and not (record_checksum and insert_sim):
         raise ValueError('NSE-2 retry fixture requires integrity EEPROM and inserted SIM')
+    if security_records and not record_checksum:
+        raise ValueError('NSE-2 security records require the integrity EEPROM')
+    if lab and not nominal_vbat:
+        raise ValueError('NSE-2 laboratory BTS machine derives from the nominal-voltage socket')
     masks = {}
     for name, size, expected in MASK_INPUTS:
         data = (root / 'roms/noki5110' / name).read_bytes()
@@ -45,7 +52,7 @@ def prepare_native(root, run, *, record_checksum=False, nominal_vbat=False, inse
             raise ValueError('acquired NSE-1 mask differs: ' + name)
         masks[name] = data
     report = prepare(root, run, record_checksum=record_checksum)
-    machine = 'nse2r4v' if nominal_vbat else 'nse2r4t'
+    machine = 'nse2ap5' if lab else 'nse2r4v' if nominal_vbat else 'nse2r4t'
     (run / 'roms/noki5110i').rename(run / 'roms' / machine)
     if (run / 'nvram/noki5110i').exists():
         (run / 'nvram/noki5110i').rename(run / 'nvram' / machine)
@@ -60,6 +67,16 @@ def prepare_native(root, run, *, record_checksum=False, nominal_vbat=False, inse
                                basis='NSE-1 3.6 V / typical CCONT 6.5 mV per bit' if nominal_vbat else 'research open-pin default',
                                measured_nse2_calibration=False)
     report['inserted_synthetic_sim'] = insert_sim
+    if security_records:
+        path = run / 'nvram' / machine / 'eeprom'
+        image = bytearray(path.read_bytes())
+        provision_nse2_records(image)
+        for start, length, stored, _ in NV_BLOCKS:
+            value = (~(sum(image[start:start + length]) & 0xffff)) & 0xffffffff
+            image[stored:stored + 4] = value.to_bytes(4, 'big')
+        path.write_bytes(image)
+        report.update(security_records='NSE-1 profile records in NSE-2 layout for the substituted NSE-1 mask',
+                      eeprom_sha256=hashlib.sha256(image).hexdigest())
     if phone_retry_zero:
         path = run / 'nvram' / machine / 'eeprom'
         image = bytearray(path.read_bytes())
