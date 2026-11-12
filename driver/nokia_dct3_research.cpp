@@ -114,9 +114,12 @@ void dct3_rf_adc_fixture_state::nse1ap5(machine_config &config)
 }
 
 // Products running NSE-1 ROM4 as an unproved mask input share its receive
-// and transmit grammar; attach the complete nse1ap5 laboratory chain.
-void dct3_rf_adc_fixture_state::configure_nse1_lab_bts(machine_config &config)
+// and transmit grammar; attach the complete nse1ap5 laboratory chain. The lab
+// carrier sits in the product's own band.
+void dct3_rf_adc_fixture_state::configure_nse1_lab_bts(machine_config &config, lab_band band)
 {
+	m_band = band;
+	m_lab_arfcn = band == lab_band::gsm900 ? 35 : 600;
 	configure_adc_lab(config);
 	m_burst = m_sch = m_compare_start = true;
 	m_bcch = m_full_broadcast = true;
@@ -133,19 +136,19 @@ void dct3_rf_adc_fixture_state::nse2ap5(machine_config &config)
 void dct3_rf_adc_fixture_state::nsk1ap5(machine_config &config)
 {
 	nsk1r4t(config);
-	configure_nse1_lab_bts(config);
+	configure_nse1_lab_bts(config, lab_band::dcs1800);
 }
 
 void dct3_rf_adc_fixture_state::nsk3ap5(machine_config &config)
 {
 	nsk3r4t(config);
-	configure_nse1_lab_bts(config);
+	configure_nse1_lab_bts(config, lab_band::dcs1800);
 }
 
 void dct3_rf_adc_fixture_state::nsb3ap5(machine_config &config)
 {
 	nsb3r4t(config);
-	configure_nse1_lab_bts(config);
+	configure_nse1_lab_bts(config, lab_band::pcs1900);
 }
 
 void dct3_rf_adc_fixture_state::npe3ad0(machine_config &config)
@@ -239,7 +242,7 @@ void dct3_rf_adc_fixture_state::machine_start()
 	if (m_compare_start) machine().logerror("npe3_capture_candidate: p09_start=1 all_captures=1 block_request_latch=1 physical_claim=0 source_epoch_shift=0\n");
 	if (m_full_broadcast)
 	{
-		machine().logerror("rf_adc_bcch: frames=2,3,4,5 tsc=2 schedule=0,1,2,3,1,1,2,3 repeated_si3_only=0 arfcn=35 epoch=0 physical_claim=0\n");
+		machine().logerror("rf_adc_bcch: frames=2,3,4,5 tsc=2 schedule=0,1,2,3,1,1,2,3 repeated_si3_only=0 arfcn=%u epoch=0 physical_claim=0\n",m_lab_arfcn);
 	}
 	else if (m_bcch)
 	{
@@ -289,7 +292,8 @@ void dct3_rf_adc_fixture_state::machine_reset()
 	auto &network=*subdevice<nokia_gsm_network_device>("gsm_network");
 	// Explicit laboratory BTS composition, not a detected/fitted carrier.
 	auto cell=*network.cell_at(0);
-	cell.arfcn=35;
+	cell.arfcn=m_lab_arfcn;
+	network.set_pcs1900_band(m_band==lab_band::pcs1900);
 	cell.bsic=42;
 	if (m_raw_agch)
 	{
@@ -303,7 +307,7 @@ void dct3_rf_adc_fixture_state::machine_reset()
 	{
 		// GSM 04.04 7.1: two L1 octets precede the 21-byte SACCH L2 frame.
 		// SI5 reuses the neighbour list; SI6 reuses the cell's CI/LAI/options.
-		auto const si2=network.system_information(1,35),si3=network.system_information(2,35);
+		auto const si2=network.system_information(1,m_lab_arfcn),si3=network.system_information(2,m_lab_arfcn);
 		for (unsigned kind=0;kind<2;++kind)
 		{
 			gsm::tch_f::packed_control_block block{};
@@ -338,7 +342,7 @@ void dct3_rf_adc_fixture_state::machine_reset()
 	}
 	for (unsigned kind=0; kind<4; ++kind)
 	{
-		auto const information=network.system_information(kind,35);
+		auto const information=network.system_information(kind,m_lab_arfcn);
 		gsm::tch_f::packed_control_block octets{};
 		std::copy_n(information.begin(),octets.size(),octets.begin());
 		// TS44.018 10.5.2.11: combined CCCH on C0/TS0, matching
@@ -349,7 +353,7 @@ void dct3_rf_adc_fixture_state::machine_reset()
 			m_broadcast_samples[kind][burst]=nokia_rf_lab::gmsk_samples(bursts[burst]);
 		std::string hex;
 		for (auto byte:octets) hex+=util::string_format("%02x",byte);
-		machine().logerror("rf_adc_broadcast_si: index=%u arfcn=35 octets=%s physical_claim=0\n",kind,hex);
+		machine().logerror("rf_adc_broadcast_si: index=%u arfcn=%u octets=%s physical_claim=0\n",kind,m_lab_arfcn,hex);
 	}
 }
 
@@ -390,9 +394,15 @@ void dct3_rf_adc_fixture_state::control_w(offs_t port, u16 data)
 		u32 const word=(u32(data)<<16)|m_synth_low;
 		if (!m_tuned_air || ((word>>20)&7)!=3) return;
 		// NSE-1 manual: 64/65 UHF prescaler, 200 kHz steps, LO 71 MHz above
-		// the 935 MHz GSM900 receive band, hence ARFCN = M - 5030.
-		s32 const arfcn=s32(((word>>7)&0x1fff)*64+(word&0x7f))-5030;
-		m_rx_arfcn=arfcn>=1 && arfcn<=124 ? arfcn : -1;
+		// the 935 MHz GSM900 receive band, hence ARFCN = M - 5030. The DCS
+		// 1800 and PCS 1900 siblings' power-up scans sweep M over 6591..6964
+		// and 7216..7514: exactly 374 and 299 values, their bands' channel
+		// counts from ARFCN 512. Their LO/IF plans are not documented here.
+		struct band_plan { s32 offset, first, last; };
+		static constexpr band_plan plans[]={{5030,1,124},{6079,512,885},{6704,512,810}};
+		auto const &plan=plans[unsigned(m_band)];
+		s32 const arfcn=s32(((word>>7)&0x1fff)*64+(word&0x7f))-plan.offset;
+		m_rx_arfcn=arfcn>=plan.first && arfcn<=plan.last ? arfcn : -1;
 		return;
 	}
 	if (port>=5 && port<=8)
@@ -525,7 +535,7 @@ TIMER_CALLBACK_MEMBER(dct3_rf_adc_fixture_state::candidate_transmit_start)
 				m_call_release_start_frame=~u64(0);m_call_channel_release_sent=false;
 				u64 const frame=machine().time().as_ticks(13'000'000)/60'000;
 				auto const assignment=subdevice<nokia_gsm_network_device>("gsm_network")->immediate_assignment(
-					*access,frame%nokia_rf_lab::hyperframe,35);
+					*access,frame%nokia_rf_lab::hyperframe,m_lab_arfcn);
 				std::copy_n(assignment.begin(),m_agch_octets.size(),m_agch_octets.begin());
 				auto const bursts=nokia_rf_lab::bcch_bits(m_agch_octets,2);
 				for (unsigned burst=0; burst<4; ++burst)
@@ -595,7 +605,7 @@ void dct3_rf_adc_fixture_state::receive_normal_uplink(std::array<u16,15> const &
 			m_assignment_start_frame==~u64(0) && m_normal_start_frame>m_call_proceeding_start_frame+3 &&
 			(*block)[0]==3 && (*block)[1]==0x41 && (*block)[2]==1)
 	{
-		auto const assignment=subdevice<nokia_gsm_network_device>("gsm_network")->traffic_assignment(35);
+		auto const assignment=subdevice<nokia_gsm_network_device>("gsm_network")->traffic_assignment(m_lab_arfcn);
 		gsm::tch_f::packed_control_block lapdm{};
 		// Network N(S)=2, N(R)=1: no further mobile I-frame was received.
 		lapdm.fill(0x2b);lapdm[0]=3;lapdm[1]=0x24;lapdm[2]=(assignment.size()<<2)|1;
@@ -664,7 +674,7 @@ void dct3_rf_adc_fixture_state::receive_normal_uplink(std::array<u16,15> const &
 	{
 		// Second network I-frame,N(S)=1; N(R) acknowledges the actual
 		// Call Confirmed or CONNECT. Earlier RR replies do not consume N(S).
-		auto const assignment=subdevice<nokia_gsm_network_device>("gsm_network")->traffic_assignment(35);
+		auto const assignment=subdevice<nokia_gsm_network_device>("gsm_network")->traffic_assignment(m_lab_arfcn);
 		gsm::tch_f::packed_control_block lapdm{};
 		lapdm.fill(0x2b);lapdm[0]=3;lapdm[1]=(((((*block)[1]>>1)+1)&7)<<5)|2;lapdm[2]=(assignment.size()<<2)|1;
 		std::copy(assignment.begin(),assignment.end(),lapdm.begin()+3);
@@ -782,7 +792,7 @@ void dct3_rf_adc_fixture_state::receive_normal_uplink(std::array<u16,15> const &
 			std::copy_n(request+10,m_page_identity.size(),m_page_identity.begin());
 			m_page_identity_valid=true;
 		}
-		auto const accept=subdevice<nokia_gsm_network_device>("gsm_network")->location_update_accept(request,length,35);
+		auto const accept=subdevice<nokia_gsm_network_device>("gsm_network")->location_update_accept(request,length,m_lab_arfcn);
 		gsm::tch_f::packed_control_block lapdm{};
 		lapdm.fill(0x2b);
 		lapdm[0]=3;lapdm[1]=0;lapdm[2]=(accept.size()<<2)|1;
@@ -824,7 +834,7 @@ u16 dct3_rf_adc_fixture_state::sample_r(offs_t component)
 	static constexpr s16 q[16] = {0,392,724,946,1024,946,724,392,0,-392,-724,-946,-1024,-946,-724,-392};
 	if (!m_tone) return 0;
 	if (component) return u16(m_q_latch);
-	if (m_tuned_air && m_capture_arfcn!=35)
+	if (m_tuned_air && m_capture_arfcn!=s32(m_lab_arfcn))
 	{
 		m_q_latch=0;
 		return 0;

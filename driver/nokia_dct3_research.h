@@ -82,7 +82,8 @@ protected:
 	void machine_reset() override;
 private:
 	void configure_adc_lab(machine_config &config);
-	void configure_nse1_lab_bts(machine_config &config);
+	enum class lab_band { gsm900, dcs1800, pcs1900 };
+	void configure_nse1_lab_bts(machine_config &config, lab_band band = lab_band::gsm900);
 	void control_w(offs_t port, u16 data);
 	void transmit_word_w(u16 data);
 	void rf_reset_w(int released);
@@ -139,6 +140,8 @@ private:
 	// the next window's channel during the current capture, so the lab
 	// latches the programmed channel when a capture window opens.
 	bool m_tuned_air=false;
+	lab_band m_band=lab_band::gsm900;
+	u16 m_lab_arfcn=35;
 	u16 m_synth_low=0;
 	s32 m_rx_arfcn=-1, m_capture_arfcn=-1;
 	std::array<std::array<s16,2>,148*4> m_dummy_samples{};

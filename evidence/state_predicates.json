@@ -2595,6 +2595,12 @@
       "evidence": ["driver/nokia_dct3_research.cpp", "tools/run_rom4_lab_registration.py", "tools/rom4_lab_registration_check.py", "tools/test_rom4_lab_registration_check.py", "tools/rom4_lab_call_input.lua", "tools/npe3_bts_page_input.lua", "docs/rom4_rf_control.md"]
     },
     {
+      "id": "rom4_high_band_lab_sync", "owner": "native_dsp_rf", "status": "unresolved",
+      "predicate": "The DCS 1800 and PCS 1900 ROM4 siblings synchronise to a laboratory cell in their own band",
+      "current": "Power-up scans on nsk3ap5/nsk1ap5 sweep tag-3 M 6591..6964 and on nsb3ap5 7216..7514, exactly 374 and 299 values (DCS 512..885, PCS 512..810), so the lab decodes ARFCN = M-6079 / M-6704 and places the cell on ARFCN 600 of each band; both imply a 487 MHz IF for 600. Scans rank 600 first (about -14 against -148), the DSP detects FCCH and attempts SCH on frames 21/31/41, and every attempt fails because the sync captures program M 6639 (DCS, IF 495 MHz) or 7339 (PCS, IF 480 MHz) instead of the scan word, so the lab hears silence. The GSM900 5110 uses M 5065 for both. These machines run the substituted GSM900 NSE-1 mask, so the sync word may be a mask artefact or the products' radio plan; neither the NSK/NSB IF plan nor the code forming the word is in hand. All three run 90 s without a restart.",
+      "evidence": ["driver/nokia_dct3_research.cpp", "driver/nokia_dct3_research.h", "driver/nokia_gsm_network.cpp", "docs/rom4_rf_control.md"]
+    },
+    {
       "id": "mu4_native_coefficient_cache_publication",
       "owner": "mu4_native_dsp",
       "status": "satisfied",

@@ -997,14 +997,33 @@ The halt confirms that ROM4 enforces this check on dedicated-channel
 transmission, not that the 5110i fitted mask behaves the same.
 
 The 5130 and 6130 are DCS 1800 products and the 6190 is PCS 1900. Their
-scans report ARFCNs 884 and 808 at about -148/-145 dBm, so the 900 MHz
-laboratory carrier is inaudible to them. Their results do not test reason 68;
-that needs a band-aware synthesiser decode and a carrier on their own bands.
-The DSP's empty scan reports still let each task-0 idle loop choose its
-deep-sleep arm. Without delivery restoration that arm starves the OS timers
+power-up scans sweep the tag-3 word over `M` 6591..6964 (DCS) and 7216..7514
+(PCS): exactly 374 and 299 values, their bands' channel counts from ARFCN
+512. The lab therefore decodes `ARFCN = M - 6079` (DCS) and `M - 6704` (PCS),
+and `nsk1ap5`, `nsk3ap5` and `nsb3ap5` put the laboratory cell on ARFCN 600 of
+their own band (variable-bitmap SI1/SI2; PCS band indicator on the 6190). The
+earlier reports of ARFCNs 884 and 808 were the GSM900 decode applied to these
+words. For ARFCN 600 the scan word implies the same 487 MHz IF in both bands.
+
+Their scans now rank ARFCN 600 first (about -14 against -148 for every other
+channel), and the DSP finds the FCCH and attempts SCH one frame later on
+frames 21/31/41, but every SCH attempt reports failure. During those sync
+captures the DSP programs a different word: `M` 6639 on DCS (40 steps, 8 MHz,
+below the scan word 6679) and 7339 on PCS (35 steps above 7304), i.e. IFs of
+495 and 480 MHz. The lab hears only the decoded channel, so those captures are
+silent. The 5110 uses one word (`M` 5065) for both scan and sync. No RF
+documentation in the repository explains a separate sync LO, and these
+machines run the substituted GSM900 NSE-1 mask rather than their own DSPs, so
+it is not settled whether this is the products' radio plan or an artefact of
+the mask. Deciding needs the NSK/NSB RF IF plan or the code that forms the
+sync word; widening the lab to hear both words would be an unsupported
+fixture. All three still run 90 s without a restart.
+
+Before the band-aware decode the DSP's scan reports were empty. They still
+let each task-0 idle loop choose its deep-sleep arm. Without delivery restoration that arm starves the OS timers
 and the CCONT watchdog resets the phone. These machines select the opt-in
 MAD2 contract in
 [MAD2 fidelity](mad2_fidelity.md#rom4-sibling-wake-delivery-opt-in). With it
 they run 120 s without a restart, and the 6190 accepts its phone code. The
-missing reason-68 reset reflects receive-activity bookkeeping from those
-scan reports, not camping on a cell.
+missing reason-68 reset reflects receive-activity bookkeeping from scan
+reports, not camping on a cell; none of the three camps yet.
