@@ -1328,9 +1328,12 @@ runner return code 0). Its 5,690 distinct `[opassert]` records include all
 fixture assertion coverage, not a source-text inventory or full ISA proof.
 The word-contract gate itself still does not run that expensive fixture.
 This baseline came from the retired default `tms54test` run, which emitted
-the `[opassert]` records. The section catalogue does not emit them, so the
-assertion inventory cannot currently be reproduced. That run took about
-35 minutes and its inventory was used only after the runner's terminal PASS.
+the `[opassert]` records. On 2026-11-11 the section inventory replaced it
+([C54x test suite](c54x_test_suite.md#opcode-assertion-inventory)): all 564
+forms execute in passing CPU sections. That is a weaker per-case claim than
+the retired markers. The same word-contract run now fails its separate fetch
+counts (`3924` reads 94 instead of 46, `3f4e` 1253 instead of 1247), so the
+word-service contract itself needs re-baselining.
 Compare exact opcode sets against the
 bounded service log; an assertion for a neighboring encoding does not cover
 the observed form. Neither this comparison nor the fixture establishes

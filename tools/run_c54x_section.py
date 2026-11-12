@@ -100,7 +100,7 @@ def batch_header(names):
     return '\n'.join(lines) + '\n'
 
 
-def run_suite(selected, sections, jobs, scope, root=ROOT, batch_size=8):
+def run_suite(selected, sections, jobs, scope, root=ROOT, batch_size=8, coverage=False):
     output = root / 'tmp/c54x-section-trial' / (scope + '-summary.json')
     output.parent.mkdir(parents=True, exist_ok=True)
     started = time.monotonic()
@@ -111,7 +111,8 @@ def run_suite(selected, sections, jobs, scope, root=ROOT, batch_size=8):
             report['active_section'] = ','.join(batch)
             output.write_text(json.dumps(report, indent=2) + '\n')
             arguments = batch if len(batch) == 1 else ['--batch', *batch]
-            subprocess.run([sys.executable, __file__, *arguments, '--jobs', str(jobs)], check=True)
+            subprocess.run([sys.executable, __file__, *arguments, '--jobs', str(jobs),
+                            *(['--opcode-coverage'] if coverage else [])], check=True)
             elapsed = time.monotonic() - current
             for name in batch:
                 report['completed'].append(dict(section=name, cases=sections[name]['cases'],
@@ -140,6 +141,8 @@ def main():
     parser.add_argument('--jobs', type=int, default=8)
     parser.add_argument('--build-only', action='store_true', help='prepare and compile the selected section without executing it')
     parser.add_argument('--negative-control', action='store_true', help='require failure of an intentionally wrong expectation')
+    parser.add_argument('--opcode-coverage', action='store_true',
+                        help='keep each section error.log with the core [opcov] records (-log -verbose)')
     args = parser.parse_args()
     if args.fixture_header:
         if (not args.section or args.section=='all' or not args.section.replace('_','').isalnum() or
@@ -166,7 +169,8 @@ def main():
             parser.error('--build-only requires one section')
         if args.negative_control:
             parser.error('select one section for the negative control')
-        run_suite(selected, sections, args.jobs, args.scope, batch_size=args.batch_size)
+        run_suite(selected, sections, args.jobs, args.scope, batch_size=args.batch_size,
+                  coverage=args.opcode_coverage)
         return
     names = args.batch or [args.section]
     group = 'batch-' + hashlib.sha256(','.join(names).encode()).hexdigest()[:12] if args.batch else args.section
@@ -221,6 +225,8 @@ def main():
     command = [str(ROOT / 'mame/c54xisa'), 'tms54isa', '-video', 'none', '-sound', 'none',
                '-joystickprovider', 'none', '-midiprovider', 'none', '-nothrottle',
                '-noreadconfig', '-seconds_to_run', '1']
+    if args.opcode_coverage:
+        command += ['-log', '-verbose']
     for name in names:
         run_section(command, output, name, counts[name], built-start, args.negative_control,
                     group if args.batch else None)
@@ -231,6 +237,7 @@ def run_section(command, output, name, count, build_seconds, negative=False, gro
         output = ROOT / 'tmp/c54x-section-trial' / name
         output.mkdir(parents=True, exist_ok=True)
     started = time.monotonic()
+    (output / 'error.log').unlink(missing_ok=True)
     env = os.environ.copy()
     env['C54X_TEST_SECTION'] = name
     run = subprocess.run(command, cwd=output, env=env, capture_output=True, text=True, timeout=30)

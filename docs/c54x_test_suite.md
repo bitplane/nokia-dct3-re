@@ -125,6 +125,35 @@ dimensions or dense per-tick polling where ordered bus events establish the
 contract. Deliberate redistribution must leave a concise local explanation;
 closed migration chronology belongs in Git, not a parallel progress table.
 
+## Opcode assertion inventory
+
+The retired default fixture printed an explicit `[opassert]` marker per
+asserted opcode. Its replacement is the set of opcodes the core admits while
+a passing section executes: every case loads its own program and asserts the
+complete final state, so those opcodes are executed under assertion. This is
+weaker than a per-instruction marker; it does not show that each
+instruction's own effect is distinguishable from the rest of its case.
+Rejection, bus and clock sections may pass without admitting any opcode.
+
+```sh
+python3 tools/run_c54x_section.py all --scope all --jobs 8 --opcode-coverage
+python3 tools/c54x_section_opcode_inventory.py tmp/c54x-sections.log --scope cpu
+python3 tools/c54x_opcode_coverage.py FIRMWARE/error.log \
+    --fixture-log tmp/c54x-sections.log [--additional-fixture-log BSP/error.log] \
+    --require-all-asserted
+```
+
+The inventory accepts only a complete suite summary, each section's exact
+PASS line and its own coverage log. Firmware traces come from
+`run_c54x_rom4_pcm_clock.py --coverage` (the `pin_boot` case) and
+`run_nse2_word_contract.py` (`service/error.log`). The backend BSP fixture
+(`run_c54x_backend_bsp.py --coverage`) still prints its explicit
+`[opassert] op=7721`, the clocked boot's `STM #0aaa, BDXR` retry store.
+
+At the 2026-11-11 run (528 sections, 31,588 CPU-scope opcodes) the NSE-2
+service inventory (564 forms) is fully covered by CPU sections, and the
+clocked NSE-1 boot (643 forms) by CPU sections plus that BSP assertion.
+
 ## Firmware boundary
 
 Private ROMs and application ABI assumptions remain outside generic ISA tests.
