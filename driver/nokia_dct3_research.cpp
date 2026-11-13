@@ -276,6 +276,7 @@ void dct3_rf_adc_fixture_state::machine_reset()
 	m_call_rr_sequence=0xff;
 	m_call_release_start_frame=~u64(0);m_call_channel_release_sent=false;
 	m_lu_acknowledged=false;m_release_start_frame=~u64(0);
+	m_tch.stop();m_tch_stop_frame=m_tch_samples_frame=~u64(0);
 	m_normal_count=0;m_contention_active=false;
 	m_page_identity_valid=m_page_pending=false;
 	m_page_identity.fill(0);m_page_phase=m_page_offset=0;
@@ -303,7 +304,7 @@ void dct3_rf_adc_fixture_state::machine_reset()
 	}
 	network.use_single_cell();
 	network.set_cell(0,cell);
-	if (m_raw_agch && (ioport("LAB_BTS")->read()&64))
+	if (m_raw_agch)
 	{
 		// GSM 04.04 7.1: two L1 octets precede the 21-byte SACCH L2 frame.
 		// SI5 reuses the neighbour list; SI6 reuses the cell's CI/LAI/options.
@@ -324,6 +325,9 @@ void dct3_rf_adc_fixture_state::machine_reset()
 				std::copy_n(si3.begin()+3,7,block.begin()+7);
 				block[14]=si3[13];block[15]=0xff;
 			}
+			m_sacch_blocks[kind]=block;
+			// SACCH/4 on the SDCCH is optional; the TS1 SACCH/TF always carries them.
+			if (!(ioport("LAB_BTS")->read()&64)) continue;
 			auto const encoded=nokia_rf_lab::bcch_bits(block,0);
 			for (unsigned at=0;at<4;++at) m_sacch_samples[kind][at]=nokia_rf_lab::gmsk_samples(encoded[at]);
 			std::string packed;for (auto byte:block) packed+=util::string_format("%02x",byte);
@@ -511,7 +515,11 @@ TIMER_CALLBACK_MEMBER(dct3_rf_adc_fixture_state::candidate_transmit_start)
 		machine().logerror("npe3_tx_release: sequence=%u t=%.9f target=%04x counter=%04x words=%s network_reply=0 physical_claim=0\n",
 			++m_transmit_releases,machine().time().as_double(),m_lab_tx_compares[0],
 			subdevice<nokia_dsp_c54x_device>("dsp_c54x")->lab_counter_value(),packed);
-		if (m_raw_agch)
+		u64 const release_tick=machine().time().as_ticks(13'000'000);
+		// The uplink trails the downlink by three timeslots: TS1 releases in the fifth.
+		if (m_raw_agch && m_tch.active() && release_tick%60'000/7'500==4)
+			receive_traffic_uplink(words,release_tick/60'000);
+		else if (m_raw_agch)
 		{
 			// The external BTS sees only serialized bits and their release time.
 			// RA_INFO, private DSP memory and MCU request state are not inputs.
@@ -616,6 +624,7 @@ void dct3_rf_adc_fixture_state::receive_normal_uplink(std::array<u16,15> const &
 		packed.clear();for (auto byte:lapdm) packed+=util::string_format("%02x",byte);
 		machine().logerror("npe3_raw_mo_assignment: ack_start_frame=%u start_frame=%u octets=%s raw_adc_only=1 physical_claim=0\n",
 			unsigned(m_normal_start_frame),unsigned(m_assignment_start_frame),packed);
+		start_traffic_channel(m_assignment_start_frame+4);
 		return;
 	}
 	if ((ioport("LAB_BTS")->read()&16) &&
@@ -685,6 +694,7 @@ void dct3_rf_adc_fixture_state::receive_normal_uplink(std::array<u16,15> const &
 		machine().logerror("npe3_raw_%s: %s_start_frame=%u start_frame=%u octets=%s raw_adc_only=1 physical_claim=0\n",
 			late_assignment ? "late_assignment" : "assignment",late_assignment ? "connect" : "confirmed",
 			unsigned(m_normal_start_frame),unsigned(m_assignment_start_frame),packed);
+		start_traffic_channel(m_assignment_start_frame+4);
 		return;
 	}
 	if (!m_lu_acknowledged && m_lu_start_frame!=~u64(0) &&
@@ -805,6 +815,163 @@ void dct3_rf_adc_fixture_state::receive_normal_uplink(std::array<u16,15> const &
 		machine().logerror("npe3_raw_lu_accept: uplink_start_frame=%u start_frame=%u octets=%s policy=plain_test_cell raw_adc_only=1 physical_claim=0\n",
 			unsigned(m_normal_start_frame),unsigned(m_lu_start_frame),packed);
 	}
+}
+
+void dct3_rf_adc_fixture_state::start_traffic_channel(u64 frame)
+{
+	// Optionally fill every traffic block not stolen for FACCH with speech,
+	// as a BTS does; otherwise the blocks stay empty and decode as BFI. One
+	// tone period is eight samples at 8 kHz, about -12 dBFS.
+	m_tch_codec.reset();
+	m_tch_tone_phase=m_tch_speech_frames=0;
+	bool const speech=ioport("LAB_BTS")->read()&0x800;
+	if (!speech) m_tch.set_speech_source(nullptr);
+	else m_tch.set_speech_source([this] {
+		static constexpr s16 tone[8]={0,5793,8192,5793,0,-5793,-8192,-5793};
+		nokia_gsm_fr_codec::pcm_block pcm{};
+		for (auto &sample:pcm) sample=tone[m_tch_tone_phase++&7];
+		gsm::tch_f::packed_speech_frame frame{};
+		m_tch_codec.encode(pcm,frame);
+		++m_tch_speech_frames;
+		return frame;
+	});
+	// The Assignment Command's Channel Description: TCH/F, TN1, TSC 2.
+	m_tch.start(frame,1,2,m_sacch_blocks);
+	m_facch_send=m_facch_receive=0;
+	m_facch_outstanding.clear();m_facch_t200=~u64(0);
+	m_tch_stop_frame=m_tch_samples_frame=~u64(0);
+	m_tch_speech=m_tch_bad_speech=m_tch_unreadable=0;
+	machine().logerror("npe3_tch_start: first_frame=%u timeslot=1 tsc=2 sacch=si5,si6 speech=%s codec=%s raw_adc_only=1 physical_claim=0\n",
+		unsigned(m_tch.first_frame()),speech ? "tone_1000hz" : "empty",m_tch_codec.available() ? "gsm_06_10" : "unavailable");
+}
+
+void dct3_rf_adc_fixture_state::receive_traffic_uplink(std::array<u16,15> const &words,u64 frame)
+{
+	auto const burst=gsm::normal::decode_p27_traffic(words,2);
+	if (!burst) ++m_tch_unreadable;
+	using kind=nokia_rf_lab::traffic_channel::uplink_kind;
+	for (auto const &event:m_tch.uplink(frame,burst))
+	{
+		if (event.kind==kind::speech) { ++m_tch_speech;continue; }
+		if (event.kind==kind::bad_speech) { ++m_tch_bad_speech;continue; }
+		bool const sacch=gsm::tch_f::full_rate_slot(event.frame,1)==gsm::tch_f::tdma_slot_kind::sacch;
+		std::string packed;
+		for (auto byte:event.octets) packed+=util::string_format("%02x",byte);
+		machine().logerror("npe3_tch_uplink: channel=%s start_frame=%u octets=%s exact_code=%u speech_blocks=%u bad_speech_blocks=%u unreadable_bursts=%u downlink_speech_blocks=%u port_bits_only=1 physical_claim=0\n",
+			sacch ? "sacch" : "facch",unsigned(event.frame),packed,event.kind!=kind::bad_control,
+			m_tch_speech,m_tch_bad_speech,m_tch_unreadable,m_tch_speech_frames);
+		if (event.kind==kind::facch) receive_facch(event.octets,event.frame);
+	}
+}
+
+void dct3_rf_adc_fixture_state::receive_facch(gsm::tch_f::packed_control_block const &block,u64 frame)
+{
+	// GSM 04.06 on the new channel's SAPI0 link, network side.
+	if ((block[0]&0xfd)!=1) return;
+	gsm::tch_f::packed_control_block reply{};
+	reply.fill(0x2b);
+	if ((block[1]==0x3f || block[1]==0x53) && block[2]==1)
+	{
+		// SABM resets both sequence variables; DISC ends the link.
+		bool const disc=block[1]==0x53;
+		if (!disc) m_facch_send=m_facch_receive=0;
+		m_facch_outstanding.clear();m_facch_t200=~u64(0);
+		reply[0]=1;reply[1]=0x73;reply[2]=1;
+		send_facch(disc ? "disc_ua" : "ua",reply,frame);
+		if (disc)
+		{
+			// Two traffic blocks carry the UA; the handset then leaves TS1.
+			m_tch_stop_frame=frame+60;
+			m_contention_active=false;
+		}
+		return;
+	}
+	// Every I and S frame carries N(R), acknowledging network I-frames.
+	acknowledge_facch(block[1]>>5);
+	if (block[1]&1)
+	{
+		// REJ asks for every unacknowledged I-frame again, from N(R).
+		if ((block[1]&0x0f)==0x09) resend_facch("rej",frame);
+		return;
+	}
+	unsigned const length=block[2]>>2;
+	if ((block[2]&3)!=1 || length<2 || length>20) return;
+	// RR is a network response (C/R=0); F echoes the I-frame's P bit.
+	u8 const final=block[1]&0x10;
+	if (((block[1]>>1)&7)!=m_facch_receive)
+	{
+		reply[0]=1;reply[1]=(m_facch_receive<<5)|final|1;reply[2]=1;
+		send_facch("duplicate_rr",reply,frame);
+		return;
+	}
+	m_facch_receive=(m_facch_receive+1)&7;
+	u8 const *const l3=block.data()+3;
+	auto &network=*subdevice<nokia_gsm_network_device>("gsm_network");
+	std::vector<u8> message;
+	char const *kind="rr";
+	if ((l3[0]&15)==3 && (l3[1]&0x3f)==0x07)
+	{
+		auto const ack=network.connect_acknowledge(l3[0]);
+		message.assign(ack.begin(),ack.end());kind="connect_acknowledge";
+	}
+	else if ((l3[0]&15)==3 && (l3[1]&0x3f)==0x25 && (ioport("LAB_BTS")->read()&32))
+	{
+		auto const release=network.call_release(l3[0]);
+		message.assign(release.begin(),release.end());kind="cc_release";
+	}
+	else if ((l3[0]&15)==3 && (l3[1]&0x3f)==0x2a && (ioport("LAB_BTS")->read()&32))
+	{
+		auto const release=network.channel_release();
+		message.assign(release.begin(),release.end());kind="channel_release";
+	}
+	if (message.empty())
+	{
+		reply[0]=1;reply[1]=(m_facch_receive<<5)|final|1;reply[2]=1;
+		send_facch(kind,reply,frame);
+		return;
+	}
+	m_facch_outstanding.push_back({m_facch_send,kind,message});
+	m_facch_send=(m_facch_send+1)&7;
+	send_facch_information(m_facch_outstanding.back(),frame);
+}
+
+void dct3_rf_adc_fixture_state::send_facch_information(facch_information const &information,u64 frame)
+{
+	// An I-frame command (C/R=1) also acknowledges through its N(R).
+	gsm::tch_f::packed_control_block lapdm{};
+	lapdm.fill(0x2b);
+	lapdm[0]=3;lapdm[1]=(m_facch_receive<<5)|(information.sequence<<1);
+	lapdm[2]=(information.layer3.size()<<2)|1;
+	std::copy(information.layer3.begin(),information.layer3.end(),lapdm.begin()+3);
+	send_facch(information.kind,lapdm,frame);
+	// TS 44.006 T200 for FACCH/F is 155 ms; allow for both interleaving delays.
+	m_facch_t200=frame+40;
+}
+
+void dct3_rf_adc_fixture_state::acknowledge_facch(u8 received)
+{
+	// Frames up to N(R)-1 are acknowledged; the window holds at most seven.
+	while (!m_facch_outstanding.empty() && ((received-m_facch_outstanding.front().sequence)&7) &&
+			((received-m_facch_outstanding.front().sequence)&7)<=m_facch_outstanding.size())
+		m_facch_outstanding.erase(m_facch_outstanding.begin());
+	if (m_facch_outstanding.empty()) m_facch_t200=~u64(0);
+}
+
+void dct3_rf_adc_fixture_state::resend_facch(char const *cause,u64 frame)
+{
+	if (m_facch_outstanding.empty()) return;
+	machine().logerror("npe3_tch_facch_recovery: cause=%s frame=%u outstanding=%u first_sequence=%u physical_claim=0\n",
+		cause,unsigned(frame),unsigned(m_facch_outstanding.size()),unsigned(m_facch_outstanding.front().sequence));
+	for (auto const &information:m_facch_outstanding) send_facch_information(information,frame);
+}
+
+void dct3_rf_adc_fixture_state::send_facch(char const *kind,gsm::tch_f::packed_control_block const &lapdm,u64 frame)
+{
+	m_tch.send_facch(lapdm);
+	std::string packed;
+	for (auto byte:lapdm) packed+=util::string_format("%02x",byte);
+	machine().logerror("npe3_tch_facch: kind=%s uplink_start_frame=%u octets=%s raw_adc_only=1 physical_claim=0\n",
+		kind,unsigned(frame),packed);
 }
 
 TIMER_CALLBACK_MEMBER(dct3_rf_adc_fixture_state::candidate_receive_start)
@@ -942,6 +1109,21 @@ u16 dct3_rf_adc_fixture_state::sample_r(offs_t component)
 		}
 		auto const &sample = m_sch_cache[(tick % 60'000) / 12];
 		m_q_latch = sample[1];
+		return u16(sample[0]);
+	}
+	if (m_tch.active() && frame>=m_tch_stop_frame) m_tch.stop();
+	if (m_tch.active() && tick%60'000>=7'500 && tick%60'000<7'500+148*48)
+	{
+		// TS1 carries the dummy burst in its idle frame, as on any BCCH carrier.
+		if (frame!=m_tch_samples_frame)
+		{
+			m_tch_samples_frame=frame;
+			if (frame>=m_facch_t200) resend_facch("t200",frame);
+			auto const bits=m_tch.downlink(frame);
+			m_tch_samples=bits ? nokia_rf_lab::gmsk_samples(*bits) : m_dummy_samples;
+		}
+		auto const &sample=m_tch_samples[(tick%60'000-7'500)/12];
+		m_q_latch=sample[1];
 		return u16(sample[0]);
 	}
 	unsigned const offset=tick%60'000%7'500;

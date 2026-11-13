@@ -9,7 +9,8 @@
 namespace gsm::normal {
 
 // Observed native serializer lane,not an RF demodulator or FIFO-size claim.
-inline std::optional<tch_f::burst_payload> decode_p27(
+// The stealing flags are returned as transmitted: clear on TCH speech.
+inline std::optional<tch_f::burst_payload> decode_p27_traffic(
 		std::array<std::uint16_t,15> const &words,unsigned tsc)
 {
 	if (tsc>7) return std::nullopt;
@@ -25,11 +26,28 @@ inline std::optional<tch_f::burst_payload> decode_p27(
 		for (unsigned bit=0;bit<26;++bit) same&=bits[at+61+bit]==training[bit];
 		if (same) { start=at;++matches; }
 	}
-	if (matches!=1 || bits[start+60]!=1 || bits[start+87]!=1) return std::nullopt;
+	if (matches!=1) return std::nullopt;
 	tch_f::burst_payload result{};
 	std::copy_n(bits.begin()+start+3,57,result.data.begin());
 	std::copy_n(bits.begin()+start+88,57,result.data.begin()+57);
-	result.hl=result.hu=1;
+	result.hl=bits[start+60];result.hu=bits[start+87];
+	return result;
+}
+
+// Dedicated control channels (SDCCH, SACCH) always set both stealing flags.
+inline std::optional<tch_f::burst_payload> decode_p27(
+		std::array<std::uint16_t,15> const &words,unsigned tsc)
+{
+	auto const result=decode_p27_traffic(words,tsc);
+	if (!result || !result->hl || !result->hu) return std::nullopt;
+	return result;
+}
+
+// Air-interface octets are LSB first, as decode_control below returns them.
+inline tch_f::packed_control_block control_octets(tch_f::control_bits const &bits)
+{
+	tch_f::packed_control_block result{};
+	for (unsigned bit=0;bit<184;++bit) result[bit/8]|=bits[bit]<<(bit%8);
 	return result;
 }
 
@@ -40,11 +58,9 @@ inline std::optional<tch_f::packed_control_block> decode_control(
 	// The laboratory bit endpoint is noiseless: never hide a malformed native
 	// transmission behind the channel decoder's error correction.
 	if (!decoded.good || decoded.corrected_bits) return std::nullopt;
-	// Air-interface octets are LSB first. The older traffic helper's
-	// pack_control convention is MSB first and is not this port adapter's ABI.
-	tch_f::packed_control_block result{};
-	for (unsigned bit=0;bit<184;++bit) result[bit/8]|=decoded.bits[bit]<<(bit%8);
-	return result;
+	// The older traffic helper's pack_control convention is MSB first and
+	// is not this port adapter's ABI.
+	return control_octets(decoded.bits);
 }
 
 // TS44.006 8.4.1.4: SAPI0 contention resolution returns the SABM information

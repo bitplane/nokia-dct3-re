@@ -1862,6 +1862,9 @@ static INPUT_PORTS_START( dct3_lab_bts )
 	PORT_CONFNAME(0x400, 0x00, "Laboratory BTS uniquely identified paging blocks")
 	PORT_CONFSETTING(0x000, DEF_STR( Off ))
 	PORT_CONFSETTING(0x400, DEF_STR( On ))
+	PORT_CONFNAME(0x800, 0x00, "Laboratory BTS traffic-channel speech (1 kHz tone)")
+	PORT_CONFSETTING(0x000, DEF_STR( Off ))
+	PORT_CONFSETTING(0x800, DEF_STR( On ))
 INPUT_PORTS_END
 
 static INPUT_PORTS_START( npe3_raw_bts )

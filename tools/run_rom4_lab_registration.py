@@ -12,7 +12,7 @@ if __package__ in (None, ''):
 from tools.make_5110_eeprom_profile import build_profile
 from tools.process_runner import run_emulator
 from tools.rom4_lab_registration_check import (NSE1_LCD_SHA256, check, check_incoming_call, check_lcd,
-                                              check_lcd_sequence)
+                                              check_lcd_sequence, check_traffic_call)
 from tools.run_nse2_native import prepare_native
 
 HEADLESS = ['-noreadconfig', '-midiprovider', 'none', '-keyboardprovider', 'none',
@@ -21,6 +21,8 @@ HEADLESS = ['-noreadconfig', '-midiprovider', 'none', '-keyboardprovider', 'none
 # Laboratory BTS options: incoming SETUP, RR acknowledgement of call control,
 # network clearing, and SACCH.
 CALL_BTS_BITS = (4, 16, 32, 64)
+# The same call moved to TCH/F on timeslot 1 after CALL CONFIRMED.
+TRAFFIC_BTS_BITS = (4, 8, 16, 32, 64)
 # The page follows Location Updating; Answer and End are physical left-softkey presses.
 CALL_INPUTS = {'NPE3_NATIVE_PAGE_AT': '20', 'NOKIA_DCT3_POST_READY_KEYS': 'menu,menu',
                'NOKIA_DCT3_POST_READY_KEY_DELAY_MS': '23000', 'NOKIA_DCT3_POST_READY_KEY_DURATION_MS': '220',
@@ -37,7 +39,7 @@ def write_bts_config(run, machine, bits):
         '</input></system></mameconfig>\n')
 
 
-def command(root, run, machine, mame, call=False):
+def command(root, run, machine, mame, call=False, traffic=False):
     if machine == 'nse1ap5':
         nvram = run / 'nvram/nse1ap5'
         nvram.mkdir(parents=True)
@@ -46,7 +48,7 @@ def command(root, run, machine, mame, call=False):
             (root / 'roms/noki5110/nse-1.bin').read_bytes(),
             (root / 'roms/noki5110/5110f530.fls').read_bytes()))
         if call:
-            write_bts_config(run, machine, CALL_BTS_BITS)
+            write_bts_config(run, machine, TRAFFIC_BTS_BITS if traffic else CALL_BTS_BITS)
             os.environ.update(CALL_INPUTS)
         # The staged menu script adds the LCD mirror and the staged-CPU end marker.
         script = root / ('tools/rom4_lab_call_input.lua' if call else 'tools/c54x_rom4_staged_menu.lua')
@@ -66,7 +68,10 @@ def main():
     parser.add_argument('--mame', type=Path)
     parser.add_argument('--incoming-call', action='store_true',
                         help='page after registration, answer, then end the call (nse1ap5)')
+    parser.add_argument('--traffic-channel', action='store_true',
+                        help='the incoming call, assigned to TCH/F on timeslot 1 (nse1ap5)')
     args = parser.parse_args()
+    args.incoming_call |= args.traffic_channel
     if args.incoming_call and args.machine != 'nse1ap5':
         parser.error('the incoming-call scenario is defined for nse1ap5')
     root = Path(__file__).resolve().parents[1]
@@ -75,7 +80,8 @@ def main():
     run = Path(tempfile.mkdtemp(prefix=f'{args.machine}-registration.', dir=scratch))
     os.rmdir(run)  # prepare_native requires a new directory
     try:
-        cmd = command(root, run, args.machine, (args.mame or root / 'mame/mame').resolve(), args.incoming_call)
+        cmd = command(root, run, args.machine, (args.mame or root / 'mame/mame').resolve(), args.incoming_call,
+                      args.traffic_channel)
         run.mkdir(exist_ok=True)
         os.environ['NOKIA_DCT3_SNAPSHOT_DIR'] = str(run / 'snap')
         with open(run / 'console.log', 'wb') as output:
@@ -86,7 +92,7 @@ def main():
         if args.incoming_call:
             page = text.find('npe3_bts_page_request:')
             result = check(text[:page] if page >= 0 else text)
-            result.update(check_incoming_call(text))
+            result.update(check_traffic_call(text) if args.traffic_channel else check_incoming_call(text))
             check_lcd_sequence(run / 'snap', (RINGING_LCD_SHA256, CALL_LCD_SHA256), NSE1_LCD_SHA256)
         else:
             result = check(text)
@@ -98,7 +104,8 @@ def main():
     except Exception as error:
         raise SystemExit(f'FAIL - {error}; evidence retained: {run}')
     print(' '.join(f'{key}={value}' for key, value in result.items()))
-    scenario = 'incoming call' if args.incoming_call else 'Location Updating'
+    scenario = ('traffic-channel call' if args.traffic_channel else
+                'incoming call' if args.incoming_call else 'Location Updating')
     print(f'NSE ROM4 {args.machine} native laboratory {scenario}: PASS')
     shutil.rmtree(run)
 

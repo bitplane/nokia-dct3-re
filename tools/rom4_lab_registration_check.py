@@ -136,3 +136,61 @@ def check_lcd(directory, expected):
     digest = hashlib.sha256(frames[-1].read_bytes()).hexdigest()
     if digest != expected:
         raise ValueError(f'final LCD differs from the registered idle frame: {digest}')
+
+
+TCH_START = re.compile(r'npe3_tch_start: first_frame=(\d+) timeslot=1 tsc=2 ')
+TCH_UPLINK = re.compile(r'npe3_tch_uplink: channel=(facch|sacch) start_frame=(\d+) octets=([0-9a-f]{46}) exact_code=(\d)')
+TCH_REPLY = re.compile(r'npe3_tch_facch: kind=(\w+) uplink_start_frame=(\d+) ')
+TCH_ASSIGNMENT = re.compile(r'npe3_raw_assignment: confirmed_start_frame=(\d+) start_frame=(\d+) ')
+# FACCH uplink in order: link establishment, RR Assignment Complete, then call
+# control on the new channel and its clearing (GSM 04.08 9.1.3, table 9.54).
+TCH_MESSAGES = (('sabm', lambda block: block[:3] == b'\x01\x3f\x01'),
+                ('assignment_complete', lambda block: block[3:5] == b'\x06\x29'),
+                ('alerting', lambda block: block[3] == 0x83 and block[4] & 0x3f == 0x01),
+                ('connect', lambda block: block[3] == 0x83 and block[4] & 0x3f == 0x07),
+                ('disconnect', lambda block: block[3] == 0x83 and block[4] & 0x3f == 0x25),
+                ('release_complete', lambda block: block[3] == 0x83 and block[4] & 0x3f == 0x2a),
+                ('disc', lambda block: block[:3] == b'\x01\x53\x01'))
+# Each network FACCH reply and the uplink message it answers.
+TCH_BINDINGS = (('ua', 'sabm'), ('connect_acknowledge', 'connect'), ('cc_release', 'disconnect'),
+                ('channel_release', 'release_complete'), ('disc_ua', 'disc'))
+
+
+def check_traffic_call(text):
+    """Check the call after CALL CONFIRMED moves to TCH/F on timeslot 1."""
+    assignment = TCH_ASSIGNMENT.findall(text)
+    if len(assignment) != 1:
+        raise ValueError('missing unique Assignment Command')
+    text = text[text.find('npe3_raw_assignment:'):]
+    if FAULT.search(text) or 'native_dsp_reset_line:' in text:
+        raise ValueError('native run reset or faulted on the traffic channel')
+    start = TCH_START.findall(text)
+    if len(start) != 1 or int(start[0]) < int(assignment[0][1]) + 4:
+        raise ValueError('traffic channel did not start after the Assignment Command')
+    uplinks = [(kind, int(frame), bytes.fromhex(octets), code == '1')
+               for kind, frame, octets, code in TCH_UPLINK.findall(text)]
+    facch = [(frame, block) for kind, frame, block, exact in uplinks if kind == 'facch']
+    if len(facch) != sum(exact for kind, _, _, exact in uplinks if kind == 'facch'):
+        raise ValueError('FACCH uplink block without an exact convolutional decode')
+    reports = [frame for kind, frame, block, exact in uplinks
+               if kind == 'sacch' and exact and block[5:7] == b'\x06\x15']
+    if len(reports) < 4:
+        raise ValueError('too few SACCH Measurement Reports decoded on the traffic channel')
+    frames = {}
+    for frame, block in facch:
+        for name, match in TCH_MESSAGES:
+            if match(block):
+                frames.setdefault(name, frame)
+    if list(frames) != [name for name, _ in TCH_MESSAGES]:
+        raise ValueError(f'traffic-channel messages missing or out of order: {list(frames)}')
+    replies = {}
+    for kind, source in TCH_REPLY.findall(text):
+        replies.setdefault(kind, int(source))
+    for kind, message in TCH_BINDINGS:
+        if replies.get(kind) != frames[message]:
+            raise ValueError(f'{kind} is not bound to the first {message}')
+    if int(start[0]) > frames['sabm']:
+        raise ValueError('FACCH uplink precedes the traffic channel')
+    return dict(tch_first_frame=int(start[0]), **{f'tch_{name}_frame': frame for name, frame in frames.items()},
+                measurement_reports=len(reports),
+                facch_retransmissions=text.count('npe3_tch_facch_recovery:'))

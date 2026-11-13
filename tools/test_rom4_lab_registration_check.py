@@ -1,6 +1,6 @@
 import unittest
 
-from tools.rom4_lab_registration_check import check, check_incoming_call
+from tools.rom4_lab_registration_check import check, check_incoming_call, check_traffic_call
 
 # Dialogue lines from a native nse1ap5 run (frames 3028-3337).
 LOG = '''native_dsp_reset_line: released=1
@@ -40,6 +40,39 @@ npe3_raw_call_channel_release: complete_start_frame=6055 start_frame=6091 octets
 npe3_bts_uplink: start_frame=6106 octets=0361012b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b exact_code=1 port_bits_only=1 physical_claim=0
 npe3_bts_uplink: start_frame=6157 octets=0153012b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b exact_code=1 port_bits_only=1 physical_claim=0
 npe3_raw_disc_ua: disc_start_frame=6157 start_frame=6193 octets=0173012b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b raw_adc_only=1 physical_claim=0
+'''
+
+# The same call assigned to TCH/F timeslot 1 (FACCH/SACCH lines only).
+TRAFFIC = '''npe3_raw_assignment: confirmed_start_frame=4678 start_frame=4714 octets=032221062e0940230063012b2b2b2b2b2b2b2b2b2b2b2b
+npe3_tch_start: first_frame=4719 timeslot=1 tsc=2 sacch=si5,si6 speech=empty codec=gsm_06_10
+npe3_tch_uplink: channel=facch start_frame=4732 octets=013f012b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b exact_code=1
+npe3_tch_facch: kind=ua uplink_start_frame=4732 octets=0173012b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b
+npe3_tch_uplink: channel=facch start_frame=4771 octets=013f012b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b exact_code=1
+npe3_tch_facch: kind=ua uplink_start_frame=4771 octets=0173012b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b
+npe3_tch_uplink: channel=facch start_frame=4792 octets=01000d0629002b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b exact_code=1
+npe3_tch_facch: kind=rr uplink_start_frame=4792 octets=0121012b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b
+npe3_tch_uplink: channel=facch start_frame=4827 octets=01100d0629002b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b exact_code=1
+npe3_tch_facch: kind=duplicate_rr uplink_start_frame=4827 octets=0131012b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b
+npe3_tch_uplink: channel=facch start_frame=4844 octets=01020983412b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b exact_code=1
+npe3_tch_facch: kind=rr uplink_start_frame=4844 octets=0141012b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b
+npe3_tch_uplink: channel=sacch start_frame=4809 octets=050001034906153f3f7fc0000000000000000000000000 exact_code=1
+npe3_tch_uplink: channel=sacch start_frame=4913 octets=050001034906157f3f6bc0000000000000000000000000 exact_code=1
+npe3_tch_uplink: channel=facch start_frame=5000 octets=01040983072b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b exact_code=1
+npe3_tch_facch: kind=connect_acknowledge uplink_start_frame=5000 octets=036009030f2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b
+npe3_tch_uplink: channel=facch start_frame=5039 octets=01140983072b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b exact_code=1
+npe3_tch_facch: kind=duplicate_rr uplink_start_frame=5039 octets=0171012b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b
+npe3_tch_uplink: channel=sacch start_frame=5017 octets=050001034906157f3f7fc0000000000000000000000000 exact_code=1
+npe3_tch_uplink: channel=facch start_frame=5091 octets=0321012b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b exact_code=1
+npe3_tch_uplink: channel=sacch start_frame=5121 octets=050001034906157f3f7bc0000000000000000000000000 exact_code=1
+npe3_tch_uplink: channel=sacch start_frame=5225 octets=050001034906157f3f7fc0000000000000000000000000 exact_code=1
+npe3_tch_uplink: channel=facch start_frame=5915 octets=012615836502e0902b2b2b2b2b2b2b2b2b2b2b2b2b2b2b exact_code=1
+npe3_tch_facch: kind=cc_release uplink_start_frame=5915 octets=038209032d2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b
+npe3_tch_uplink: channel=facch start_frame=5936 octets=014809832a2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b exact_code=1
+npe3_tch_facch: kind=channel_release uplink_start_frame=5936 octets=03a40d060d002b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b
+npe3_tch_uplink: channel=facch start_frame=5971 octets=015809832a2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b exact_code=1
+npe3_tch_facch: kind=duplicate_rr uplink_start_frame=5971 octets=01b1012b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b
+npe3_tch_uplink: channel=facch start_frame=5988 octets=0153012b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b exact_code=1
+npe3_tch_facch: kind=disc_ua uplink_start_frame=5988 octets=0173012b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b
 '''
 
 
@@ -85,6 +118,29 @@ class LabRegistrationCheckTest(unittest.TestCase):
                 check_incoming_call(LOG + CALL.replace(old, new, 1))
         with self.assertRaises(ValueError):
             check_incoming_call(LOG + CALL + 'native_dsp_reset_line: released=0\n')
+
+
+    def test_traffic_call_passes(self):
+        result = check_traffic_call(TRAFFIC)
+        self.assertEqual((result['tch_sabm_frame'], result['tch_connect_frame'], result['tch_disc_frame']),
+                         (4732, 5000, 5988))
+        self.assertEqual(result['measurement_reports'], 5)
+
+    def test_traffic_call_steps_are_required(self):
+        for old, new in (
+                ('first_frame=4719', 'first_frame=4716'),  # before the Assignment Command ends
+                ('0d0629002b', '0d0628002b'),  # no Assignment Complete, nor its retransmission
+                ('kind=connect_acknowledge uplink_start_frame=5000', 'kind=connect_acknowledge uplink_start_frame=5039'),
+                ('kind=cc_release', 'kind=rr'),
+                ('start_frame=5936 octets=014809832a', 'start_frame=5936 octets=014809832b'),
+                ('channel=facch start_frame=5988 octets=0153012b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b exact_code=1',
+                 'channel=facch start_frame=5988 octets=0153012b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b exact_code=0'),
+                ('channel=sacch start_frame=5', 'channel=sacch start_frame=x'),  # two reports left
+        ):
+            with self.subTest(old=old), self.assertRaises(ValueError):
+                check_traffic_call(TRAFFIC.replace(old, new))
+        with self.assertRaises(ValueError):
+            check_traffic_call(TRAFFIC + 'native_dsp_reset_line: released=0\n')
 
 
 if __name__ == '__main__':

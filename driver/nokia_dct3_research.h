@@ -6,6 +6,8 @@
 
 #include "nokia_dct3_state.h"
 #include "nokia_rf_lab_tx.h"
+#include "nokia_rf_lab_tch.h"
+#include "nokia_gsm_fr_codec.h"
 
 namespace nokia_dct3 {
 
@@ -93,6 +95,14 @@ private:
 	TIMER_CALLBACK_MEMBER(candidate_transmit_start);
 	void arm_transmit_candidate();
 	void receive_normal_uplink(std::array<u16,15> const &words,u64 frame);
+	void start_traffic_channel(u64 frame);
+	void receive_traffic_uplink(std::array<u16,15> const &words,u64 frame);
+	void receive_facch(gsm::tch_f::packed_control_block const &block,u64 frame);
+	void send_facch(char const *kind,gsm::tch_f::packed_control_block const &lapdm,u64 frame);
+	struct facch_information { u8 sequence; char const *kind; std::vector<u8> layer3; };
+	void send_facch_information(facch_information const &information,u64 frame);
+	void acknowledge_facch(u8 received);
+	void resend_facch(char const *cause,u64 frame);
 	emu_timer *m_candidate_timer=nullptr;
 	emu_timer *m_transmit_timer=nullptr;
 	bool m_p05_transmit=false, m_transmit_compare_written=false;
@@ -122,6 +132,19 @@ private:
 	bool m_call_channel_release_sent=false;
 	std::array<std::array<std::array<std::array<s16,2>,148*4>,4>,2> m_sacch_samples{};
 	bool m_lu_acknowledged=false;
+	// TCH/F on TS1 after the Assignment Command, with the network side of
+	// its FACCH LAPDm link (V(S), V(R)). Not saved: a diagnostic lab channel.
+	std::array<gsm::tch_f::packed_control_block,2> m_sacch_blocks{};
+	nokia_rf_lab::traffic_channel m_tch;
+	u8 m_facch_send=0,m_facch_receive=0;
+	std::vector<facch_information> m_facch_outstanding;
+	u64 m_facch_t200=~u64(0);
+	u64 m_tch_stop_frame=~u64(0),m_tch_samples_frame=~u64(0);
+	std::array<std::array<s16,2>,148*4> m_tch_samples{};
+	// Downlink speech: a continuous 1 kHz tone, GSM 06.10-encoded per block.
+	nokia_gsm_fr_codec m_tch_codec;
+	unsigned m_tch_tone_phase=0,m_tch_speech_frames=0;
+	unsigned m_tch_speech=0,m_tch_bad_speech=0,m_tch_unreadable=0;
 	u64 m_release_start_frame=~u64(0);
 	std::array<std::array<std::array<s16,2>,148*4>,4> m_release_samples{};
 	// Default fill and separate diagnostic pages for unassigned TMSIs.

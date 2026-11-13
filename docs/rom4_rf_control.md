@@ -918,18 +918,88 @@ binding and order and the ringing, connected and idle LCD frames. The run is
 deterministic.
 
 The whole call stays on SDCCH; the lab does not send CONNECT ACKNOWLEDGE.
+
+### Traffic channel
+
 With traffic assignment (bit 8) the BTS sends an Assignment Command to TCH/F
-on timeslot 1 after CALL CONFIRMED. An earlier note blamed the lab for the
-DSP falling silent 0.08 s later. The real cause was the staged core: its
-traffic-channel code stopped on a repeated `ABDST` (`e3e0` at `abb3`), then
-on nine further unadmitted forms. They are now admitted with their own
-sections ([ROM4 traffic-channel forms](c54x_execution_contracts.md#rom4-traffic-channel-forms)),
-and a 36-second run has no core stop. The handset then releases a transmit
-window every TDMA frame until 24.29 s, about 2.5 s after the assignment. It
-hears nothing more, abandons the call and shows `Missed 1: 5551234`. The lab
-captures, releases and synthesises only timeslot 0. A traffic channel needs a
-timeslot-1 downlink in the sample source (TCH/FACCH/SACCH bursts from
-`gsm_tch_f_l1`) and release and decode of the handset's timeslot-1 uplink.
+on timeslot 1 (TSC 2) after CALL CONFIRMED and serves that channel:
+
+- **Downlink.** `nokia_rf_lab::traffic_channel` (`nokia_rf_lab_tch.h`) fills
+  timeslot 1 from frame 4719, the first block boundary after the command.
+  TS 45.002 table 1 puts timeslot 1's SACCH in frame 25 of each 26-frame
+  multiframe and its idle frame in 12. The SACCH alternates SI5 and SI6 per
+  104-frame block. FACCH blocks steal traffic blocks through the diagonal
+  interleaver. The idle frame carries the dummy burst.
+- **Uplink.** A release in the fifth timeslot of a frame is timeslot 1's
+  uplink. `decode_p27_traffic` keeps the stealing flags, which are clear on
+  speech. The SDCCH path, `decode_p27`, still requires both flags.
+- **FACCH link.** The lab is the network side of LAPDm:
+  - SABM → UA.
+  - Each I-frame is acknowledged by an RR response (C/R 0, F echoing P), or
+    by the network I-frame it causes: CONNECT → CONNECT ACKNOWLEDGE,
+    DISCONNECT → RELEASE, RELEASE COMPLETE → Channel Release.
+  - DISC → UA.
+  - Unacknowledged network I-frames are resent after 40 frames (T200) or on
+    REJ.
+
+`make verify-5110-lab-traffic-call` (`run_rom4_lab_registration.py nse1ap5
+--traffic-channel`) runs the paged call with bits 4, 8, 16, 32 and 64:
+
+| Frame | Direction | Content |
+| --- | --- | --- |
+| 4714 | downlink (SDCCH) | Assignment Command, TCH/F timeslot 1 |
+| 4732 | uplink (FACCH) | SABM; the lab answers UA |
+| 4792 | uplink (FACCH) | RR ASSIGNMENT COMPLETE |
+| 4844 | uplink (FACCH) | ALERTING; the LCD shows `5551234 calling` |
+| 5000 | uplink (FACCH) | CONNECT after Answer at 23 s; CONNECT ACKNOWLEDGE; LCD `Call 1` |
+| 5915 | uplink (FACCH) | DISCONNECT after End; the lab sends RELEASE |
+| 5936 | uplink (FACCH) | RELEASE COMPLETE; the lab sends Channel Release |
+| 5988 | uplink (FACCH) | DISC; the lab answers UA |
+
+Twelve SACCH Measurement Reports decode exactly on the way. The phone then
+returns to the `DCT3 LAB` idle frame and camps on timeslot 0 again. The gate
+binds each network reply to the first uplink it answers. It also requires
+every FACCH uplink to decode exactly, and at least four Measurement Reports.
+
+Two earlier stops were in the emulation, not the lab:
+
+- **Staged core.** The DSP first fell silent 0.08 s after the command on a
+  repeated `ABDST` (`e3e0` at `abb3`), then on nine further unadmitted
+  forms. They are now admitted with their own sections
+  ([ROM4 traffic-channel forms](c54x_execution_contracts.md#rom4-traffic-channel-forms)).
+- **In-service mask.** Once the lab served timeslot 1, the call connected
+  and then dropped to idle 0.1 s later. At call connect the MCU writes a
+  parameter (`4aee`) to shared word `0aa`. The model had projected the DSP's
+  port-2 in-service mask onto that same word, so the parameter masked the
+  slot-compare request (bit 3). INT2 never fired, the frame-compare chain
+  stopped, and the DSP sat idle at `408d` while the MCU fell back to idle.
+  With the headset inputs the MCU writes `11be`, which also masks the
+  transfer request, and the stop came before CONNECT. Request gating and
+  port-2 reads now use the DSP's own register (`m_service_mask`), which only
+  port 2 writes. Port-2 writes still also appear in shared `0855`, because the
+  boot code reads that word: dropping the projection changes the boot BSP
+  echo (`check-c54x-rom4-coherent`). The MCU never reads `0aa`.
+  `check-c54x-backend-requests` checks that an MCU parameter in shared `0855`
+  no longer masks a request.
+
+Open:
+
+- **Lost receive windows.** About half the downlink FACCH blocks are lost:
+  the DSP posts a failed block, or none. In about 30 % of timeslot-1 receive
+  windows the DSP's port-4 transfer queue has moved the synthesizer to its
+  neighbour-monitor word (ARFCN 0, an empty BA slot) and has not queued the
+  return to 35 (`0fb4`). The lab therefore delivers silence for that window.
+  Latching the channel when the transfer is shifted out, instead of when
+  port 32 is written, makes no difference, so the missing retune comes from
+  the DSP's schedule. LAPDm recovery covers the losses; three
+  retransmissions in this run. The phone's own Measurement Reports agree,
+  with RXQUAL-FULL 5–7.
+- **Speech.** With bit `0x800` the lab fills every traffic block not stolen
+  for FACCH with a GSM 06.10 1 kHz tone. The erased windows then turn speech
+  into false FACCH detections, and the call does not complete, so speech is
+  opt-in. The phone's uplink speech blocks are counted but not decoded to
+  audio.
+- **Save states.** The lab's traffic channel is not saved.
 
 ### Tuned laboratory carrier
 
