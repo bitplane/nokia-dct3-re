@@ -332,7 +332,9 @@ void dct3_rf_adc_fixture_state::machine_reset()
 			{
 				block[4]=0x2d;block[6]=0x1e;
 				std::copy_n(si3.begin()+3,7,block.begin()+7);
-				block[14]=si3[13];block[15]=0xff;
+				// Cell options as SI3, but uplink DTX "shall not be used" (TS 44.018
+				// 10.5.2.3: DTX 10), so the handset sends speech in every block.
+				block[14]=(si3[13]&~0x30)|0x20;block[15]=0xff;
 			}
 			m_sacch_blocks[kind]=block;
 			// SACCH/4 on the SDCCH is optional; the TS1 SACCH/TF always carries them.

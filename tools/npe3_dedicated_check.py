@@ -17,7 +17,7 @@ def check_sacch(text,ms_power_level):
         expected.append(bytes.fromhex(rows[0]))
     si2,si3=expected
     blocks=[bytes([ms_power_level,0,3,3,0x49,6,0x1d])+si2[3:19],
-            bytes([ms_power_level,0,3,3,0x2d,6,0x1e])+si3[3:10]+bytes([si3[13],0xff])+b'\x2b'*7]
+            bytes([ms_power_level,0,3,3,0x2d,6,0x1e])+si3[3:10]+bytes([(si3[13]&~0x30)|0x20,0xff])+b'\x2b'*7]
     pattern=re.compile(r'npe3_bts_sacch: index=([01]) starts=42 period=102 octets=([0-9a-f]{46}) tsc=0 raw_adc_only=1 physical_claim=0')
     rows=list(pattern.finditer(text))
     if (len(rows)!=2 or len(rows)!=text.count('npe3_bts_sacch:') or

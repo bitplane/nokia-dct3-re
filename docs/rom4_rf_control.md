@@ -1018,6 +1018,11 @@ Five problems were in the emulation, not the lab:
   ([READA RAM bypass](c54x_execution_contracts.md#rom4-speech-path-forms)).
   Every receive window is now on 35 and no FACCH block is resent before
   clearing.
+- **Uplink DTX.** The lab's SI6 copied SI3's cell options, which allow
+  uplink DTX, so with a silent microphone the handset sent mostly non-speech
+  blocks (37 good, 256 failing CRC). SI6 now says DTX "shall not be used"
+  (TS 44.018 10.5.2.3, DTX `10`); without lab speech the uplink then
+  carries 274 good speech blocks and 4 bad.
 - **Earpiece level (a lab artefact).** The earpiece first carried the tone
   at about 5 for an 8192 input. The decoder (`8458`, from `9ce2`) received
   the lab's exact parameters, its history (`1100..118a`) was untouched
@@ -1041,8 +1046,6 @@ Five problems were in the emulation, not the lab:
 
 Open:
 
-- **Uplink DTX.** SI6 allows uplink DTX; with a silent microphone most
-  uplink speech blocks are not valid speech. The gate drives the microphone.
 - **FACCH loss with speech.** Before the encoder restart one Channel
   Release was resent after T200 in the speech run. It has not recurred
   since (no resends); the cause was not traced.

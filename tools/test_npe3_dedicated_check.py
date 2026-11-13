@@ -9,7 +9,7 @@ class DedicatedSubmissionTest(unittest.TestCase):
         si2=bytes([0x59,6,0x1a])+bytes(20)
         si3=bytearray(23);si3[:3]=bytes([0x49,6,0x1b]);si3[3:10]=bytes.fromhex('000100f1100001')
         blocks=[bytes.fromhex('0500030349061d')+bytes(16),
-                bytes.fromhex('050003032d061e000100f110000100ff')+b'\x2b'*7]
+                bytes.fromhex('050003032d061e000100f110000120ff')+b'\x2b'*7]
         text=(f'rf_adc_broadcast_si: index=1 arfcn=35 octets={si2.hex()} physical_claim=0\n'
               f'rf_adc_broadcast_si: index=2 arfcn=35 octets={si3.hex()} physical_claim=0\n')
         text+='\n'.join(f'npe3_bts_sacch: index={i} starts=42 period=102 octets={b.hex()} tsc=0 raw_adc_only=1 physical_claim=0'
