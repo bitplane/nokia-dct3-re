@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Run native ROM4 Location Updating on a laboratory BTS machine and check it."""
 import argparse
+import json
 import os
 import shutil
 from pathlib import Path
@@ -11,8 +12,9 @@ if __package__ in (None, ''):
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from tools.make_5110_eeprom_profile import build_profile
 from tools.process_runner import run_emulator
-from tools.rom4_lab_registration_check import (NSE1_LCD_SHA256, check, check_incoming_call, check_lcd,
-                                              check_lcd_sequence, check_roundtrip, check_traffic_call)
+from tools.lab_host_call_client import HostCallClient
+from tools.rom4_lab_registration_check import (NSE1_LCD_SHA256, check, check_host_call, check_incoming_call,
+                                              check_lcd, check_lcd_sequence, check_roundtrip, check_traffic_call)
 from tools.run_nse2_native import prepare_native
 
 HEADLESS = ['-noreadconfig', '-midiprovider', 'none', '-keyboardprovider', 'none',
@@ -42,7 +44,7 @@ def write_bts_config(run, machine, bits):
         '</input></system></mameconfig>\n')
 
 
-def command(root, run, machine, mame, call=False, traffic=False, roundtrip=None):
+def command(root, run, machine, mame, call=False, traffic=False, roundtrip=None, http_port=None):
     if machine == 'nse1ap5':
         nvram = run / 'nvram/nse1ap5'
         nvram.mkdir(parents=True)
@@ -77,12 +79,19 @@ def command(root, run, machine, mame, call=False, traffic=False, roundtrip=None)
             else:
                 raise ValueError('the round trip must fall in ringing, the connected call or clearing')
             os.environ.update(keys)
+        extra = []
+        if http_port is not None:
+            # The host places the call: no scripted page, and the host hangs
+            # up, so only Answer is pressed.
+            os.environ.pop('NPE3_NATIVE_PAGE_AT', None)
+            os.environ['NOKIA_DCT3_POST_READY_KEYS'] = 'menu'
+            extra = ['-http', '-http_port', str(http_port)]
         # The staged menu script adds the LCD mirror and the staged-CPU end marker.
         script = root / ('tools/rom4_lab_call_restore.lua' if roundtrip is not None else
                          'tools/rom4_lab_call_input.lua' if call else 'tools/c54x_rom4_staged_menu.lua')
         return [str(mame), machine, '-rompath', str(root / 'mame/roms'), '-nvram_directory', str(run / 'nvram'),
                 '-cfg_directory', str(run / 'cfg'), '-seconds_to_run', '36' if call else '22', *HEADLESS,
-                '-autoboot_script', str(script)]
+                *extra, '-autoboot_script', str(script)]
     # The 5110i runs past its former 62-second reason-68 reset.
     prepare_native(root, run, record_checksum=True, nominal_vbat=True, insert_sim=True,
                    phone_retry_zero=True, security_records=True, lab=True)
@@ -100,9 +109,11 @@ def main():
                         help='the incoming call, assigned to TCH/F on timeslot 1 (nse1ap5)')
     parser.add_argument('--state-roundtrip', type=float, metavar='SECONDS',
                         help='save, replay and reload the traffic-channel call at this time (nse1ap5)')
+    parser.add_argument('--host-call', type=int, metavar='HTTP_PORT',
+                        help='a synthetic host places the traffic-channel call over the host call protocol and hangs up (nse1ap5)')
     parser.add_argument('--keep', action='store_true', help='retain the run directory after a pass')
     args = parser.parse_args()
-    args.traffic_channel |= args.state_roundtrip is not None
+    args.traffic_channel |= args.state_roundtrip is not None or args.host_call is not None
     args.incoming_call |= args.traffic_channel
     if args.incoming_call and args.machine != 'nse1ap5':
         parser.error('the incoming-call scenario is defined for nse1ap5')
@@ -113,15 +124,28 @@ def main():
     os.rmdir(run)  # prepare_native requires a new directory
     try:
         cmd = command(root, run, args.machine, (args.mame or root / 'mame/mame').resolve(), args.incoming_call,
-                      args.traffic_channel, args.state_roundtrip)
+                      args.traffic_channel, args.state_roundtrip, args.host_call)
         run.mkdir(exist_ok=True)
         os.environ['NOKIA_DCT3_SNAPSHOT_DIR'] = str(run / 'snap')
+        client = None
+        if args.host_call is not None:
+            client = HostCallClient(f'ws://127.0.0.1:{args.host_call}/nokia/dct3/calls')
+            client.start()
         with open(run / 'console.log', 'wb') as output:
             status = run_emulator(cmd, run, output, timeout=1200)
         if status:
             raise ValueError(f'emulator exited {status}')
         text = (run / 'error.log').read_text(errors='replace')
-        if args.incoming_call:
+        if client is not None:
+            client.join(10)
+            (run / 'host_call.json').write_text(json.dumps(client.result(), indent=2) + '\n')
+            if client.error is not None:
+                raise ValueError(f'host client: {client.error}')
+            page = text.find('npe3_bts_page_request:')
+            result = check(text[:page] if page >= 0 else text)
+            result.update(check_host_call(text, client.result()))
+            check_lcd(run / 'snap', NSE1_LCD_SHA256)
+        elif args.incoming_call:
             page = text.find('npe3_bts_page_request:')
             result = check(text[:page] if page >= 0 else text)
             result.update(check_traffic_call(text) if args.traffic_channel else check_incoming_call(text))
@@ -138,7 +162,8 @@ def main():
     except Exception as error:
         raise SystemExit(f'FAIL - {error}; evidence retained: {run}')
     print(' '.join(f'{key}={value}' for key, value in result.items()))
-    scenario = ('traffic-channel call with state round trip' if args.state_roundtrip is not None else
+    scenario = ('host-placed traffic-channel call' if args.host_call is not None else
+                'traffic-channel call with state round trip' if args.state_roundtrip is not None else
                 'traffic-channel call' if args.traffic_channel else
                 'incoming call' if args.incoming_call else 'Location Updating')
     print(f'NSE ROM4 {args.machine} native laboratory {scenario}: PASS')

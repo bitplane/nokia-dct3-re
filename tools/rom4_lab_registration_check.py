@@ -202,6 +202,59 @@ def check_traffic_call(text):
     return result
 
 
+HOST_PHASE = re.compile(r'npe3_host_call: request=1 epoch=\d+ phase=(\w+)')
+# Network-initiated clearing on FACCH (GSM 04.08 5.4.4): the lab's DISCONNECT,
+# the handset's RELEASE, RELEASE COMPLETE, Channel Release and the final DISC.
+HOST_CLEARING = (('net', 'cc_disconnect'), ('ms', 'release'), ('net', 'cc_release_complete'),
+                 ('net', 'channel_release'), ('ms', 'disc'), ('net', 'disc_ua'))
+
+
+def check_host_lab(text, phases=('paged', 'alerting', 'connected', 'network_clearing', 'ended')):
+    """Lab side of a host-placed traffic-channel call that the host clears."""
+    if FAULT.search(text) or 'native_dsp_reset_line: released=0' in text.split('phase=paged', 1)[-1]:
+        raise ValueError('native run reset or faulted during the host call')
+    seen = HOST_PHASE.findall(text)
+    if seen != list(phases):
+        raise ValueError(f'host call phases out of order: {seen}')
+    if 'phase=paged digits=4 ' not in text:
+        raise ValueError('host caller digits did not reach SETUP')
+    events = []
+    clearing = text[text.find('phase=network_clearing'):]
+    for line in clearing.splitlines():
+        reply = TCH_REPLY.search(line)
+        if reply:
+            events.append(('net', reply.group(1)))
+        uplink = TCH_UPLINK.search(line)
+        if uplink and uplink.group(1) == 'facch' and uplink.group(4) == '1':
+            block = bytes.fromhex(uplink.group(3))
+            if block[3] & 15 == 3 and block[4] & 0x3f == 0x2d:
+                events.append(('ms', 'release'))
+            elif block[:3] == b'\x01\x53\x01':
+                events.append(('ms', 'disc'))
+    order = iter(events)
+    if not all(step in order for step in HOST_CLEARING):
+        raise ValueError(f'network clearing out of order: {events}')
+    # Host media flows only after CONNECT, so require an absolute duration of
+    # the host's 1 kHz tone at the earpiece rather than a share of the call.
+    audio = TCH_AUDIO.findall(text)
+    if len(audio) != 1 or int(audio[0][1]) < 100:
+        raise ValueError('host downlink tone did not reach the earpiece for 2 s')
+    return dict(earpiece_tone_blocks=int(audio[0][1]))
+
+
+def check_host_call(text, client):
+    """Check a host-placed traffic-channel call that the host clears."""
+    result = check_host_lab(text)
+    if [phase for phase in client['phases'] if phase != 'media_closed'] != ['alerting', 'connected', 'ended']:
+        raise ValueError(f'host saw phases {client["phases"]}')
+    if client['uplink_good'] < 100 or client['downlink'] < 100:
+        raise ValueError('too little host media in either direction')
+    if client['uplink_microphone_fraction'] < 0.5:
+        raise ValueError('host uplink lacks the handset microphone tone')
+    return dict(host_uplink_frames=client['uplink_good'], host_downlink_frames=client['downlink'],
+                host_microphone_fraction=client['uplink_microphone_fraction'], **result)
+
+
 def check_traffic_audio(text):
     """Require the lab's tones through the native speech codecs both ways."""
     audio = TCH_AUDIO.findall(text)

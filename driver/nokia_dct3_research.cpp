@@ -209,6 +209,12 @@ void dct3_rf_adc_fixture_state::machine_start()
 	m_candidate_timer=timer_alloc(FUNC(dct3_rf_adc_fixture_state::candidate_receive_start),this);
 	m_transmit_timer=timer_alloc(FUNC(dct3_rf_adc_fixture_state::candidate_transmit_start),this);
 	m_codec_timer=timer_alloc(FUNC(dct3_rf_adc_fixture_state::codec_frame),this);
+	m_call_host_timer=timer_alloc(FUNC(dct3_rf_adc_fixture_state::poll_call_host),this);
+	if (m_raw_agch && m_call_host.start(machine()))
+	{
+		m_call_host_timer->adjust(attotime::from_msec(10),0,attotime::from_msec(10));
+		machine().add_notifier(MACHINE_NOTIFY_EXIT,machine_notify_delegate(&dct3_rf_adc_fixture_state::stop_call_host,this));
+	}
 	// Size the serialized traffic-channel block once; its layout is fixed.
 	visit_tch_state([this](auto &field) { m_tch_state.resize(m_tch_state.size()+sizeof(field)); });
 	save_item(NAME(m_tch_state));
@@ -237,7 +243,7 @@ void dct3_rf_adc_fixture_state::machine_start()
 	save_item(NAME(m_call_release_start_frame));
 	save_item(NAME(m_call_channel_release_sent));
 	save_item(NAME(m_sacch_samples));
-	save_item(NAME(m_lu_acknowledged));save_item(NAME(m_release_start_frame));
+	save_item(NAME(m_lu_acknowledged));save_item(NAME(m_lu_completed));save_item(NAME(m_release_start_frame));
 	save_item(NAME(m_release_samples));
 	save_item(NAME(m_lab_tx_compares));
 	save_item(NAME(m_lab_tx.words)); save_item(NAME(m_lab_tx.count));
@@ -284,8 +290,10 @@ void dct3_rf_adc_fixture_state::machine_reset()
 	m_call_rr_start_frame=~u64(0);
 	m_call_rr_sequence=0xff;
 	m_call_release_start_frame=~u64(0);m_call_channel_release_sent=false;
-	m_lu_acknowledged=false;m_release_start_frame=~u64(0);
+	m_lu_acknowledged=m_lu_completed=false;m_release_start_frame=~u64(0);
 	m_tch.stop();m_codec_timer->adjust(attotime::never);m_tch_stop_frame=m_tch_samples_frame=~u64(0);
+	m_host_request=0;m_host_connected=false;m_host_downlink.clear();m_host_published_registered=false;
+	m_call_host.new_epoch();
 	m_normal_count=0;m_contention_active=false;
 	m_page_identity_valid=m_page_pending=false;
 	m_page_identity.fill(0);m_page_phase=m_page_offset=0;
@@ -374,18 +382,22 @@ void dct3_rf_adc_fixture_state::machine_reset()
 
 INPUT_CHANGED_MEMBER(dct3_rf_adc_fixture_state::bts_page_w)
 {
-	if (!newval || !m_raw_agch) return;
+	if (newval && m_raw_agch) page_subscriber();
+}
+
+bool dct3_rf_adc_fixture_state::page_subscriber()
+{
 	u64 const frame=machine().time().as_ticks(13'000'000)/60'000;
 	if (!m_page_identity_valid || frame<m_page_not_before)
 	{
 		machine().logerror("npe3_bts_page_ignored: t=%.9f no_released_air_identity=1 physical_claim=0\n",machine().time().as_double());
-		return;
+		return false;
 	}
 	unsigned const suffix=(m_page_identity[6]>>4)*100+(m_page_identity[7]&15)*10+(m_page_identity[7]>>4);
 	// The raw BTS advertises combined CCCH,BS_AG_BLKS_RES=0 and
 	// BS_PA_MFRMS=2. Do not reuse the HLE cell's nine-block DRX schedule.
 	auto const slot=nokia::radio::subscriber_paging_slot(suffix,true,0,2);
-	if (!slot) return;
+	if (!slot) return false;
 	m_page_phase=slot->multiframe_phase;m_page_offset=slot->frame_offset;
 	auto const page=subdevice<nokia_gsm_network_device>("gsm_network")->paging_request(m_page_identity.data(),m_page_identity.size());
 	gsm::tch_f::packed_control_block octets{};
@@ -398,6 +410,84 @@ INPUT_CHANGED_MEMBER(dct3_rf_adc_fixture_state::bts_page_w)
 	for (auto byte:octets) packed+=util::string_format("%02x",byte);
 	machine().logerror("npe3_bts_page_request: t=%.9f identity=%s phase=%u offset=%u multiframes=2 after_frame=%u octets=%s raw_adc_only=1 port_bits_identity=1 physical_claim=0\n",
 		machine().time().as_double(),identity,m_page_phase,m_page_offset,unsigned(m_page_not_before),packed);
+	return true;
+}
+
+void dct3_rf_adc_fixture_state::host_call_phase(char const *phase)
+{
+	if (!m_host_request) return;
+	bool const connected=!strcmp(phase,"connected");
+	if (connected && m_host_connected) return;
+	if (connected) m_host_connected=true;
+	m_call_host.publish_incoming_state(m_host_request,phase,m_host_uplink_sequence,m_host_downlink_sequence);
+	machine().logerror("npe3_host_call: request=%u epoch=%u phase=%s t=%.9f\n",m_host_request,m_call_host.epoch(),phase,machine().time().as_double());
+	if (!strcmp(phase,"ended")) { m_host_request=0;m_host_connected=false;m_host_downlink.clear(); }
+}
+
+TIMER_CALLBACK_MEMBER(dct3_rf_adc_fixture_state::poll_call_host)
+{
+	auto events=m_call_host.take();
+	if (events.ready_pending)
+	{
+		m_call_host.publish_ready(!m_host_request);
+		m_call_host.publish_network(host_registered(),m_lab_arfcn,42);
+		m_host_published_registered=host_registered();
+		machine().logerror("npe3_host_call: request=0 epoch=%u phase=ready registered=%u t=%.9f\n",m_call_host.epoch(),host_registered(),machine().time().as_double());
+	}
+	if (host_registered()!=m_host_published_registered)
+	{
+		m_host_published_registered=host_registered();
+		m_call_host.publish_network(m_host_published_registered,m_lab_arfcn,42);
+		machine().logerror("npe3_host_call: request=0 epoch=%u phase=network registered=%u t=%.9f\n",m_call_host.epoch(),host_registered(),machine().time().as_double());
+	}
+	u32 const epoch=m_call_host.epoch();
+	for (auto const &call:events.calls)
+	{
+		if (call.epoch!=epoch) continue;
+		// The lab cell serves one call per run; its dialogue state is not reset.
+		bool const admissible=!m_host_request && host_registered() && m_setup_start_frame==~u64(0) &&
+				(ioport("LAB_BTS")->read()&0x2c)==0x2c;
+		if (!admissible)
+		{
+			m_call_host.publish_incoming_state(call.request_id,"ended");
+			machine().logerror("npe3_host_call: request=%u epoch=%u phase=rejected t=%.9f\n",call.request_id,epoch,machine().time().as_double());
+			continue;
+		}
+		m_host_request=call.request_id;
+		std::copy(call.digits.begin(),call.digits.end(),m_host_digits.begin());
+		m_host_digit_count=call.length;
+		m_host_connected=false;m_host_terminate_cause=-1;m_host_page_pending=true;
+		m_host_uplink_sequence=m_host_downlink_sequence=0;m_host_downlink.clear();
+	}
+	// Like a real MSC, hold the call until the cell may page again after the
+	// Location Updating channel is released.
+	if (m_host_page_pending && m_host_request &&
+			machine().time().as_ticks(13'000'000)/60'000>=m_page_not_before && page_subscriber())
+	{
+		m_host_page_pending=false;
+		machine().logerror("npe3_host_call: request=%u epoch=%u phase=paged digits=%u t=%.9f\n",m_host_request,epoch,m_host_digit_count,machine().time().as_double());
+	}
+	for (auto const &end:events.terminations)
+		if (end.epoch==epoch && end.request_id==m_host_request && m_host_terminate_cause<0)
+			m_host_terminate_cause=end.cause;
+	for (auto const &media:events.media)
+	{
+		if (media.epoch!=epoch || media.request_id!=m_host_request || media.sequence<m_host_downlink_sequence) continue;
+		// A bounded jitter queue: never let host bursts run far ahead of the air.
+		if (m_host_downlink.size()>=8) m_host_downlink.pop_front();
+		m_host_downlink.push_back(media.frame);
+		m_host_downlink_sequence=media.sequence+1;
+	}
+	if (m_host_terminate_cause>=0 && m_tch.active() && m_tch_cc_ti_valid)
+	{
+		// Network-initiated clearing on FACCH: DISCONNECT (GSM 04.08 5.4.4).
+		u64 const frame=machine().time().as_ticks(13'000'000)/60'000;
+		auto const disconnect=subdevice<nokia_gsm_network_device>("gsm_network")->call_disconnect(m_tch_cc_ti,u8(m_host_terminate_cause));
+		machine().logerror("npe3_host_call: request=%u epoch=%u phase=network_clearing cause=%u t=%.9f\n",m_host_request,epoch,m_host_terminate_cause,machine().time().as_double());
+		m_host_terminate_cause=-2;
+		queue_facch_information(3,disconnect.data(),disconnect.size(),frame);
+	}
+	if (events.dropped) machine().logerror("npe3_host_call: dropped=%u t=%.9f\n",events.dropped,machine().time().as_double());
 }
 
 void dct3_rf_adc_fixture_state::control_w(offs_t port, u16 data)
@@ -712,7 +802,7 @@ void dct3_rf_adc_fixture_state::receive_normal_uplink(std::array<u16,15> const &
 			m_normal_start_frame>m_lu_start_frame+3 &&
 			(*block)[0]==3 && (*block)[1]==0x21 && (*block)[2]==1)
 	{
-		m_lu_acknowledged=true;
+		m_lu_acknowledged=m_lu_completed=true;
 		auto const release=subdevice<nokia_gsm_network_device>("gsm_network")->channel_release();
 		gsm::tch_f::packed_control_block lapdm{};
 		lapdm.fill(0x2b);
@@ -790,7 +880,10 @@ void dct3_rf_adc_fixture_state::receive_normal_uplink(std::array<u16,15> const &
 		if ((ioport("LAB_BTS")->read()&4) && m_setup_start_frame==~u64(0))
 		{
 			static constexpr u8 digits[]={5,5,5,1,2,3,4};
-			auto const setup=subdevice<nokia_gsm_network_device>("gsm_network")->incoming_call_setup(digits,std::size(digits));
+			// A host call presents the host's caller number.
+			auto const setup=m_host_request ?
+				subdevice<nokia_gsm_network_device>("gsm_network")->incoming_call_setup(m_host_digits.data(),m_host_digit_count) :
+				subdevice<nokia_gsm_network_device>("gsm_network")->incoming_call_setup(digits,std::size(digits));
 			gsm::tch_f::packed_control_block lapdm{};
 			lapdm.fill(0x2b);
 			lapdm[0]=3;lapdm[1]=0;lapdm[2]=(setup.length<<2)|1;
@@ -860,7 +953,15 @@ void dct3_rf_adc_fixture_state::load_tch_state()
 	m_facch_outstanding.assign(m_facch_window.begin(),m_facch_window.begin()+m_facch_window_count);
 	if (!m_tch_codec.restore(m_tch_codec_state[0]) || !m_tch_uplink_codec.restore(m_tch_codec_state[1]))
 		fatalerror("laboratory TCH: invalid codec state in save image\n");
+	// Host connections are outside the image: a load ends host ownership.
+	m_host_request=0;m_host_connected=false;m_host_downlink.clear();
+	m_call_host.new_epoch();
 	set_tch_speech_source();
+}
+
+void dct3_rf_adc_fixture_state::stop_call_host()
+{
+	m_call_host.stop(machine());
 }
 
 void dct3_rf_adc_fixture_state::set_tch_speech_source()
@@ -868,9 +969,23 @@ void dct3_rf_adc_fixture_state::set_tch_speech_source()
 	// Optionally fill every traffic block not stolen for FACCH with speech,
 	// as a BTS does; otherwise the blocks stay empty and decode as BFI. One
 	// tone period is eight samples at 8 kHz, about -12 dBFS.
-	if (!m_tch_speech_enabled) { m_tch.set_speech_source(nullptr); return; }
+	if (!m_tch_speech_enabled && !m_host_request) { m_tch.set_speech_source(nullptr); return; }
 	m_tch.set_speech_source([this] {
 		static constexpr s16 tone[8]={0,5793,8192,5793,0,-5793,-8192,-5793};
+		if (m_host_request)
+		{
+			// A host call carries the host's frames; silence while it has none.
+			++m_tch_speech_frames;
+			if (!m_host_downlink.empty())
+			{
+				auto const frame=m_host_downlink.front();
+				m_host_downlink.pop_front();
+				return frame;
+			}
+			gsm::tch_f::packed_speech_frame frame{};
+			m_tch_codec.encode(nokia_gsm_fr_codec::pcm_block{},frame);
+			return frame;
+		}
 		// A steady tone is fully predicted by the long-term predictor, so its
 		// frames carry no excitation (xmaxc 0, bc 3) and a decoder that joins
 		// mid-stream keeps its empty history. Restarting the encoder each
@@ -901,14 +1016,16 @@ void dct3_rf_adc_fixture_state::start_traffic_channel(u64 frame)
 	m_earpiece_at=m_microphone_phase=0;
 	m_earpiece_meter=m_uplink_meter=tone_meter{};
 	m_codec_timer->adjust(attotime::from_hz(8'000),0,attotime::from_hz(8'000));
+	m_tch_cc_ti_valid=m_facch_channel_release_after_ack=false;
 	machine().logerror("npe3_tch_start: first_frame=%u timeslot=1 tsc=2 sacch=si5,si6 speech=%s codec=%s raw_adc_only=1 physical_claim=0\n",
-		unsigned(m_tch.first_frame()),m_tch_speech_enabled ? "tone_1000hz" : "empty",m_tch_codec.available() ? "gsm_06_10" : "unavailable");
+		unsigned(m_tch.first_frame()),m_host_request ? "host" : m_tch_speech_enabled ? "tone_1000hz" : "empty",m_tch_codec.available() ? "gsm_06_10" : "unavailable");
 }
 
 void dct3_rf_adc_fixture_state::stop_traffic_channel()
 {
 	m_tch.stop();
 	m_codec_timer->adjust(attotime::never);
+	if (m_host_request) host_call_phase("ended");
 	machine().logerror("npe3_tch_audio: earpiece_hz=1000 earpiece_blocks=%u earpiece_tone_blocks=%u earpiece_tone_amplitude=%d microphone_hz=%u uplink_blocks=%u uplink_tone_blocks=%u uplink_tone_amplitude=%d physical_claim=0\n",
 		m_earpiece_meter.blocks,m_earpiece_meter.tone_blocks,m_earpiece_meter.peak,m_tch_speech_enabled ? 500 : 0,
 		m_uplink_meter.blocks,m_uplink_meter.tone_blocks,m_uplink_meter.peak);
@@ -960,6 +1077,12 @@ void dct3_rf_adc_fixture_state::receive_traffic_uplink(std::array<u16,15> const 
 	using kind=nokia_rf_lab::traffic_channel::uplink_kind;
 	for (auto const &event:m_tch.uplink(frame,burst))
 	{
+		if ((event.kind==kind::speech || event.kind==kind::bad_speech) && m_host_request && m_host_connected)
+		{
+			u64 const time_us=machine().time().as_ticks(1'000'000);
+			m_call_host.publish_uplink(m_host_request,m_host_uplink_sequence++,time_us,
+				event.kind==kind::speech,event.kind==kind::speech ? event.speech : nokia_lab_call_host::speech_frame{});
+		}
 		if (event.kind==kind::speech)
 		{
 			++m_tch_speech;
@@ -1002,6 +1125,13 @@ void dct3_rf_adc_fixture_state::receive_facch(gsm::tch_f::packed_control_block c
 	}
 	// Every I and S frame carries N(R), acknowledging network I-frames.
 	acknowledge_facch(block[1]>>5);
+	if (m_facch_channel_release_after_ack && m_facch_outstanding.empty())
+	{
+		// Channel Release waits for RELEASE COMPLETE's acknowledgement.
+		m_facch_channel_release_after_ack=false;
+		auto const release=subdevice<nokia_gsm_network_device>("gsm_network")->channel_release();
+		queue_facch_information(2,release.data(),release.size(),frame);
+	}
 	if (block[1]&1)
 	{
 		// REJ asks for every unacknowledged I-frame again, from N(R).
@@ -1021,6 +1151,18 @@ void dct3_rf_adc_fixture_state::receive_facch(gsm::tch_f::packed_control_block c
 	m_facch_receive=(m_facch_receive+1)&7;
 	u8 const *const l3=block.data()+3;
 	auto &network=*subdevice<nokia_gsm_network_device>("gsm_network");
+	if ((l3[0]&15)==3) { m_tch_cc_ti=l3[0];m_tch_cc_ti_valid=true; }
+	if ((l3[0]&15)==3 && (l3[1]&0x3f)==0x01) host_call_phase("alerting");
+	if ((l3[0]&15)==3 && (l3[1]&0x3f)==0x07) host_call_phase("connected");
+	if ((l3[0]&15)==3 && (l3[1]&0x3f)==0x2d)
+	{
+		// RELEASE answers a network DISCONNECT: RELEASE COMPLETE, then once
+		// it is acknowledged, Channel Release (GSM 04.08 5.4.4).
+		auto const complete=network.call_release_complete(l3[0]);
+		m_facch_channel_release_after_ack=true;
+		queue_facch_information(4,complete.data(),complete.size(),frame);
+		return;
+	}
 	std::vector<u8> message;
 	char const *kind="rr";
 	u8 kind_index=0;
@@ -1045,8 +1187,13 @@ void dct3_rf_adc_fixture_state::receive_facch(gsm::tch_f::packed_control_block c
 		send_facch(kind,reply,frame);
 		return;
 	}
-	facch_information information{m_facch_send,kind_index,u8(message.size()),{}};
-	std::copy(message.begin(),message.end(),information.layer3.begin());
+	queue_facch_information(kind_index,message.data(),message.size(),frame);
+}
+
+void dct3_rf_adc_fixture_state::queue_facch_information(u8 kind,u8 const *layer3,unsigned length,u64 frame)
+{
+	facch_information information{m_facch_send,kind,u8(length),{}};
+	std::copy_n(layer3,length,information.layer3.begin());
 	m_facch_outstanding.push_back(information);
 	m_facch_send=(m_facch_send+1)&7;
 	send_facch_information(m_facch_outstanding.back(),frame);

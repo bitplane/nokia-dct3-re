@@ -1,6 +1,7 @@
 import unittest
 
-from tools.rom4_lab_registration_check import check, check_incoming_call, check_roundtrip, check_traffic_call
+from tools.rom4_lab_registration_check import (check, check_host_call, check_host_lab, check_incoming_call, check_roundtrip,
+                                                check_traffic_call)
 
 # Dialogue lines from a native nse1ap5 run (frames 3028-3337).
 LOG = '''native_dsp_reset_line: released=1
@@ -169,3 +170,46 @@ class LabRegistrationCheckTest(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+# A host-placed call cleared by the host (native nse1ap5 run, hangup after 150 frames).
+HOST_LOG = """npe3_host_call: request=1 epoch=2 phase=paged digits=4 t=16.130000000
+npe3_host_call: request=1 epoch=2 phase=alerting t=18.994631730
+npe3_host_call: request=1 epoch=2 phase=connected t=23.116170192
+npe3_host_call: request=1 epoch=2 phase=network_clearing cause=16 t=26.140000000
+npe3_tch_facch: kind=cc_disconnect uplink_start_frame=5663 octets=036215032502e0902b2b2b2b2b2b2b2b2b2b2b2b2b2b2b raw_adc_only=1 physical_claim=0
+npe3_tch_uplink: channel=facch start_frame=5681 octets=014609836d2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b exact_code=1 speech_blocks=366 bad_speech_blocks=4 unreadable_bursts=0 downlink_speech_blocks=372 port_bits_only=1 physical_claim=0
+npe3_tch_facch: kind=cc_release_complete uplink_start_frame=5681 octets=038409032a2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b raw_adc_only=1 physical_claim=0
+npe3_tch_uplink: channel=facch start_frame=5698 octets=0361012b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b exact_code=1 speech_blocks=369 bad_speech_blocks=4 unreadable_bursts=0 downlink_speech_blocks=375 port_bits_only=1 physical_claim=0
+npe3_tch_facch: kind=channel_release uplink_start_frame=5698 octets=03860d060d002b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b raw_adc_only=1 physical_claim=0
+npe3_tch_uplink: channel=facch start_frame=5720 octets=0153012b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b exact_code=1 speech_blocks=373 bad_speech_blocks=4 unreadable_bursts=0 downlink_speech_blocks=379 port_bits_only=1 physical_claim=0
+npe3_tch_facch: kind=disc_ua uplink_start_frame=5720 octets=0173012b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b raw_adc_only=1 physical_claim=0
+npe3_host_call: request=1 epoch=2 phase=ended t=26.677469538
+npe3_tch_audio: earpiece_hz=1000 earpiece_blocks=390 earpiece_tone_blocks=151 earpiece_tone_amplitude=862 microphone_hz=500 uplink_blocks=378 uplink_tone_blocks=148 uplink_tone_amplitude=24049 physical_claim=0
+"""
+HOST_CLIENT = dict(phases=['alerting', 'connected', 'ended'], uplink_good=166, downlink=167,
+                   uplink_microphone_fraction=0.801)
+
+
+class HostCallTest(unittest.TestCase):
+    def test_accepts_native_host_call(self):
+        result = check_host_call(HOST_LOG, HOST_CLIENT)
+        self.assertEqual(result['earpiece_tone_blocks'], 151)
+        self.assertEqual(result['host_uplink_frames'], 166)
+
+    def test_rejects_unfinished_clearing(self):
+        with self.assertRaisesRegex(ValueError, 'phases out of order'):
+            check_host_lab(HOST_LOG.replace('phase=ended', 'phase=stuck'))
+
+    def test_rejects_missing_handset_release(self):
+        broken = '\n'.join(line for line in HOST_LOG.splitlines() if '014609836d' not in line)
+        with self.assertRaisesRegex(ValueError, 'clearing out of order'):
+            check_host_lab(broken)
+
+    def test_rejects_short_earpiece_tone(self):
+        with self.assertRaisesRegex(ValueError, 'earpiece'):
+            check_host_lab(HOST_LOG.replace('earpiece_tone_blocks=151', 'earpiece_tone_blocks=99'))
+
+    def test_rejects_quiet_host_uplink(self):
+        with self.assertRaisesRegex(ValueError, 'microphone'):
+            check_host_call(HOST_LOG, dict(HOST_CLIENT, uplink_microphone_fraction=0.2))

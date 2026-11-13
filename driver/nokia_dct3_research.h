@@ -8,6 +8,7 @@
 #include "nokia_rf_lab_tx.h"
 #include "nokia_rf_lab_tch.h"
 #include "nokia_gsm_fr_codec.h"
+#include "nokia_lab_call_host.h"
 
 namespace nokia_dct3 {
 
@@ -99,6 +100,13 @@ private:
 	void start_traffic_channel(u64 frame);
 	void set_tch_speech_source();
 	void stop_traffic_channel();
+	bool page_subscriber();
+	// Host telephony (-http): incoming calls with GSM-FR media both ways.
+	TIMER_CALLBACK_MEMBER(poll_call_host);
+	// Registered once Location Updating completes; later accesses keep it.
+	bool host_registered() const { return m_lu_completed && m_page_identity_valid; }
+	void host_call_phase(char const *phase);
+	void stop_call_host();
 	template <typename F> void visit_tch_state(F &&field);
 	void save_tch_state();
 	void load_tch_state();
@@ -107,7 +115,8 @@ private:
 	void send_facch(char const *kind,gsm::tch_f::packed_control_block const &lapdm,u64 frame);
 	// Plain data, so the outstanding window can be saved.
 	struct facch_information { u8 sequence,kind,length; std::array<u8,20> layer3; };
-	static constexpr char const *facch_kinds[]={"connect_acknowledge","cc_release","channel_release"};
+	static constexpr char const *facch_kinds[]={"connect_acknowledge","cc_release","channel_release","cc_disconnect","cc_release_complete"};
+	void queue_facch_information(u8 kind,u8 const *layer3,unsigned length,u64 frame);
 	void send_facch_information(facch_information const &information,u64 frame);
 	void acknowledge_facch(u8 received);
 	void resend_facch(char const *cause,u64 frame);
@@ -139,7 +148,7 @@ private:
 	u64 m_call_release_start_frame=~u64(0);
 	bool m_call_channel_release_sent=false;
 	std::array<std::array<std::array<std::array<s16,2>,148*4>,4>,2> m_sacch_samples{};
-	bool m_lu_acknowledged=false;
+	bool m_lu_acknowledged=false,m_lu_completed=false;
 	// TCH/F on TS1 after the Assignment Command, with the network side of
 	// its FACCH LAPDm link (V(S), V(R)). Saved as one serialized block.
 	std::array<gsm::tch_f::packed_control_block,2> m_sacch_blocks{};
@@ -167,6 +176,19 @@ private:
 	u8 m_facch_window_count=0;
 	std::array<nokia_gsm_fr_codec::state,2> m_tch_codec_state{};
 	std::vector<u8> m_tch_state;
+	// The phone's CC transaction byte, for network-initiated clearing.
+	u8 m_tch_cc_ti=0;
+	bool m_tch_cc_ti_valid=false,m_facch_channel_release_after_ack=false;
+	nokia_lab_call_host m_call_host;
+	emu_timer *m_call_host_timer=nullptr;
+	// Host state is outside the machine image: a load ends host ownership.
+	u32 m_host_request=0;
+	std::array<u8,20> m_host_digits{};
+	unsigned m_host_digit_count=0;
+	bool m_host_published_registered=false,m_host_connected=false,m_host_page_pending=false;
+	int m_host_terminate_cause=-1;
+	u32 m_host_uplink_sequence=0,m_host_downlink_sequence=0;
+	std::deque<nokia_lab_call_host::speech_frame> m_host_downlink;
 	u64 m_release_start_frame=~u64(0);
 	std::array<std::array<std::array<s16,2>,148*4>,4> m_release_samples{};
 	// Default fill and separate diagnostic pages for unassigned TMSIs.

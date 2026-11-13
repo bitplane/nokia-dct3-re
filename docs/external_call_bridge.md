@@ -1209,6 +1209,28 @@ The five-profile acceptance below covers basic SIP failures, active-call
 clearing and fresh service after idle restoration. It does not establish native
 DSP speech, arbitrary SIP endpoint interoperability, or additional products.
 
+### Native NSE-1 laboratory call
+
+```sh
+make verify-5110-lab-sip-call
+```
+
+The same bridge also drives the native NSE-1 (`nse1ap5`) on the laboratory
+BTS. There the ROM4 MCU and C54x DSP firmware run the radio link, and speech
+is GSM-FR over a real TCH/F. The lab's
+[host-placed calls](rom4_rf_control.md#host-placed-calls) serve protocol v1
+for incoming calls: `call_adapter_ready`, `network_state`, `incoming_call`,
+`incoming_call_state`, both media directions and `incoming_call_terminate`.
+PJSUA calls the bridge. The handset rings and is answered with its own key,
+speech crosses RTP and the native DSP codec both ways, and the remote's BYE
+clears the call from the network side. The remote recording must be at least
+half the handset's 500 Hz microphone tone. This is the only SIP gate in which
+native DSP firmware carries the speech. It covers mobile-terminated calls
+only; the lab does not offer outgoing calls, call waiting or restoration
+through the bridge. During the call MAME runs at about 40 % of real time,
+so the remote talks for twelve wall-clock seconds and the bridge's jitter
+handling absorbs the rate difference.
+
 ## Cross-product SIP acceptance
 
 The 3410 v5.46E independently admits a fresh incoming SIP call after an idle

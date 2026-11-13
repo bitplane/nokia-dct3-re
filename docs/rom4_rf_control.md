@@ -1044,11 +1044,60 @@ Five problems were in the emulation, not the lab:
   admitted with its own section
   ([ROM4 speech-path forms](c54x_execution_contracts.md#rom4-speech-path-forms)).
 
-Open:
+- **Dropped frame.** The phone's DSP sometimes skipped one whole TDMA
+  frame of its schedule shortly after a FACCH exchange. It missed two
+  transmissions and stayed one frame behind the lab, so the lab's uplink
+  deinterleaver never resynchronised. Clearing then stalled with every
+  FACCH message resent forever. The DSP chains its frame through slot
+  compares, and each one raises a request that its handler accepts with a
+  port-1 write (`25b8`). ROM4's critical section at `35f9..3605` saves the
+  port-2 in-service mask, writes `ffff` and restores it. The model treated
+  any port-2 write as acceptance as well, so a compare that fired inside
+  that window was dropped (frame 5674 in a run whose host hung up after 149
+  frames). Port 2 is now only the mask, and only port 1 accepts. This is
+  probably also the earlier unexplained Channel Release resend in the
+  speech run.
 
-- **FACCH loss with speech.** Before the encoder restart one Channel
-  Release was resent after T200 in the speech run. It has not recurred
-  since (no resends); the cause was not traced.
+### Host-placed calls
+
+The lab can take its call from MAME's host call endpoint
+(`/nokia/dct3/calls`, [protocol v1](external_call_bridge.md#protocol-contract)),
+which is where the SIP bridge connects. `nokia_lab_call_host` replaces the
+HLE adapter's route on the native machines. It publishes `call_adapter_ready`
+and `network_state`: registered once Location Updating completes, on ARFCN
+35 with BSIC 0. An `incoming_call` pages the phone and puts the caller's
+digits in SETUP. The lab publishes `alerting` and `connected` from the
+phone's FACCH ALERTING and CONNECT. While connected, each uplink speech block
+goes to the host as `incoming_call_media_uplink` (`good` false for a bad
+frame), and host `incoming_call_media_downlink` frames replace the lab's
+tone; when the host has none queued, the lab sends encoded silence. An
+`incoming_call_terminate` clears from the network side on FACCH (GSM 04.08
+5.4.4): DISCONNECT with the host's cause, the phone's RELEASE, RELEASE
+COMPLETE, Channel Release and the phone's DISC. The lab then publishes
+`network_clearing` and `ended`. One call is taken per run. A reset or state
+load starts a new epoch.
+
+`make verify-5110-lab-host-call` runs a synthetic remote
+(`tools/lab_host_call_client.py`). It answers each uplink frame with one
+frame of a 1 kHz tone and hangs up after 150 uplink frames. The run pages
+at 16.13 s and shows alerting at 18.99 s, connected at 23.12 s,
+network_clearing at 26.14 s and ended at 26.68 s. The host gets 166 good
+and 1 bad uplink frames; 0.80 of their energy is the handset's 500 Hz
+microphone tone. 151 earpiece blocks carry the host's tone. The gate
+requires the phases in order, the clearing messages in order, at least 100
+frames each way, a microphone fraction of 0.5 and 100 earpiece tone
+blocks.
+
+`make verify-5110-lab-sip-call` places a real SIP call. PJSUA calls
+`tools/dct3_sip_bridge.py`, which places it on the lab. The handset rings
+and is answered with its own key. The remote plays 1 kHz and records what
+it hears. Twelve seconds after the answer it hangs up, and the bridge
+forwards the BYE as `incoming_call_terminate`. MAME runs throttled, since
+RTP runs in real time. During the call the emulation reaches only about
+40 % of real time (2.0 emulated seconds in 5.0 wall seconds), so the talk
+window is in wall time and long enough for the bridge's 100 frames. A run
+gives 239 uplink and 581 downlink frames, and 0.65 of the remote
+recording's energy is the 500 Hz microphone tone.
 
 ### Tuned laboratory carrier
 
