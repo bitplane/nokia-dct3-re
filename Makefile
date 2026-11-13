@@ -339,7 +339,7 @@ INTERACTIVE_EXTRA_ARGS ?=
 
 .PHONY: help venv download-mame overlay eeprom-profile normalize-2100 normalize-3330 normalize-3410 normalize-5210 roms build swap16 census gates gate-parity controller-census ccont-static-census ccont-runtime-census mad2-census mad2-static-census board-io-static-census dsp-census census-docs evidence-check test-tools prepare-run-files prepare-run-nvram run run-prebuilt run-captured run-prebuilt-captured run-frontier run-interactive call-bridge smoke smoke-3310-639 smoke-3330e smoke-3210-v501 audit-roms audit-dsp-roms audit-dsp-rom4 check-dsp-rom4-cosim frame watch verify verify-ccont verify-ccont-watchdog verify-ccont-rtc verify-ccont-mask verify-alarm verify-power-lifecycle verify-power-lifecycle-v501 verify-charger-lifecycle verify-charger-wake verify-gensio verify-display verify-dsp-transport verify-dsp-memory-upload verify-dsp-speech-control-static verify-cell-broadcast-static verify-gsm-fr-codec verify-gsm-tch-f-l1 verify-gsm-a5 verify-gsm-xcch-l1 verify-gsm-mobility verify-gsm-sms-transport verify-radio-periodic-location-update verify-radio-a5-1-incoming-call verify-radio-a5-1-state verify-dsp-bootstrap-3310 verify-3310-radio-boundary verify-3330-radio-boundary verify-3310-radio-registration verify-3330-radio-registration-preserved verify-3330-radio-registration-state verify-3330-radio-unsuitable-cells verify-3310-radio-paging verify-3330-radio-paging verify-3330-radio-paging-preserved verify-3330-radio-paging-state verify-3330-radio-paging-negatives verify-3310-radio-incoming-call-boundary verify-3310-radio-incoming-call-ui verify-3310-radio-incoming-call-lifecycle verify-3310-radio-media-resilience verify-3310-radio-physical-duplex verify-3310-frontier verify-3310-menu verify-3310-navigation verify-3330-frontier verify-3330-navigation verify-3410-frontier verify-3410-menu verify-3410-navigation verify-dsp-tone verify-radio-camp verify-radio-registration verify-radio-paging verify-radio-incoming-call verify-radio-incoming-ringing verify-radio-incoming-call-answered verify-radio-incoming-call-lifecycle verify-radio-incoming-call-lifecycle-v501 verify-radio-call-state-roundtrip verify-radio-pcm-missing verify-radio-degraded-speech verify-radio-physical-uplink verify-radio-physical-uplink-one verify-radio-incoming-sms verify-radio-incoming-smart-message verify-radio-operator verify-mad2 verify-mad2-interrupts verify-mad2-clocks verify-mad2-sleep verify-mad2-timer1 verify-mad2-reset verify-mbus verify-2100-mbus verify-buzzer verify-3210-v501 verify-frontier verify-frontier-stability verify-mmi-menu verify-mmi-menu-501 verify-sim-phonebook verify-structure verify-structure-subset clean clean-build
 .PHONY: verify-model-frontier-state verify-model-frontier-negative
-.PHONY: check-c54x-core prepare-c54x-rom4-fixture check-c54x-rom4-execute check-c54x-rom4-cold-execute check-c54x-rom4-coherent check-c54x-rom4-rf-boundary check-c54x-observed-coverage check-c54x-cross-rom verify-5110-menu verify-5110-lab-registration verify-5110i-lab-registration verify-5110-lab-incoming-call verify-5110-lab-traffic-call verify-5110-save-state verify-5110-power-lifecycle verify-5110-late-input check-c54x-rom4-transform check-c54x-rom4-snapshot check-c54x-opcode-coverage
+.PHONY: check-c54x-core prepare-c54x-rom4-fixture check-c54x-rom4-execute check-c54x-rom4-cold-execute check-c54x-rom4-coherent check-c54x-rom4-rf-boundary check-c54x-observed-coverage check-c54x-cross-rom verify-5110-menu verify-5110-lab-registration verify-5110i-lab-registration verify-5110-lab-incoming-call verify-5110-lab-traffic-call verify-5110-lab-traffic-state verify-5110-save-state verify-5110-power-lifecycle verify-5110-late-input check-c54x-rom4-transform check-c54x-rom4-snapshot check-c54x-opcode-coverage
 .PHONY: storage-static-census mad2-residual-census
 .PHONY: verify-eeprom
 .PHONY: smoke-5210e
@@ -506,7 +506,8 @@ help:
 	@echo "make verify-5110-late-input open the NSE-1 menu after the later idle interval (staged CPU by default; NSE1_MACHINE overrides composition)"
 	@echo "make verify-5110-lab-registration complete native ROM4 Location Updating on the nse1ap5 laboratory BTS and show the lab operator"
 	@echo "make verify-5110-lab-incoming-call page the registered nse1ap5, answer and end a call on SDCCH (no traffic channel)"
-	@echo "make verify-5110-lab-traffic-call the same call assigned to TCH/F timeslot 1, with FACCH/SACCH and clearing"
+	@echo "make verify-5110-lab-traffic-call the same call assigned to TCH/F timeslot 1, with FACCH/SACCH, speech both ways and clearing"
+	@echo "make verify-5110-lab-traffic-state save, replay and reload that call mid-conversation, then clear it"
 	@echo "make verify-5110i-lab-registration complete native ROM4 Location Updating on nse2ap5 with provisioned security records and no restart"
 	@echo "make verify-5110-power-lifecycle check short and sustained NSE-1 power presses (staged CPU by default; NSE1_MACHINE overrides composition)"
 	@echo "make verify-5110-save-state restore ROM4/C54x idle then open the menu (staged CPU by default; NSE1_MACHINE overrides composition)"
@@ -1836,6 +1837,9 @@ verify-5110-lab-incoming-call: build
 # measurement reports and clearing on the traffic channel.
 verify-5110-lab-traffic-call: build
 	$(PYTHON) tools/run_rom4_lab_registration.py nse1ap5 --traffic-channel
+
+verify-5110-lab-traffic-state: build
+	$(PYTHON) tools/run_rom4_lab_registration.py nse1ap5 --state-roundtrip 24.5
 
 verify-5110-power-lifecycle: build
 	@set -eu; mkdir -p "$(NATIVE_SCRATCH_ROOT)"; tmp=""; \

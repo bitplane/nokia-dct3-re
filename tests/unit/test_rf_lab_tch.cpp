@@ -2,7 +2,9 @@
 // copyright-holders:Gaz
 #include "nokia_rf_lab_tch.h"
 #include <cassert>
+#include <cstring>
 #include <iostream>
+#include <type_traits>
 
 namespace {
 using nokia_rf_lab::traffic_channel;
@@ -13,6 +15,23 @@ traffic_channel::block octets(std::initializer_list<std::uint8_t> head)
 	result.fill(0x2b);
 	std::copy(head.begin(),head.end(),result.begin());
 	return result;
+}
+
+std::vector<unsigned char> save(traffic_channel &channel)
+{
+	std::vector<unsigned char> bytes;
+	channel.visit_state([&](auto &field) {
+		static_assert(std::is_trivially_copyable_v<std::remove_reference_t<decltype(field)>>);
+		auto const *at=reinterpret_cast<unsigned char const *>(&field);
+		bytes.insert(bytes.end(),at,at+sizeof(field));
+	});
+	return bytes;
+}
+
+void load(traffic_channel &channel,std::vector<unsigned char> const &bytes)
+{
+	std::size_t at=0;
+	channel.visit_state([&](auto &field) { std::memcpy(&field,bytes.data()+at,sizeof(field));at+=sizeof(field); });
 }
 
 gsm::tch_f::burst_payload payload(traffic_channel::bits const &bits)
@@ -73,6 +92,17 @@ int main()
 	// Skipped bursts corrupt some speech blocks; most still decode exactly.
 	assert(good_speech>=50);
 	std::cout<<"tch_lab facch="<<facch<<" sacch="<<sacch<<" speech="<<good_speech<<'\n';
+	// A restored channel continues exactly, with a FACCH block in flight.
+	traffic_channel original,copy;
+	original.start(4718,1,2,{si5,si6});original.set_speech_source([&] { return speech; });
+	for (std::uint64_t frame=4719;frame<4800;++frame) original.downlink(frame);
+	original.send_facch(octets({1,0x73,1}));
+	original.downlink(4801);
+	copy.set_speech_source([&] { return speech; });
+	load(copy,save(original));
+	for (std::uint64_t frame=4802;frame<4900;++frame) assert(original.downlink(frame)==copy.downlink(frame));
+	assert(save(original)==save(copy));
+	std::cout<<"tch_lab restore=exact\n";
 	// Traffic uplink keeps cleared stealing flags; SDCCH decode rejects them.
 	gsm::tch_f::burst_payload clear{};
 	clear.data[0]=1;

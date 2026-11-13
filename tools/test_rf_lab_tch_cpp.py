@@ -18,6 +18,7 @@ class RfLabTrafficChannelTest(unittest.TestCase):
                 check=True,capture_output=True,text=True)
             result=subprocess.run([str(binary)],check=True,capture_output=True,text=True)
             self.assertIn('tch_lab facch=1 sacch=2',result.stdout)
+            self.assertIn('tch_lab restore=exact',result.stdout)
 
 
 if __name__=='__main__':unittest.main()

@@ -941,27 +941,48 @@ on timeslot 1 (TSC 2) after CALL CONFIRMED and serves that channel:
   - DISC → UA.
   - Unacknowledged network I-frames are resent after 40 frames (T200) or on
     REJ.
+- **Speech.** With bit `0x800` every traffic block not stolen for FACCH
+  carries a GSM 06.10 1 kHz tone (about -12 dBFS). While the channel runs,
+  the lab also stands in for COBBA's 8 kHz PCM frame strobe on the DSP
+  serial port. Earpiece words go to COBBA's earpiece output, and the
+  microphone carries a 500 Hz tone at the same level. The lab decodes the
+  phone's uplink speech blocks with the same codec.
 
 `make verify-5110-lab-traffic-call` (`run_rom4_lab_registration.py nse1ap5
---traffic-channel`) runs the paged call with bits 4, 8, 16, 32 and 64:
+--traffic-channel`) runs the paged call with bits 4, 8, 16, 32, 64 and
+`0x800`:
 
 | Frame | Direction | Content |
 | --- | --- | --- |
-| 4714 | downlink (SDCCH) | Assignment Command, TCH/F timeslot 1 |
+| 4714 | downlink (SDCCH) | Assignment Command, TCH/F timeslot 1, full-rate speech |
 | 4732 | uplink (FACCH) | SABM; the lab answers UA |
-| 4792 | uplink (FACCH) | RR ASSIGNMENT COMPLETE |
-| 4844 | uplink (FACCH) | ALERTING; the LCD shows `5551234 calling` |
+| 4753 | uplink (FACCH) | RR ASSIGNMENT COMPLETE |
+| 4771 | uplink (FACCH) | ALERTING; the LCD shows `5551234 calling` |
 | 5000 | uplink (FACCH) | CONNECT after Answer at 23 s; CONNECT ACKNOWLEDGE; LCD `Call 1` |
 | 5915 | uplink (FACCH) | DISCONNECT after End; the lab sends RELEASE |
 | 5936 | uplink (FACCH) | RELEASE COMPLETE; the lab sends Channel Release |
-| 5988 | uplink (FACCH) | DISC; the lab answers UA |
+| 5993 | uplink (FACCH) | DISC; the lab answers UA |
 
-Twelve SACCH Measurement Reports decode exactly on the way. The phone then
-returns to the `DCT3 LAB` idle frame and camps on timeslot 0 again. The gate
-binds each network reply to the first uplink it answers. It also requires
-every FACCH uplink to decode exactly, and at least four Measurement Reports.
+Twelve SACCH Measurement Reports decode exactly on the way; every one after
+the first reports RXQUAL 0. The phone then returns to the `DCT3 LAB` idle
+frame and camps on timeslot 0 again. The gate binds each network reply to
+the first uplink it answers. It also requires every FACCH uplink to decode
+exactly and at least four Measurement Reports. With speech it requires the
+tone in at least half of the non-silent 20 ms blocks each way, and in at
+least 50 (`npe3_tch_audio`). The run gives 206 of 307 earpiece blocks and
+202 of 230 uplink blocks. A tone counts when it is four times the bins a
+quarter of its frequency either side, so the earpiece sidetone (500 and
+1500 Hz) does not count as the 1 kHz downlink.
 
-Two earlier stops were in the emulation, not the lab:
+`make verify-5110-lab-traffic-state` saves the call at 24.5 s, runs 200 ms
+recording every DSP I/O write, reloads and requires the same 4,308 writes,
+then clears the call as above. The lab saves its traffic channel, FACCH
+window, codecs and audio state as one serialized block. Without restoring
+that block the replay diverges after 4 ms. Lua key timers are outside the
+machine image, so only Answer is scheduled before the save; the restored
+branch presses End at the ordinary run's time.
+
+Five problems were in the emulation, not the lab:
 
 - **Staged core.** The DSP first fell silent 0.08 s after the command on a
   repeated `ABDST` (`e3e0` at `abb3`), then on nine further unadmitted
@@ -981,25 +1002,38 @@ Two earlier stops were in the emulation, not the lab:
   echo (`check-c54x-rom4-coherent`). The MCU never reads `0aa`.
   `check-c54x-backend-requests` checks that an MCU parameter in shared `0855`
   no longer masks a request.
+- **Lost receive windows.** About 30 % of timeslot-1 receive windows heard
+  ARFCN 0, the neighbour-monitor word for an empty BA list, and half the
+  downlink FACCH blocks were lost (RXQUAL 5-7). The DSP's synthesizer queue
+  builder (`a1d6`) runs once per frame. It reads its event mask from the
+  program table at `a26f - [197e]` with `READA *AR2` (`a1e7`) and loads it
+  with the next instruction, `LD *AR2,B` (`a1e8`). The core wrote READA's
+  RAM destination in Execute but let that adjacent read see the stale word,
+  so the mask was whatever `12c8` last held. Masks `fffa` and `ffee` queue
+  the monitor load without the return to 35 (`0fb4`). Frame type 0 selects
+  `000f`: transmit (`0299`), monitor (`09ec`) and receive (`0fb4`) every
+  frame. READA now uses the same-location bypass as other copies
+  ([READA RAM bypass](c54x_execution_contracts.md#rom4-speech-path-forms)).
+  Every receive window is now on 35 and no FACCH block is resent before
+  clearing.
+- **Speech-path forms.** Downlink speech reached `STL A,-8,*AR5` in a `BD`
+  delay (`ab16`), the codec port's interrupt reached `RPT PSHD *AR0+` over
+  memory-mapped registers including SP and AR0 (`b687`), and a microphone
+  signal reached `MAC *AR4,#7ef8,A` in a `BD` delay (`b081`). Each is
+  admitted with its own section
+  ([ROM4 speech-path forms](c54x_execution_contracts.md#rom4-speech-path-forms)).
 
 Open:
 
-- **Lost receive windows.** About half the downlink FACCH blocks are lost:
-  the DSP posts a failed block, or none. In about 30 % of timeslot-1 receive
-  windows the DSP's port-4 transfer queue has moved the synthesizer to its
-  neighbour-monitor word (ARFCN 0, an empty BA slot) and has not queued the
-  return to 35 (`0fb4`). The lab therefore delivers silence for that window.
-  Latching the channel when the transfer is shifted out, instead of when
-  port 32 is written, makes no difference, so the missing retune comes from
-  the DSP's schedule. LAPDm recovery covers the losses; three
-  retransmissions in this run. The phone's own Measurement Reports agree,
-  with RXQUAL-FULL 5–7.
-- **Speech.** With bit `0x800` the lab fills every traffic block not stolen
-  for FACCH with a GSM 06.10 1 kHz tone. The erased windows then turn speech
-  into false FACCH detections, and the call does not complete, so speech is
-  opt-in. The phone's uplink speech blocks are counted but not decoded to
-  audio.
-- **Save states.** The lab's traffic channel is not saved.
+- **Earpiece level.** The decoded 1 kHz tone reaches the earpiece at about
+  amplitude 5-6 for an 8192 input, about -63 dB. The microphone's sidetone
+  is at 256 and the uplink carries the microphone tone at 23,500. The DSP's
+  downlink gain, the earpiece volume setting and COBBA's PCM word format are
+  not separated.
+- **Uplink DTX.** SI6 allows uplink DTX; with a silent microphone most
+  uplink speech blocks are not valid speech. The gate drives the microphone.
+- **FACCH loss with speech.** One Channel Release was resent after T200 in
+  the speech run; the cause was not traced.
 
 ### Tuned laboratory carrier
 

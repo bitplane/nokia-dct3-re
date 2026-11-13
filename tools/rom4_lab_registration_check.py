@@ -139,6 +139,9 @@ def check_lcd(directory, expected):
 
 
 TCH_START = re.compile(r'npe3_tch_start: first_frame=(\d+) timeslot=1 tsc=2 ')
+TCH_SPEECH = re.compile(r'npe3_tch_start: .* speech=tone_1000hz ')
+TCH_AUDIO = re.compile(r'npe3_tch_audio: earpiece_hz=1000 earpiece_blocks=(\d+) earpiece_tone_blocks=(\d+) '
+                       r'earpiece_tone_amplitude=\d+ microphone_hz=500 uplink_blocks=(\d+) uplink_tone_blocks=(\d+) ')
 TCH_UPLINK = re.compile(r'npe3_tch_uplink: channel=(facch|sacch) start_frame=(\d+) octets=([0-9a-f]{46}) exact_code=(\d)')
 TCH_REPLY = re.compile(r'npe3_tch_facch: kind=(\w+) uplink_start_frame=(\d+) ')
 TCH_ASSIGNMENT = re.compile(r'npe3_raw_assignment: confirmed_start_frame=(\d+) start_frame=(\d+) ')
@@ -191,6 +194,31 @@ def check_traffic_call(text):
             raise ValueError(f'{kind} is not bound to the first {message}')
     if int(start[0]) > frames['sabm']:
         raise ValueError('FACCH uplink precedes the traffic channel')
-    return dict(tch_first_frame=int(start[0]), **{f'tch_{name}_frame': frame for name, frame in frames.items()},
-                measurement_reports=len(reports),
-                facch_retransmissions=text.count('npe3_tch_facch_recovery:'))
+    result = dict(tch_first_frame=int(start[0]), **{f'tch_{name}_frame': frame for name, frame in frames.items()},
+                  measurement_reports=len(reports),
+                  facch_retransmissions=text.count('npe3_tch_facch_recovery:'))
+    if TCH_SPEECH.search(text):
+        result.update(check_traffic_audio(text))
+    return result
+
+
+def check_traffic_audio(text):
+    """Require the lab's tones through the native speech codecs both ways."""
+    audio = TCH_AUDIO.findall(text)
+    if len(audio) != 1:
+        raise ValueError('missing unique traffic-channel audio summary')
+    earpiece, earpiece_tone, uplink, uplink_tone = map(int, audio[0])
+    # Each count is of 20 ms blocks; muted and lost blocks are expected.
+    for name, blocks, tone in (('earpiece 1 kHz', earpiece, earpiece_tone), ('uplink 500 Hz', uplink, uplink_tone)):
+        if tone < 50 or 2 * tone < blocks:
+            raise ValueError(f'{name} tone in only {tone} of {blocks} blocks')
+    return dict(earpiece_tone_blocks=earpiece_tone, uplink_tone_blocks=uplink_tone)
+
+
+def check_roundtrip(text):
+    """Require the mid-call save to reload and replay the DSP's I/O exactly."""
+    if not re.search(r'state_roundtrip: result=pass ', text):
+        raise ValueError('state round trip did not pass')
+    if not re.search(r'rom4_codec_replay: result=pass ', text):
+        raise ValueError('DSP I/O diverged after reloading the mid-call state')
+    return dict(state_roundtrip='pass')

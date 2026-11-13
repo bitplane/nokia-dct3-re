@@ -42,6 +42,17 @@ public:
 	std::uint64_t first_frame() const { return m_first; }
 	void set_speech_source(std::function<gsm::tch_f::packed_speech_frame()> source) { m_speech_source=std::move(source); }
 
+	// Every saved field, each trivially copyable; the speech source is the
+	// owner's to rebuild.
+	template <typename F> void visit_state(F &&field)
+	{
+		field(m_active);field(m_timeslot);field(m_tsc);
+		field(m_first);field(m_downlink_next);field(m_uplink_next);
+		field(m_sacch);field(m_transmitter.live_state());field(m_receiver.live_state());
+		field(m_downlink_last);field(m_traffic_frames);field(m_traffic_count);
+		field(m_sacch_bursts);field(m_sacch_mask);field(m_sacch_start);
+	}
+
 	// FACCH/F steals the next speech block that has not started transmission.
 	void send_facch(block const &octets)
 	{

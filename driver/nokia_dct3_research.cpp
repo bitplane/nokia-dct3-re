@@ -13,6 +13,9 @@
 #include "nokia_rf_lab_bcch.h"
 #include "gsm_rach.h"
 #include "gsm_normal_p27.h"
+#include <cmath>
+#include <cstring>
+#include <type_traits>
 #include "nokia_radio_timing.h"
 
 namespace nokia_dct3 {
@@ -205,6 +208,12 @@ void dct3_rf_adc_fixture_state::machine_start()
 	nokia_dct3_state::machine_start();
 	m_candidate_timer=timer_alloc(FUNC(dct3_rf_adc_fixture_state::candidate_receive_start),this);
 	m_transmit_timer=timer_alloc(FUNC(dct3_rf_adc_fixture_state::candidate_transmit_start),this);
+	m_codec_timer=timer_alloc(FUNC(dct3_rf_adc_fixture_state::codec_frame),this);
+	// Size the serialized traffic-channel block once; its layout is fixed.
+	visit_tch_state([this](auto &field) { m_tch_state.resize(m_tch_state.size()+sizeof(field)); });
+	save_item(NAME(m_tch_state));
+	machine().save().register_presave(save_prepost_delegate(FUNC(dct3_rf_adc_fixture_state::save_tch_state),this));
+	machine().save().register_postload(save_prepost_delegate(FUNC(dct3_rf_adc_fixture_state::load_tch_state),this));
 	save_item(NAME(m_transmit_compare_written));
 	save_item(NAME(m_agch_start_frame));
 	save_item(NAME(m_agch_octets));
@@ -276,7 +285,7 @@ void dct3_rf_adc_fixture_state::machine_reset()
 	m_call_rr_sequence=0xff;
 	m_call_release_start_frame=~u64(0);m_call_channel_release_sent=false;
 	m_lu_acknowledged=false;m_release_start_frame=~u64(0);
-	m_tch.stop();m_tch_stop_frame=m_tch_samples_frame=~u64(0);
+	m_tch.stop();m_codec_timer->adjust(attotime::never);m_tch_stop_frame=m_tch_samples_frame=~u64(0);
 	m_normal_count=0;m_contention_active=false;
 	m_page_identity_valid=m_page_pending=false;
 	m_page_identity.fill(0);m_page_phase=m_page_offset=0;
@@ -817,16 +826,48 @@ void dct3_rf_adc_fixture_state::receive_normal_uplink(std::array<u16,15> const &
 	}
 }
 
-void dct3_rf_adc_fixture_state::start_traffic_channel(u64 frame)
+template <typename F> void dct3_rf_adc_fixture_state::visit_tch_state(F &&field)
+{
+	m_tch.visit_state(field);
+	field(m_facch_send);field(m_facch_receive);field(m_facch_t200);
+	field(m_facch_window);field(m_facch_window_count);
+	field(m_tch_stop_frame);field(m_tch_samples_frame);field(m_tch_samples);
+	field(m_tch_codec_state);field(m_tch_speech_enabled);
+	field(m_tch_tone_phase);field(m_tch_speech_frames);
+	field(m_tch_speech);field(m_tch_bad_speech);field(m_tch_unreadable);
+	field(m_earpiece);field(m_earpiece_at);field(m_microphone_phase);
+	field(m_earpiece_meter);field(m_uplink_meter);
+}
+
+void dct3_rf_adc_fixture_state::save_tch_state()
+{
+	m_facch_window_count=std::min<size_t>(m_facch_outstanding.size(),m_facch_window.size());
+	std::copy_n(m_facch_outstanding.begin(),m_facch_window_count,m_facch_window.begin());
+	m_tch_codec_state={m_tch_codec.snapshot(),m_tch_uplink_codec.snapshot()};
+	size_t at=0;
+	visit_tch_state([&](auto &field) {
+		static_assert(std::is_trivially_copyable_v<std::remove_reference_t<decltype(field)>>);
+		std::memcpy(m_tch_state.data()+at,&field,sizeof(field));at+=sizeof(field);
+	});
+}
+
+void dct3_rf_adc_fixture_state::load_tch_state()
+{
+	size_t at=0;
+	visit_tch_state([&](auto &field) { std::memcpy(&field,m_tch_state.data()+at,sizeof(field));at+=sizeof(field); });
+	m_facch_outstanding.assign(m_facch_window.begin(),m_facch_window.begin()+m_facch_window_count);
+	if (!m_tch_codec.restore(m_tch_codec_state[0]) || !m_tch_uplink_codec.restore(m_tch_codec_state[1]))
+		fatalerror("laboratory TCH: invalid codec state in save image\n");
+	set_tch_speech_source();
+}
+
+void dct3_rf_adc_fixture_state::set_tch_speech_source()
 {
 	// Optionally fill every traffic block not stolen for FACCH with speech,
 	// as a BTS does; otherwise the blocks stay empty and decode as BFI. One
 	// tone period is eight samples at 8 kHz, about -12 dBFS.
-	m_tch_codec.reset();
-	m_tch_tone_phase=m_tch_speech_frames=0;
-	bool const speech=ioport("LAB_BTS")->read()&0x800;
-	if (!speech) m_tch.set_speech_source(nullptr);
-	else m_tch.set_speech_source([this] {
+	if (!m_tch_speech_enabled) { m_tch.set_speech_source(nullptr); return; }
+	m_tch.set_speech_source([this] {
 		static constexpr s16 tone[8]={0,5793,8192,5793,0,-5793,-8192,-5793};
 		nokia_gsm_fr_codec::pcm_block pcm{};
 		for (auto &sample:pcm) sample=tone[m_tch_tone_phase++&7];
@@ -835,14 +876,73 @@ void dct3_rf_adc_fixture_state::start_traffic_channel(u64 frame)
 		++m_tch_speech_frames;
 		return frame;
 	});
+}
+
+void dct3_rf_adc_fixture_state::start_traffic_channel(u64 frame)
+{
+	m_tch_codec.reset();m_tch_uplink_codec.reset();
+	m_tch_tone_phase=m_tch_speech_frames=0;
+	m_tch_speech_enabled=ioport("LAB_BTS")->read()&0x800;
+	set_tch_speech_source();
 	// The Assignment Command's Channel Description: TCH/F, TN1, TSC 2.
 	m_tch.start(frame,1,2,m_sacch_blocks);
 	m_facch_send=m_facch_receive=0;
 	m_facch_outstanding.clear();m_facch_t200=~u64(0);
 	m_tch_stop_frame=m_tch_samples_frame=~u64(0);
 	m_tch_speech=m_tch_bad_speech=m_tch_unreadable=0;
+	m_earpiece_at=m_microphone_phase=0;
+	m_earpiece_meter=m_uplink_meter=tone_meter{};
+	m_codec_timer->adjust(attotime::from_hz(8'000),0,attotime::from_hz(8'000));
 	machine().logerror("npe3_tch_start: first_frame=%u timeslot=1 tsc=2 sacch=si5,si6 speech=%s codec=%s raw_adc_only=1 physical_claim=0\n",
-		unsigned(m_tch.first_frame()),speech ? "tone_1000hz" : "empty",m_tch_codec.available() ? "gsm_06_10" : "unavailable");
+		unsigned(m_tch.first_frame()),m_tch_speech_enabled ? "tone_1000hz" : "empty",m_tch_codec.available() ? "gsm_06_10" : "unavailable");
+}
+
+void dct3_rf_adc_fixture_state::stop_traffic_channel()
+{
+	m_tch.stop();
+	m_codec_timer->adjust(attotime::never);
+	machine().logerror("npe3_tch_audio: earpiece_hz=1000 earpiece_blocks=%u earpiece_tone_blocks=%u earpiece_tone_amplitude=%d microphone_hz=%u uplink_blocks=%u uplink_tone_blocks=%u uplink_tone_amplitude=%d physical_claim=0\n",
+		m_earpiece_meter.blocks,m_earpiece_meter.tone_blocks,m_earpiece_meter.peak,m_tch_speech_enabled ? 500 : 0,
+		m_uplink_meter.blocks,m_uplink_meter.tone_blocks,m_uplink_meter.peak);
+}
+
+void dct3_rf_adc_fixture_state::measure_tone(tone_meter &meter,nokia_gsm_fr_codec::pcm_block const &block,double hz)
+{
+	// A 160-sample block resolves 50 Hz bins. The tone counts when it stands
+	// well above the bins a quarter of its frequency either side, which the
+	// other tone, its sidetone and their harmonics do not reach.
+	auto const amplitude=[&block](double frequency) {
+		double in_phase=0,quadrature=0;
+		for (unsigned at=0;at<block.size();++at)
+		{
+			double const phase=2*M_PI*frequency*at/8'000;
+			in_phase+=block[at]*std::cos(phase);quadrature+=block[at]*std::sin(phase);
+		}
+		return 2*std::hypot(in_phase,quadrature)/block.size();
+	};
+	if (std::all_of(block.begin(),block.end(),[](s16 sample) { return !sample; })) return;
+	++meter.blocks;
+	double const tone=amplitude(hz);
+	meter.peak=std::max(meter.peak,s32(std::lround(tone)));
+	if (tone>=1 && tone>4*std::max(amplitude(hz*0.75),amplitude(hz*1.25))) ++meter.tone_blocks;
+}
+
+TIMER_CALLBACK_MEMBER(dct3_rf_adc_fixture_state::codec_frame)
+{
+	// The lab stands in for COBBA's 8 kHz PCM frame strobe on the DSP serial
+	// port; the existing untimed boot echo keeps its loopback frames.
+	auto &codec=*subdevice<nokia_cobba_device>("cobba");
+	if (codec.codec_serial_loopback()) return;
+	auto &backend=*subdevice<nokia_dsp_c54x_device>("dsp_c54x");
+	u16 output=0;
+	backend.codec_transmit_frame(output);
+	static constexpr s16 microphone[16]={0,3135,5793,7568,8192,7568,5793,3135,0,-3135,-5793,-7568,-8192,-7568,-5793,-3135};
+	backend.codec_receive_frame(m_tch_speech_enabled ? u16(microphone[m_microphone_phase++&15]) : 0);
+	m_earpiece[m_earpiece_at++]=s16(output);
+	if (m_earpiece_at<m_earpiece.size()) return;
+	m_earpiece_at=0;
+	codec.write_earpiece_pcm(m_earpiece);
+	measure_tone(m_earpiece_meter,m_earpiece,1'000);
 }
 
 void dct3_rf_adc_fixture_state::receive_traffic_uplink(std::array<u16,15> const &words,u64 frame)
@@ -852,7 +952,13 @@ void dct3_rf_adc_fixture_state::receive_traffic_uplink(std::array<u16,15> const 
 	using kind=nokia_rf_lab::traffic_channel::uplink_kind;
 	for (auto const &event:m_tch.uplink(frame,burst))
 	{
-		if (event.kind==kind::speech) { ++m_tch_speech;continue; }
+		if (event.kind==kind::speech)
+		{
+			++m_tch_speech;
+			nokia_gsm_fr_codec::pcm_block pcm{};
+			if (m_tch_uplink_codec.decode(event.speech,pcm)) measure_tone(m_uplink_meter,pcm,500);
+			continue;
+		}
 		if (event.kind==kind::bad_speech) { ++m_tch_bad_speech;continue; }
 		bool const sacch=gsm::tch_f::full_rate_slot(event.frame,1)==gsm::tch_f::tdma_slot_kind::sacch;
 		std::string packed;
@@ -909,20 +1015,21 @@ void dct3_rf_adc_fixture_state::receive_facch(gsm::tch_f::packed_control_block c
 	auto &network=*subdevice<nokia_gsm_network_device>("gsm_network");
 	std::vector<u8> message;
 	char const *kind="rr";
+	u8 kind_index=0;
 	if ((l3[0]&15)==3 && (l3[1]&0x3f)==0x07)
 	{
 		auto const ack=network.connect_acknowledge(l3[0]);
-		message.assign(ack.begin(),ack.end());kind="connect_acknowledge";
+		message.assign(ack.begin(),ack.end());kind_index=0;kind=facch_kinds[kind_index];
 	}
 	else if ((l3[0]&15)==3 && (l3[1]&0x3f)==0x25 && (ioport("LAB_BTS")->read()&32))
 	{
 		auto const release=network.call_release(l3[0]);
-		message.assign(release.begin(),release.end());kind="cc_release";
+		message.assign(release.begin(),release.end());kind_index=1;kind=facch_kinds[kind_index];
 	}
 	else if ((l3[0]&15)==3 && (l3[1]&0x3f)==0x2a && (ioport("LAB_BTS")->read()&32))
 	{
 		auto const release=network.channel_release();
-		message.assign(release.begin(),release.end());kind="channel_release";
+		message.assign(release.begin(),release.end());kind_index=2;kind=facch_kinds[kind_index];
 	}
 	if (message.empty())
 	{
@@ -930,7 +1037,9 @@ void dct3_rf_adc_fixture_state::receive_facch(gsm::tch_f::packed_control_block c
 		send_facch(kind,reply,frame);
 		return;
 	}
-	m_facch_outstanding.push_back({m_facch_send,kind,message});
+	facch_information information{m_facch_send,kind_index,u8(message.size()),{}};
+	std::copy(message.begin(),message.end(),information.layer3.begin());
+	m_facch_outstanding.push_back(information);
 	m_facch_send=(m_facch_send+1)&7;
 	send_facch_information(m_facch_outstanding.back(),frame);
 }
@@ -941,9 +1050,9 @@ void dct3_rf_adc_fixture_state::send_facch_information(facch_information const &
 	gsm::tch_f::packed_control_block lapdm{};
 	lapdm.fill(0x2b);
 	lapdm[0]=3;lapdm[1]=(m_facch_receive<<5)|(information.sequence<<1);
-	lapdm[2]=(information.layer3.size()<<2)|1;
-	std::copy(information.layer3.begin(),information.layer3.end(),lapdm.begin()+3);
-	send_facch(information.kind,lapdm,frame);
+	lapdm[2]=(information.length<<2)|1;
+	std::copy_n(information.layer3.begin(),information.length,lapdm.begin()+3);
+	send_facch(facch_kinds[information.kind],lapdm,frame);
 	// TS 44.006 T200 for FACCH/F is 155 ms; allow for both interleaving delays.
 	m_facch_t200=frame+40;
 }
@@ -1111,7 +1220,7 @@ u16 dct3_rf_adc_fixture_state::sample_r(offs_t component)
 		m_q_latch = sample[1];
 		return u16(sample[0]);
 	}
-	if (m_tch.active() && frame>=m_tch_stop_frame) m_tch.stop();
+	if (m_tch.active() && frame>=m_tch_stop_frame) stop_traffic_channel();
 	if (m_tch.active() && tick%60'000>=7'500 && tick%60'000<7'500+148*48)
 	{
 		// TS1 carries the dummy burst in its idle frame, as on any BCCH carrier.

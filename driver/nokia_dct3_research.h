@@ -93,13 +93,21 @@ private:
 	void fault_observe_w(int state);
 	TIMER_CALLBACK_MEMBER(candidate_receive_start);
 	TIMER_CALLBACK_MEMBER(candidate_transmit_start);
+	TIMER_CALLBACK_MEMBER(codec_frame);
 	void arm_transmit_candidate();
 	void receive_normal_uplink(std::array<u16,15> const &words,u64 frame);
 	void start_traffic_channel(u64 frame);
+	void set_tch_speech_source();
+	void stop_traffic_channel();
+	template <typename F> void visit_tch_state(F &&field);
+	void save_tch_state();
+	void load_tch_state();
 	void receive_traffic_uplink(std::array<u16,15> const &words,u64 frame);
 	void receive_facch(gsm::tch_f::packed_control_block const &block,u64 frame);
 	void send_facch(char const *kind,gsm::tch_f::packed_control_block const &lapdm,u64 frame);
-	struct facch_information { u8 sequence; char const *kind; std::vector<u8> layer3; };
+	// Plain data, so the outstanding window can be saved.
+	struct facch_information { u8 sequence,kind,length; std::array<u8,20> layer3; };
+	static constexpr char const *facch_kinds[]={"connect_acknowledge","cc_release","channel_release"};
 	void send_facch_information(facch_information const &information,u64 frame);
 	void acknowledge_facch(u8 received);
 	void resend_facch(char const *cause,u64 frame);
@@ -133,7 +141,7 @@ private:
 	std::array<std::array<std::array<std::array<s16,2>,148*4>,4>,2> m_sacch_samples{};
 	bool m_lu_acknowledged=false;
 	// TCH/F on TS1 after the Assignment Command, with the network side of
-	// its FACCH LAPDm link (V(S), V(R)). Not saved: a diagnostic lab channel.
+	// its FACCH LAPDm link (V(S), V(R)). Saved as one serialized block.
 	std::array<gsm::tch_f::packed_control_block,2> m_sacch_blocks{};
 	nokia_rf_lab::traffic_channel m_tch;
 	u8 m_facch_send=0,m_facch_receive=0;
@@ -142,9 +150,23 @@ private:
 	u64 m_tch_stop_frame=~u64(0),m_tch_samples_frame=~u64(0);
 	std::array<std::array<s16,2>,148*4> m_tch_samples{};
 	// Downlink speech: a continuous 1 kHz tone, GSM 06.10-encoded per block.
-	nokia_gsm_fr_codec m_tch_codec;
+	nokia_gsm_fr_codec m_tch_codec,m_tch_uplink_codec;
+	bool m_tch_speech_enabled=false;
 	unsigned m_tch_tone_phase=0,m_tch_speech_frames=0;
 	unsigned m_tch_speech=0,m_tch_bad_speech=0,m_tch_unreadable=0;
+	// The lab drives the DSP codec port at 8 kHz during the call: earpiece
+	// words go to COBBA, the microphone carries a 500 Hz tone with speech.
+	struct tone_meter { unsigned blocks=0,tone_blocks=0; s32 peak=0; }; // peak tone amplitude
+	void measure_tone(tone_meter &meter,nokia_gsm_fr_codec::pcm_block const &block,double hz);
+	emu_timer *m_codec_timer=nullptr;
+	nokia_gsm_fr_codec::pcm_block m_earpiece{};
+	unsigned m_earpiece_at=0,m_microphone_phase=0;
+	tone_meter m_earpiece_meter,m_uplink_meter;
+	// Snapshot staging for the serialized block.
+	std::array<facch_information,7> m_facch_window{};
+	u8 m_facch_window_count=0;
+	std::array<nokia_gsm_fr_codec::state,2> m_tch_codec_state{};
+	std::vector<u8> m_tch_state;
 	u64 m_release_start_frame=~u64(0);
 	std::array<std::array<std::array<s16,2>,148*4>,4> m_release_samples{};
 	// Default fill and separate diagnostic pages for unassigned TMSIs.

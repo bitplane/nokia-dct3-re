@@ -1,6 +1,6 @@
 import unittest
 
-from tools.rom4_lab_registration_check import check, check_incoming_call, check_traffic_call
+from tools.rom4_lab_registration_check import check, check_incoming_call, check_roundtrip, check_traffic_call
 
 # Dialogue lines from a native nse1ap5 run (frames 3028-3337).
 LOG = '''native_dsp_reset_line: released=1
@@ -74,6 +74,12 @@ npe3_tch_facch: kind=duplicate_rr uplink_start_frame=5971 octets=01b1012b2b2b2b2
 npe3_tch_uplink: channel=facch start_frame=5988 octets=0153012b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b exact_code=1
 npe3_tch_facch: kind=disc_ua uplink_start_frame=5988 octets=0173012b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b
 '''
+# The same call carrying the lab's tones both ways.
+SPEECH = TRAFFIC.replace('speech=empty', 'speech=tone_1000hz') + (
+    'npe3_tch_audio: earpiece_hz=1000 earpiece_blocks=307 earpiece_tone_blocks=206 earpiece_tone_amplitude=325 '
+    'microphone_hz=500 uplink_blocks=230 uplink_tone_blocks=202 uplink_tone_amplitude=23552 physical_claim=0\n')
+ROUNDTRIP = ('[luaengine] state_roundtrip: result=pass timer_delta=0000 mode=0000 requested_at=24.500000 t=24.500000\n'
+             '[luaengine] rom4_codec_replay: result=pass reference_events=4308 restored_events=4308 window=0.16\n')
 
 
 class LabRegistrationCheckTest(unittest.TestCase):
@@ -141,6 +147,24 @@ class LabRegistrationCheckTest(unittest.TestCase):
                 check_traffic_call(TRAFFIC.replace(old, new))
         with self.assertRaises(ValueError):
             check_traffic_call(TRAFFIC + 'native_dsp_reset_line: released=0\n')
+
+    def test_traffic_speech_passes(self):
+        result = check_traffic_call(SPEECH)
+        self.assertEqual((result['earpiece_tone_blocks'], result['uplink_tone_blocks']), (206, 202))
+
+    def test_traffic_speech_needs_both_tones(self):
+        for old, new in (('earpiece_tone_blocks=206', 'earpiece_tone_blocks=100'),
+                         ('uplink_tone_blocks=202', 'uplink_tone_blocks=40'),
+                         ('npe3_tch_audio:', 'dropped:')):
+            with self.subTest(old=old), self.assertRaises(ValueError):
+                check_traffic_call(SPEECH.replace(old, new))
+
+    def test_roundtrip_needs_exact_replay(self):
+        self.assertEqual(check_roundtrip(ROUNDTRIP), {'state_roundtrip': 'pass'})
+        for old, new in (('state_roundtrip: result=pass', 'state_roundtrip: result=fail'),
+                         ('rom4_codec_replay: result=pass', 'rom4_codec_replay: result=fail')):
+            with self.subTest(old=old), self.assertRaises(ValueError):
+                check_roundtrip(ROUNDTRIP.replace(old, new))
 
 
 if __name__ == '__main__':
