@@ -33,6 +33,16 @@ u16 reverse_carry_index(u16 address, u16 index, bool subtract)
 	return bitswap<16>(u16(subtract ? left - right : left + right), 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15);
 }
 
+constexpr bool popd_own_pointer(u16 word, u16 destination)
+{
+	// SPRU131G tables 7-7/7-11: a POPD into ARx or SP is unprotected for the
+	// next pointer use. Within a repeat the DAGEN updates of SP and of the
+	// popping pointer survive; the popped word is not written over them.
+	u8 const mode = word;
+	return (word & 0xff00) == 0x8b00 && (destination == 0x18 ||
+		(BIT(mode, 7) && (mode & 0x78) && mode < 0xe0 && destination == 0x10 + (mode & 7)));
+}
+
 s32 accumulator_high17(u64 value)
 {
 	const u32 high = (value >> 16) & 0x1ffff;
@@ -1901,8 +1911,8 @@ void tms320c54x_device::pipeline_step()
 			bool const delay_shift = staged_shifted_smem(word) && u8(word) < 0x98;
 			bool const delay_multiply = ((word & 0xfc00) == 0x2000 || (word & 0xf800) == 0x2800) &&
 				(u8(word) < 0xa0 || (u8(word) >= 0xe0 && u8(word) <= 0xf8));
-			// MPY Smem,#lk fills a two-word delay; T and the literal are retained in Read.
-			bool const delay_immediate_multiply = (word & 0xfe00) == 0x6200 && u8(word) < 0x98 && m_pipeline_delay_decode_words == 2;
+			// MPY/MAC Smem,#lk fill a two-word delay; T and the literal are retained in Read.
+			bool const delay_immediate_multiply = ((word & 0xfe00) == 0x6200 || (word & 0xfc00) == 0x6400) && u8(word) < 0x98 && m_pipeline_delay_decode_words == 2;
 			// MPYA/MASA/MACA/MACAR publish Smem to T in Read;
 			// their independently owned B result retires before redirect.
 			bool const delay_accumulator_multiply = ((word & 0xf9ff) == (0x3100 | u8(word))) &&
@@ -2026,14 +2036,17 @@ void tms320c54x_device::pipeline_step()
 		{
 			logerror("%s: staged extended T/TRN store repeat/control composition is unsupported\n", machine().describe_context()); m_illegal = true; return;
 		}
-		// Admit the complete shifted store only for the tested RPTBD owner;
-		// other delayed transfers retain their independent exclusions.
-		bool rptbd_delay_store = false;
+		// Admit the complete shifted store only for the tested RPTBD and BD
+		// owners; other delayed transfers retain their independent exclusions.
+		bool delay_store = false;
 		if (completing_shift_delay && staged_shifted_memory_store(word, m_pipeline_immediate[2]))
+		{
+			delay_store = m_pipeline_control_words && m_pipeline_control_word == 0xf273;
 			for (unsigned stage = 3; stage < 6; ++stage)
 				if (m_pipeline_valid[stage] && m_pipeline_address[stage] == m_pipeline_control_address && m_pipeline_word[stage] == 0xf272)
-					rptbd_delay_store = true;
-		if (completing_shift_delay && m_pipeline_valid[2] && (m_pipeline_immediate[2] & 0xfee0) != 0x0c40 && !staged_shifted_memory_arithmetic(m_pipeline_immediate[2]) && !rptbd_delay_store)
+					delay_store = true;
+		}
+		if (completing_shift_delay && m_pipeline_valid[2] && (m_pipeline_immediate[2] & 0xfee0) != 0x0c40 && !staged_shifted_memory_arithmetic(m_pipeline_immediate[2]) && !delay_store)
 		{
 			logerror("%s: staged control-delay Smem extension is not an admitted shifted load instruction=%06x word=%04x operation=%04x\n", machine().describe_context(), unsigned(m_pipeline_address[2]), word, m_pipeline_immediate[2]); m_illegal = true; return;
 		}
@@ -2684,8 +2697,12 @@ void tms320c54x_device::pipeline_step()
 		m_pipeline_operand[3] = !extended ? basic_address(3, mode) : mode == 0xf8 ? m_pipeline_immediate[3] : long_offset_address(mode, ar, s16(m_pipeline_immediate[3]), 3);
 		u16 const source = m_pipeline_operand[3];
 		bool const modifying = extended ? mode != 0xf8 && (mode & 0x78) != 0x60 : BIT(mode, 7) && (mode & 0x78);
+		// Inside a repeat, SP and the modified pointer AR read as their live
+		// Read-stage values; the matching repeated POPD keeps its own DAGEN
+		// updates (ROM4's RPT PSHD *AR0+ context save, rpt_context_save).
 		bool const self_ar = modifying && source == 0x10 + ar;
-		if (source == 0x18 || self_ar || (source >= 0x20 && source < 0x60))
+		bool const repeat_body = m_pipeline_repeat_active && m_pipeline_address[3] == m_pipeline_repeat_address;
+		if (((extended || !repeat_body) && (source == 0x18 || self_ar)) || (source >= 0x20 && source < 0x60))
 		{
 			// A prototype exclusion is not a hardware trap: discard address
 			// preview side effects before returning without stack allocation.
@@ -2702,7 +2719,8 @@ void tms320c54x_device::pipeline_step()
 		unsigned const ar = indirect_ar(mode, 3); u16 const previous_ar = m_ar[ar], previous_st0 = m_st0;
 		m_pipeline_operand_address[3] = !extended ? basic_address(3, mode) : mode == 0xf8 ? m_pipeline_immediate[3] : long_offset_address(mode, ar, s16(m_pipeline_immediate[3]), 3);
 		u16 const destination = m_pipeline_operand_address[3];
-		bool const mapped = (destination >= 8 && destination <= 0x17) || (destination >= 0x19 && destination <= 0x1d);
+		bool const repeat_body = m_pipeline_repeat_active && m_pipeline_address[3] == m_pipeline_repeat_address;
+		bool const mapped = (destination >= 8 && destination <= 0x1d && destination != 0x18) || (destination == 0x18 && repeat_body);
 		if ((extended && destination < 0x60) || (destination < 0x60 && !mapped) || (destination >= 0x1a && destination <= 0x1d && m_pipeline_block_active && m_pipeline_block_body[3]))
 		{
 			// Extended mapped destinations need their own DAGEN/write arbitration tests.
@@ -3316,7 +3334,8 @@ void tms320c54x_device::pipeline_step()
 			bool const conflict = m_pipeline_valid[5] && (staged_store(m_pipeline_word[5]) || staged_accumulator_mmr_store(m_pipeline_word[5]) || staged_rmw(m_pipeline_word[5]) || staged_shifted_memory_store(m_pipeline_word[5], m_pipeline_immediate[5])) &&
 				m_pipeline_operand_address[5] >= 0x10 && m_pipeline_operand_address[5] <= 0x19;
 			m_pipeline_early_write_deferred[4] = conflict;
-			if (!conflict && !late_popm_read)
+			bool const own_pointer = popd_own_pointer(m_pipeline_word[4], destination) && m_pipeline_repeat_active && m_pipeline_address[4] == m_pipeline_repeat_address;
+			if (!conflict && !late_popm_read && !own_pointer)
 			{
 				data_write(destination, m_pipeline_operand[4], 4);
 				if (destination == 0x18) pipeline_delay_compiler_sp(m_pipeline_direct_sp[4]);
@@ -4025,7 +4044,8 @@ bool tms320c54x_device::pipeline_execute()
 	else if ((m_op & 0xff00) == 0x8b00)
 	{
 		u16 const destination = m_pipeline_operand_address[5];
-		if (destination < 0x10 || destination > 0x19 || m_pipeline_early_write_deferred[5])
+		bool const own_pointer = popd_own_pointer(m_op, destination) && m_pipeline_repeat_active && m_pipeline_address[5] == m_pipeline_repeat_address;
+		if ((destination < 0x10 || destination > 0x19 || m_pipeline_early_write_deferred[5]) && !own_pointer)
 			data_write(destination, m_pipeline_operand[5]);
 		if (staged_extended_pop(m_op)) ++m_pc;
 	}
@@ -4778,9 +4798,9 @@ u16 tms320c54x_device::pipeline_read_data(u16 address, unsigned stage)
 		if (address == (m_pipeline_operand_address[5] ^ 1)) return m_pipeline_immediate[5];
 	}
 	if (address >= 0x60 && m_pipeline_valid[5] && address == m_pipeline_operand_address[5] &&
-		(staged_data_copy(m_pipeline_word[5]) || staged_port_read(m_pipeline_word[5]) ||
+		(staged_data_copy(m_pipeline_word[5]) || staged_port_read(m_pipeline_word[5]) || staged_read_a(m_pipeline_word[5]) ||
 		(staged_mvdd(m_pipeline_word[5]) && !staged_mvdd(m_pipeline_word[stage]))))
-		// Copies and PORTR already retained their Read sample. An adjacent
+		// Copies, PORTR and READA already retained their Read sample. An adjacent
 		// consumer must not see the old RAM word while EB is still pending.
 		// Forward the sample without another I/O access; preserve the EB write.
 		// Pipelined MVDD iterations retain their separately qualified

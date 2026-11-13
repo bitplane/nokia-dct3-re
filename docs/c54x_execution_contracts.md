@@ -5094,6 +5094,45 @@ Low-page operands, memory-count headers, nested blocks,
 interrupt composition, physical RAM banks and bus phases are not newly
 qualified by these gates.
 
+## ROM4 speech-path forms
+
+A lab traffic channel with speech both ways reached four more forms. Each
+section failed on the earlier core.
+
+`reada_ram_bypass` (24 cases/restores): `READA` into RAM followed, with zero,
+one or two NOPs, by a load of the same word, through `*AR2` or an absolute
+address. READA writes RAM in Execute; SPRU131G 7.3.2's same-location bypass
+gives the adjacent load the retained program word, as for copies and PORTR.
+Before, the load read the stale word (`5aa5` for `000f`). ROM4's synthesizer
+queue builder depends on it: `a1e7 READA *AR2; a1e8 LD *AR2,B` reads the
+frame's event mask, and the stale word dropped the receive retune from about
+30 % of traffic frames ([traffic channel](rom4_rf_control.md#traffic-channel)).
+
+`branch_delay_shift_store` (320): two-word `STL/STH src,SHIFT,Smem` filling
+both `BD` delay words, as the RPTBD owner already allowed (`ab16`:
+`STL A,-8,*AR5` under `BD ab1d`). Four destination forms, both accumulators,
+high/low, shifts -16/-8/-1/0/15, SXM and two pages; one store, then the
+branch target.
+
+`rpt_context_save` (48): the codec-port interrupt's context save and restore,
+`STM #first,AR0; RPT #n; PSHD *AR0+` and `STM #last,AR0; RPT #n; POPD *AR0-`,
+over the three ROM4 ranges (`0e..1c` at `b682`, `12..1c` at `b5ed`, `10..19`
+at `b70c`), with the range clobbered in between. The ranges include AR0, the
+pointer, and SP. SPRU131G tables 7-7 and 7-11 list POPD into ARx or SP as
+unprotected for the next pointer or stack use. The model therefore lets the
+repeat's own DAGEN updates of SP and of the popping pointer stand: a
+repeated PSHD reads SP and its pointer as live Read-stage values, and a
+repeated POPD into SP or into its own modified pointer does not overwrite
+them. The routine's final `POPM AR0` restores AR0. Every register in the
+range must come back unchanged. These PSHD sources and POPD destinations
+outside a repeat, and extended-address forms, remain rejected. The
+choice is a model of the documented latency, not a silicon measurement.
+
+`delayed_immediate_mac` (128): two-word `MAC Smem,#lk,src,dst` filling a `BD`
+delay (`b081`: `MAC *AR4,#7ef8,A` under `BD b09d`), extending the delayed
+`MPY Smem,#lk` admission. Both source and destination accumulators, FRCT,
+four memory words, four literals and two pages; T takes the memory word.
+
 ## Repeated RAM square-accumulate
 
 Short RAM-source SQURA/SQURS use the existing per-iteration pipeline issue
