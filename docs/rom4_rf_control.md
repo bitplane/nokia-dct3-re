@@ -1026,10 +1026,27 @@ Five problems were in the emulation, not the lab:
 Open:
 
 - **Earpiece level.** The decoded 1 kHz tone reaches the earpiece at about
-  amplitude 5-6 for an 8192 input, about -63 dB. The microphone's sidetone
-  is at 256 and the uplink carries the microphone tone at 23,500. The DSP's
-  downlink gain, the earpiece volume setting and COBBA's PCM word format are
-  not separated.
+  amplitude 5-6 for an 8192 input, about -63 dB; the sidetone is at 256 and
+  the uplink carries the microphone tone at 23,500. Narrowed down so far:
+  - The lab's speech coding matches libosmocore's `gsm610_bitorder`
+    (TS 45.003 table 2) in all 260 positions.
+  - At decoder entry (`8458`, called from `9ce2`) the 76 parameters at
+    `1390` equal the lab's encoded frame exactly.
+  - `check-c54x-rom4-fr-decoder` passes bit-exact on the staged core, but
+    the live decoder output in `1496` already has the tone at about 90, and
+    the earpiece then gets about 1/16 of that.
+  - The output is not monotonic in level: tones of 2048, 4096, 5488, 6553
+    and 8192 decode to about 3978, 84, 795, 1215 and 93. That points at
+    decoder state, not a gain.
+  - The decoder initialiser `8449` puts its state at `1100..120a`, and its
+    hook `2432` is a bare RET. During the call other routines write that
+    region every frame with absolute addresses: `6149` zeroes `11fa`,
+    `11fb`, `1200` and `1201`, and the post-decoder chain (`95a3`, `ab7c`,
+    `ae..`) and others write `1200..126f`.
+  
+  Next: find where the live call keeps the FR decoder's history, or whether
+  those writers should reach other memory (banking, or an emulated
+  addressing error).
 - **Uplink DTX.** SI6 allows uplink DTX; with a silent microphone most
   uplink speech blocks are not valid speech. The gate drives the microphone.
 - **FACCH loss with speech.** One Channel Release was resent after T200 in
