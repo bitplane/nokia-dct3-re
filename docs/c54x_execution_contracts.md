@@ -6736,7 +6736,7 @@ establish physical timing, acquisition or whole-session parity.
 checks the reset-free ten-second capture against the reviewed structured
 fixture `fixtures/c54x_rom4_staged_checkpoint.json`. The fixture is a
 regression fingerprint, not a physical timing specification. The checker
-requires all 390 records in order, unchanged non-time fields, ordered bounded
+requires all 399 records in order, unchanged non-time fields, ordered bounded
 timestamps, the same half-second ownership epochs, MCU validator `r6=1`, no
 reset/fault, and unique binding of all four observed uploads to their MCU
 source offsets. It does not pin absolute sub-microsecond timestamps. The
@@ -6748,7 +6748,13 @@ The first RF-control writes include two six-write bursts, `2813/0030` at
 `0834/0884/08d4/0924/0974`. Later controls include ascending
 `2727..272d` writes at `4026` in the logged prefix. The observer
 logs only the first 32 controls and first 256 transfer expiries; summaries
-count all 262 controls and 2,878 expiries in this ten-second capture.
+count all 261 controls and 2,874 expiries in this ten-second capture.
+The fixture was re-banked at `1c5ee0f6` from base `eed490b0`. The record
+format gained `owner=` on RF-control rows (`60e01990`), transfer delays moved
+from 77 to 78 ticks, the first RF reads moved from frame 30 to 24, and a
+codec-port sequence (`a5b8..a5ef`: `00f1/00f2` low-memory traffic and BSP
+control `c008/c0c8`) added nine records. The endpoint, validator and host
+traffic are unchanged.
 CPU ILLEGAL must remain clear. In stopped runs, device timer edges alone
 are not further execution. RF-control
 and transfer-expiry parity remain open; these are calibrated bench-device
