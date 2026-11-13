@@ -961,7 +961,7 @@ on timeslot 1 (TSC 2) after CALL CONFIRMED and serves that channel:
 | 5000 | uplink (FACCH) | CONNECT after Answer at 23 s; CONNECT ACKNOWLEDGE; LCD `Call 1` |
 | 5915 | uplink (FACCH) | DISCONNECT after End; the lab sends RELEASE |
 | 5936 | uplink (FACCH) | RELEASE COMPLETE; the lab sends Channel Release |
-| 5993 | uplink (FACCH) | DISC; the lab answers UA |
+| 5954 | uplink (FACCH) | DISC; the lab answers UA |
 
 Twelve SACCH Measurement Reports decode exactly on the way; every one after
 the first reports RXQUAL 0. The phone then returns to the `DCT3 LAB` idle
@@ -969,8 +969,8 @@ frame and camps on timeslot 0 again. The gate binds each network reply to
 the first uplink it answers. It also requires every FACCH uplink to decode
 exactly and at least four Measurement Reports. With speech it requires the
 tone in at least half of the non-silent 20 ms blocks each way, and in at
-least 50 (`npe3_tch_audio`). The run gives 206 of 307 earpiece blocks and
-202 of 230 uplink blocks. A tone counts when it is four times the bins a
+least 50 (`npe3_tch_audio`). The run gives 209 of 290 earpiece blocks and
+202 of 224 uplink blocks. A tone counts when it is four times the bins a
 quarter of its frequency either side, so the earpiece sidetone (500 and
 1500 Hz) does not count as the 1 kHz downlink.
 
@@ -1016,6 +1016,20 @@ Five problems were in the emulation, not the lab:
   ([READA RAM bypass](c54x_execution_contracts.md#rom4-speech-path-forms)).
   Every receive window is now on 35 and no FACCH block is resent before
   clearing.
+- **Earpiece level (a lab artefact).** The earpiece first carried the tone
+  at about 5 for an 8192 input. The decoder (`8458`, from `9ce2`) received
+  the lab's exact parameters, its history (`1100..118a`) was untouched
+  between frames, and it is bit-exact in isolation. The parameters showed
+  why: the steady tone is fully predicted by the long-term predictor, so
+  every subframe has xmaxc 0 and bc 3 (gain 1). A decoder that starts after
+  the encoder, as the handset's does at connect, has an empty history that
+  gain 1 preserves, and decodes only residue (about ±100). Reference libgsm
+  decoding from the first frame gives 8162. The lab now restarts its
+  encoder every 50 frames. The restart frame carries the whole signal as
+  excitation and resynchronises the handset's history. The decoder output
+  is then 8100-8200 and the earpiece gets about 1/16 of it (peak tone
+  amplitude 871), against a 256 sidetone; that step is the DSP's
+  post-decoder gain.
 - **Speech-path forms.** Downlink speech reached `STL A,-8,*AR5` in a `BD`
   delay (`ab16`), the codec port's interrupt reached `RPT PSHD *AR0+` over
   memory-mapped registers including SP and AR0 (`b687`), and a microphone
@@ -1025,32 +1039,11 @@ Five problems were in the emulation, not the lab:
 
 Open:
 
-- **Earpiece level.** The decoded 1 kHz tone reaches the earpiece at about
-  amplitude 5-6 for an 8192 input, about -63 dB; the sidetone is at 256 and
-  the uplink carries the microphone tone at 23,500. Narrowed down so far:
-  - The lab's speech coding matches libosmocore's `gsm610_bitorder`
-    (TS 45.003 table 2) in all 260 positions.
-  - At decoder entry (`8458`, called from `9ce2`) the 76 parameters at
-    `1390` equal the lab's encoded frame exactly.
-  - `check-c54x-rom4-fr-decoder` passes bit-exact on the staged core, but
-    the live decoder output in `1496` already has the tone at about 90, and
-    the earpiece then gets about 1/16 of that.
-  - The output is not monotonic in level: tones of 2048, 4096, 5488, 6553
-    and 8192 decode to about 3978, 84, 795, 1215 and 93. That points at
-    decoder state, not a gain.
-  - The decoder initialiser `8449` puts its state at `1100..120a`, and its
-    hook `2432` is a bare RET. During the call other routines write that
-    region every frame with absolute addresses: `6149` zeroes `11fa`,
-    `11fb`, `1200` and `1201`, and the post-decoder chain (`95a3`, `ab7c`,
-    `ae..`) and others write `1200..126f`.
-  
-  Next: find where the live call keeps the FR decoder's history, or whether
-  those writers should reach other memory (banking, or an emulated
-  addressing error).
 - **Uplink DTX.** SI6 allows uplink DTX; with a silent microphone most
   uplink speech blocks are not valid speech. The gate drives the microphone.
-- **FACCH loss with speech.** One Channel Release was resent after T200 in
-  the speech run; the cause was not traced.
+- **FACCH loss with speech.** Before the encoder restart one Channel
+  Release was resent after T200 in the speech run. It has not recurred
+  since (no resends); the cause was not traced.
 
 ### Tuned laboratory carrier
 

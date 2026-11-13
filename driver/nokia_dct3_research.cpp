@@ -869,6 +869,12 @@ void dct3_rf_adc_fixture_state::set_tch_speech_source()
 	if (!m_tch_speech_enabled) { m_tch.set_speech_source(nullptr); return; }
 	m_tch.set_speech_source([this] {
 		static constexpr s16 tone[8]={0,5793,8192,5793,0,-5793,-8192,-5793};
+		// A steady tone is fully predicted by the long-term predictor, so its
+		// frames carry no excitation (xmaxc 0, bc 3) and a decoder that joins
+		// mid-stream keeps its empty history. Restarting the encoder each
+		// second puts the whole signal back in one frame's excitation, which
+		// resynchronises the handset's decoder; speech does this naturally.
+		if (!(m_tch_speech_frames%50)) m_tch_codec.reset();
 		nokia_gsm_fr_codec::pcm_block pcm{};
 		for (auto &sample:pcm) sample=tone[m_tch_tone_phase++&7];
 		gsm::tch_f::packed_speech_frame frame{};
