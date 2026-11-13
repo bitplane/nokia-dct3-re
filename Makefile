@@ -507,7 +507,7 @@ help:
 	@echo "make verify-5110-lab-registration complete native ROM4 Location Updating on the nse1ap5 laboratory BTS and show the lab operator"
 	@echo "make verify-5110-lab-incoming-call page the registered nse1ap5, answer and end a call on SDCCH (no traffic channel)"
 	@echo "make verify-5110-lab-traffic-call the same call assigned to TCH/F timeslot 1, with FACCH/SACCH, speech both ways and clearing"
-	@echo "make verify-5110-lab-traffic-state save, replay and reload that call mid-conversation, then clear it"
+	@echo "make verify-5110-lab-traffic-state save, replay and reload that call while ringing, connected and clearing"
 	@echo "make verify-5110i-lab-registration complete native ROM4 Location Updating on nse2ap5 with provisioned security records and no restart"
 	@echo "make verify-5110-power-lifecycle check short and sustained NSE-1 power presses (staged CPU by default; NSE1_MACHINE overrides composition)"
 	@echo "make verify-5110-save-state restore ROM4/C54x idle then open the menu (staged CPU by default; NSE1_MACHINE overrides composition)"
@@ -1839,7 +1839,9 @@ verify-5110-lab-traffic-call: build
 	$(PYTHON) tools/run_rom4_lab_registration.py nse1ap5 --traffic-channel
 
 verify-5110-lab-traffic-state: build
-	$(PYTHON) tools/run_rom4_lab_registration.py nse1ap5 --state-roundtrip 24.5
+	@set -e; for at in 22.0 24.5 27.46; do \
+		$(PYTHON) tools/run_rom4_lab_registration.py nse1ap5 --state-roundtrip $$at; \
+	done
 
 verify-5110-power-lifecycle: build
 	@set -eu; mkdir -p "$(NATIVE_SCRATCH_ROOT)"; tmp=""; \

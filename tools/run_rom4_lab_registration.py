@@ -54,18 +54,29 @@ def command(root, run, machine, mame, call=False, traffic=False, roundtrip=None)
             write_bts_config(run, machine, TRAFFIC_BTS_BITS if traffic else CALL_BTS_BITS)
             os.environ.update(CALL_INPUTS)
         if roundtrip is not None:
-            # Lua key timers are outside the machine image: only Answer is
-            # scheduled before the save, and the restored branch presses End
-            # at the same emulated time as the ordinary run.
-            end = 23 + 0.22 + 4
-            if not 23.5 <= roundtrip <= end - 1:
-                raise ValueError('the round trip must fall between Answer and End')
-            os.environ.update({'NOKIA_DCT3_POST_READY_KEYS': 'menu',
-                               'NOKIA_DCT3_STATE_ROUNDTRIP_AT': str(roundtrip),
-                               'NOKIA_DCT3_STATE_ROUNDTRIP_REPLAY_MS': str(ROUNDTRIP_REPLAY_MS),
-                               'NOKIA_DCT3_STATE_ROUNDTRIP_END_KEY': 'menu',
-                               'NOKIA_DCT3_STATE_ROUNDTRIP_END_DELAY_MS':
-                                   str(round((end - roundtrip) * 1000) - ROUNDTRIP_REPLAY_MS)})
+            # Lua key timers are outside the machine image, so every press
+            # after the save comes from the restored branch, at the same
+            # emulated time as the ordinary run: Answer at 23 s, End 4.22 s on.
+            answer, end = 23.0, 23.0 + 0.22 + 4
+            replay = ROUNDTRIP_REPLAY_MS / 1000
+            keys = {'NOKIA_DCT3_STATE_ROUNDTRIP_AT': str(roundtrip),
+                    'NOKIA_DCT3_STATE_ROUNDTRIP_REPLAY_MS': str(ROUNDTRIP_REPLAY_MS)}
+            if 21.9 <= roundtrip <= answer - replay - 0.1:
+                # Ringing: Answer and End both follow the reload.
+                keys.update(NOKIA_DCT3_POST_READY_KEYS='',
+                            NOKIA_DCT3_STATE_ROUNDTRIP_KEYS='menu,menu',
+                            NOKIA_DCT3_STATE_ROUNDTRIP_KEY_DELAY_MS=str(round((answer - roundtrip - replay) * 1000)))
+            elif answer + 0.5 <= roundtrip <= end - 1:
+                # Connected: Answer precedes the save; End follows the reload.
+                keys.update(NOKIA_DCT3_POST_READY_KEYS='menu',
+                            NOKIA_DCT3_STATE_ROUNDTRIP_END_KEY='menu',
+                            NOKIA_DCT3_STATE_ROUNDTRIP_END_DELAY_MS=str(round((end - roundtrip - replay) * 1000)))
+            elif end + 0.22 < roundtrip <= end + 0.6:
+                # Clearing: both presses precede the save.
+                pass
+            else:
+                raise ValueError('the round trip must fall in ringing, the connected call or clearing')
+            os.environ.update(keys)
         # The staged menu script adds the LCD mirror and the staged-CPU end marker.
         script = root / ('tools/rom4_lab_call_restore.lua' if roundtrip is not None else
                          'tools/rom4_lab_call_input.lua' if call else 'tools/c54x_rom4_staged_menu.lua')

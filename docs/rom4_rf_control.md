@@ -974,13 +974,15 @@ least 50 (`npe3_tch_audio`). The run gives 209 of 290 earpiece blocks and
 quarter of its frequency either side, so the earpiece sidetone (500 and
 1500 Hz) does not count as the 1 kHz downlink.
 
-`make verify-5110-lab-traffic-state` saves the call at 24.5 s, runs 200 ms
-recording every DSP I/O write, reloads and requires the same 4,308 writes,
-then clears the call as above. The lab saves its traffic channel, FACCH
-window, codecs and audio state as one serialized block. Without restoring
-that block the replay diverges after 4 ms. Lua key timers are outside the
-machine image, so only Answer is scheduled before the save; the restored
-branch presses End at the ordinary run's time.
+`make verify-5110-lab-traffic-state` saves the call at three points (22.0 s
+ringing, 24.5 s connected, 27.46 s clearing between RELEASE COMPLETE and
+DISC), runs 200 ms recording every DSP I/O write, reloads and requires the
+same writes, then completes the call as above. At 24.5 s that is 4,308
+writes. The lab saves its traffic channel, FACCH window, codecs and audio
+state as one serialized block. Without restoring that block the connected
+replay diverges after 4 ms. Lua key timers are outside the machine image,
+so every press after the save comes from the restored branch at the
+ordinary run's time (Answer 23.0 s, End 27.22 s).
 
 Five problems were in the emulation, not the lab:
 
