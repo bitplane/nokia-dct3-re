@@ -312,22 +312,22 @@ class NativeToneTests(unittest.TestCase):
             "rom4_tone_enable: imr=035f ifr=0020 bspc22=c8c8 bspce23=0000 t=1.58",
             "input-press: t=8.0 name=1 port=1f",
             "rom4_tone_access: owner=codec_shared_mcu direction=write address=0100a8 value=84260000 mask=ffff0000 pc=272034 t=1.55854",
-            "rom4_tone_access: owner=codec_shared_dsp direction=read address=000854 value=8426 mask=ffff pc=0027f2 t=1.55855",
+            "rom4_tone_access: owner=codec_shared_dsp direction=read address=000854 value=8426 mask=ffff pc=0027f0 t=1.55855",
             "rom4_codec_control_call: hit=21 a=0000000026 b=0000000008 sp=1eab return=a598 t=1.55856",
             "rom4_codec_control_call: hit=24 a=0000000626 b=0000000008 sp=1ea3 return=a4bb t=1.57959",
             "rom4_codec_control_call: hit=37 a=0000000626 b=0000000008 sp=1ea3 return=a4bb t=8.077",
             "rom4_tone_access: owner=mcu direction=write address=0100ac value=e10000 mask=ffff0000 pc=272034 t=8.07",
-            "rom4_tone_access: owner=dsp direction=read address=000856 value=00e1 mask=ffff pc=00a59a t=8.08",
-            "rom4_tone_access: owner=dsp direction=write address=0000fe value=00e1 mask=ffff pc=00a5de t=8.09",
+            "rom4_tone_access: owner=dsp direction=read address=000856 value=00e1 mask=ffff pc=00a598 t=8.08",
+            "rom4_tone_access: owner=dsp direction=write address=0000fe value=00e1 mask=ffff pc=00a5db t=8.09",
             "input-release: t=8.22 name=1 port=1d",
             "rom4_speech_configuration_entry: selector=0210 destination=0010a6c4 length=0004 caller=002894fd t=0.156",
             "rom4_tone_access: owner=speech_record direction=write address=10b2b8 value=df29 mask=ffff pc=274cba t=0.157",
             "rom4_speech_field_entry: input=df29 parameter=0000 caller=00275445 pc=00271d70 source=0010b2b8 index=09 t=0.158",
             "rom4_tone_access: owner=mcu direction=write address=0100bc value=df290000 mask=ffff0000 pc=272034 t=0.159",
             "rom4_tone_access: owner=speech_shared direction=read address=00085e value=df29 mask=ffff pc=0027ae t=0.160",
-            "rom4_tone_access: owner=speech_flags direction=write address=001f2b value=df29 mask=ffff pc=0027ae t=0.160",
+            "rom4_tone_access: owner=speech_flags direction=write address=001f2b value=df29 mask=ffff pc=0027ac t=0.160",
             "rom4_tone_access: owner=speech_shared direction=read address=00085e value=df29 mask=ffff pc=0027ae t=8.084",
-            "rom4_tone_access: owner=speech_flags direction=write address=001f2b value=df29 mask=ffff pc=0027ae t=8.084",
+            "rom4_tone_access: owner=speech_flags direction=write address=001f2b value=df29 mask=ffff pc=0027ac t=8.084",
             "rom4_tone_summary: tx_words=2 rx_reads=2 tone_reads=29 tone_copies=7 t=11.01",
         ])
 
@@ -337,13 +337,21 @@ class NativeToneTests(unittest.TestCase):
     def test_packed_control_provenance_requires_lane_payload_caller_and_order(self):
         for before, after in (
                 ('value=84260000 mask=ffff0000', 'value=8426 mask=ffff'),
-                ('value=8426 mask=ffff pc=0027f2', 'value=8426 mask=ffff pc=00a583'),
+                ('value=8426 mask=ffff pc=0027f0', 'value=8426 mask=ffff pc=00a583'),
                 ('a=0000000026 b=0000000008', 'a=0000000426 b=0000000008'),
                 ('return=a598 t=1.55856', 'return=a4bb t=1.55856'),
                 ('t=1.55855', 't=1.55853'),
                 ('t=1.57959', 't=1.55854')):
             with self.subTest(before=before), self.assertRaisesRegex(ValueError, 'packed codec-control'):
                 check_tone(self.trace().replace(before, after))
+
+    def test_packed_control_follows_the_mcu_register8_byte(self):
+        # Unattached accessories give 840a; the DSP must then use 0a/060a.
+        trace = self.trace().replace('8426', '840a').replace('a=0000000026', 'a=000000000a').replace(
+            'a=0000000626', 'a=000000060a')
+        check_tone(trace)
+        with self.assertRaisesRegex(ValueError, 'packed codec-control'):
+            check_tone(trace.replace('a=000000000a b=0000000008', 'a=0000000026 b=0000000008'))
 
     def test_speech_shared_copy_requires_correct_lane(self):
         with self.assertRaisesRegex(ValueError, "speech-control copy"):
@@ -370,12 +378,17 @@ class NativeToneTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "speech-control copy"):
             check_tone(self.trace().replace("pc=272034 t=0.159", "pc=272034 t=9.159"))
 
-    def test_speech_copy_requires_post_extension_bus_pc(self):
-        for pc in ('0027ad', '0027ac'):
-            with self.subTest(pc=pc), self.assertRaisesRegex(ValueError, "speech-control copy"):
-                check_tone(self.trace().replace(
-                    'owner=speech_shared direction=read address=00085e value=df29 mask=ffff pc=0027ae',
-                    'owner=speech_shared direction=read address=00085e value=df29 mask=ffff pc=' + pc))
+    def test_speech_copy_requires_the_27ac_mvdk(self):
+        # The source read has no stage owner: any fetch PC within the MVDK's
+        # reach passes, others fail. The write must be owned by 27ac.
+        read = 'owner=speech_shared direction=read address=00085e value=df29 mask=ffff pc='
+        write = 'owner=speech_flags direction=write address=001f2b value=df29 mask=ffff pc='
+        for pc in ('0027ac', '0027b0'):
+            check_tone(self.trace().replace(read + '0027ae', read + pc))
+        for old, new in ((read + '0027ae', read + '0027ab'), (read + '0027ae', read + '0027b2'),
+                         (write + '0027ac', write + '0027ae')):
+            with self.subTest(new=new), self.assertRaisesRegex(ValueError, "speech-control copy"):
+                check_tone(self.trace().replace(old, new))
 
     def test_speech_shared_copy_requires_post_key_observation(self):
         with self.assertRaisesRegex(ValueError, "speech-control copy"):

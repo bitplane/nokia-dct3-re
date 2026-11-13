@@ -602,20 +602,35 @@ def check_restore(text: str, *, require_replay: bool = False) -> None:
             raise ValueError('native DSP I/O continuation did not replay exactly')
 
 
+def packed_register8(text: str) -> str:
+    """Low byte of the MCU's first packed register-8 control (84xx).
+
+    Board accessory inputs select it (unattached: 0a), so it is read from the
+    run rather than fixed here.
+    """
+    packed = re.search(r"rom4_tone_access: owner=codec_shared_mcu direction=write "
+                       r"address=0100a8 value=84([0-9a-f]{2})0000 mask=ffff0000 pc=272034", text)
+    if not packed:
+        raise ValueError("missing packed codec-control register-8 write from the MCU")
+    return packed.group(1)
+
+
 def check_shared_codec_control(text: str) -> None:
     """Observed original-MCU packed control, not inferred COBBA bit meanings."""
     presses = re.findall(r"input-press: t=([0-9.]+) name=1\b", text)
     if len(presses) != 1:
         raise ValueError("packed codec-control provenance requires the physical-key phase boundary")
     limit = float(presses[0])
+    low = packed_register8(text)
     patterns = (
         r"rom4_tone_access: owner=codec_shared_mcu direction=write address=0100a8 "
-        r"value=84260000 mask=ffff0000 pc=272034 t=([0-9.]+)",
+        rf"value=84{low}0000 mask=ffff0000 pc=272034 t=([0-9.]+)",
+        # LDU *(0854),A at 27f0; reads report their instruction (READPC).
         r"rom4_tone_access: owner=codec_shared_dsp direction=read address=000854 "
-        r"value=8426 mask=ffff pc=0027f2 t=([0-9.]+)",
-        r"rom4_codec_control_call: hit=\d+ a=0000000026 b=0000000008 "
+        rf"value=84{low} mask=ffff pc=0027f0 t=([0-9.]+)",
+        rf"rom4_codec_control_call: hit=\d+ a=00000000{low} b=0000000008 "
         r"sp=[0-9a-f]{4} return=a598 t=([0-9.]+)",
-        r"rom4_codec_control_call: hit=\d+ a=0000000626 b=0000000008 "
+        rf"rom4_codec_control_call: hit=\d+ a=00000006{low} b=0000000008 "
         r"sp=[0-9a-f]{4} return=a4bb t=([0-9.]+)",
     )
     previous = -1.0
@@ -639,7 +654,8 @@ def check_tone(text: str) -> None:
     calls = re.findall(
         r"rom4_codec_control_call: hit=(\d+) a=([0-9a-f]{10}) b=([0-9a-f]{10}) "
         r"sp=([0-9a-f]{4}) return=([0-9a-f]{4}) t=([0-9.]+)", text)
-    if not any(a == "0000000626" and b == "0000000008" and ret == "a4bb"
+    activation = "00000006" + packed_register8(text)
+    if not any(a == activation and b == "0000000008" and ret == "a4bb"
                and start <= float(time) < end
                for _, a, b, _, ret, time in calls):
         raise ValueError("missing organic register-8 activation caller after physical key")
@@ -649,8 +665,8 @@ def check_tone(text: str) -> None:
         r"address=([0-9a-f]{6}) value=([0-9a-f]+) mask=([0-9a-f]+) "
         r"pc=([0-9a-f]{6}) t=([0-9.]+)", text)
     required = [("mcu", "write", "0100ac", "e10000", "ffff0000", "272034"),
-                ("dsp", "read", "000856", "00e1", "ffff", "00a59a"),
-                ("dsp", "write", "0000fe", "00e1", "ffff", "00a5de")]
+                ("dsp", "read", "000856", "00e1", "ffff", "00a598"),
+                ("dsp", "write", "0000fe", "00e1", "ffff", "00a5db")]
     cursor = start
     for event in required:
         matches = [float(time) for *fields, time in events
@@ -690,16 +706,19 @@ def check_tone(text: str) -> None:
     if not any(float(t) <= min(record_writes) for t in configuration):
         raise ValueError("missing preceding speech EEPROM configuration read")
     cursor = entries[0][1]
-    # Byte-pinned MVDK at 27ac is 7194,1f2b. The destination extension
-    # is consumed before its source read, so both bus taps report PC 27ae.
+    # Byte-pinned MVDK at 27ac is 7194,1f2b; its write reports that owner.
+    # The source read precedes any stage owner and keeps a fetch PC within
+    # the instruction's three-word prefetch reach.
+    mvdk_read = {f"0027{low:02x}" for low in range(0xac, 0xb2)}
     for expected, earliest in (
-            (("mcu", "write", "0100bc", "df290000", "ffff0000", "272034"), 0.0),
-            (("speech_shared", "read", "00085e", "df29", "ffff", "0027ae"), 0.0),
-            (("speech_flags", "write", "001f2b", "df29", "ffff", "0027ae"), 0.0),
-            (("speech_shared", "read", "00085e", "df29", "ffff", "0027ae"), start),
-            (("speech_flags", "write", "001f2b", "df29", "ffff", "0027ae"), start)):
+            (("mcu", "write", "0100bc", "df290000", "ffff0000", {"272034"}), 0.0),
+            (("speech_shared", "read", "00085e", "df29", "ffff", mvdk_read), 0.0),
+            (("speech_flags", "write", "001f2b", "df29", "ffff", {"0027ac"}), 0.0),
+            (("speech_shared", "read", "00085e", "df29", "ffff", mvdk_read), start),
+            (("speech_flags", "write", "001f2b", "df29", "ffff", {"0027ac"}), start)):
         matches = [float(t) for *fields, t in flag_events
-                   if tuple(fields) == expected and float(t) >= max(cursor, earliest)]
+                   if tuple(fields[:5]) == expected[:5] and fields[5] in expected[5]
+                   and float(t) >= max(cursor, earliest)]
         if not matches:
             raise ValueError("missing ordered shared speech-control copy: " + str(expected))
         cursor = matches[0]

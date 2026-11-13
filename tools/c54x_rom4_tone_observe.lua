@@ -16,10 +16,20 @@ local function watch(cpu, kind, address, owner, last, lane)
             local output_key = key .. '_' .. phase
             emitted[output_key] = (emitted[output_key] or 0) + 1
             if emitted[output_key] <= 64 then
+                -- DSP accesses report their instruction when a pipeline stage
+                -- owns it (writes: Execute, else Read; reads: Read); MVDK's
+                -- early source read has no owner and keeps the fetch PC.
+                local pc = cpu.state['PC'].value
+                if cpu == dsp then
+                    for _, stage in ipairs(direction == 'write' and {'EXECPC', 'READPC'} or {'READPC'}) do
+                        if cpu.state[stage].value ~= 0xffffffff then pc = cpu.state[stage].value; break end
+                    end
+                end
                 machine:logerror(string.format(
                     'rom4_tone_access: owner=%s direction=%s address=%06x value=%04x mask=%04x pc=%06x t=%.9f\n',
                     owner, direction, address, value, mask,
-                    cpu.state['PC'].value, machine.time:as_double()))
+                    pc,
+                    machine.time:as_double()))
             end
         end)
     end
@@ -170,9 +180,16 @@ taps[#taps + 1] = dsp.spaces['io']:install_write_tap(2, 2, 'codec_host_accept', 
     end
     pending_request = nil
 end)
+local last_control_call
+-- Sample after the entry hook (CALL 2470, a bare RET) has returned: the
+-- staged pipeline has then pushed this call's own return address.
 taps[#taps + 1] = dsp.spaces['program']:install_read_tap(
-    0x45c2, 0x45c2, 'codec_control_call', function()
-        if dsp.state['PC'].value ~= 0x45c3 then return end
+    0x45c4, 0x45c4, 'codec_control_call', function()
+        if dsp.state['PC'].value ~= 0x45c5 then return end
+        -- The word is fetched twice; count each entry once.
+        local key = string.format('%.9f:%04x', machine.time:as_double(), dsp.state['SP'].value)
+        if key == last_control_call then return end
+        last_control_call = key
         control_calls = control_calls + 1
         if control_calls <= 256 then
             local sp = dsp.state['SP'].value

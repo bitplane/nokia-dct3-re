@@ -4,9 +4,9 @@ import re
 import hashlib
 
 try:
-    from .c54x_rom4_codec_contract import check_trace
+    from .c54x_rom4_codec_contract import check_trace, packed_register8
 except ImportError:
-    from c54x_rom4_codec_contract import check_trace
+    from c54x_rom4_codec_contract import check_trace, packed_register8
 
 
 DIGIT_TWO_PIXELS = 'cf44d8d2cf6398d7d69aa5cb9b766d3b8a2905169c6edda6e313b4fc2d6b8cd6'
@@ -117,11 +117,14 @@ def check_level(text, option):
     if int(totals[0][2]) != len(copies):
         raise ValueError('truncated tone-copy observations')
     # Earlier enabled menu keys are a positive control for Off's absence test.
-    if not any(int(value, 16) == 0xe1 and pc == '00a5de' and 8 <= float(time) < start
+    # MVDK *(0856),00fe at a5db owns the tone-command copy.
+    if not any(int(value, 16) == 0xe1 and pc == '00a5db' and 8 <= float(time) < start
                for value, pc, time in copies):
         raise ValueError('missing pre-selection tone positive control')
+    # Register 8 is the MCU's packed low byte with 0600 set (codec contract).
+    activation = '00000006' + packed_register8(text)
     active = [float(time) for _, a, b, ret, time in calls
-              if a == '0000000626' and b == '0000000008' and ret == 'a4bb'
+              if a == activation and b == '0000000008' and ret == 'a4bb'
               and start <= float(time) < stop]
     tone = [float(time) for value, pc, time in copies
             if int(value, 16) == 0xe1 and start <= float(time) < stop]
@@ -132,7 +135,9 @@ def check_level(text, option):
     if not any(start <= time < end for time in tone) or not active:
         raise ValueError('enabled setting lacks organic tone/activation')
     if option in (3, 4):
-        word = '920c' if option == 3 else '9209'
+        # Packed register-9 levels with no accessory attached (handset route):
+        # Low 9108, Medium 9104, High 9100. The headset route gave 920c/9209.
+        word = '9104' if option == 3 else '9100'
         updates = re.findall(
             r'rom4_tone_access: owner=codec_shared_mcu direction=write address=0100a8 '
             rf'value={word}0000 mask=ffff0000 pc=272034 t=([0-9.]+)', text)
@@ -140,7 +145,7 @@ def check_level(text, option):
             raise ValueError('missing ordered level-dependent packed control')
         reads = re.findall(
             r'rom4_tone_access: owner=codec_shared_dsp direction=read address=000854 '
-            rf'value={word} mask=ffff pc=0027f2 t=([0-9.]+)', text)
+            rf'value={word} mask=ffff pc=0027f0 t=([0-9.]+)', text)
         expected = f'{int(word, 16) & 0xfff:010x}'
         delivered = [float(time) for _, a, b, ret, time in calls
                      if a == expected and b == '0000000009' and ret == 'a598']

@@ -60,32 +60,35 @@ class NativeToneLevelsTest(unittest.TestCase):
             with self.subTest(old=old), self.assertRaises(ValueError):
                 check_host_writers(text.replace(old, new), report)
     def trace(self, option):
-        lines = [codec_fixtures.CodecTraceTests().trace()]
+        lines = [codec_fixtures.CodecTraceTests().trace(),
+                 # Boot-time packed register-8 control with no accessory attached.
+                 'rom4_tone_access: owner=codec_shared_mcu direction=write address=0100a8 '
+                 'value=840a0000 mask=ffff0000 pc=272034 t=1.55']
         for index, key in enumerate(('menu', '9', '5', str(option), 'clear', 'clear', 'clear', '2')):
             time = 8 + index * .42
             lines.extend((f'input-press: t={time:.6f} name={key} port=1f',
                           f'input-release: t={time + .22:.6f} name={key} port=1d'))
         lines.extend((
-            'rom4_codec_control_call: hit=1 a=0000000626 b=0000000008 sp=1ea0 return=a4bb t=8.06',
-            'rom4_tone_access: owner=dsp direction=write address=0000fe value=00e1 mask=ffff pc=00a5de t=8.05'))
+            'rom4_codec_control_call: hit=1 a=000000060a b=0000000008 sp=1ea0 return=a4bb t=8.06',
+            'rom4_tone_access: owner=dsp direction=write address=0000fe value=00e1 mask=ffff pc=00a5db t=8.05'))
         count = 1
         copies = 1
         if option in (3, 4):
-            word = '920c' if option == 3 else '9209'
-            value = '000000020c' if option == 3 else '0000000209'
+            word = '9104' if option == 3 else '9100'
+            value = '0000000104' if option == 3 else '0000000100'
             lines.extend((
                 'rom4_tone_access: owner=codec_shared_mcu direction=write address=0100a8 '
                 f'value={word}0000 mask=ffff0000 pc=272034 t=10.98',
                 'rom4_tone_access: owner=codec_shared_dsp direction=read address=000854 '
-                f'value={word} mask=ffff pc=0027f2 t=10.99',
+                f'value={word} mask=ffff pc=0027f0 t=10.99',
                 f'rom4_codec_control_call: hit=2 a={value} b=0000000009 sp=1ea7 return=a598 t=10.991'))
             count += 1
         if option != 1:
             count += 1
             copies += 1
             lines.extend((
-                f'rom4_codec_control_call: hit={count} a=0000000626 b=0000000008 sp=1ea0 return=a4bb t=11.02',
-                'rom4_tone_access: owner=dsp direction=write address=0000fe value=00e1 mask=ffff pc=00a5de t=11.0'))
+                f'rom4_codec_control_call: hit={count} a=000000060a b=0000000008 sp=1ea0 return=a4bb t=11.02',
+                'rom4_tone_access: owner=dsp direction=write address=0000fe value=00e1 mask=ffff pc=00a5db t=11.0'))
         lines.extend((f'rom4_codec_control_summary: calls={count} t=15.0',
                       f'rom4_tone_summary: tx_words=2 rx_reads=2 tone_reads=40 tone_copies={copies}'))
         return '\n'.join(lines)
@@ -105,8 +108,8 @@ class NativeToneLevelsTest(unittest.TestCase):
                 check_level(self.trace(3).replace(before, after), 3)
 
     def test_enabled_requires_tone_and_activation(self):
-        for before, after in (('value=00e1 mask=ffff pc=00a5de t=11.0',
-                               'value=0001 mask=ffff pc=00a5de t=11.0'),
+        for before, after in (('value=00e1 mask=ffff pc=00a5db t=11.0',
+                               'value=0001 mask=ffff pc=00a5db t=11.0'),
                               ('return=a4bb t=11.02', 'return=a598 t=11.02')):
             with self.subTest(before=before), self.assertRaises(ValueError):
                 check_level(self.trace(2).replace(before, after), 2)
@@ -114,23 +117,23 @@ class NativeToneLevelsTest(unittest.TestCase):
     def test_off_rejects_late_activation_and_tone(self):
         text = self.trace(1)
         for line in (
-                'rom4_codec_control_call: hit=2 a=0000000626 b=0000000008 sp=1ea0 return=a4bb t=12.0',
-                'rom4_tone_access: owner=dsp direction=write address=0000fe value=00e1 mask=ffff pc=00a5de t=12.0'):
+                'rom4_codec_control_call: hit=2 a=000000060a b=0000000008 sp=1ea0 return=a4bb t=12.0',
+                'rom4_tone_access: owner=dsp direction=write address=0000fe value=00e1 mask=ffff pc=00a5db t=12.0'):
             changed = text + '\n' + line
             changed = changed.replace('calls=1', 'calls=2') if 'hit=2' in line else changed.replace('tone_copies=1', 'tone_copies=2')
             with self.subTest(line=line), self.assertRaisesRegex(ValueError, 'Off still emits'):
                 check_level(changed, 1)
 
     def test_level_controls_require_correct_lane_and_order(self):
-        for before, after in (('920c0000', '92090000'), ('mask=ffff0000', 'mask=ffff'),
+        for before, after in (('91040000', '91000000'), ('mask=ffff0000', 'mask=ffff'),
                               ('t=10.98', 't=11.03')):
             with self.subTest(before=before), self.assertRaises(ValueError):
                 check_level(self.trace(3).replace(before, after), 3)
 
     def test_packed_control_must_survive_native_consumption(self):
-        for before, after in (('value=920c mask=ffff', 'value=0000 mask=ffff'),
-                              ('pc=0027f2', 'pc=0027f4'),
-                              ('a=000000020c', 'a=0000000000'),
+        for before, after in (('value=9104 mask=ffff', 'value=0000 mask=ffff'),
+                              ('pc=0027f0', 'pc=0027f4'),
+                              ('a=0000000104', 'a=0000000000'),
                               ('b=0000000009', 'b=0000000000'),
                               ('t=10.991', 't=11.01')):
             with self.subTest(before=before), self.assertRaises(ValueError):

@@ -497,10 +497,20 @@ when the tone command is absent.
 
 | Selected option | Final key's observed control behavior |
 | --- | --- |
-| Off (1) | No new `00e1` tone copy to DSP `00fe` and no register-8 `0626` activation during the remaining capture. Earlier menu keys supply the positive control. |
-| Level 1 (2) | Tone copy and register-8 `0626` activation occur; no new level-dependent shared control is required. |
-| Level 2 (3) | MCU `920c` reaches native `27f2` intact and produces register 9/value `020c` before the tone copy; register-8 activation is still `0626`. |
-| Level 3 (4) | MCU `9209` reaches native `27f2` intact and produces register 9/value `0209` before the tone copy; register-8 activation is still `0626`. |
+| Off (1) | No new `00e1` tone copy to DSP `00fe` and no register-8 `060a` activation during the remaining capture. Earlier menu keys supply the positive control. |
+| Level 1 (2) | Tone copy and register-8 `060a` activation occur; no new level-dependent shared control is required. |
+| Level 2 (3) | MCU `9104` reaches native `27f0` intact and produces register 9/value `0104` before the tone copy; register-8 activation is still `060a`. |
+| Level 3 (4) | MCU `9100` reaches native `27f0` intact and produces register 9/value `0100` before the tone copy; register-8 activation is still `060a`. |
+
+These values are for the 5110 board with no accessory attached (handset
+route): the MCU's boot-time packed register-8 control is `840a`, and
+activation is `0600` ORed with its low byte. The table first recorded the
+headset route that the board's former all-low accessory inputs selected
+(`8426`/`0626`, levels `920c`/`9209`). The checkers now derive register 8 from
+the run's own packed control. The PCs are the issuing instructions
+(`27f0` `LDU *(0854)`, `a598` `LD *(0856)`, `a5db` and `27ac` MVDK), as the CPU's
+`READPC`/`EXECPC` report them, rather than fetch addresses that move with
+pipeline timing; an MVDK source read with no stage owner keeps its fetch PC.
 
 The checker requires all eight physical press/release pairs, complete
 helper-call and tone-copy observations, ordered level controls and the
