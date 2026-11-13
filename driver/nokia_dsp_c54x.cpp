@@ -636,15 +636,16 @@ void nokia_dsp_c54x_device::io_w(offs_t offset, u16 data)
 		m_port36_timer->adjust(attotime::from_ticks(1, clock()));
 	if (port == 0x02)
 	{
-		// Acceptance clears the independent slot latch, not parameter data.
-		// The ring comparator retires only when its consumer advances. The
-		// in-service mask still projects onto shared 0aa, but request gating
-		// uses the DSP's own register: at call connect the MCU writes a
-		// parameter there (4aee), which as a mask would hide the slot
+		// The in-service mask only gates requests; acceptance is the port-1
+		// strobe. ROM4's critical section at 35f9..3605 saves this mask,
+		// writes ffff and restores it, and a slot compare raised meanwhile
+		// must stay pending: clearing it here dropped a frame of the TDMA
+		// schedule. The mask still projects onto shared 0aa, but request
+		// gating uses the DSP's own register: at call connect the MCU writes
+		// a parameter there (4aee), which as a mask would hide the slot
 		// compare and stop the frame chain.
 		m_service_mask = data;
 		m_transport->peer_shared_w(0x0aa / 2, data);
-		acknowledge_host_command(data);
 		update_host_command_line();
 	}
 	else if (port == 0x01)

@@ -4,7 +4,7 @@ from pathlib import Path
 import subprocess
 import tempfile
 
-PASS='C54x compare boundary: PASS replacement=1 armed_restore=1 exact_time=1 ack_ports=1,2 periodic=1 raw_zero=1 cancellation=1 reset_abort=1 hagar_restore=1 mfi_clock_restore=1 mfi_irq_owner=1 reload_phase=1 mfi_request_restore=1 physical_latch_claim=0'
+PASS='C54x compare boundary: PASS replacement=1 armed_restore=1 exact_time=1 ack_ports=1 mask_retains=1 periodic=1 raw_zero=1 cancellation=1 reset_abort=1 hagar_restore=1 mfi_clock_restore=1 mfi_irq_owner=1 reload_phase=1 mfi_request_restore=1 physical_latch_claim=0'
 DONE='Fatal error: C54x compare boundary tests complete'
 
 

@@ -160,7 +160,10 @@ private:
 			}
 			expect(m_events==2 && m_tuple==0x0000ccccbbbb00c8ULL,"next frame still observes raw zero control");
 			io.write_word(4,15000); expect(io.read_word(1)&0x1000,"cancel does not acknowledge pending");
-			io.write_word(2,0x1000); expect(!(io.read_word(1)&0x1000),"P02 also acknowledges pending");
+			// P02 is the in-service mask (ROM4 35f9..3605 masks with ffff and
+			// restores); only the P01 strobe acknowledges.
+			io.write_word(2,0x1000); expect(io.read_word(1)&0x1000,"P02 masks without acknowledging pending");
+			io.write_word(1,0x1000); expect(!(io.read_word(1)&0x1000),"P01 acknowledges pending");
 			break;
 		case 6:
 			expect(subdevice<tms320c54x_device>("external:cpu")->state_int(tms320c54x_device::STATE_IFR)&1,
@@ -232,7 +235,7 @@ private:
 			expect(m_deferred_requests==2 && !m_mfi->overruns() && !m_mfi->underruns(),
 				"restored request rearms once without empty-buffer interrupt");
 			m_mfi->enable_w(0);
-			osd_printf_info("C54x compare boundary: PASS replacement=1 armed_restore=1 exact_time=1 ack_ports=1,2 periodic=1 raw_zero=1 cancellation=1 reset_abort=1 hagar_restore=1 mfi_clock_restore=1 mfi_irq_owner=1 reload_phase=1 mfi_request_restore=1 physical_latch_claim=0\n");
+			osd_printf_info("C54x compare boundary: PASS replacement=1 armed_restore=1 exact_time=1 ack_ports=1 mask_retains=1 periodic=1 raw_zero=1 cancellation=1 reset_abort=1 hagar_restore=1 mfi_clock_restore=1 mfi_irq_owner=1 reload_phase=1 mfi_request_restore=1 physical_latch_claim=0\n");
 			fatalerror("C54x compare boundary tests complete");
 		}
 		++m_stage;

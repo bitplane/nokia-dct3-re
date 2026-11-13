@@ -443,7 +443,8 @@ that architectural repeat behavior removes the last flat-image/`SEEDDARAM`
 dependency from the MAME backend. The installed program subsequently requests
 and receives another block (`0x044c` input words) and executes into the
 operational ROM. The DSP's INT2 input is the level comparison between the
-port-1 command latch plus live MDISND ring state and the port-2 accept mask.
+port-1 command latch plus live MDISND ring state and the port-2 in-service mask; only a port-1 write
+accepts a request.
 The operational ISR now consumes the complete MCU ring (`0x0033/0x0033`) and
 returns to its ordinary idle at `0x31a5` without an illegal instruction.
 An MDISND producer commit updates this INT2 comparator only; it must not

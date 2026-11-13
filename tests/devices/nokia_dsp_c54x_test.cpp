@@ -796,7 +796,9 @@ private:
 		u16 const payload = std::array<u16, 4>{0, 0x8000, 0x9201, 0x9209}[(m_case % 8) / 2];
 		u16 const request = m_case < 8 ? 8 : 0x1000;
 		unsigned const compare_port = m_case < 8 ? 0x0f : 4;
-		unsigned const accept_port = 1 + m_case % 2;
+		// Port 1 accepts; port 2 is only the in-service mask (ROM4 25b8 vs 35f9).
+		unsigned const accept_port = 1;
+		bool const mask_cycle = m_case % 2;
 		if (m_stage == 90)
 		{
 			m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
@@ -830,8 +832,15 @@ private:
 			expect(m_cpu->state_int(tms320c54x_device::STATE_IFR) & 4, "Unmasking asserts native source 2 although shared 0855 holds the request bit");
 			m_timer->adjust(attotime::never);
 			expect(capture_snapshot(machine(), m_saved) == STATERR_NONE, "Save the pending slot and its independent payload");
+			if (mask_cycle)
+			{
+				// ROM4's critical section saves the mask, writes ffff, restores it.
+				io.write_word(2, 0xffff);
+				io.write_word(2, 0);
+				expect(io.read_word(1) == request, "Masking with port 2 keeps the request pending; it does not accept it");
+			}
 			io.write_word(accept_port, request);
-			expect(!io.read_word(1) && data.read_word(0x0854) == payload, "Either accept port retires the slot without changing these payloads");
+			expect(!io.read_word(1) && data.read_word(0x0854) == payload, "Port-1 acceptance retires the slot without changing these payloads");
 		}
 		else if (m_stage == 93)
 		{
@@ -898,7 +907,8 @@ private:
 			expect(io.read_word(1) == 0x1008 && !(m_cpu->state_int(tms320c54x_device::STATE_IFR) & 4),
 				"Masked coincident compares retain both independent requests");
 			m_timer->adjust(attotime::never); expect(capture_snapshot(machine(), m_saved) == STATERR_NONE, "Save both pending comparators and their mask");
-			io.write_word(2, 8);
+			// Accept the slot on port 1, then leave only the slot masked.
+			io.write_word(1, 8); io.write_word(2, 8);
 			expect(io.read_word(1) == 0x1000, "Accepting the slot leaves the transfer pending");
 		}
 		else if (m_stage == 102)
@@ -920,7 +930,7 @@ private:
 			expect(m_cpu->state_int(tms320c54x_device::STATE_IFR) & 4, "The remaining unmasked slot asserts the same CPU source");
 			io.write_word(1, 8);
 			expect(!io.read_word(1) && data.read_word(0x0854) == 0x9209, "Both acknowledgements preserve packed parameter data");
-			osd_printf_info("C54x native backend compare requests: PASS cases=16 channels=2 pending_restore=16 armed_restore=16 overlap_restore=1 payload_preserved=1 masked_pending=1 ack_ports=1,2 reset=16 mapping_claim=0\n");
+			osd_printf_info("C54x native backend compare requests: PASS cases=16 channels=2 pending_restore=16 armed_restore=16 overlap_restore=1 payload_preserved=1 masked_pending=1 ack_ports=1 mask_retains=1 reset=16 mapping_claim=0\n");
 			throw emu_fatalerror(0, "C54x backend compare request tests complete");
 		}
 		++m_stage; m_timer->adjust(attotime::from_usec(100));
