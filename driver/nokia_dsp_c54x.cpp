@@ -91,6 +91,7 @@ void nokia_dsp_c54x_device::device_start()
 	save_item(NAME(m_host_command_line));
 	save_item(NAME(m_reset_released));
 	save_item(NAME(m_host_command_vector));
+	save_item(NAME(m_service_mask));
 	save_item(NAME(m_slot_frame_length));
 	save_item(NAME(m_slot_delay));
 	save_item(NAME(m_transfer_delay));
@@ -124,6 +125,7 @@ void nokia_dsp_c54x_device::device_reset()
 	m_host_command_line = false;
 	m_reset_released = false;
 	m_host_command_vector = 0;
+	m_service_mask = 0;
 	m_slot_frame_length = 0;
 	m_slot_delay = 0;
 	m_transfer_delay = 0;
@@ -551,7 +553,7 @@ void nokia_dsp_c54x_device::update_host_command_line()
 	// Bit 1 is a live ring-not-empty comparator, not an acknowledgeable latch.
 	// Firmware may leave bit 1 set in the in-service mask; it must not suppress
 	// a later empty-to-nonempty MDISND transition.
-	const u16 acknowledgement = m_transport->shared_word(0x0aa / 2) & ~u16(0x0002);
+	const u16 acknowledgement = m_service_mask & ~u16(0x0002);
 	// Only modeled peripheral sources drive INT2: independent compare latches
 	// and the live MDISND comparator. Other ROM dispatcher bits need independently
 	// evidenced producers; packed MCU parameter data is not a request bitmap.
@@ -577,7 +579,7 @@ u16 nokia_dsp_c54x_device::io_r(offs_t offset)
 	case 0x01:
 		return host_request();
 	case 0x02:
-		return m_transport->shared_word(0x0aa / 2);
+		return m_service_mask;
 	case 0x0d:
 		return frame_counter();
 	case 0x27:
@@ -636,7 +638,11 @@ void nokia_dsp_c54x_device::io_w(offs_t offset, u16 data)
 	{
 		// Acceptance clears the independent slot latch, not parameter data.
 		// The ring comparator retires only when its consumer advances. The
-		// in-service mask's shared-0aa projection remains a partial model.
+		// in-service mask still projects onto shared 0aa, but request gating
+		// uses the DSP's own register: at call connect the MCU writes a
+		// parameter there (4aee), which as a mask would hide the slot
+		// compare and stop the frame chain.
+		m_service_mask = data;
 		m_transport->peer_shared_w(0x0aa / 2, data);
 		acknowledge_host_command(data);
 		update_host_command_line();

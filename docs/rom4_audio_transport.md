@@ -525,9 +525,12 @@ Do not reintroduce the direct payload/request alias to produce other ROM
 dispatcher bits. It turned `9209` into zero before consumption and selected
 register 0 instead of 9. Physical sources of other request bits still need
 independent evidence; successful boot does not prove those bits unnecessary
-for radio/call operation. The port-2 in-service mask still projects onto shared
-`0855`/MCU `100aa` in this partial model; its full electrical ownership remains
-unvalidated.
+for radio/call operation. Port-2 writes still project onto shared
+`0855`/MCU `100aa`, which the boot code reads. Request gating and port-2 reads
+use the DSP's own register, because the MCU writes call parameters to that word
+(`4aee` at call connect). As a mask, that parameter stopped the frame chain
+([traffic channel](rom4_rf_control.md#traffic-channel)). The mask's full
+electrical ownership remains unvalidated.
 
 **RF snapshot provenance:** a retained pre-transfer 30-second ring-plus-slot capture
 has 20,285 frame expiries and 648,192 RF reads, as in the existing scan

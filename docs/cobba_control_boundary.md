@@ -62,9 +62,10 @@ Current native scope is split deliberately:
   additionally validates runtime ROM synthesis of physical key 2's two
   frequency components. Its supplied clock is laboratory input, not recovered
   handset enable wiring or native call speech.
-- Native MCU parameter delivery preserves packed words through HPINT;
-  the in-service-mask projection and other peripheral request sources remain
-  unresolved. RF sample encoding,
+- Native MCU parameter delivery preserves packed words through HPINT. The
+  port-2 in-service mask gates requests from a DSP register, not from shared
+  `0855`. Port-2 writes still project onto `0855`. Other peripheral request
+  sources remain unresolved. RF sample encoding,
   production/consumption timing and SCU serialization are also open. None of
   the codec or peripheral gates promotes native handset speech or acquisition.
 

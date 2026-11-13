@@ -130,6 +130,8 @@ private:
 	u16 m_overlay_end = 0x2800;
 	bool m_external_codec_clock = false;
 	u16 m_host_command_vector = 0;
+	// Port 2 in-service mask: a DSP register, not the MCU's shared 0aa word.
+	u16 m_service_mask = 0;
 	emu_timer *m_slot_timer = nullptr;
 	emu_timer *m_transfer_timer = nullptr;
 	emu_timer *m_frame_timer = nullptr;

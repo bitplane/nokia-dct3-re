@@ -819,12 +819,15 @@ private:
 			expect(!(m_cpu->state_int(tms320c54x_device::STATE_IFR) & 4), "In-service masking retains the pending slot without asserting INT2");
 			io.write_word(1, 1);
 			expect(io.read_word(1) == request && data.read_word(0x0854) == payload, "An unrelated completion cannot retire the compare or change parameter bits");
+			// An MCU parameter in shared 0855 (MCU 100aa) is not the port-2 mask.
+			data.write_word(0x0855, request);
 			io.write_word(2, 0);
+			expect(io.read_word(2) == 0, "Port 2 reads its own mask, not shared parameter data");
 		}
 		else if (m_stage == 92)
 		{
 			// CPU input changes settle between callbacks, before the snapshot.
-			expect(m_cpu->state_int(tms320c54x_device::STATE_IFR) & 4, "Unmasking the retained slot request asserts native source 2");
+			expect(m_cpu->state_int(tms320c54x_device::STATE_IFR) & 4, "Unmasking asserts native source 2 although shared 0855 holds the request bit");
 			m_timer->adjust(attotime::never);
 			expect(capture_snapshot(machine(), m_saved) == STATERR_NONE, "Save the pending slot and its independent payload");
 			io.write_word(accept_port, request);
