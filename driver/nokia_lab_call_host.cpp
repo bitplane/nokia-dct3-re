@@ -37,7 +37,10 @@ struct nokia_lab_call_host::state
 	std::set<http_manager::websocket_connection_ptr, std::owner_less<http_manager::websocket_connection_ptr>> connections;
 	events pending;
 
-	unsigned queued() const { return pending.calls.size() + pending.terminations.size() + pending.media.size(); }
+	unsigned queued() const
+	{
+		return pending.calls.size() + pending.terminations.size() + pending.media.size() + pending.decisions.size();
+	}
 };
 
 nokia_lab_call_host::nokia_lab_call_host() : m_state(std::make_unique<state>()) { }
@@ -94,17 +97,30 @@ bool nokia_lab_call_host::start(running_machine &machine)
 					}
 					m_state->pending.calls.push_back(item);
 				}
-				else if (type == "incoming_call_terminate")
+				else if (type == "outgoing_call_decision")
+				{
+					if (!request_id || !message.HasMember("decision") || !message["decision"].IsString())
+						return;
+					std::string_view const decision(message["decision"].GetString(), message["decision"].GetStringLength());
+					decision_outcome result;
+					if (decision == "connect") result = decision_outcome::connect;
+					else if (decision == "busy") result = decision_outcome::busy;
+					else if (decision == "no_answer") result = decision_outcome::no_answer;
+					else return;
+					m_state->pending.decisions.push_back({ epoch, request_id, result });
+				}
+				else if (type == "incoming_call_terminate" || type == "outgoing_call_terminate")
 				{
 					if (message.HasMember("cause") && (!message["cause"].IsUint() ||
 							!message["cause"].GetUint() || message["cause"].GetUint() > 0x7f))
 						return;
 					u8 const cause = message.HasMember("cause") ? u8(message["cause"].GetUint()) : u8(16);
-					m_state->pending.terminations.push_back({ epoch, request_id, cause });
+					m_state->pending.terminations.push_back({ epoch, request_id, cause, type[0] == 'o' });
 				}
-				else if (type == "incoming_call_media_downlink")
+				else if (type == "incoming_call_media_downlink" || type == "outgoing_call_media_downlink")
 				{
 					downlink media{ epoch, request_id };
+					media.outgoing = type[0] == 'o';
 					if (!message.HasMember("sequence") || !message["sequence"].IsUint() ||
 							!message.HasMember("frame") || !message["frame"].IsString() ||
 							message["frame"].GetStringLength() != 2 * media.frame.size())
@@ -201,12 +217,29 @@ void nokia_lab_call_host::publish_network(bool registered, u16 arfcn, u8 bsic)
 	send(buffer.GetString());
 }
 
-void nokia_lab_call_host::publish_incoming_state(u32 request_id, char const *phase, u32 uplink_sequence, u32 downlink_sequence)
+void nokia_lab_call_host::publish_outgoing_call(u32 request_id, u8 const *digits, unsigned length)
+{
+	std::string text;
+	for (unsigned index = 0; index < length; ++index)
+		text.push_back(char('0' + digits[index]));
+	rapidjson::StringBuffer buffer;
+	rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
+	writer.StartObject();
+	writer.Key("type"); writer.String("outgoing_call");
+	writer.Key("request_id"); writer.Uint(request_id);
+	writer.Key("epoch"); writer.Uint(epoch());
+	writer.Key("digits"); writer.String(text.data(), text.size());
+	writer.Key("decision_pending"); writer.Bool(true);
+	writer.EndObject();
+	send(buffer.GetString());
+}
+
+void nokia_lab_call_host::publish_state(bool outgoing, u32 request_id, char const *phase, u32 uplink_sequence, u32 downlink_sequence)
 {
 	rapidjson::StringBuffer buffer;
 	rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
 	writer.StartObject();
-	writer.Key("type"); writer.String("incoming_call_state");
+	writer.Key("type"); writer.String(outgoing ? "outgoing_call_state" : "incoming_call_state");
 	writer.Key("request_id"); writer.Uint(request_id);
 	writer.Key("epoch"); writer.Uint(epoch());
 	writer.Key("phase"); writer.String(phase);
@@ -219,7 +252,7 @@ void nokia_lab_call_host::publish_incoming_state(u32 request_id, char const *pha
 	send(buffer.GetString());
 }
 
-void nokia_lab_call_host::publish_uplink(u32 request_id, u32 sequence, u64 time_us, bool good, speech_frame const &frame)
+void nokia_lab_call_host::publish_uplink(bool outgoing, u32 request_id, u32 sequence, u64 time_us, bool good, speech_frame const &frame)
 {
 	static constexpr char HEX[] = "0123456789abcdef";
 	std::string encoded;
@@ -231,7 +264,7 @@ void nokia_lab_call_host::publish_uplink(u32 request_id, u32 sequence, u64 time_
 	rapidjson::StringBuffer buffer;
 	rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
 	writer.StartObject();
-	writer.Key("type"); writer.String("incoming_call_media_uplink");
+	writer.Key("type"); writer.String(outgoing ? "outgoing_call_media_uplink" : "incoming_call_media_uplink");
 	writer.Key("request_id"); writer.Uint(request_id);
 	writer.Key("epoch"); writer.Uint(epoch());
 	writer.Key("sequence"); writer.Uint(sequence);

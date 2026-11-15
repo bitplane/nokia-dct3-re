@@ -18,14 +18,18 @@ class nokia_lab_call_host
 public:
 	using speech_frame = std::array<u8, 33>;
 	struct incoming { u32 epoch = 0, request_id = 0; std::array<u8, 20> digits{}; unsigned length = 0; };
-	struct termination { u32 epoch = 0, request_id = 0; u8 cause = 16; };
-	struct downlink { u32 epoch = 0, request_id = 0, sequence = 0; speech_frame frame{}; };
+	// Terminations and media name their direction; it must match the call.
+	struct termination { u32 epoch = 0, request_id = 0; u8 cause = 16; bool outgoing = false; };
+	struct downlink { u32 epoch = 0, request_id = 0, sequence = 0; speech_frame frame{}; bool outgoing = false; };
+	enum class decision_outcome : u8 { connect, busy, no_answer };
+	struct decision { u32 epoch = 0, request_id = 0; decision_outcome result = decision_outcome::connect; };
 	struct events
 	{
 		bool ready_pending = false;
 		std::deque<incoming> calls;
 		std::deque<termination> terminations;
 		std::deque<downlink> media;
+		std::deque<decision> decisions;
 		unsigned dropped = 0;
 	};
 
@@ -43,8 +47,9 @@ public:
 
 	void publish_ready(bool calls_idle);
 	void publish_network(bool registered, u16 arfcn, u8 bsic);
-	void publish_incoming_state(u32 request_id, char const *phase, u32 uplink_sequence = 0, u32 downlink_sequence = 0);
-	void publish_uplink(u32 request_id, u32 sequence, u64 time_us, bool good, speech_frame const &frame);
+	void publish_outgoing_call(u32 request_id, u8 const *digits, unsigned length);
+	void publish_state(bool outgoing, u32 request_id, char const *phase, u32 uplink_sequence = 0, u32 downlink_sequence = 0);
+	void publish_uplink(bool outgoing, u32 request_id, u32 sequence, u64 time_us, bool good, speech_frame const &frame);
 
 private:
 	struct state;

@@ -59,8 +59,14 @@ def without_gaps(pcm, shortest=80):
 
 
 class HostCallClient(threading.Thread):
-    def __init__(self, url, hangup_after=150, timeout=120, quiet_after_hangup=False):
+    """Incoming: place a call and hang up after `hangup_after` uplink frames.
+    Outgoing: answer the handset's dialled call once it is alerting; with
+    `hangup_after` None the handset clears it."""
+
+    def __init__(self, url, hangup_after=150, timeout=120, quiet_after_hangup=False, outgoing=False):
         super().__init__(daemon=True)
+        self.outgoing = outgoing
+        self.digits = None
         self.quiet_after_hangup = quiet_after_hangup
         self.url = url
         self.hangup_after = hangup_after
@@ -92,6 +98,7 @@ class HostCallClient(threading.Thread):
         tone = [int(8192 * math.sin(2 * math.pi * TONE_HZ * n / 8000)) for n in range(8)]
         epoch = None
         placed = False
+        direction = 'outgoing' if self.outgoing else 'incoming'
         sequence = 0
         try:
             websocket = await self.connect()
@@ -102,17 +109,23 @@ class HostCallClient(threading.Thread):
                     self.received.append(kind)
                     if kind == 'call_adapter_ready':
                         epoch = event['epoch']
-                    elif kind == 'network_state' and event.get('registered') and not placed and epoch is not None:
+                    elif kind == 'outgoing_call' and self.outgoing and event['epoch'] == epoch:
+                        self.digits = event['digits']
+                    elif (kind == 'network_state' and event.get('registered') and not placed and epoch is not None
+                          and not self.outgoing):
                         placed = True
                         await websocket.send(json.dumps({'type': 'incoming_call', 'epoch': epoch,
                                                          'request_id': 1, 'caller': CALLER}))
-                    elif kind == 'incoming_call_state':
+                    elif kind == f'{direction}_call_state':
                         self.phases.append(event['phase'])
+                        if self.outgoing and event['phase'] == 'alerting':
+                            await websocket.send(json.dumps({'type': 'outgoing_call_decision', 'epoch': epoch,
+                                                             'request_id': event['request_id'], 'decision': 'connect'}))
                         if event['phase'] == 'connected':
                             sequence = event['media_downlink_sequence']
                         if event['phase'] == 'ended':
                             return
-                    elif kind == 'incoming_call_media_uplink':
+                    elif kind == f'{direction}_call_media_uplink':
                         if event['good']:
                             self.uplink_good += 1
                             self.uplink.extend(decoder.decode(bytes.fromhex(event['frame'])))
@@ -123,22 +136,22 @@ class HostCallClient(threading.Thread):
                         if sequence % 50 == 0:
                             encoder.close()
                             encoder = GsmFrCodec()
-                        if self.uplink_good + self.uplink_bad > self.hangup_after and self.quiet_after_hangup:
+                        if self.hangup_after is not None and self.quiet_after_hangup and self.uplink_good + self.uplink_bad > self.hangup_after:
                             continue
                         pcm = struct.pack('<160h', *(tone[n % 8] for n in range(160)))
                         await websocket.send(json.dumps({
-                            'type': 'incoming_call_media_downlink', 'epoch': epoch, 'request_id': 1,
+                            'type': f'{direction}_call_media_downlink', 'epoch': epoch, 'request_id': 1,
                             'sequence': sequence, 'source_time_us': sequence * 20000,
                             'frame': encoder.encode(pcm).hex()}))
                         sequence += 1
                         self.downlink += 1
-                        if self.uplink_good + self.uplink_bad == self.hangup_after:
-                            await websocket.send(json.dumps({'type': 'incoming_call_terminate',
+                        if self.hangup_after is not None and self.uplink_good + self.uplink_bad == self.hangup_after:
+                            await websocket.send(json.dumps({'type': f'{direction}_call_terminate',
                                                              'epoch': epoch, 'request_id': 1, 'cause': 16}))
         finally:
             decoder.close()
             encoder.close()
 
     def result(self):
-        return dict(received=sorted(set(self.received)), phases=self.phases, uplink_good=self.uplink_good, uplink_bad=self.uplink_bad,
+        return dict(received=sorted(set(self.received)), digits=self.digits, phases=self.phases, uplink_good=self.uplink_good, uplink_bad=self.uplink_bad,
                     downlink=self.downlink, uplink_microphone_fraction=round(tone_fraction(bytes(self.uplink), MICROPHONE_HZ), 3))

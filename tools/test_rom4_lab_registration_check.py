@@ -213,3 +213,53 @@ class HostCallTest(unittest.TestCase):
     def test_rejects_quiet_host_uplink(self):
         with self.assertRaisesRegex(ValueError, 'microphone'):
             check_host_call(HOST_LOG, dict(HOST_CLIENT, uplink_microphone_fraction=0.2))
+
+
+# A call the handset dials and clears, answered by a host (native nse1ap5 run).
+OUTGOING_LOG = """npe3_host_call: request=1 epoch=2 phase=dialled direction=outgoing digits=3 t=20.900208653
+npe3_host_call: request=1 epoch=2 phase=alerting direction=outgoing t=21.514631730
+npe3_host_call: request=1 epoch=2 phase=decided direction=outgoing decision=connect t=21.520000000
+npe3_host_call: request=1 epoch=2 phase=connecting direction=outgoing t=21.520000000
+npe3_host_call: request=1 epoch=2 phase=connected direction=outgoing t=21.634631730
+npe3_tch_facch: kind=rr uplink_start_frame=4680 octets=0141012b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b raw_adc_only=1 physical_claim=0
+npe3_tch_uplink: channel=facch start_frame=5815 octets=014415036502e0902b2b2b2b2b2b2b2b2b2b2b2b2b2b2b exact_code=1 speech_blocks=269 bad_speech_blocks=4 unreadable_bursts=0 downlink_speech_blocks=274 port_bits_only=1 physical_claim=0
+npe3_tch_facch: kind=cc_release uplink_start_frame=5815 octets=036409832d2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b raw_adc_only=1 physical_claim=0
+npe3_tch_uplink: channel=facch start_frame=5837 octets=016609032a2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b exact_code=1 speech_blocks=273 bad_speech_blocks=4 unreadable_bursts=0 downlink_speech_blocks=278 port_bits_only=1 physical_claim=0
+npe3_tch_facch: kind=channel_release uplink_start_frame=5837 octets=03860d060d002b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b raw_adc_only=1 physical_claim=0
+npe3_tch_uplink: channel=facch start_frame=5858 octets=0153012b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b exact_code=1 speech_blocks=277 bad_speech_blocks=4 unreadable_bursts=0 downlink_speech_blocks=282 port_bits_only=1 physical_claim=0
+npe3_tch_facch: kind=disc_ua uplink_start_frame=5858 octets=0173012b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b raw_adc_only=1 physical_claim=0
+npe3_host_call: request=1 epoch=2 phase=ended direction=outgoing t=27.314393538
+npe3_tch_audio: earpiece_hz=1000 earpiece_blocks=291 earpiece_tone_blocks=256 earpiece_tone_amplitude=863 microphone_hz=500 uplink_blocks=282 uplink_tone_blocks=258 uplink_tone_amplitude=39063 physical_claim=0
+"""
+OUTGOING_CLIENT = dict(digits='123', phases=['alerting', 'connected', 'ended'], uplink_good=274, downlink=274,
+                       uplink_microphone_fraction=0.902)
+
+
+class OutgoingHostCallTest(unittest.TestCase):
+    def test_accepts_native_dialled_call(self):
+        result = check_host_call(OUTGOING_LOG, OUTGOING_CLIENT, outgoing=True)
+        self.assertEqual(result['earpiece_tone_blocks'], 256)
+
+    def test_accepts_a_decision_before_alerting(self):
+        lines = OUTGOING_LOG.splitlines()
+        decided = next(line for line in lines if 'phase=decided' in line)
+        lines.remove(decided)
+        lines.insert(next(i for i, line in enumerate(lines) if 'phase=alerting' in line), decided)
+        check_host_call('\n'.join(lines), OUTGOING_CLIENT, outgoing=True)
+
+    def test_rejects_connect_before_alerting(self):
+        lines = OUTGOING_LOG.splitlines()
+        alerting = next(line for line in lines if 'phase=alerting' in line)
+        lines.remove(alerting)
+        lines.insert(next(i for i, line in enumerate(lines) if 'phase=connected' in line), alerting)
+        with self.assertRaisesRegex(ValueError, 'phases out of order'):
+            check_host_call('\n'.join(lines), OUTGOING_CLIENT, outgoing=True)
+
+    def test_rejects_missing_handset_disconnect(self):
+        broken = '\n'.join(line for line in OUTGOING_LOG.splitlines() if '15036502e090' not in line)
+        with self.assertRaisesRegex(ValueError, 'clearing out of order'):
+            check_host_call(broken, OUTGOING_CLIENT, outgoing=True)
+
+    def test_rejects_wrong_digits(self):
+        with self.assertRaisesRegex(ValueError, 'digits'):
+            check_host_call(OUTGOING_LOG, dict(OUTGOING_CLIENT, digits='124'), outgoing=True)

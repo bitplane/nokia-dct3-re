@@ -209,30 +209,43 @@ HOST_CLEARING = (('net', 'cc_disconnect'), ('ms', 'release'), ('net', 'cc_releas
                  ('net', 'channel_release'), ('ms', 'disc'), ('net', 'disc_ua'))
 
 
-def check_host_lab(text, phases=('paged', 'alerting', 'connected', 'network_clearing', 'ended')):
-    """Lab side of a host-placed traffic-channel call that the host clears."""
-    if FAULT.search(text) or 'native_dsp_reset_line: released=0' in text.split('phase=paged', 1)[-1]:
+# Clearing started by the handset (GSM 04.08 5.4.3): its DISCONNECT, the lab's
+# RELEASE, RELEASE COMPLETE, Channel Release and the final DISC.
+HANDSET_CLEARING = (('ms', 'disconnect'), ('net', 'cc_release'), ('ms', 'release_complete'),
+                    ('net', 'channel_release'), ('ms', 'disc'), ('net', 'disc_ua'))
+OUTGOING_PHASES = ('dialled', 'alerting', 'decided', 'connecting', 'connected', 'ended')
+
+
+def check_host_lab(text, phases=('paged', 'alerting', 'connected', 'network_clearing', 'ended'),
+                   clearing=HOST_CLEARING, start='phase=network_clearing'):
+    """Lab side of a host traffic-channel call: phases, clearing and earpiece tone."""
+    if FAULT.search(text) or 'native_dsp_reset_line: released=0' in text.split(f'phase={phases[0]}', 1)[-1]:
         raise ValueError('native run reset or faulted during the host call')
     seen = HOST_PHASE.findall(text)
+    if 'decided' in phases and 'decided' in seen and 'connecting' in seen:
+        # The host may answer before the assignment completes; CONNECT must
+        # still follow ALERTING, so only the decision itself may move.
+        seen.remove('decided')
+        seen.insert(seen.index('connecting'), 'decided')
     if seen != list(phases):
         raise ValueError(f'host call phases out of order: {seen}')
-    if 'phase=paged digits=4 ' not in text:
+    if phases[0] == 'paged' and 'phase=paged digits=4 ' not in text:
         raise ValueError('host caller digits did not reach SETUP')
     events = []
-    clearing = text[text.find('phase=network_clearing'):]
-    for line in clearing.splitlines():
+    for line in text[text.find(start):].splitlines():
         reply = TCH_REPLY.search(line)
         if reply:
             events.append(('net', reply.group(1)))
         uplink = TCH_UPLINK.search(line)
         if uplink and uplink.group(1) == 'facch' and uplink.group(4) == '1':
             block = bytes.fromhex(uplink.group(3))
-            if block[3] & 15 == 3 and block[4] & 0x3f == 0x2d:
-                events.append(('ms', 'release'))
+            message = {0x2d: 'release', 0x25: 'disconnect', 0x2a: 'release_complete'}.get(block[4] & 0x3f)
+            if block[3] & 15 == 3 and message:
+                events.append(('ms', message))
             elif block[:3] == b'\x01\x53\x01':
                 events.append(('ms', 'disc'))
     order = iter(events)
-    if not all(step in order for step in HOST_CLEARING):
+    if not all(step in order for step in clearing):
         raise ValueError(f'network clearing out of order: {events}')
     # Host media flows only after CONNECT, so require an absolute duration of
     # the host's 1 kHz tone at the earpiece rather than a share of the call.
@@ -242,9 +255,14 @@ def check_host_lab(text, phases=('paged', 'alerting', 'connected', 'network_clea
     return dict(earpiece_tone_blocks=int(audio[0][1]))
 
 
-def check_host_call(text, client):
-    """Check a host-placed traffic-channel call that the host clears."""
-    result = check_host_lab(text)
+def check_host_call(text, client, outgoing=False):
+    """Check a host-placed call that the host clears, or a dialled one the handset clears."""
+    if outgoing:
+        if client['digits'] != '123':
+            raise ValueError(f'host saw dialled digits {client["digits"]!r}')
+        result = check_host_lab(text, OUTGOING_PHASES, HANDSET_CLEARING, 'phase=connected')
+    else:
+        result = check_host_lab(text)
     if [phase for phase in client['phases'] if phase != 'media_closed'] != ['alerting', 'connected', 'ended']:
         raise ValueError(f'host saw phases {client["phases"]}')
     if client['uplink_good'] < 100 or client['downlink'] < 100:

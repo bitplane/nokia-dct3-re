@@ -1225,10 +1225,12 @@ PJSUA calls the bridge. The handset rings and is answered with its own key,
 speech crosses RTP and the native DSP codec both ways, and the remote's BYE
 clears the call from the network side. The remote offers only G.711. Its
 recording, with the bridge's silent gap frames removed, must be at least half
-the handset's 500 Hz microphone tone (runs give 0.86). This is the only SIP gate in which
-native DSP firmware carries the speech. It covers mobile-terminated calls
-only; the lab does not offer outgoing calls, call waiting or restoration
-through the bridge. During the call MAME runs at about 40 % of real time,
+the handset's 500 Hz microphone tone (runs give 0.86).
+`make verify-5110-lab-sip-outgoing-call` runs the other direction: the handset
+dials 123, the bridge calls a PJSUA remote that answers at once, and the
+handset's End clears the call. These are the only SIP gates in which
+native DSP firmware carries the speech. The lab takes one call per run and
+does not offer call waiting or restoration through the bridge. During the call MAME runs at about 40 % of real time,
 so the remote talks for twelve wall-clock seconds and the bridge's jitter
 handling absorbs the rate difference.
 

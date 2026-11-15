@@ -292,7 +292,7 @@ void dct3_rf_adc_fixture_state::machine_reset()
 	m_call_release_start_frame=~u64(0);m_call_channel_release_sent=false;
 	m_lu_acknowledged=m_lu_completed=false;m_release_start_frame=~u64(0);
 	m_tch.stop();m_codec_timer->adjust(attotime::never);m_tch_stop_frame=m_tch_samples_frame=~u64(0);
-	m_host_request=0;m_host_connected=false;m_host_downlink.clear();m_host_published_registered=false;
+	m_host_request=0;m_host_connected=m_host_outgoing=m_host_alerted=m_host_connect_pending=false;m_host_downlink.clear();m_host_published_registered=false;
 	m_call_host.new_epoch();
 	m_normal_count=0;m_contention_active=false;
 	m_page_identity_valid=m_page_pending=false;
@@ -419,9 +419,10 @@ void dct3_rf_adc_fixture_state::host_call_phase(char const *phase)
 	bool const connected=!strcmp(phase,"connected");
 	if (connected && m_host_connected) return;
 	if (connected) m_host_connected=true;
-	m_call_host.publish_incoming_state(m_host_request,phase,m_host_uplink_sequence,m_host_downlink_sequence);
-	machine().logerror("npe3_host_call: request=%u epoch=%u phase=%s t=%.9f\n",m_host_request,m_call_host.epoch(),phase,machine().time().as_double());
-	if (!strcmp(phase,"ended")) { m_host_request=0;m_host_connected=false;m_host_downlink.clear(); }
+	m_call_host.publish_state(m_host_outgoing,m_host_request,phase,m_host_uplink_sequence,m_host_downlink_sequence);
+	machine().logerror("npe3_host_call: request=%u epoch=%u phase=%s direction=%s t=%.9f\n",m_host_request,m_call_host.epoch(),phase,
+		m_host_outgoing ? "outgoing" : "incoming",machine().time().as_double());
+	if (!strcmp(phase,"ended")) { m_host_request=0;m_host_connected=m_host_outgoing=m_host_alerted=m_host_connect_pending=false;m_host_downlink.clear(); }
 }
 
 TIMER_CALLBACK_MEMBER(dct3_rf_adc_fixture_state::poll_call_host)
@@ -449,11 +450,11 @@ TIMER_CALLBACK_MEMBER(dct3_rf_adc_fixture_state::poll_call_host)
 				(ioport("LAB_BTS")->read()&0x2c)==0x2c;
 		if (!admissible)
 		{
-			m_call_host.publish_incoming_state(call.request_id,"ended");
+			m_call_host.publish_state(false,call.request_id,"ended");
 			machine().logerror("npe3_host_call: request=%u epoch=%u phase=rejected t=%.9f\n",call.request_id,epoch,machine().time().as_double());
 			continue;
 		}
-		m_host_request=call.request_id;
+		m_host_request=call.request_id;m_host_outgoing=false;
 		std::copy(call.digits.begin(),call.digits.end(),m_host_digits.begin());
 		m_host_digit_count=call.length;
 		m_host_connected=false;m_host_terminate_cause=-1;m_host_page_pending=true;
@@ -467,12 +468,24 @@ TIMER_CALLBACK_MEMBER(dct3_rf_adc_fixture_state::poll_call_host)
 		m_host_page_pending=false;
 		machine().logerror("npe3_host_call: request=%u epoch=%u phase=paged digits=%u t=%.9f\n",m_host_request,epoch,m_host_digit_count,machine().time().as_double());
 	}
+	for (auto const &decision:events.decisions)
+	{
+		if (decision.epoch!=epoch || decision.request_id!=m_host_request || !m_host_outgoing || m_host_connect_pending || m_host_connected) continue;
+		bool const connect=decision.result==nokia_lab_call_host::decision_outcome::connect;
+		machine().logerror("npe3_host_call: request=%u epoch=%u phase=decided direction=outgoing decision=%s t=%.9f\n",m_host_request,epoch,
+			connect ? "connect" : decision.result==nokia_lab_call_host::decision_outcome::busy ? "busy" : "no_answer",machine().time().as_double());
+		// A refusal is followed by the host's terminate, which clears the call.
+		if (!connect) continue;
+		m_host_connect_pending=true;
+		if (m_host_alerted) send_host_connect();
+	}
 	for (auto const &end:events.terminations)
-		if (end.epoch==epoch && end.request_id==m_host_request && m_host_terminate_cause<0)
+		if (end.epoch==epoch && end.request_id==m_host_request && end.outgoing==m_host_outgoing && m_host_terminate_cause<0)
 			m_host_terminate_cause=end.cause;
 	for (auto const &media:events.media)
 	{
-		if (media.epoch!=epoch || media.request_id!=m_host_request || media.sequence<m_host_downlink_sequence) continue;
+		if (media.epoch!=epoch || media.request_id!=m_host_request || media.outgoing!=m_host_outgoing ||
+				media.sequence<m_host_downlink_sequence) continue;
 		// A bounded jitter queue: never let host bursts run far ahead of the air.
 		if (m_host_downlink.size()>=8) m_host_downlink.pop_front();
 		m_host_downlink.push_back(media.frame);
@@ -703,6 +716,7 @@ void dct3_rf_adc_fixture_state::receive_normal_uplink(std::array<u16,15> const &
 		std::copy(proceeding.begin(),proceeding.end(),lapdm.begin()+3);
 		// Network N(S)=1 follows CM SERVICE ACCEPT; N(R)=1 acknowledges SETUP.
 		m_call_proceeding_start_frame=m_call_rr_start_frame=(frame/51+1)*51+22;
+		offer_host_outgoing(block->data()+3,(*block)[2]>>2);
 		auto const encoded=nokia_rf_lab::bcch_bits(lapdm,0);
 		for (unsigned at=0;at<4;++at) m_call_rr_samples[at]=nokia_rf_lab::gmsk_samples(encoded[at]);
 		packed.clear();for (auto byte:lapdm) packed+=util::string_format("%02x",byte);
@@ -954,7 +968,7 @@ void dct3_rf_adc_fixture_state::load_tch_state()
 	if (!m_tch_codec.restore(m_tch_codec_state[0]) || !m_tch_uplink_codec.restore(m_tch_codec_state[1]))
 		fatalerror("laboratory TCH: invalid codec state in save image\n");
 	// Host connections are outside the image: a load ends host ownership.
-	m_host_request=0;m_host_connected=false;m_host_downlink.clear();
+	m_host_request=0;m_host_connected=m_host_outgoing=m_host_alerted=m_host_connect_pending=false;m_host_downlink.clear();
 	m_call_host.new_epoch();
 	set_tch_speech_source();
 }
@@ -1016,7 +1030,9 @@ void dct3_rf_adc_fixture_state::start_traffic_channel(u64 frame)
 	m_earpiece_at=m_microphone_phase=0;
 	m_earpiece_meter=m_uplink_meter=tone_meter{};
 	m_codec_timer->adjust(attotime::from_hz(8'000),0,attotime::from_hz(8'000));
-	m_tch_cc_ti_valid=m_facch_channel_release_after_ack=false;
+	m_facch_channel_release_after_ack=false;
+	// A dialled call's CC transaction began with its SETUP on SDCCH.
+	m_tch_cc_ti_valid=m_host_outgoing;
 	machine().logerror("npe3_tch_start: first_frame=%u timeslot=1 tsc=2 sacch=si5,si6 speech=%s codec=%s raw_adc_only=1 physical_claim=0\n",
 		unsigned(m_tch.first_frame()),m_host_request ? "host" : m_tch_speech_enabled ? "tone_1000hz" : "empty",m_tch_codec.available() ? "gsm_06_10" : "unavailable");
 }
@@ -1080,7 +1096,7 @@ void dct3_rf_adc_fixture_state::receive_traffic_uplink(std::array<u16,15> const 
 		if ((event.kind==kind::speech || event.kind==kind::bad_speech) && m_host_request && m_host_connected)
 		{
 			u64 const time_us=machine().time().as_ticks(1'000'000);
-			m_call_host.publish_uplink(m_host_request,m_host_uplink_sequence++,time_us,
+			m_call_host.publish_uplink(m_host_outgoing,m_host_request,m_host_uplink_sequence++,time_us,
 				event.kind==kind::speech,event.kind==kind::speech ? event.speech : nokia_lab_call_host::speech_frame{});
 		}
 		if (event.kind==kind::speech)
@@ -1153,6 +1169,17 @@ void dct3_rf_adc_fixture_state::receive_facch(gsm::tch_f::packed_control_block c
 	auto &network=*subdevice<nokia_gsm_network_device>("gsm_network");
 	if ((l3[0]&15)==3) { m_tch_cc_ti=l3[0];m_tch_cc_ti_valid=true; }
 	if ((l3[0]&15)==3 && (l3[1]&0x3f)==0x01) host_call_phase("alerting");
+	if ((l3[0]&15)==3 && (l3[1]&0x3f)==0x0f && m_host_outgoing) host_call_phase("connected");
+	if (l3[0]==6 && l3[1]==0x29 && m_host_outgoing && !m_host_alerted)
+	{
+		// The far end is being called: ALERTING gives the handset ringback.
+		auto const alerting=network.call_alerting(m_tch_cc_ti);
+		m_host_alerted=true;
+		queue_facch_information(5,alerting.data(),alerting.size(),frame);
+		host_call_phase("alerting");
+		if (m_host_connect_pending) send_host_connect();
+		return;
+	}
 	if ((l3[0]&15)==3 && (l3[1]&0x3f)==0x07) host_call_phase("connected");
 	if ((l3[0]&15)==3 && (l3[1]&0x3f)==0x2d)
 	{
@@ -1188,6 +1215,43 @@ void dct3_rf_adc_fixture_state::receive_facch(gsm::tch_f::packed_control_block c
 		return;
 	}
 	queue_facch_information(kind_index,message.data(),message.size(),frame);
+}
+
+void dct3_rf_adc_fixture_state::send_host_connect()
+{
+	if (!m_tch.active() || !m_tch_cc_ti_valid) return;
+	auto const connect=subdevice<nokia_gsm_network_device>("gsm_network")->call_connect(m_tch_cc_ti);
+	queue_facch_information(6,connect.data(),connect.size(),machine().time().as_ticks(13'000'000)/60'000);
+	machine().logerror("npe3_host_call: request=%u epoch=%u phase=connecting direction=outgoing t=%.9f\n",
+		m_host_request,m_call_host.epoch(),machine().time().as_double());
+}
+
+void dct3_rf_adc_fixture_state::offer_host_outgoing(u8 const *setup,unsigned length)
+{
+	if (!m_call_host.active() || m_host_request || length<2) return;
+	// Called party BCD number (GSM 04.08 10.5.4.7): type octet, then digits
+	// low nibble first, an f nibble filling the last octet.
+	std::array<u8,20> digits{};
+	unsigned count=0;
+	for (unsigned at=2;at<length;)
+	{
+		u8 const iei=setup[at];
+		if (iei&0x80) { ++at;continue; }
+		if (at+1>=length) break;
+		unsigned const size=setup[at+1];
+		if (iei==0x5e)
+			for (unsigned index=at+3;index<at+2+size && index<length;++index)
+				for (u8 const nibble:{u8(setup[index]&15),u8(setup[index]>>4)})
+					if (nibble<=9 && count<digits.size()) digits[count++]=nibble;
+		at+=2+size;
+	}
+	if (!count) return;
+	m_host_request=1;m_host_outgoing=true;m_host_alerted=m_host_connect_pending=m_host_connected=false;
+	m_host_terminate_cause=-1;m_host_uplink_sequence=m_host_downlink_sequence=0;m_host_downlink.clear();
+	m_tch_cc_ti=setup[0];m_tch_cc_ti_valid=true;
+	m_call_host.publish_outgoing_call(m_host_request,digits.data(),count);
+	machine().logerror("npe3_host_call: request=%u epoch=%u phase=dialled direction=outgoing digits=%u t=%.9f\n",
+		m_host_request,m_call_host.epoch(),count,machine().time().as_double());
 }
 
 void dct3_rf_adc_fixture_state::queue_facch_information(u8 kind,u8 const *layer3,unsigned length,u64 frame)

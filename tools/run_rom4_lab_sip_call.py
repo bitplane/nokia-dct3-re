@@ -6,7 +6,9 @@ call on the lab cell through MAME's host call endpoint. The handset rings, is
 answered with its own key, and its native DSP carries speech both ways: the
 remote's 1 kHz tone to the earpiece and the lab microphone's 500 Hz tone to
 the remote. The remote hangs up and the lab clears the call from the network
-side. MAME runs in real time, as SIP media does.
+side. With --outgoing the handset dials 123 instead; the bridge calls the
+remote, which answers, and the handset hangs up. MAME runs in real time, as
+SIP media does.
 """
 import argparse
 import asyncio
@@ -22,7 +24,8 @@ import wave
 if __package__ in (None, ''):
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from tools.lab_host_call_client import MICROPHONE_HZ, TONE_HZ, tone_fraction, without_gaps
-from tools.rom4_lab_registration_check import NSE1_LCD_SHA256, check, check_host_lab, check_lcd
+from tools.rom4_lab_registration_check import (HANDSET_CLEARING, NSE1_LCD_SHA256, OUTGOING_PHASES, check, check_host_lab,
+                                               check_lcd)
 from tools.run_rom4_lab_registration import command
 from tools.run_sip_stack_probe import write_tone
 
@@ -34,7 +37,7 @@ def recorded_fraction(path, hz):
 
 async def run(args, root, run_dir):
     cmd = [part for part in command(root, run_dir, 'nse1ap5', args.mame.resolve(), True, True,
-                                    http_port=args.http_port) if part != '-nothrottle']
+                                    http_port=args.http_port, outgoing=args.outgoing) if part != '-nothrottle']
     write_tone(run_dir / 'remote.wav', TONE_HZ)
     environment = dict(os.environ, PYTHONPATH=os.pathsep.join(filter(None, (args.pjsua2, os.environ.get('PYTHONPATH')))))
     processes = []
@@ -66,9 +69,18 @@ async def run(args, root, run_dir):
                 *(f'--dis-codec={codec}' for codec in ('speex', 'iLBC', 'GSM', 'G722', 'PCMA')),
                 f'--play-file={run_dir / "remote.wav"}', '--auto-play',
                 f'--rec-file={run_dir / "remote-received.wav"}', '--auto-rec',
-                '--id', f'sip:4420@127.0.0.1:{args.sip_port}', f'sip:dct3@127.0.0.1:{args.sip_port + 1}',
+                '--id', f'sip:4420@127.0.0.1:{args.sip_port}',
+                # The remote answers the handset's call, or places one to it.
+                *(['--auto-answer=200'] if args.outgoing else [f'sip:dct3@127.0.0.1:{args.sip_port + 1}']),
                 stdin=asyncio.subprocess.PIPE, stdout=remote_log, stderr=asyncio.subprocess.STDOUT)
             processes.append(remote)
+            if args.outgoing:
+                # The handset dials, talks and hangs up on its own schedule.
+                if await asyncio.wait_for(bridge.wait(), 180):
+                    raise RuntimeError('SIP bridge failed; inspect sip-bridge.log')
+                if await asyncio.wait_for(handset.wait(), 120):
+                    raise RuntimeError('handset exited unsuccessfully')
+                return
             # pjsua's --duration runs from the INVITE, so ringing would eat the
             # talk time: hang up a fixed time after the handset answers.
             for _ in range(1200):
@@ -101,15 +113,22 @@ async def run(args, root, run_dir):
                     await process.wait()
 
 
-def verify(run_dir):
+def verify(run_dir, outgoing=False):
     text = (run_dir / 'error.log').read_text(errors='replace')
-    page = text.find('npe3_bts_page_request:')
-    result = check(text[:page] if page >= 0 else text)
-    result.update(check_host_lab(text))
+    if outgoing:
+        access = text.find('npe3_raw_agch:', text.find('npe3_raw_agch:') + 1)
+        result = check(text[:access])
+        result.update(check_host_lab(text, OUTGOING_PHASES, HANDSET_CLEARING, 'phase=connected'))
+    else:
+        page = text.find('npe3_bts_page_request:')
+        result = check(text[:page] if page >= 0 else text)
+        result.update(check_host_lab(text))
     check_lcd(run_dir / 'snap', NSE1_LCD_SHA256)
     bridge = (run_dir / 'sip-bridge.log').read_text(errors='replace')
     remote = (run_dir / 'sip-remote.log').read_text(errors='replace')
-    for marker in ('SIP incoming identity=', 'caller=4420', 'SIP physical answer identity=', 'SIP confirmed status=200'):
+    markers = (('SIP dial identity=', 'digits=123') if outgoing else
+               ('SIP incoming identity=', 'caller=4420', 'SIP physical answer identity=', 'SIP confirmed status=200'))
+    for marker in markers:
         if marker not in bridge:
             raise ValueError(f'bridge log lacks {marker!r}')
     if 'state changed to CONFIRMED' not in remote or 'DISCONNECTED' not in remote:
@@ -136,6 +155,7 @@ def main():
     # The handset's DSP runs at about 40% of real time during a call, so 12 s
     # of wall-clock talk carries roughly 240 uplink frames (the bridge needs 100).
     parser.add_argument('--talk', type=int, default=12, help='wall-clock seconds the remote talks after answer')
+    parser.add_argument('--outgoing', action='store_true', help='the handset dials the remote and hangs up')
     parser.add_argument('--keep', action='store_true')
     args = parser.parse_args()
     root = Path(__file__).resolve().parents[1]
@@ -146,11 +166,11 @@ def main():
     try:
         os.environ['NOKIA_DCT3_SNAPSHOT_DIR'] = str(run_dir / 'snap')
         asyncio.run(run(args, root, run_dir))
-        result = verify(run_dir)
+        result = verify(run_dir, args.outgoing)
     except Exception as error:
         raise SystemExit(f'FAIL - {error}; evidence retained: {run_dir}')
     print(' '.join(f'{key}={value}' for key, value in result.items()))
-    print('NSE ROM4 nse1ap5 native laboratory SIP call: PASS')
+    print(f'NSE ROM4 nse1ap5 native laboratory {"dialled " if args.outgoing else ""}SIP call: PASS')
     if args.keep:
         print(f'evidence retained: {run_dir}')
     else:

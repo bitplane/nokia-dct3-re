@@ -106,6 +106,8 @@ private:
 	// Registered once Location Updating completes; later accesses keep it.
 	bool host_registered() const { return m_lu_completed && m_page_identity_valid; }
 	void host_call_phase(char const *phase);
+	void offer_host_outgoing(u8 const *setup,unsigned length);
+	void send_host_connect();
 	void stop_call_host();
 	template <typename F> void visit_tch_state(F &&field);
 	void save_tch_state();
@@ -115,7 +117,7 @@ private:
 	void send_facch(char const *kind,gsm::tch_f::packed_control_block const &lapdm,u64 frame);
 	// Plain data, so the outstanding window can be saved.
 	struct facch_information { u8 sequence,kind,length; std::array<u8,20> layer3; };
-	static constexpr char const *facch_kinds[]={"connect_acknowledge","cc_release","channel_release","cc_disconnect","cc_release_complete"};
+	static constexpr char const *facch_kinds[]={"connect_acknowledge","cc_release","channel_release","cc_disconnect","cc_release_complete","cc_alerting","cc_connect"};
 	void queue_facch_information(u8 kind,u8 const *layer3,unsigned length,u64 frame);
 	void send_facch_information(facch_information const &information,u64 frame);
 	void acknowledge_facch(u8 received);
@@ -186,6 +188,9 @@ private:
 	std::array<u8,20> m_host_digits{};
 	unsigned m_host_digit_count=0;
 	bool m_host_published_registered=false,m_host_connected=false,m_host_page_pending=false;
+	// A call the handset dials: MAME owns its request identity; the host
+	// decides it, and the lab alerts after assignment and connects on demand.
+	bool m_host_outgoing=false,m_host_alerted=false,m_host_connect_pending=false;
 	int m_host_terminate_cause=-1;
 	u32 m_host_uplink_sequence=0,m_host_downlink_sequence=0;
 	std::deque<nokia_lab_call_host::speech_frame> m_host_downlink;

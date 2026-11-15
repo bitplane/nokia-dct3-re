@@ -1109,6 +1109,37 @@ gate ran pjsua with `--auto-loop`, which echoes received RTP back to the
 sender. The handset then heard its own microphone tone mixed into the
 remote's, and the scores fell to about 0.5.
 
+Calls the handset dials use the lab's mobile-originated path (LAB_BTS
+`0x100` CM SERVICE ACCEPT, `0x200` CALL PROCEEDING, `0x80` late
+assignment), which the 5110 follows unchanged. It sends CM SERVICE
+REQUEST and SETUP with the called number. With a host connected, the lab
+offers the call as `outgoing_call` with the decoded digits. After the
+handset's ASSIGNMENT COMPLETE on FACCH it sends ALERTING, and once the
+host decides `connect` it sends CONNECT. A decision that arrives earlier,
+as from a SIP remote that answers at once, waits for ALERTING. The
+handset's CONNECT ACKNOWLEDGE publishes `connected`. Media then flows in
+the outgoing direction. Pressing End clears the call: the handset's
+DISCONNECT, then RELEASE, RELEASE COMPLETE, Channel Release and DISC. The
+CC transaction began with SETUP on SDCCH, so starting the traffic channel
+keeps its identifier for a dialled call.
+
+`make verify-5110-lab-host-outgoing-call` dials 123 from 17 s after
+start-up and presses End 7.5 s later. The synthetic host answers when the
+call alerts. It gets 274 good uplink frames (0.90 microphone tone), and
+256 earpiece blocks carry its 1 kHz tone. `make
+verify-5110-lab-sip-outgoing-call` places the same call through the
+bridge to a PJSUA remote that answers at once: 274 uplink and 504
+downlink frames, with 0.91 of the remote's gap-free recording being the
+microphone tone.
+
+Open: with End pressed 0.75 s earlier (26.0 s), about half the lab's
+downlink FACCH blocks during the handset's clearing went undecoded. The
+DSP posted the RELEASE only on its T200 resend, missed the RR answers to
+three of the handset's retransmitted DISCONNECTs, and the clearing took
+0.75 s longer. The DSP's frame task ran on time throughout. The same
+moment with silent host speech, and End 0.75 or 2.25 s later, cleared
+without a resend. The cause was not traced.
+
 The host time is the C54x pipeline model: about 80 % of a profile, spread
 over its per-cycle opcode tests with no single hot spot (the DSP's IDLE
 is already skipped, so every modelled cycle is an executed one).

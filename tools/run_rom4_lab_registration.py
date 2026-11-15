@@ -44,7 +44,15 @@ def write_bts_config(run, machine, bits):
         '</input></system></mameconfig>\n')
 
 
-def command(root, run, machine, mame, call=False, traffic=False, roundtrip=None, http_port=None):
+# The handset dials 123 and presses Navi to call, then Navi again to end the
+# call after it connects. Names without a key only hold a 0.75 s slot.
+OUTGOING_KEYS = '1,2,3,menu,' + 'wait,' * 9 + 'menu'
+# Mobile-originated service: CM SERVICE ACCEPT (0x100), CALL PROCEEDING
+# (0x200) and the late TCH assignment (0x80), with handset clearing (32).
+OUTGOING_BTS_BITS = (8, 16, 32, 64, 128, 256, 512, 2048)
+
+
+def command(root, run, machine, mame, call=False, traffic=False, roundtrip=None, http_port=None, outgoing=False):
     if machine == 'nse1ap5':
         nvram = run / 'nvram/nse1ap5'
         nvram.mkdir(parents=True)
@@ -53,7 +61,7 @@ def command(root, run, machine, mame, call=False, traffic=False, roundtrip=None,
             (root / 'roms/noki5110/nse-1.bin').read_bytes(),
             (root / 'roms/noki5110/5110f530.fls').read_bytes()))
         if call:
-            write_bts_config(run, machine, TRAFFIC_BTS_BITS if traffic else CALL_BTS_BITS)
+            write_bts_config(run, machine, OUTGOING_BTS_BITS if outgoing else TRAFFIC_BTS_BITS if traffic else CALL_BTS_BITS)
             os.environ.update(CALL_INPUTS)
         if roundtrip is not None:
             # Lua key timers are outside the machine image, so every press
@@ -85,6 +93,10 @@ def command(root, run, machine, mame, call=False, traffic=False, roundtrip=None,
             # up, so only Answer is pressed.
             os.environ.pop('NPE3_NATIVE_PAGE_AT', None)
             os.environ['NOKIA_DCT3_POST_READY_KEYS'] = 'menu'
+            if outgoing:
+                # Dial once registered (17 s after ready); end the call 7.5 s later.
+                os.environ.update(NOKIA_DCT3_POST_READY_KEYS=OUTGOING_KEYS, NOKIA_DCT3_POST_READY_KEY_DELAY_MS='17000',
+                                  NOKIA_DCT3_POST_READY_KEY_DURATION_MS='150', NOKIA_DCT3_POST_READY_KEY_GAP_MS='600')
             extra = ['-http', '-http_port', str(http_port)]
         # The staged menu script adds the LCD mirror and the staged-CPU end marker.
         script = root / ('tools/rom4_lab_call_restore.lua' if roundtrip is not None else
@@ -111,8 +123,13 @@ def main():
                         help='save, replay and reload the traffic-channel call at this time (nse1ap5)')
     parser.add_argument('--host-call', type=int, metavar='HTTP_PORT',
                         help='a synthetic host places the traffic-channel call over the host call protocol and hangs up (nse1ap5)')
+    parser.add_argument('--host-outgoing-call', type=int, metavar='HTTP_PORT',
+                        help='the handset dials 123; a synthetic host answers it, and the handset hangs up (nse1ap5)')
     parser.add_argument('--keep', action='store_true', help='retain the run directory after a pass')
     args = parser.parse_args()
+    outgoing = args.host_outgoing_call is not None
+    if outgoing:
+        args.host_call = args.host_outgoing_call
     args.traffic_channel |= args.state_roundtrip is not None or args.host_call is not None
     args.incoming_call |= args.traffic_channel
     if args.incoming_call and args.machine != 'nse1ap5':
@@ -124,12 +141,13 @@ def main():
     os.rmdir(run)  # prepare_native requires a new directory
     try:
         cmd = command(root, run, args.machine, (args.mame or root / 'mame/mame').resolve(), args.incoming_call,
-                      args.traffic_channel, args.state_roundtrip, args.host_call)
+                      args.traffic_channel, args.state_roundtrip, args.host_call, outgoing)
         run.mkdir(exist_ok=True)
         os.environ['NOKIA_DCT3_SNAPSHOT_DIR'] = str(run / 'snap')
         client = None
         if args.host_call is not None:
-            client = HostCallClient(f'ws://127.0.0.1:{args.host_call}/nokia/dct3/calls')
+            client = HostCallClient(f'ws://127.0.0.1:{args.host_call}/nokia/dct3/calls',
+                                    hangup_after=None if outgoing else 150, outgoing=outgoing)
             client.start()
         with open(run / 'console.log', 'wb') as output:
             status = run_emulator(cmd, run, output, timeout=1200)
@@ -141,9 +159,12 @@ def main():
             (run / 'host_call.json').write_text(json.dumps(client.result(), indent=2) + '\n')
             if client.error is not None:
                 raise ValueError(f'host client: {client.error}')
-            page = text.find('npe3_bts_page_request:')
+            # Registration ends where the call's own access begins: the page,
+            # or for a dialled call its second Immediate Assignment.
+            page = (text.find('npe3_raw_agch:', text.find('npe3_raw_agch:') + 1) if outgoing else
+                    text.find('npe3_bts_page_request:'))
             result = check(text[:page] if page >= 0 else text)
-            result.update(check_host_call(text, client.result()))
+            result.update(check_host_call(text, client.result(), outgoing))
             check_lcd(run / 'snap', NSE1_LCD_SHA256)
         elif args.incoming_call:
             page = text.find('npe3_bts_page_request:')
@@ -162,7 +183,8 @@ def main():
     except Exception as error:
         raise SystemExit(f'FAIL - {error}; evidence retained: {run}')
     print(' '.join(f'{key}={value}' for key, value in result.items()))
-    scenario = ('host-placed traffic-channel call' if args.host_call is not None else
+    scenario = ('dialled traffic-channel call answered by the host' if outgoing else
+                'host-placed traffic-channel call' if args.host_call is not None else
                 'traffic-channel call with state round trip' if args.state_roundtrip is not None else
                 'traffic-channel call' if args.traffic_channel else
                 'incoming call' if args.incoming_call else 'Location Updating')
