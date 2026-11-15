@@ -135,6 +135,15 @@ inline u64 stage4_gates(u16 word)
 			(staged_conditional_call(word)) ||
 			((staged_conditional_return(word) || staged_delayed_conditional_return(word))))
 		result |= u64(1) << 23;
+	if ((register_product_form(word)) ||
+			(staged_load_mac(word)) ||
+			((staged_dual_multiply(word) || staged_coefficient_mac(word) || (word & 0xff00) == 0x4c00)) ||
+			(staged_parallel_load(word)) ||
+			(staged_smem_special(word)) ||
+			(staged_dst(word)) ||
+			((word & 0xfffe) == 0xf4e4) ||
+			((word & 0xfffe) == 0xf6e4))
+		result |= u64(1) << 24;
 	return result;
 }
 

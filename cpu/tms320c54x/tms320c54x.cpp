@@ -223,9 +223,9 @@ void tms320c54x_device::device_start()
 	save_item(STRUCT_MEMBER(m_slot, direct_sp));
 	save_item(STRUCT_MEMBER(m_slot, far_call_page));
 	save_item(STRUCT_MEMBER(m_slot, far_call_stack));
-	save_item(NAME(m_pipeline_acc_transfer_pending));
+	save_item(NAME(m_hold.acc_transfer));
 	save_item(NAME(m_pipeline_acc_transfer_target));
-	save_item(NAME(m_pipeline_cc_pending));
+	save_item(NAME(m_hold.cc));
 	save_item(STRUCT_MEMBER(m_slot, block_first_final));
 	save_item(STRUCT_MEMBER(m_slot, block_end));
 	save_item(STRUCT_MEMBER(m_slot, block_body));
@@ -237,7 +237,7 @@ void tms320c54x_device::device_start()
 	save_item(NAME(m_pipeline_block_end_address));
 	save_item(NAME(m_pipeline_block_fetch_remaining));
 	save_item(NAME(m_pipeline_compiler_sp_previous));
-	save_item(NAME(m_pipeline_compiler_sp_wait));
+	save_item(NAME(m_hold.compiler_sp_wait));
 	save_item(NAME(m_pipeline_idle_barrier));
 	save_item(NAME(m_pipeline_idle_resume_pending));
 	save_item(NAME(m_pipeline_idle_resume_address));
@@ -265,10 +265,10 @@ void tms320c54x_device::device_start()
 	save_item(NAME(m_pipeline_retd_words));
 	save_item(NAME(m_pipeline_retd_addresses));
 	save_item(NAME(m_pipeline_retd_target));
-	save_item(NAME(m_pipeline_far_return_pending));
-	save_item(NAME(m_pipeline_long_store_pending));
-	save_item(NAME(m_pipeline_program_move_pending));
-	save_item(NAME(m_pipeline_coefficient_pending));
+	save_item(NAME(m_hold.far_return));
+	save_item(NAME(m_hold.long_store));
+	save_item(NAME(m_hold.program_move));
+	save_item(NAME(m_hold.coefficient));
 	save_item(NAME(m_pipeline_coefficient_source));
 	save_item(NAME(m_pipeline_repeat_coefficient_started));
 	save_item(NAME(m_pipeline_repeat_active));
@@ -286,15 +286,15 @@ void tms320c54x_device::device_start()
 	save_item(NAME(m_pipeline_repeat_address));
 	save_item(NAME(m_pipeline_repeat_redirect_pending));
 	save_item(NAME(m_pipeline_repeat_redirect_target));
-	save_item(NAME(m_pipeline_read_a_wait));
-	save_item(NAME(m_pipeline_write_a_wait));
+	save_item(NAME(m_hold.read_a_wait));
+	save_item(NAME(m_hold.write_a_wait));
 	save_item(NAME(m_pipeline_write_a_target));
 	save_item(NAME(m_pipeline_write_a_logical));
-	save_item(NAME(m_pipeline_mvdp_wait));
+	save_item(NAME(m_hold.mvdp_wait));
 	save_item(NAME(m_pipeline_read_a_source));
-	save_item(NAME(m_pipeline_memory_repeat_wait));
+	save_item(NAME(m_hold.memory_repeat_wait));
 	save_item(NAME(m_pipeline_repeat_program_source));
-	save_item(NAME(m_pipeline_dp_wait));
+	save_item(NAME(m_hold.dp_wait));
 	save_item(NAME(m_pipeline_cycles));
 	save_item(NAME(m_clkmd));
 	save_item(NAME(m_swwsr));
@@ -1312,11 +1312,11 @@ void tms320c54x_device::reset_pipeline()
 	for (auto &slot : m_slot) slot.direct_sp = 0;
 	for (auto &slot : m_slot) slot.far_call_page = 0;
 	for (auto &slot : m_slot) slot.far_call_stack = 0;
-	m_pipeline_acc_transfer_pending = false;
+	m_hold.acc_transfer = false;
 	m_pipeline_acc_transfer_target = 0;
-	m_pipeline_cc_pending = false;
+	m_hold.cc = false;
 	m_pipeline_compiler_sp_previous = 0;
-	m_pipeline_compiler_sp_wait = 0;
+	m_hold.compiler_sp_wait = 0;
 	m_pipeline_idle_barrier = m_pipeline_idle_resume_pending = false;
 	m_pipeline_idle_resume_address = 0;
 	m_pipeline_intm_follow = false;
@@ -1345,10 +1345,10 @@ void tms320c54x_device::reset_pipeline()
 	m_pipeline_xc_active = false;
 	m_pipeline_xc_end = 0;
 	m_pipeline_xc_skip_words = 0;
-	m_pipeline_far_return_pending = false;
-	m_pipeline_long_store_pending = false;
-	m_pipeline_program_move_pending = false;
-	m_pipeline_coefficient_pending = false;
+	m_hold.far_return = false;
+	m_hold.long_store = false;
+	m_hold.program_move = false;
+	m_hold.coefficient = false;
 	m_pipeline_coefficient_source = 0;
 	m_pipeline_repeat_coefficient_started = false;
 	m_pipeline_repeat_active = m_pipeline_repeat_body_latched = m_pipeline_repeat_stream = false;
@@ -1360,15 +1360,15 @@ void tms320c54x_device::reset_pipeline()
 	m_pipeline_repeat_address = 0;
 	m_pipeline_repeat_redirect_pending = false;
 	m_pipeline_repeat_redirect_target = 0;
-	m_pipeline_read_a_wait = 0;
-	m_pipeline_write_a_wait = 0;
-	m_pipeline_mvdp_wait = 0;
+	m_hold.read_a_wait = 0;
+	m_hold.write_a_wait = 0;
+	m_hold.mvdp_wait = 0;
 	m_pipeline_write_a_target = 0;
 	m_pipeline_write_a_logical = 0;
 	m_pipeline_read_a_source = 0;
-	m_pipeline_memory_repeat_wait = 0;
+	m_hold.memory_repeat_wait = 0;
 	m_pipeline_repeat_program_source = 0;
-	m_pipeline_dp_wait = 0;
+	m_hold.dp_wait = 0;
 	m_pipeline_cycles = 0;
 }
 
@@ -1379,7 +1379,7 @@ void tms320c54x_device::reset_execution_pipeline()
 	reset_pipeline();
 }
 
-tms320c54x_device::pipeline_cycle_result tms320c54x_device::pipeline_service_bus_wait()
+inline ATTR_FORCE_INLINE tms320c54x_device::pipeline_cycle_result tms320c54x_device::pipeline_service_bus_wait()
 {
 	if (m_pipeline_peripheral_read_pending)
 	{
@@ -1420,98 +1420,98 @@ tms320c54x_device::pipeline_cycle_result tms320c54x_device::pipeline_service_bus
 
 tms320c54x_device::pipeline_cycle_result tms320c54x_device::pipeline_service_pending_transfer()
 {
-	if (m_pipeline_compiler_sp_wait) --m_pipeline_compiler_sp_wait;
-	if (m_pipeline_dp_wait)
+	if (m_hold.compiler_sp_wait) --m_hold.compiler_sp_wait;
+	if (m_hold.dp_wait)
 	{
-		--m_pipeline_dp_wait;
+		--m_hold.dp_wait;
 		return pipeline_cycle_result::consumed;
 	}
-	if (m_pipeline_long_store_pending)
+	if (m_hold.long_store)
 	{
 		m_data.write_word(m_slot[5].operand_address ^ 1, m_slot[5].immediate);
-		m_pipeline_long_store_pending = false;
+		m_hold.long_store = false;
 		pipeline_accept_interrupt();
 		return pipeline_cycle_result::consumed;
 	}
-	if (m_pipeline_far_return_pending)
+	if (m_hold.far_return)
 	{
 		// Retain the second stack operand while the return holds Read.
 		// This bus placement is a partial model of class 34, not measured
 		// silicon phases. The first sample follows older Execute writes.
 		m_slot[4].operand_address = data_read(m_sp++);
-		m_pipeline_far_return_pending = false;
+		m_hold.far_return = false;
 		return pipeline_cycle_result::consumed;
 	}
-	if (m_pipeline_acc_transfer_pending)
+	if (m_hold.acc_transfer)
 	{
 		// Classes 30A/B hold this transfer boundary; only FCALA owns
 		// a second stack write. BACC/FBACC own no stack transaction.
 		// Bus placement is a partial model, not measured silicon phases.
 		if (staged_accumulator_far_call(m_slot[4].word)) data_write(m_slot[4].far_call_stack, m_slot[4].far_call_page, 4);
-		m_pipeline_acc_transfer_pending = false;
+		m_hold.acc_transfer = false;
 		return pipeline_cycle_result::consumed;
 	}
-	if (m_pipeline_cc_pending)
+	if (m_hold.cc)
 	{
 		// The retained nondelayed Class 31B model holds one clock on both
 		// paths. Only a taken predicate owns a stack write; retain that
 		// decision through the held clock.
 		if (m_slot[4].immediate) data_write(m_slot[4].operand_address, u16(m_slot[4].address + 2), 4);
-		m_pipeline_cc_pending = false;
+		m_hold.cc = false;
 		return pipeline_cycle_result::consumed;
 	}
-	if (m_pipeline_memory_repeat_wait)
+	if (m_hold.memory_repeat_wait)
 	{
-		--m_pipeline_memory_repeat_wait;
+		--m_hold.memory_repeat_wait;
 		return pipeline_cycle_result::consumed;
 	}
-	if (m_pipeline_mvdp_wait)
+	if (m_hold.mvdp_wait)
 	{
-		--m_pipeline_mvdp_wait;
+		--m_hold.mvdp_wait;
 		return pipeline_cycle_result::consumed;
 	}
-	if (m_pipeline_write_a_wait)
+	if (m_hold.write_a_wait)
 	{
 		// Class 26's program-bus hold is partial stage placement. A direct
 		// accumulator producer must publish before PAR is retained (7.5.10).
-		if (m_pipeline_write_a_wait == 4)
+		if (m_hold.write_a_wait == 4)
 		{
 			m_pipeline_write_a_logical = u32(m_a) & (m_extended_program ? 0x7fffff : 0xffff);
 			m_pipeline_write_a_target = physical_program_address(m_pipeline_write_a_logical);
 		}
-		--m_pipeline_write_a_wait;
+		--m_hold.write_a_wait;
 		return pipeline_cycle_result::consumed;
 	}
-	if (m_pipeline_read_a_wait)
+	if (m_hold.read_a_wait)
 	{
 		// READA samples A after older Execute publications, then holds the
 		// program bus for its four extra clocks. Placement is partial.
-		if (m_pipeline_read_a_wait == 4) m_pipeline_read_a_source = u32(m_a);
-		if (!--m_pipeline_read_a_wait)
+		if (m_hold.read_a_wait == 4) m_pipeline_read_a_source = u32(m_a);
+		if (!--m_hold.read_a_wait)
 			m_slot[4].operand = m_program.read_word(physical_program_address(m_pipeline_read_a_source));
 		return pipeline_cycle_result::consumed;
 	}
-	if (m_pipeline_program_move_pending)
+	if (m_hold.program_move)
 	{
 		// MVPD's extra program-bus clock holds Read and younger slots.
 		// Retain the sampled word; exact bus phase is a partial model.
 		u32 const source = (m_slot[4].address & 0x7f0000) | m_slot[4].immediate;
 		m_slot[4].operand = m_program.read_word(physical_program_address(source));
-		m_pipeline_program_move_pending = false;
+		m_hold.program_move = false;
 		return pipeline_cycle_result::consumed;
 	}
-	if (m_pipeline_coefficient_pending)
+	if (m_hold.coefficient)
 	{
 		// Class 8 owns an extra program-bus cycle. Hold the sampled X/Y
 		// operands and captured physical coefficient address across it.
 		m_slot[4].immediate = m_program.read_word(m_pipeline_coefficient_source);
-		m_pipeline_coefficient_pending = false;
+		m_hold.coefficient = false;
 		return pipeline_cycle_result::consumed;
 	}
 	return pipeline_cycle_result::proceed;
 }
 
-tms320c54x_device::pipeline_arbitration_result tms320c54x_device::pipeline_arbitrate_peripheral()
+inline ATTR_FORCE_INLINE tms320c54x_device::pipeline_arbitration_result tms320c54x_device::pipeline_arbitrate_peripheral()
 {
 	bool const read_peripheral = m_slot[3].valid &&
 		((m_slot[3].operand_address >= 0x20 && m_slot[3].operand_address <= 0x5f &&
@@ -1655,7 +1655,7 @@ void tms320c54x_device::pipeline_step()
 		pipeline_finish_repeat_iteration();
 		return;
 	}
-	if (pipeline_service_pending_transfer() != pipeline_cycle_result::proceed) return;
+	if (m_hold.any() && pipeline_service_pending_transfer() != pipeline_cycle_result::proceed) return;
 	auto const peripheral = pipeline_arbitrate_peripheral();
 	if (peripheral.cycle != pipeline_cycle_result::proceed) return;
 	u8 const entry_stage = m_interrupt_entry_stage;
@@ -2472,7 +2472,7 @@ void tms320c54x_device::pipeline_step()
 					machine().describe_context(), unsigned(m_slot[4].address), m_slot[4].word, destination, unsigned(repeat_body)); m_illegal = true; return;
 			}
 			if (!extended && BIT(mode, 7) && !preincrement) indirect_modify(mode, false, 4);
-			m_pipeline_read_a_wait = 4;
+			m_hold.read_a_wait = 4;
 		}
 		if (m_slot[4].valid && staged_xmem_store(m_slot[4].word))
 		{
@@ -2566,7 +2566,7 @@ void tms320c54x_device::pipeline_step()
 	{
 		if (m_slot[3].valid && staged_data_to_program(m_slot[3].word))
 		{
-			m_slot[3].direct_sp = m_pipeline_compiler_sp_wait ? m_pipeline_compiler_sp_previous :
+			m_slot[3].direct_sp = m_hold.compiler_sp_wait ? m_pipeline_compiler_sp_previous :
 				m_slot[4].valid && (m_slot[4].word & 0xff00) == 0x4b00 ? m_slot[4].immediate : m_sp;
 			u8 const mode = m_slot[3].word;
 			bool const extended = mode >= 0xe0;
@@ -2583,7 +2583,7 @@ void tms320c54x_device::pipeline_step()
 		}
 		if (m_slot[3].valid && staged_write_a(m_slot[3].word))
 		{
-			m_slot[3].direct_sp = m_pipeline_compiler_sp_wait ? m_pipeline_compiler_sp_previous :
+			m_slot[3].direct_sp = m_hold.compiler_sp_wait ? m_pipeline_compiler_sp_previous :
 				m_slot[4].valid && (m_slot[4].word & 0xff00) == 0x4b00 ? m_slot[4].immediate : m_sp;
 			u8 const mode = m_slot[3].word;
 			bool const extended = mode >= 0xe0, absolute = mode == 0xf8;
@@ -2626,7 +2626,7 @@ void tms320c54x_device::pipeline_step()
 		if (m_slot[3].valid && BIT(staged_opcode_descriptor[m_slot[3].word], 6))
 			// Table 7-9: a basic direct consumer samples SP before an older
 			// PSHM allocates its stack word in this clock's Read stage.
-			m_slot[3].direct_sp = m_pipeline_compiler_sp_wait ? m_pipeline_compiler_sp_previous : m_slot[4].valid && (m_slot[4].word & 0xff00) == 0x4b00
+			m_slot[3].direct_sp = m_hold.compiler_sp_wait ? m_pipeline_compiler_sp_previous : m_slot[4].valid && (m_slot[4].word & 0xff00) == 0x4b00
 				? m_slot[4].immediate : m_sp; // Table 7-9: one-clock Category-I latency after PSHD.
 		if (m_slot[3].valid && staged_delay_copy(m_slot[3].word))
 		{
@@ -3436,7 +3436,7 @@ void tms320c54x_device::pipeline_step()
 				m_pipeline_repeat_address == ((m_slot[4].address & 0x7f0000) | u16(m_slot[4].address + (extended ? 2 : 1))))
 				m_pipeline_repeat_issue_remaining = m_slot[4].operand;
 			if (!extended && BIT(mode, 7)) indirect_modify(mode, false, 4);
-			m_pipeline_memory_repeat_wait = 2; // Class 5A/5B's extra clocks; placement is partial.
+			m_hold.memory_repeat_wait = 2; // Class 5A/5B's extra clocks; placement is partial.
 		}
 		if (m_slot[4].valid && staged_data_to_program(m_slot[4].word))
 		{
@@ -3447,12 +3447,12 @@ void tms320c54x_device::pipeline_step()
 			m_slot[4].operand_address = u16(target);
 			m_slot[4].immediate = u16(target >> 16);
 			// Four/five-clock standalone totals; exact silicon bus phase is partial.
-			m_pipeline_mvdp_wait = 2;
+			m_hold.mvdp_wait = 2;
 		}
 		if (m_slot[4].valid && staged_write_a(m_slot[4].word))
 		{
 			m_slot[4].operand = pipeline_read_data(m_slot[4].operand_address);
-			m_pipeline_write_a_wait = 4;
+			m_hold.write_a_wait = 4;
 		}
 		if (m_slot[4].valid && staged_program_move(m_slot[4].word))
 		{
@@ -3476,7 +3476,7 @@ void tms320c54x_device::pipeline_step()
 				m_illegal = true; return;
 			}
 			if (!extended && BIT(mode, 7) && !preincrement) indirect_modify(mode, false, 4);
-			m_pipeline_program_move_pending = true;
+			m_hold.program_move = true;
 		}
 	}
 	if (BIT(gates, 18)) // stage gate 18
@@ -3644,7 +3644,7 @@ void tms320c54x_device::pipeline_step()
 				m_pipeline_fetch_address = m_pipeline_acc_transfer_target;
 				m_pipeline_decode_flush = 1; // Discard sequential Fetch after the two delay words.
 			}
-			else m_pipeline_acc_transfer_pending = true;
+			else m_hold.acc_transfer = true;
 		}
 	}
 	if (m_slot[2].valid && (staged_call(m_slot[2].word) || staged_far_call(m_slot[2].word)))
@@ -3688,7 +3688,7 @@ void tms320c54x_device::pipeline_step()
 			// CCD must replace its target literal with the retained predicate
 			// before deciding whether the call owns any stack reservation.
 			if (m_slot[4].immediate) { m_slot[4].operand_address = --m_sp; m_rtn = u16(m_slot[4].address + (BIT(m_slot[4].word, 9) ? 4 : 2)); }
-			if (!BIT(m_slot[4].word, 9)) m_pipeline_cc_pending = true;
+			if (!BIT(m_slot[4].word, 9)) m_hold.cc = true;
 		}
 		if (m_slot[4].valid && (staged_conditional_return(m_slot[4].word) || staged_delayed_conditional_return(m_slot[4].word)))
 		{
@@ -3723,7 +3723,7 @@ void tms320c54x_device::pipeline_step()
 		// (SPRU172C 4-71, SPRU131G table 7-17). Retain one memory sample
 		// and forward it to younger direct operands before the two held clocks.
 		m_slot[4].operand = m_data.read_word(m_slot[4].operand_address);
-		m_pipeline_dp_wait = 2;
+		m_hold.dp_wait = 2;
 		for (unsigned stage = 2; stage < 4; ++stage)
 		{
 			u16 const word = m_slot[stage].word;
@@ -3734,7 +3734,7 @@ void tms320c54x_device::pipeline_step()
 			if (stage == 3) m_slot[stage].operand_address = basic_address(stage, u8(word));
 		}
 	}
-	pipeline_publish_read_results(smem_t_product_read);
+	pipeline_publish_read_results(gates, smem_t_product_read);
 	if (entry_stage == 2)
 	{
 		m_interrupt_stack_address = --m_sp;
@@ -4113,7 +4113,7 @@ bool tms320c54x_device::pipeline_execute()
 	case 33: // staged_dst(m_op)
 		{
 			m_data.write_word(m_slot[5].operand_address, m_slot[5].operand);
-			m_pipeline_long_store_pending = true;
+			m_hold.long_store = true;
 			if (staged_extended_dst(m_op)) ++m_pc;
 		}
 		break;
@@ -4545,55 +4545,59 @@ bool tms320c54x_device::pipeline_execute()
 	return true;
 }
 
-void tms320c54x_device::pipeline_publish_read_results(bool smem_t_product_read)
+void tms320c54x_device::pipeline_publish_read_results(u64 gates, bool smem_t_product_read)
 {
-	if (m_slot[4].valid && register_product_form(m_slot[4].word))
-		// SPRU131G 7.5.6/table 7-13: multiply is not a Category-I TS consumer.
-		// Retain T after older Execute but before younger Read publications;
-		// sampling live T in Execute could instead consume a following STM.
-		m_slot[4].operand = m_t;
-	if (m_slot[4].valid && staged_load_mac(m_slot[4].word))
-		// Retain T after older Execute publications; X loads the accumulator, not T.
-		m_slot[4].t = m_t;
+	// Sampled ahead of the gated blocks: the two that preceded it never write T.
 	if (smem_t_product_read || (m_slot[4].valid && (staged_poly(m_slot[4].word) || staged_parallel_product(m_slot[4].word))))
 		m_slot[4].immediate = m_t;
-	if (m_slot[4].valid && (staged_dual_multiply(m_slot[4].word) || staged_coefficient_mac(m_slot[4].word) || (m_slot[4].word & 0xff00) == 0x4c00))
-		// MPY/MAC/MACSU/LTD load T in Read (SPRU172C 4-101/4-82/4-91/4-81). An older
-		// Execute write must not overwrite this younger publication.
-		m_t = m_slot[4].operand;
-	if (m_slot[4].valid && staged_parallel_load(m_slot[4].word) && (m_slot[4].word & 0xfd00) == 0xe400)
-		// The load side owns T in Read; do not republish it in Execute or
-		// let an older Execute write erase this younger publication.
-		m_t = m_slot[4].operand;
-	if (m_slot[4].valid && staged_smem_special(m_slot[4].word))
+	if (BIT(gates, 24)) // stage gate 24
 	{
-		// LD T, memory SQUR and MPYA/MACA/MASA publish T in Read after older Execute.
-		// T-based Smem MPY/MAC/MAS consume retained T without publishing it.
-		if ((m_slot[4].word & 0xfe00) == 0x2600 ||
-			((m_slot[4].word & 0xf000) != 0x2000 && (m_slot[4].word & 0xff00) != 0x3200 && !staged_poly(m_slot[4].word) && !staged_bitt(m_slot[4].word)))
+		if (m_slot[4].valid && register_product_form(m_slot[4].word))
+			// SPRU131G 7.5.6/table 7-13: multiply is not a Category-I TS consumer.
+			// Retain T after older Execute but before younger Read publications;
+			// sampling live T in Execute could instead consume a following STM.
+			m_slot[4].operand = m_t;
+		if (m_slot[4].valid && staged_load_mac(m_slot[4].word))
+			// Retain T after older Execute publications; X loads the accumulator, not T.
+			m_slot[4].t = m_t;
+		if (m_slot[4].valid && (staged_dual_multiply(m_slot[4].word) || staged_coefficient_mac(m_slot[4].word) || (m_slot[4].word & 0xff00) == 0x4c00))
+			// MPY/MAC/MACSU/LTD load T in Read (SPRU172C 4-101/4-82/4-91/4-81). An older
+			// Execute write must not overwrite this younger publication.
 			m_t = m_slot[4].operand;
-	}
-	if (m_slot[4].valid && staged_dst(m_slot[4].word))
-	{
-		// Retain the source after older Execute writes, then occupy both
-		// write clocks (SPRU172C classes 13A/13B). Placement is a partial model.
-		u32 const value = saturated_store(accumulator(BIT(m_slot[4].word, 8)));
-		m_slot[4].operand = u16(value >> 16);
-		m_slot[4].immediate = u16(value);
-	}
-	if (m_slot[4].valid && (m_slot[4].word & 0xfffe) == 0xf4e4)
-	{
-		// An adjacent PSHM commits its stack word in older Execute first.
-		m_slot[4].operand = data_read(m_sp++);
-		m_pipeline_far_return_pending = true;
-	}
-	if (m_slot[4].valid && (m_slot[4].word & 0xfffe) == 0xf6e4)
-	{
-		m_slot[4].operand_address = data_read(m_sp++);
-		m_pipeline_fetch_address = ((m_slot[4].operand & 0x7f) << 16) | m_slot[4].operand_address;
-		pipeline_restore_block_on_return(m_slot[4].address);
-		// Both delay words have reached Decode; discard the next sequential word.
-		m_pipeline_decode_flush = 1;
+		if (m_slot[4].valid && staged_parallel_load(m_slot[4].word) && (m_slot[4].word & 0xfd00) == 0xe400)
+			// The load side owns T in Read; do not republish it in Execute or
+			// let an older Execute write erase this younger publication.
+			m_t = m_slot[4].operand;
+		if (m_slot[4].valid && staged_smem_special(m_slot[4].word))
+		{
+			// LD T, memory SQUR and MPYA/MACA/MASA publish T in Read after older Execute.
+			// T-based Smem MPY/MAC/MAS consume retained T without publishing it.
+			if ((m_slot[4].word & 0xfe00) == 0x2600 ||
+				((m_slot[4].word & 0xf000) != 0x2000 && (m_slot[4].word & 0xff00) != 0x3200 && !staged_poly(m_slot[4].word) && !staged_bitt(m_slot[4].word)))
+				m_t = m_slot[4].operand;
+		}
+		if (m_slot[4].valid && staged_dst(m_slot[4].word))
+		{
+			// Retain the source after older Execute writes, then occupy both
+			// write clocks (SPRU172C classes 13A/13B). Placement is a partial model.
+			u32 const value = saturated_store(accumulator(BIT(m_slot[4].word, 8)));
+			m_slot[4].operand = u16(value >> 16);
+			m_slot[4].immediate = u16(value);
+		}
+		if (m_slot[4].valid && (m_slot[4].word & 0xfffe) == 0xf4e4)
+		{
+			// An adjacent PSHM commits its stack word in older Execute first.
+			m_slot[4].operand = data_read(m_sp++);
+			m_hold.far_return = true;
+		}
+		if (m_slot[4].valid && (m_slot[4].word & 0xfffe) == 0xf6e4)
+		{
+			m_slot[4].operand_address = data_read(m_sp++);
+			m_pipeline_fetch_address = ((m_slot[4].operand & 0x7f) << 16) | m_slot[4].operand_address;
+			pipeline_restore_block_on_return(m_slot[4].address);
+			// Both delay words have reached Decode; discard the next sequential word.
+			m_pipeline_decode_flush = 1;
+		}
 	}
 }
 
@@ -4699,7 +4703,7 @@ void tms320c54x_device::pipeline_request_coefficient(u16 address)
 	else
 	{
 		m_pipeline_coefficient_source = source;
-		m_pipeline_coefficient_pending = true;
+		m_hold.coefficient = true;
 		if (repeated) m_pipeline_repeat_coefficient_started = true;
 	}
 }
@@ -4805,7 +4809,7 @@ void tms320c54x_device::pipeline_delay_compiler_sp(u16 previous)
 	// before its compiler-addressing path is ready. Stack operations use
 	// architectural SP directly and are not stalled by this window.
 	m_pipeline_compiler_sp_previous = previous;
-	m_pipeline_compiler_sp_wait = 2;
+	m_hold.compiler_sp_wait = 2;
 }
 
 void tms320c54x_device::pipeline_accept_interrupt()
@@ -4831,7 +4835,7 @@ void tms320c54x_device::pipeline_accept_interrupt()
 		m_slot[3].address == m_pipeline_control_address + 2 && staged_absolute_load(m_slot[3].word);
 	bool const control_protected = m_pipeline_control_words && !(near_branch_retired && retained_load_delay);
 	if ((!intm_protected || m_nmi_pending) && !m_interrupt_entry_stage && !m_pipeline_vector_pending && !m_pipeline_decode_remaining &&
-		!m_pipeline_peripheral_read_pending && !m_pipeline_mvdp_wait && !m_pipeline_read_a_wait && !m_pipeline_write_a_wait && !m_pipeline_acc_transfer_pending && !m_pipeline_cc_pending && !m_pipeline_repeat_active && !m_pipeline_xc_active && !control_protected && !m_pipeline_long_store_pending && !m_pipeline_program_move_pending && !m_pipeline_coefficient_pending && !m_pipeline_dp_wait && accept_interrupt())
+		!m_pipeline_peripheral_read_pending && !m_hold.mvdp_wait && !m_hold.read_a_wait && !m_hold.write_a_wait && !m_hold.acc_transfer && !m_hold.cc && !m_pipeline_repeat_active && !m_pipeline_xc_active && !control_protected && !m_hold.long_store && !m_hold.program_move && !m_hold.coefficient && !m_hold.dp_wait && accept_interrupt())
 	{
 		m_pipeline_return_pc = u16(m_slot[1].valid ? m_slot[1].address :
 			m_slot[0].valid ? m_slot[0].address : m_pipeline_fetch_address);

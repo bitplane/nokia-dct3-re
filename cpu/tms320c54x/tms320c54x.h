@@ -8,6 +8,7 @@
 
 #include <map>
 #include <cstdio>
+#include <cstring>
 #include <vector>
 
 class tms320c54x_device : public cpu_device
@@ -180,7 +181,7 @@ private:
 	pipeline_arbitration_result pipeline_arbitrate_peripheral();
 	void pipeline_step();
 	bool pipeline_execute();
-	void pipeline_publish_read_results(bool smem_t_product_read);
+	void pipeline_publish_read_results(u64 gates, bool smem_t_product_read);
 	void pipeline_prefetch(bool prefetch_bubble, bool software_intr_prefetch, u32 software_intr_physical);
 	void pipeline_accept_interrupt();
 	void pipeline_delay_compiler_sp(u16 previous);
@@ -315,7 +316,6 @@ private:
 	u8 m_pipeline_io_wait_remaining = 0;
 	bool m_pipeline_io_ready_required = false;
 	u16 m_pipeline_compiler_sp_previous = 0;
-	u8 m_pipeline_compiler_sp_wait = 0;
 	bool m_pipeline_idle_barrier = false;
 	bool m_pipeline_idle_resume_pending = false;
 	u32 m_pipeline_idle_resume_address = 0;
@@ -343,10 +343,6 @@ private:
 	std::array<u16, 2> m_pipeline_retd_words = {};
 	std::array<u32, 2> m_pipeline_retd_addresses = {};
 	u32 m_pipeline_retd_target = 0;
-	bool m_pipeline_far_return_pending = false;
-	bool m_pipeline_long_store_pending = false;
-	bool m_pipeline_program_move_pending = false;
-	bool m_pipeline_coefficient_pending = false;
 	u32 m_pipeline_coefficient_source = 0;
 	bool m_pipeline_repeat_coefficient_started = false;
 	bool m_pipeline_repeat_active = false;
@@ -364,18 +360,39 @@ private:
 	u32 m_pipeline_repeat_address = 0;
 	bool m_pipeline_repeat_redirect_pending = false;
 	u32 m_pipeline_repeat_redirect_target = 0;
-	u8 m_pipeline_read_a_wait = 0;
-	u8 m_pipeline_write_a_wait = 0;
 	u32 m_pipeline_write_a_target = 0;
 	u32 m_pipeline_write_a_logical = 0;
-	u8 m_pipeline_mvdp_wait = 0;
-	bool m_pipeline_acc_transfer_pending = false;
 	u32 m_pipeline_acc_transfer_target = 0;
-	bool m_pipeline_cc_pending = false;
 	u32 m_pipeline_read_a_source = 0;
-	u8 m_pipeline_memory_repeat_wait = 0;
 	u32 m_pipeline_repeat_program_source = 0;
-	u8 m_pipeline_dp_wait = 0;
+	// Transfers that hold the pipeline for extra clocks, retired by
+	// pipeline_service_pending_transfer. One byte each, so a clock with none
+	// pending is recognised with two loads instead of a call.
+	struct pending_holds
+	{
+		u8 compiler_sp_wait = 0;
+		u8 dp_wait = 0;
+		bool long_store = false;
+		bool far_return = false;
+		bool acc_transfer = false;
+		bool cc = false;
+		u8 memory_repeat_wait = 0;
+		u8 mvdp_wait = 0;
+		u8 write_a_wait = 0;
+		u8 read_a_wait = 0;
+		bool program_move = false;
+		bool coefficient = false;
+
+		bool any() const
+		{
+			u64 low; u32 high;
+			std::memcpy(&low, this, sizeof(low));
+			std::memcpy(&high, reinterpret_cast<char const *>(this) + sizeof(low), sizeof(high));
+			return low | high;
+		}
+	};
+	static_assert(sizeof(pending_holds) == 12);
+	pending_holds m_hold;
 	u64 m_pipeline_cycles = 0;
 	// Allocated only for explicit verbose coverage; never architectural state.
 	struct opcode_coverage
