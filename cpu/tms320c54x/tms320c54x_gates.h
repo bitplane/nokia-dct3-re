@@ -158,6 +158,97 @@ inline const std::array<u64, 65536> stage3_gate_table = make_gate_table(stage3_g
 inline const std::array<u64, 65536> stage4_gate_table = make_gate_table(stage4_gates);
 inline const std::array<u64, 65536> stage5_gate_table = make_gate_table(stage5_gates);
 
+// pipeline_execute's dispatch: the first case whose opcode test holds, or
+// 76 for none.
+inline u8 execute_entry(u16 word)
+{
+	if (staged_immediate_repeat(word) || staged_memory_repeat(word) || staged_short_repeat(word)) return 0;
+	if (staged_block_repeat(word)) return 1;
+	if (staged_idle(word)) return 2;
+	if (staged_software_intr(word)) return 3;
+	if (word == 0xf49b || word == 0xf69b) return 4;
+	if (staged_conditional_return(word) || staged_delayed_conditional_return(word)) return 5;
+	if (word == 0xfc00 || word == 0xf4eb || word == 0xfe00) return 6;
+	if ((word & 0xfcf0) == 0xf4b0) return 7;
+	if ((word & 0xfdfe) == 0xf4e4) return 8;
+	if (staged_banz(word)) return 9;
+	if (staged_conditional_branch(word)) return 10;
+	if (staged_accumulator_transfer(word)) return 11;
+	if (staged_far_branch(word) || staged_far_call(word)) return 12;
+	if (word == 0xf073 || word == 0xf273 || staged_call(word)) return 13;
+	if ((word & 0xff00) == 0xee00) return 14;
+	if (staged_mmr_move(word)) return 15;
+	if ((word & 0xff00) == 0x7700) return 16;
+	if (staged_write_a(word)) return 17;
+	if (staged_read_a(word)) return 18;
+	if (staged_data_to_program(word)) return 19;
+	if (staged_program_move(word)) return 20;
+	if (staged_delay_copy(word)) return 21;
+	if (staged_data_copy(word)) return 22;
+	if (staged_move(word)) return 23;
+	if (staged_memory_load(word)) return 24;
+	if (staged_mmr_load(word)) return 25;
+	if (staged_memory_dp(word)) return 26;
+	if (register_product_form(word)) return 27;
+	if ((word & 0xfeff) == 0xf48d) return 28;
+	if (staged_minmax(word)) return 29;
+	if (staged_norm(word)) return 30;
+	if (staged_long_arithmetic(word)) return 31;
+	if (staged_dld(word)) return 32;
+	if (staged_dst(word)) return 33;
+	if (staged_direct_push(word) || (word & 0xff00) == 0x4b00) return 34;
+	if ((word & 0xff00) == 0x8a00) return 35;
+	if ((word & 0xff00) == 0x8b00) return 36;
+	if (staged_accumulator_mmr_store(word)) return 37;
+	if (staged_store(word)) return 38;
+	if (staged_rmw(word)) return 39;
+	if ((word & 0xff00) == 0x7600) return 40;
+	if (staged_port_write(word)) return 41;
+	if (staged_port_read(word)) return 42;
+	if (staged_conditional_store(word)) return 43;
+	if (staged_parallel_alu(word)) return 44;
+	if (staged_parallel_load(word)) return 45;
+	if (staged_parallel_mpy(word)) return 46;
+	if (staged_parallel_mac(word)) return 47;
+	if (staged_mvdd(word)) return 48;
+	if (staged_coefficient_mac(word)) return 49;
+	if (staged_firs(word)) return 50;
+	if (staged_distance(word)) return 51;
+	if (staged_dual_arithmetic(word)) return 52;
+	if (staged_lms(word)) return 53;
+	if (staged_load_mac(word)) return 54;
+	if (staged_dual_multiply(word)) return 55;
+	if (staged_cmps(word)) return 56;
+	if (staged_xmem_store(word)) return 57;
+	if (staged_xmem_arithmetic(word)) return 58;
+	if (staged_xmem_load(word)) return 59;
+	if (staged_xmem_bit(word)) return 60;
+	if (staged_bitfield(word)) return 61;
+	if (staged_shifted_smem(word)) return 62;
+	if (staged_smem_special(word)) return 63;
+	if (staged_smem_arithmetic(word)) return 64;
+	if (staged_absolute_add(word)) return 65;
+	if (staged_immediate_multiply(word)) return 66;
+	if (staged_immediate_alu(word)) return 67;
+	if ((word & 0xfef0) == 0xf020 || (word & 0xfeff) == 0xf062) return 68;
+	if (staged_memory_logic(word)) return 69;
+	if (staged_immediate_arp(word)) return 70;
+	if (staged_immediate_asm(word)) return 71;
+	if ((word & 0xfcf8) == 0xf4a8) return 72;
+	if (staged_mar(word)) return 73;
+	if ((word & 0xfcff) == 0xf480 || (word & 0xfcff) == 0xf481 || (word & 0xfcff) == 0xf482) return 74;
+	if (!staged_xc(word)) return 75;
+	return 76;
+}
+
+inline const std::array<u8, 65536> execute_entry_table = []
+{
+	std::array<u8, 65536> result{};
+	for (unsigned word = 0; word < result.size(); ++word)
+		result[word] = execute_entry(u16(word));
+	return result;
+}();
+
 } // namespace c54x_decode
 
 #endif // MAME_CPU_TMS320C54X_GATES_H

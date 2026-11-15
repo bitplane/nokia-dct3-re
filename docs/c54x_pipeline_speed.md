@@ -43,9 +43,18 @@ and `make check-c54x-state-trace` checks each change over the whole call
   source. It refuses a gated block that lacks a word-only opcode test,
   has a side-effecting term before that test, or has an `else`. The tools
   tests fail when the committed header is stale.
+- **Execute dispatch** (also in `tms320c54x_gates.h`). `pipeline_execute`
+  chose its action through a 76-branch `if`/`else if` chain of pure tests
+  of the Execute opcode, about 39 tests per clock. It is now a `switch` on
+  a per-opcode table holding the first case whose test holds. Each case
+  keeps its original test as a `case N: // test` comment, which the
+  generator reads, and the generator refuses a test that reads anything
+  but `m_op`. `--convert-chain LINE` performed the conversion, keeping
+  every comment.
 
 | Change | Host-call run CPU (s), no PGO |
 | --- | ---: |
 | Before | 38.6 |
 | Decode facts | 33.6 |
 | Stage gates (24 gates, 82 blocks) | 29.6 |
+| Execute dispatch (76 cases) | 27.2 |
