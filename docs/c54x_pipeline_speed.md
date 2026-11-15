@@ -59,6 +59,21 @@ and `make check-c54x-state-trace` checks each change over the whole call
   field with `STRUCT_MEMBER`, so states saved before this change do not
   load. `make verify-5110-lab-traffic-state` round-trips the call three
   times.
+- **Idle services skipped.** Twelve hold flags, each waiting on a pending
+  transfer, are one `pending_holds` struct. One `any()` test (two loads)
+  replaces a call to `pipeline_service_pending_transfer` on every clock.
+  Read-result publication sits behind stage gate 24. Bus-wait and
+  peripheral arbitration are inlined.
+- **Decode gates.** The Decode stage's checks of the word being decoded
+  are wrapped as `if (BIT(decode_gates, N)) // decode gate N`, keyed on that
+  word. Locals that the checks share are computed before the gates. The
+  generator expands those locals and `fact(...)` calls into word-only tests,
+  and ANDs every word-only conjunct that comes before the first
+  side-effecting one.
+- **Decode-word gates.** Once Decode ends, no slot word changes for the
+  rest of the clock. A `// Decode marker` line ORs in a stage-2 table, so
+  later blocks that test the Decode slot's word can be gated as well. The
+  generator refuses the marker if any slot word is written after it.
 
 The MCU side matters too. Every ARM fetch from flash went through MAME's
 16-to-32-bit unit splitter into two 16-bit handler calls. A native 32-bit
@@ -88,13 +103,25 @@ followed by two host-call runs.
 | 32-bit ARM flash reads (no unit splitter) | 23.8 |
 | PMST read directly on DSP program fetches | 23.1 |
 
+Later steps were measured by host instructions instead, which are steadier
+than CPU time. Each figure is `perf stat` over 27 emulated seconds of the
+traffic call (`SECS=27`), after a plain rebuild.
+
+| Change | Host instructions | User CPU (s) |
+| --- | ---: | ---: |
+| Before | 427.4 G | 17.5 |
+| Idle services skipped | 395.0 G | |
+| Decode gates (3) | 365.5 G | 15.2 |
+| Decode-word gates (22, 23, 25) | 358.4 G | 14.4 |
+
 ## Where it stands
 
 With `make build-pgo`, the native traffic call's connected segment (23-27 s
-emulated) costs about 4.7 CPU seconds per 4 emulated seconds, about 85 % of
-real time. It was 40 % before this work: 56 % from PGO alone, the rest from
-the steps above. The host executes about 1,400 instructions per DSP clock,
-down from about 2,160.
+emulated) costs about 4.1 CPU seconds per 4 emulated seconds, about 97 % of
+real time on this host. The figure is the difference in user time between
+runs stopped at 23 and at 27 emulated seconds. It was 40 % before this work:
+56 % from PGO alone, 85 % after the steps in the first table, and the rest
+from the later steps.
 
 These tried and made no measurable difference:
 
@@ -104,11 +131,13 @@ These tried and made no measurable difference:
 - PGO across the ARM core, the board devices and the scheduler as well.
 - Native 32-bit ARM RAM handlers.
 - A read-array fast path past the flash device's virtual read.
-- Gating the decode block's guards, because state-dependent locals
-  interleave them.
+- Gating the decode block's guards as they stood, because state-dependent
+  locals were interleaved with them. Moving those locals ahead of the
+  checks made the decode gates possible.
 - 16-byte alignment of the stage slots.
 
-What remains is spread thinly. The largest pieces are `pipeline_step`'s
-per-clock bookkeeping and decode guards (about a third of the process, no
-line above 2 %), `pipeline_execute`'s bodies, peripheral arbitration and
-the pending-transfer checks (2-3 % each), and the MCU's own execution.
+What remains is spread thinly. `pipeline_step` is still about half of the
+process, but no line in it costs more than 2 %. The largest line is the
+per-clock slot move. Next come `pipeline_execute`'s bodies, prefetch, the
+MCU's own execution and flash reads, at 2-8 % each. Each further gate would
+save one or two percent.
