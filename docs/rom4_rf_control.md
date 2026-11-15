@@ -1095,7 +1095,19 @@ it hears. Twelve seconds after the answer it hangs up, and the bridge
 forwards the BYE as `incoming_call_terminate`. MAME runs throttled, since
 RTP runs in real time. During the call the emulation reaches only about
 40 % of real time (2.0 emulated seconds in 5.0 wall seconds), so the talk
-window is in wall time and long enough for the bridge's 100 frames.
+window is in wall time and long enough for the bridge's 100 frames. The
+remote offers only G.711, since pjsua otherwise negotiates wideband
+Speex. When the bridge has no handset frame ready it sends a silent one,
+so at this speed the remote hears speech and silence frames alternately.
+The gate drops exact-zero runs of 80 samples or more before scoring;
+otherwise the gating alone halves the tone's share of the energy. A run
+gives about 315 uplink and 583 downlink frames. With the gaps dropped,
+0.86 of the remote recording's energy is the 500 Hz microphone tone; the
+bridge's own decode of the same uplink scores 0.865. The 1 kHz tone the
+bridge receives from the remote is pure (1.000). An early version of the
+gate ran pjsua with `--auto-loop`, which echoes received RTP back to the
+sender. The handset then heard its own microphone tone mixed into the
+remote's, and the scores fell to about 0.5.
 
 The host time is the C54x pipeline model: about 80 % of a profile, spread
 over its per-cycle opcode tests with no single hot spot (the DSP's IDLE
@@ -1103,9 +1115,7 @@ is already skipped, so every modelled cycle is an executed one).
 `make build-pgo` recompiles that one object under profile-guided
 optimisation, trained on the traffic call. The connected call then costs
 7.2 host seconds per 4 emulated seconds, about 56 % of real time, and a
-whole host-call run 31.2 s of CPU instead of 38.7 s. A run
-gives 239 uplink and 581 downlink frames, and 0.65 of the remote
-recording's energy is the 500 Hz microphone tone.
+whole host-call run 31.2 s of CPU instead of 38.7 s.
 
 ### Tuned laboratory carrier
 

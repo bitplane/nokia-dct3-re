@@ -1223,8 +1223,9 @@ for incoming calls: `call_adapter_ready`, `network_state`, `incoming_call`,
 `incoming_call_state`, both media directions and `incoming_call_terminate`.
 PJSUA calls the bridge. The handset rings and is answered with its own key,
 speech crosses RTP and the native DSP codec both ways, and the remote's BYE
-clears the call from the network side. The remote recording must be at least
-half the handset's 500 Hz microphone tone. This is the only SIP gate in which
+clears the call from the network side. The remote offers only G.711. Its
+recording, with the bridge's silent gap frames removed, must be at least half
+the handset's 500 Hz microphone tone (runs give 0.86). This is the only SIP gate in which
 native DSP firmware carries the speech. It covers mobile-terminated calls
 only; the lab does not offer outgoing calls, call waiting or restoration
 through the bridge. During the call MAME runs at about 40 % of real time,

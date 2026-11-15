@@ -35,6 +35,29 @@ def tone_fraction(pcm, hz):
     return tone / total if total else 0.0
 
 
+def without_gaps(pcm, shortest=80):
+    """Drop runs of at least `shortest` exact-zero samples.
+
+    A bridge that has no handset frame ready sends a silent frame (G.711
+    silence decodes to exact zeros). While the emulation runs slower than
+    real time these alternate with speech frames, and gating a tone every
+    20 ms halves its share of the energy without changing what was heard.
+    """
+    samples = struct.unpack(f'<{len(pcm) // 2}h', pcm)
+    kept, run = [], []
+    for value in samples:
+        if value == 0:
+            run.append(value)
+            continue
+        if len(run) < shortest:
+            kept.extend(run)
+        run = []
+        kept.append(value)
+    if len(run) < shortest:
+        kept.extend(run)
+    return struct.pack(f'<{len(kept)}h', *kept)
+
+
 class HostCallClient(threading.Thread):
     def __init__(self, url, hangup_after=150, timeout=120, quiet_after_hangup=False):
         super().__init__(daemon=True)

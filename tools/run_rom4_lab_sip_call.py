@@ -21,7 +21,7 @@ import wave
 
 if __package__ in (None, ''):
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from tools.lab_host_call_client import MICROPHONE_HZ, TONE_HZ, tone_fraction
+from tools.lab_host_call_client import MICROPHONE_HZ, TONE_HZ, tone_fraction, without_gaps
 from tools.rom4_lab_registration_check import NSE1_LCD_SHA256, check, check_host_lab, check_lcd
 from tools.run_rom4_lab_registration import command
 from tools.run_sip_stack_probe import write_tone
@@ -29,7 +29,7 @@ from tools.run_sip_stack_probe import write_tone
 
 def recorded_fraction(path, hz):
     with wave.open(str(path), 'rb') as recording:
-        return tone_fraction(recording.readframes(recording.getnframes()), hz)
+        return tone_fraction(without_gaps(recording.readframes(recording.getnframes())), hz)
 
 
 async def run(args, root, run_dir):
@@ -61,7 +61,10 @@ async def run(args, root, run_dir):
             remote = await asyncio.create_subprocess_exec(
                 str(args.pjsua.resolve()), '--null-audio', '--no-tcp', '--no-vad', '--clock-rate=8000',
                 '--bound-addr=127.0.0.1', '--ip-addr=127.0.0.1', f'--local-port={args.sip_port}',
-                f'--play-file={run_dir / "remote.wav"}', '--auto-play', '--auto-loop',
+                # Offer only G.711: pjsua prefers wideband Speex, which resamples
+                # and perceptually codes the test tones out of shape.
+                *(f'--dis-codec={codec}' for codec in ('speex', 'iLBC', 'GSM', 'G722', 'PCMA')),
+                f'--play-file={run_dir / "remote.wav"}', '--auto-play',
                 f'--rec-file={run_dir / "remote-received.wav"}', '--auto-rec',
                 '--id', f'sip:4420@127.0.0.1:{args.sip_port}', f'sip:dct3@127.0.0.1:{args.sip_port + 1}',
                 stdin=asyncio.subprocess.PIPE, stdout=remote_log, stderr=asyncio.subprocess.STDOUT)
