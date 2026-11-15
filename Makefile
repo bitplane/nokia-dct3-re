@@ -59,7 +59,7 @@ MAME_PATCHES := patches/mame-nokia-dct3-driver-name.patch \
 	patches/mame-nsm3-fcch-sch-fixture.patch
 LIB_COMPONENTS := lib/util/gsmfr.cpp lib/util/gsmfr.h
 CPU_COMPONENTS := cpu/tms320c54x/tms320c54x.cpp \
-	cpu/tms320c54x/tms320c54x.h cpu/tms320c54x/tms320c54x_decode.h \
+	cpu/tms320c54x/tms320c54x.h cpu/tms320c54x/tms320c54x_decode.h cpu/tms320c54x/tms320c54x_gates.h \
 	cpu/tms320c54x/tms320c54x_dasm.cpp cpu/tms320c54x/tms320c54x_dasm.h
 DRIVER_COMPONENTS := $(filter-out driver/nokia_dct3_trace_config.h,$(wildcard driver/nokia_dct3*.h driver/nokia_dct3_research.cpp)) \
 	driver/nokia_ccont.cpp driver/nokia_ccont.h \
