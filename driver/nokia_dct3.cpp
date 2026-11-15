@@ -1000,7 +1000,9 @@ uint16_t nokia_dct3_state::flash_r(offs_t offset, uint16_t mem_mask)
 	// the generic state table.
 	const u32 pc = downcast<arm7_cpu_device &>(*m_maincpu).current_pc();
 	const u32 addr = NOKIA_FLASH1_BASE + (offset << 1);
-	flash_firmware_traces(pc, addr);
+	// Every hook observes the fetch of its own instruction.
+	if (pc == addr)
+		flash_firmware_traces(pc, addr);
 #endif
 	const u16 data = m_flash->read(offset) & mem_mask;
 #if DCT3_RESEARCH_TRACES

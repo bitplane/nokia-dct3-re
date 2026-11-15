@@ -53,8 +53,9 @@ and `make check-c54x-state-trace` checks each change over the whole call
   every comment.
 - **Stage slots.** Each clock moves every stage one older. The 24
   per-stage arrays (`m_pipeline_word[k]` and the rest) are now one
-  `stage_slot` struct per stage (`m_slot[k].word`), moved with a single
-  fixed-size copy instead of 120 element moves. Save states register each
+  `stage_slot` struct per stage (`m_slot[k].word`), moved by five
+  whole-slot assignments instead of 120 element moves. (A fixed-size
+  `memmove` was compiled as a library call and cost 1.25 %.) Save states register each
   field with `STRUCT_MEMBER`, so states saved before this change do not
   load. `make verify-5110-lab-traffic-state` round-trips the call three
   times.
@@ -68,3 +69,4 @@ and `make check-c54x-state-trace` checks each change over the whole call
 | Stage advance | 26.7 |
 | ARM flash trace hooks | 26.0 |
 | Stage slots | 25.7 |
+| Inline slot moves; flash hook test at the call | 24.0 |
