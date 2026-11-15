@@ -51,6 +51,9 @@ and `make check-c54x-state-trace` checks each change over the whole call
   generator reads, and the generator refuses a test that reads anything
   but `m_op`. `--convert-chain LINE` performed the conversion, keeping
   every comment.
+- **Stage advance.** Each clock moves all 24 per-stage fields one stage
+  older. Each field's six slots are now copied as one small value and
+  stored back shifted, instead of moving 120 elements one at a time.
 
 | Change | Host-call run CPU (s), no PGO |
 | --- | ---: |
@@ -58,3 +61,4 @@ and `make check-c54x-state-trace` checks each change over the whole call
 | Decode facts | 33.6 |
 | Stage gates (24 gates, 82 blocks) | 29.6 |
 | Execute dispatch (76 cases) | 27.2 |
+| Stage advance | 26.7 |
