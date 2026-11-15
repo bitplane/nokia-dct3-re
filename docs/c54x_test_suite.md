@@ -161,3 +161,20 @@ Private ROMs and application ABI assumptions remain outside generic ISA tests.
 fixture; codec and handset runners have separate gates. The linked ROM4 context
 digest, bit-exact codec results, serial/pin replay and handset menu tests are
 integration evidence, not substitutes for CPU sections or physical validation.
+
+## State-trace oracle
+
+`make check-c54x-state-trace` runs the native nse1ap5 laboratory
+traffic-channel call (boot, registration, a TCH/F call with speech both ways
+and clearing: 343,147,081 DSP clocks) with `C54X_STATE_TRACE` set. The core
+then folds every clock's architectural registers, and every data, I/O and
+program write, into a rolling hash. It writes the hash every 2^20 clocks, and
+`tools/c54x_state_trace.py` compares the result with
+`fixtures/c54x_state_trace_traffic.txt`. The first differing line bounds the
+first divergent clock to a window of about 0.25 s.
+It exists for behaviour-preserving restructuring of the pipeline model:
+reintroducing the port-2 acceptance fault diverges between clocks 37,748,736
+and 38,797,312 (9.93-10.16 s). A deliberate model, laboratory or fixture
+change also changes the trace, which is then re-banked with `--rebank`.
+Without the variable the core installs no taps and only tests one pointer
+per clock.

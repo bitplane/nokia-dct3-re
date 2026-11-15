@@ -1421,6 +1421,12 @@ check-dspif-save: build
 check-c54x-core:
 	$(PYTHON) tools/run_c54x_section.py all --jobs $(JOBS)
 
+# Differential oracle for pipeline-model restructuring: every clock of the
+# native lab traffic call must hash identically to the banked reference.
+.PHONY: check-c54x-state-trace
+check-c54x-state-trace: build
+	$(VENV)/bin/python tools/c54x_state_trace.py
+
 .PHONY: check-c54x-rom4-context
 check-c54x-rom4-context: build
 	$(PYTHON) tools/run_c54x_core.py --mame $(MAME_DIR)/mame --rompath $(MAME_DIR)/roms --profile rom4-context

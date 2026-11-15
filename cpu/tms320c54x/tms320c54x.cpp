@@ -7,6 +7,8 @@
 #include "tms320c54x_dasm.h"
 #include "tms320c54x_decode.h"
 
+#include <cstdio>
+#include <cstdlib>
 #include <sstream>
 
 namespace {
@@ -121,6 +123,7 @@ void tms320c54x_device::device_start()
 	m_clock_timer = timer_alloc(FUNC(tms320c54x_device::selected_clock_complete), this);
 	// CPU-owned MMRs take precedence over broad board RAM windows.
 	space(AS_DATA).install_device(0, 0x58, *this, &tms320c54x_device::internal_data_map);
+	start_state_trace();
 	space(AS_PROGRAM).cache(m_cache);
 	space(AS_PROGRAM).specific(m_program);
 	space(AS_DATA).specific(m_data);
@@ -309,6 +312,12 @@ void tms320c54x_device::device_start()
 
 void tms320c54x_device::device_stop()
 {
+	if (m_state_trace)
+	{
+		std::fprintf(m_state_trace, "%llu %016llx end\n", (unsigned long long)m_pipeline_cycles, (unsigned long long)m_state_trace_hash);
+		std::fclose(m_state_trace);
+		m_state_trace = nullptr;
+	}
 	if (!m_coverage)
 		return;
 
@@ -5088,7 +5097,53 @@ void tms320c54x_device::execute_run()
 		}
 		pipeline_step();
 		--m_icount;
+		if (m_state_trace) trace_cycle();
 	}
+}
+
+// Development oracle for restructuring the pipeline model: with
+// C54X_STATE_TRACE=PATH (and optionally C54X_STATE_TRACE_TAG=device tag),
+// every clock's architectural registers and every data, I/O and program
+// write are folded into a rolling hash, written every 2^20 clocks. Two runs
+// of a deterministic scenario agree exactly unless the model changed; the
+// first differing line bounds the first divergent clock.
+void tms320c54x_device::start_state_trace()
+{
+	char const *const path = std::getenv("C54X_STATE_TRACE");
+	char const *const tag_filter = std::getenv("C54X_STATE_TRACE_TAG");
+	if (!path || !*path || (tag_filter && *tag_filter && tag() != std::string_view(tag_filter)))
+		return;
+	m_state_trace = std::fopen(path, "w");
+	if (!m_state_trace)
+		fatalerror("C54x state trace: cannot open %s\n", path);
+	m_state_trace_hash = 0x9e3779b97f4a7c15ULL;
+	for (int spacenum : { AS_PROGRAM, AS_DATA, AS_IO })
+		m_state_trace_taps.push_back(space(spacenum).install_write_tap(0, space(spacenum).addrmask(), "c54x_state_trace",
+				[this, spacenum](offs_t offset, u16 &data, u16 mem_mask) { trace_mix((u64(spacenum + 1) << 56) | (u64(offset) << 32) | (u32(mem_mask) << 16) | data); }));
+}
+
+void tms320c54x_device::trace_mix(u64 value)
+{
+	// splitmix64 finaliser over the running hash: order-sensitive and cheap.
+	u64 x = m_state_trace_hash ^ (value + 0x9e3779b97f4a7c15ULL + (m_state_trace_hash << 6) + (m_state_trace_hash >> 2));
+	x = (x ^ (x >> 30)) * 0xbf58476d1ce4e5b9ULL;
+	x = (x ^ (x >> 27)) * 0x94d049bb133111ebULL;
+	m_state_trace_hash = x ^ (x >> 31);
+}
+
+void tms320c54x_device::trace_cycle()
+{
+	trace_mix(m_pipeline_cycles);
+	trace_mix((u64(m_xpc) << 48) | (u64(m_pc) << 32) | (u32(m_st0) << 16) | m_st1);
+	trace_mix(m_a);
+	trace_mix(m_b);
+	trace_mix((u64(m_ar[0]) << 48) | (u64(m_ar[1]) << 32) | (u32(m_ar[2]) << 16) | m_ar[3]);
+	trace_mix((u64(m_ar[4]) << 48) | (u64(m_ar[5]) << 32) | (u32(m_ar[6]) << 16) | m_ar[7]);
+	trace_mix((u64(m_sp) << 48) | (u64(m_t) << 32) | (u32(m_brc) << 16) | m_bk);
+	trace_mix((u64(m_ifr) << 48) | (u64(m_imr) << 32) | (u32(m_idle) << 16) | u32(m_illegal));
+	if (!(m_pipeline_cycles & ((u64(1) << 20) - 1)))
+		std::fprintf(m_state_trace, "%llu %016llx %.9f\n", (unsigned long long)m_pipeline_cycles,
+				(unsigned long long)m_state_trace_hash, machine().time().as_double());
 }
 
 void tms320c54x_device::execute_set_input(int inputnum, int state)

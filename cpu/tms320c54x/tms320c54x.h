@@ -7,6 +7,8 @@
 #pragma once
 
 #include <map>
+#include <cstdio>
+#include <vector>
 
 class tms320c54x_device : public cpu_device
 {
@@ -408,6 +410,13 @@ private:
 		u64 dropped_tuples = 0;
 	};
 	std::unique_ptr<opcode_coverage> m_coverage;
+	// Development state-trace oracle (see start_state_trace); off unless set.
+	std::FILE *m_state_trace = nullptr;
+	u64 m_state_trace_hash = 0;
+	std::vector<memory_passthrough_handler> m_state_trace_taps;
+	void start_state_trace();
+	void trace_mix(u64 value);
+	void trace_cycle();
 	int m_icount = 0;
 };
 
