@@ -1,7 +1,7 @@
 from pathlib import Path
 import unittest
 
-from tools.c54x_stage_gates import (DECODE, DEVICE, HEADER, SOURCE, convert_chain, decode_gates, decode_test, execute_cases,
+from tools.c54x_stage_gates import (DECODE, DECODED, DEVICE, HEADER, SOURCE, convert_chain, decode_gates, decode_test, execute_cases,
                                     gates, generate, opcode_test, pure_predicates, side_effect_free)
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -104,6 +104,25 @@ class DecodeGateTest(unittest.TestCase):
     def test_rejects_a_block_that_reads_state_first(self):
         with self.assertRaisesRegex(ValueError, 'no opcode test'):
             decode_gates(decode_source('\t\tif (m_flag)\n\t\t\tx = 1;'), PURE, ALLOWED)
+
+
+STEP = 'void tms320c54x_device::pipeline_step()\n{\n'
+
+
+class DecodedGateTest(unittest.TestCase):
+    def test_accepts_decode_word_tests_after_the_marker(self):
+        text = STEP + '\tm_slot[2].word = 0;\n' + DECODED + source('\t\tif (m_slot[2].valid && staged_move(m_slot[2].word))\n\t\t\tx = 1;')[len('void f()\n{\n'):]
+        self.assertEqual(gates(text, PURE), {0: [(2, 'staged_move(word)')]})
+
+    def test_rejects_decode_word_tests_before_the_marker(self):
+        text = STEP + source('\t\tif (staged_move(m_slot[2].word))\n\t\t\tx = 1;')[len('void f()\n{\n'):] + DECODED
+        with self.assertRaisesRegex(ValueError, 'no opcode test'):
+            gates(text, PURE)
+
+    def test_rejects_a_slot_write_after_the_marker(self):
+        for write in ('\tm_slot[2].word = 0xf495;\n', '\tm_slot[stage] = m_slot[stage - 1];\n'):
+            with self.assertRaisesRegex(ValueError, 'writes a slot word after the Decode marker'):
+                gates(STEP + DECODED + write + '}\n', PURE)
 
 
 CHAIN = '''bool f()
