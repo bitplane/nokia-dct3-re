@@ -167,6 +167,50 @@ inline const std::array<u64, 65536> stage3_gate_table = make_gate_table(stage3_g
 inline const std::array<u64, 65536> stage4_gate_table = make_gate_table(stage4_gates);
 inline const std::array<u64, 65536> stage5_gate_table = make_gate_table(stage5_gates);
 
+// For every opcode, the decode gates in pipeline_step in which some
+// block's opcode test holds.
+inline u8 decode_gates(u16 word)
+{
+	unsigned result = 0;
+	if ((staged_program_coefficient(word)) ||
+			(staged_extended_store(word) && (word & 0xfe00) == 0x8c00))
+		result |= 1U << 0;
+	if ((staged_shifted_smem(word) && (word & 0xf8) == 0x98) ||
+			(((BIT(decode_facts[word], unsigned(decode_fact::short_repeat))) || (staged_memory_repeat(word) && word != 0x47f8))) ||
+			(((word & 0xfeff) == 0x8807 || word == 0x7707)) ||
+			(staged_block_repeat(word)) ||
+			((word & 0xfeff) == 0x8821) ||
+			(staged_delay_copy(word)) ||
+			(staged_extended_program_move(word)) ||
+			(staged_read_a(word) && u8(word) >= 0xe0 && u8(word) != 0xf8) ||
+			(staged_data_to_program(word)) ||
+			(staged_write_a(word)) ||
+			(word == 0x721a) ||
+			(staged_move(word)) ||
+			((BIT(decode_facts[word], unsigned(decode_fact::direct_move)))) ||
+			((BIT(decode_facts[word], unsigned(decode_fact::direct_move)))) ||
+			(word == 0x6bf8) ||
+			(word == 0x6bf8) ||
+			(staged_shifted_smem(word)) ||
+			(staged_direct_push(word) && u8(word) >= 0x80) ||
+			((staged_extended_push(word) || staged_extended_pop(word))) ||
+			((word == 0x8a00 || word == 0x8a01)) ||
+			(word >= 0x8a1a && word <= 0x8a1c))
+		result |= 1U << 1;
+	if ((staged_xc(word)) ||
+			(staged_idle(word)))
+		result |= 1U << 2;
+	return u8(result);
+}
+
+inline const std::array<u8, 65536> decode_gate_table = []
+{
+	std::array<u8, 65536> result{};
+	for (unsigned word = 0; word < result.size(); ++word)
+		result[word] = decode_gates(u16(word));
+	return result;
+}();
+
 // pipeline_execute's dispatch: the first case whose opcode test holds, or
 // 76 for none.
 inline u8 execute_entry(u16 word)

@@ -22,6 +22,14 @@ for each stage and opcode, the gates in which some block's opcode test holds.
 A block's opcode test failing makes its whole condition false, so skipping the
 gate is exact. A block without such a test, or with an else, is an error.
 
+The Decode stage's checks test the decoded word, held in the constant local
+`word`, and are wrapped as `if (BIT(decode_gates, N)) // decode gate N`.
+Their opcode tests may name `bool const` locals of the function, read through
+to their definitions, and `fact(decode_fact::X)` lookups. A decode gate may
+also hold `bool const` declarations whose calls have no side effects (pure
+predicates or the device's const members): skipping one is harmless, since
+C++ scoping keeps its name inside the gate.
+
   c54x_stage_gates.py            regenerate the header
   c54x_stage_gates.py --check    fail if the header is stale
   c54x_stage_gates.py --wrap F L run-length   (development) wrap runs in F..L
@@ -33,8 +41,13 @@ import sys
 
 SOURCE = Path('cpu/tms320c54x/tms320c54x.cpp')
 DECODE = Path('cpu/tms320c54x/tms320c54x_decode.h')
+DEVICE = Path('cpu/tms320c54x/tms320c54x.h')
 HEADER = Path('cpu/tms320c54x/tms320c54x_gates.h')
 GATE = re.compile(r'^(\t+)if \(BIT\(gates, (\d+)\)\) // stage gate \2$')
+DECODE_GATE = re.compile(r'^(\t+)if \(BIT\(decode_gates, (\d+)\)\) // decode gate \2$')
+FACT = re.compile(r'\bfact\((decode_fact::\w+)\)')
+LOCAL = re.compile(r'^\t+bool const (\w+) = ((?:.|\n)*?);$', re.M)
+DECLARATION = re.compile(r'\bbool const (\w+) = ([^;]*);')
 DISPATCH = '\tswitch (execute_entry_table[m_op]) // first matching case'
 CASE = re.compile(r'^\tcase (\d+): // (.+)$')
 PURE_EXTRA = {'BIT', 'u8', 'u16', 's8', 's16', 'staged_opcode_descriptor', 'staged_opcode_flags'}
@@ -42,6 +55,13 @@ PURE_EXTRA = {'BIT', 'u8', 'u16', 's8', 's16', 'staged_opcode_descriptor', 'stag
 
 def pure_predicates(decode):
     return set(re.findall(r'(?:constexpr|inline)\s+(?:constexpr\s+)?[\w:<>]+\s+(\w+)\(u16 word\)', decode)) | PURE_EXTRA
+
+
+def side_effect_free(decode, device_header):
+    """Calls a skipped declaration may make: tms320c54x_decode.h's free
+    functions, which take values, and the device's const members."""
+    return (set(re.findall(r'(?:constexpr|inline)\s+(?:constexpr\s+)?[\w:<>]+\s+(\w+)\(', decode)) |
+            set(re.findall(r'\b(\w+)\([^()]*\) const\b', device_header)) | PURE_EXTRA)
 
 
 def matching(text, start, opening='(', closing=')'):
@@ -124,8 +144,20 @@ def opcode_test(condition, pure):
     return None
 
 
-def blocks(text):
-    """(start, end, condition) for each top-level if inside a gate body."""
+def declarations_only(text, allowed_calls):
+    """Whether text holds only `bool const` declarations whose calls are allowed."""
+    rest = strip_comments(text)
+    for match in DECLARATION.finditer(rest):
+        calls = set(re.findall(r'([A-Za-z_]\w*)\s*\(', match[2]))
+        if calls - allowed_calls:
+            return False
+    return not DECLARATION.sub('', rest).strip()
+
+
+def blocks(text, allowed_calls=None):
+    """(start, end, condition) for each top-level if inside a gate body.
+
+    With allowed_calls, side-effect-free declarations may sit between blocks."""
     position, found = 0, []
     while True:
         match = re.compile(r'\bif \(').search(text, position)
@@ -141,10 +173,14 @@ def blocks(text):
         if following.startswith('else'):
             raise ValueError(f'gated block has an else: if ({condition[:60]}')
         between = text[position:start].strip()
-        if strip_comments(between).strip():
+        if strip_comments(between).strip() and not (allowed_calls is not None and declarations_only(between, allowed_calls)):
             raise ValueError(f'gate body has a statement outside its blocks: {between[:60]!r}')
         found.append((start, end, condition))
         position = end
+        if allowed_calls is not None and not re.compile(r'\bif \(').search(text, position):
+            tail = text[position:].strip()
+            if strip_comments(tail).strip() and not declarations_only(tail, allowed_calls):
+                raise ValueError(f'gate body has a statement outside its blocks: {tail[:60]!r}')
 
 
 def gates(source, pure):
@@ -177,6 +213,95 @@ def gates(source, pure):
     if sorted(result) != list(range(len(result))) or len(result) > 64:
         raise ValueError(f'gates must be numbered 0..N-1, at most 64: {sorted(result)}')
     return result
+
+
+def word_only(term, pure):
+    names = set(re.findall(r'[A-Za-z_]\w*', re.sub(r'decode_fact::\w+', '', term))) - pure - {'word', 'fact'}
+    return (re.search(r'\bword\b', term) or FACT.search(term)) and all(re.fullmatch(r'x[0-9a-fA-F]+', name) for name in names)
+
+
+def decode_test(condition, pure, local, depth=0):
+    """Expression in `word` for a decode block's gating conjunct, or None.
+
+    local maps a name to its definition (that of the declaration in scope)."""
+    if depth > 8:
+        return None
+    # Every word-only conjunct before the first that may have side effects
+    # must hold for the block to run; together they are its opcode test.
+    tests = []
+    for term in conjuncts(strip_comments(condition)):
+        expanded = term
+        for _ in range(8):
+            expanded = re.sub(r'(?<![.:\w])\w+\b', lambda name: f'({local[name[0]]})' if name[0] in local else name[0], expanded)
+        if word_only(expanded, pure):
+            tests.append(FACT.sub(r'BIT(decode_facts[word], unsigned(\1))', ' '.join(expanded.split())))
+            continue
+        if term in local:
+            inner = decode_test(local[term], pure, local, depth + 1)
+            if inner:
+                tests.append(inner)
+        calls = set(re.findall(r'([A-Za-z_]\w*)\s*\(', re.sub(r'm_\w+', '', expanded))) - pure - {'fact'}
+        if calls:
+            break
+    return ' && '.join(tests) or None
+
+
+def decode_gates(source, pure, allowed_calls):
+    """{gate: [expression]} from the source's decode gate wrappers."""
+    lines = source.split('\n')
+    offsets = [0]
+    for line in lines:
+        offsets.append(offsets[-1] + len(line) + 1)
+    result = {}
+    for number, line in enumerate(lines):
+        match = DECODE_GATE.match(line)
+        if not match:
+            continue
+        gate, indent = int(match[2]), match[1]
+        if gate in result:
+            raise ValueError(f'decode gate {gate} is defined twice')
+        if lines[number + 1] != indent + '{':
+            raise ValueError(f'decode gate {gate} must open a block on its next line')
+        body_start = offsets[number + 1] + len(indent)
+        body_end = matching(source, body_start, '{', '}')
+        body = source[body_start + 1:body_end]
+        # Locals in scope: the function's earlier declarations at this depth
+        # or shallower, then the gate's own; later definitions shadow.
+        function_start = source.rindex('\n{\n', 0, offsets[number])
+        local = {}
+        for definition in LOCAL.finditer(source, function_start, offsets[number]):
+            if len(definition[0]) - len(definition[0].lstrip('\t')) <= len(indent):
+                local[definition[1]] = ' '.join(definition[2].split())
+        tests = []
+        for start, end, condition in blocks(body, allowed_calls):
+            for definition in LOCAL.finditer(body, 0, start):
+                if len(definition[0]) - len(definition[0].lstrip('\t')) == len(indent) + 1:
+                    local[definition[1]] = ' '.join(definition[2].split())
+            test = decode_test(condition, pure, local)
+            if test is None:
+                raise ValueError(f'decode gate {gate}: block has no opcode test: if ({condition[:80]}')
+            tests.append(test)
+        if not tests:
+            raise ValueError(f'decode gate {gate} is empty')
+        result[gate] = tests
+    if sorted(result) != list(range(len(result))) or len(result) > 8:
+        raise ValueError(f'decode gates must be numbered 0..N-1, at most 8: {sorted(result)}')
+    return result
+
+
+def decode_section(table):
+    if not table:
+        return ''
+    terms = []
+    for gate, tests in sorted(table.items()):
+        joined = ' ||\n\t\t\t'.join(f'({expression})' for expression in tests)
+        terms.append(f'\tif ({joined})\n\t\tresult |= 1U << {gate};')
+    return ('// For every opcode, the decode gates in pipeline_step in which some\n'
+            '// block\'s opcode test holds.\n'
+            'inline u8 decode_gates(u16 word)\n{\n\tunsigned result = 0;\n' + '\n'.join(terms) + '\n\treturn u8(result);\n}\n\n'
+            'inline const std::array<u8, 65536> decode_gate_table = []\n{\n\tstd::array<u8, 65536> result{};\n'
+            '\tfor (unsigned word = 0; word < result.size(); ++word)\n\t\tresult[word] = decode_gates(u16(word));\n'
+            '\treturn result;\n}();\n\n')
 
 
 def execute_cases(source, pure):
@@ -231,7 +356,7 @@ inline const std::array<u8, 65536> execute_entry_table = []
 '''
 
 
-def header(table, cases=()):
+def header(table, cases=(), decode=None):
     functions, rows = [], []
     for stage in (3, 4, 5):
         terms = []
@@ -264,7 +389,7 @@ inline std::array<u64, 65536> make_gate_table(u64 (*gates)(u16))
 
 {chr(10).join(rows)}
 
-{execute_section(cases)}}} // namespace c54x_decode
+{decode_section(decode or {})}{execute_section(cases)}}} // namespace c54x_decode
 
 #endif // MAME_CPU_TMS320C54X_GATES_H
 '''
@@ -375,6 +500,10 @@ def wrap(source, first, last, run_length, pure):
     return '\n'.join(output)
 
 
+def generate(source, pure, allowed):
+    return header(gates(source, pure), execute_cases(source, pure) if DISPATCH in source else (), decode_gates(source, pure, allowed))
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument('--check', action='store_true')
@@ -383,6 +512,7 @@ def main():
     args = parser.parse_args()
     root = Path(__file__).resolve().parents[1]
     pure = pure_predicates((root / DECODE).read_text())
+    allowed = side_effect_free((root / DECODE).read_text(), (root / DEVICE).read_text())
     source = (root / SOURCE).read_text()
     if args.wrap:
         source = wrap(source, *args.wrap, pure)
@@ -391,7 +521,7 @@ def main():
         source = convert_chain(source, args.convert_chain)
         (root / SOURCE).write_text(source)
     try:
-        generated = header(gates(source, pure), execute_cases(source, pure) if DISPATCH in source else ())
+        generated = generate(source, pure, allowed)
     except ValueError as error:
         raise SystemExit(f'FAIL - C54x stage gates: {error}')
     if args.check:

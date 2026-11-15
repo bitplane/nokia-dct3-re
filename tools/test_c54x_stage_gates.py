@@ -1,8 +1,8 @@
 from pathlib import Path
 import unittest
 
-from tools.c54x_stage_gates import (DECODE, DISPATCH, HEADER, SOURCE, convert_chain, execute_cases, gates, header, opcode_test,
-                                    pure_predicates)
+from tools.c54x_stage_gates import (DECODE, DEVICE, HEADER, SOURCE, convert_chain, decode_gates, decode_test, execute_cases,
+                                    gates, generate, opcode_test, pure_predicates, side_effect_free)
 
 ROOT = Path(__file__).resolve().parents[1]
 PURE = {'staged_move', 'staged_banz', 'BIT', 'u8'}
@@ -54,9 +54,56 @@ class GateParseTest(unittest.TestCase):
             gates(text, PURE)
 
     def test_committed_header_is_current(self):
-        pure = pure_predicates((ROOT / DECODE).read_text())
-        text = (ROOT / SOURCE).read_text()
-        self.assertEqual((ROOT / HEADER).read_text(), header(gates(text, pure), execute_cases(text, pure) if DISPATCH in text else ()))
+        decode = (ROOT / DECODE).read_text()
+        allowed = side_effect_free(decode, (ROOT / DEVICE).read_text())
+        self.assertEqual((ROOT / HEADER).read_text(), generate((ROOT / SOURCE).read_text(), pure_predicates(decode), allowed))
+
+
+ALLOWED = PURE | {'staged_clock_destination_move', 'pipeline_early_braf_clear'}
+
+
+def decode_source(*blocks, before=''):
+    body = '\n'.join(blocks)
+    return (f'void f()\n{{\n\tu16 const word = m_slot[2].word;\n{before}'
+            f'\tif (BIT(decode_gates, 0)) // decode gate 0\n\t{{\n{body}\n\t}}\n}}\n')
+
+
+class DecodeGateTest(unittest.TestCase):
+    def test_reads_through_locals_and_facts(self):
+        local = {'direct_move': 'fact(decode_fact::direct_move)', 'brc_move': 'direct_move && m_slot[2].immediate == 0x1a'}
+        self.assertEqual(decode_test('m_slot[2].valid && brc_move && m_flag', PURE, local),
+                         '(BIT(decode_facts[word], unsigned(decode_fact::direct_move)))')
+
+    def test_joins_every_word_test_before_a_side_effect(self):
+        self.assertEqual(decode_test('word >= 0x8a1a && m_flag && word <= 0x8a1c', PURE, {}), 'word >= 0x8a1a && word <= 0x8a1c')
+        self.assertEqual(decode_test('staged_move(word) && pipeline_execute() && u8(word) == 0xf8', PURE, {}), 'staged_move(word)')
+        self.assertIsNone(decode_test('pipeline_execute() && staged_move(word)', PURE, {}))
+
+    def test_a_qualified_fact_name_is_not_a_local(self):
+        local = {'short_repeat': 'fact(decode_fact::short_repeat)'}
+        self.assertEqual(decode_test('short_repeat', PURE, local), '(BIT(decode_facts[word], unsigned(decode_fact::short_repeat)))')
+
+    def test_collects_gates_with_declarations_between_blocks(self):
+        text = decode_source('\t\tif (m_slot[2].valid && staged_move(word) && m_x)\n\t\t\tx = 1;',
+                             '\t\tbool const clock_move = staged_move(word) && staged_clock_destination_move(word, m_slot[2].immediate);',
+                             '\t\tif (clock_move && m_y)\n\t\t\ty = 1;',
+                             before='\tbool const short_repeat = fact(decode_fact::short_repeat);\n')
+        self.assertEqual(decode_gates(text.replace('m_x)', 'short_repeat)'), PURE, ALLOWED),
+                         {0: ['staged_move(word) && (BIT(decode_facts[word], unsigned(decode_fact::short_repeat)))', 'staged_move(word)']})
+
+    def test_rejects_a_declaration_with_a_side_effect(self):
+        text = decode_source('\t\tbool const moved = pipeline_execute();', '\t\tif (staged_move(word))\n\t\t\tx = 1;')
+        with self.assertRaisesRegex(ValueError, 'outside its blocks'):
+            decode_gates(text, PURE, ALLOWED)
+
+    def test_rejects_a_trailing_statement(self):
+        text = decode_source('\t\tif (staged_move(word))\n\t\t\tx = 1;', '\t\tm_x = 0;')
+        with self.assertRaisesRegex(ValueError, 'outside its blocks'):
+            decode_gates(text, PURE, ALLOWED)
+
+    def test_rejects_a_block_that_reads_state_first(self):
+        with self.assertRaisesRegex(ValueError, 'no opcode test'):
+            decode_gates(decode_source('\t\tif (m_flag)\n\t\t\tx = 1;'), PURE, ALLOWED)
 
 
 CHAIN = '''bool f()

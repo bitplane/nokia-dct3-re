@@ -2017,16 +2017,22 @@ void tms320c54x_device::pipeline_step()
 		u16 const word = m_slot[2].word;
 		u64 const facts = decode_facts[word];
 		auto const fact = [facts](decode_fact f) { return bool(BIT(facts, unsigned(f))); };
-		if (m_slot[2].valid && staged_program_coefficient(word) &&
-			(m_pipeline_xc_active || m_slot[2].block_body || m_pipeline_control_words ||
-			 (m_pipeline_repeat_active && !staged_pipelined_repeat(word))))
+		// Runs of word-keyed decode checks are skipped together when none of
+		// their opcode tests holds (tms320c54x_gates.h).
+		u8 const decode_gates = decode_gate_table[word];
+		if (BIT(decode_gates, 0)) // decode gate 0
 		{
-			logerror("%s: staged program-coefficient repeat/control composition is unsupported\n", machine().describe_context()); m_illegal = true; return;
-		}
-		if (m_slot[2].valid && staged_extended_store(word) && (word & 0xfe00) == 0x8c00 &&
-			(m_pipeline_repeat_active || m_pipeline_xc_active || m_slot[2].block_body || completing_t_store_delay))
-		{
-			logerror("%s: staged extended T/TRN store repeat/control composition is unsupported\n", machine().describe_context()); m_illegal = true; return;
+			if (m_slot[2].valid && staged_program_coefficient(word) &&
+				(m_pipeline_xc_active || m_slot[2].block_body || m_pipeline_control_words ||
+				 (m_pipeline_repeat_active && !staged_pipelined_repeat(word))))
+			{
+				logerror("%s: staged program-coefficient repeat/control composition is unsupported\n", machine().describe_context()); m_illegal = true; return;
+			}
+			if (m_slot[2].valid && staged_extended_store(word) && (word & 0xfe00) == 0x8c00 &&
+				(m_pipeline_repeat_active || m_pipeline_xc_active || m_slot[2].block_body || completing_t_store_delay))
+			{
+				logerror("%s: staged extended T/TRN store repeat/control composition is unsupported\n", machine().describe_context()); m_illegal = true; return;
+			}
 		}
 		// Admit the complete shifted store only for the tested RPTBD and BD
 		// owners; other delayed transfers retain their independent exclusions.
@@ -2043,129 +2049,135 @@ void tms320c54x_device::pipeline_step()
 			logerror("%s: staged control-delay Smem extension is not an admitted shifted load instruction=%06x word=%04x operation=%04x\n", machine().describe_context(), unsigned(m_slot[2].address), word, m_slot[2].immediate); m_illegal = true; return;
 		}
 		bool const software_intr = fact(decode_fact::software_intr);
-		if (m_slot[2].valid && staged_shifted_smem(word) && (word & 0xf8) == 0x98 && ((m_slot[2].immediate & 0xfee0) == 0x0c40 || staged_shifted_memory_arithmetic(m_slot[2].immediate)))
-		{
-			logerror("%s: short MOD=3 is write-only, not a shifted memory source\n", machine().describe_context()); m_illegal = true; return;
-		}
 		bool const short_repeat = fact(decode_fact::short_repeat);
-		if (m_slot[2].valid && (short_repeat || (staged_memory_repeat(word) && word != 0x47f8)))
-		{
-			if (m_pipeline_repeat_active) { logerror("%s: nested staged repeat is unsupported\n", machine().describe_context()); m_illegal = true; return; }
-			m_pipeline_repeat_active = true;
-			if (short_repeat) m_slot[2].immediate = u8(word);
-		}
-		// Register/immediate loads, short loads, DP stores and bounded RMW forms.
-		// Other memory/control forms need Access/Read/redirect ownership first.
-		bool const early_braf_clear = word == 0x7707 && pipeline_early_braf_clear(2, m_slot[2].immediate);
-		if (m_slot[2].valid && ((word & 0xfeff) == 0x8807 || word == 0x7707) &&
-			(m_pipeline_delay_decode_words || m_pipeline_repeat_active || m_pipeline_xc_active || (m_slot[2].block_body && !early_braf_clear)))
-		{
-			logerror("%s: staged STLM ST1 control/repeat composition is unsupported instruction=%06x word=%04x delay=%u repeat=%u xc=%u xc_end=%06x block=%u body=%u range=%06x..%06x\n", machine().describe_context(), unsigned(m_slot[2].address), word, m_pipeline_delay_decode_words, unsigned(m_pipeline_repeat_active), unsigned(m_pipeline_xc_active), unsigned(m_pipeline_xc_end), unsigned(m_pipeline_block_active), unsigned(m_slot[2].block_body), unsigned(m_pipeline_block_start), unsigned(m_pipeline_block_end_address)); m_illegal = true; return;
-		}
-		if (m_slot[2].valid && staged_block_repeat(word))
-			for (unsigned stage = 3; stage < 6; ++stage)
-				if (m_slot[stage].valid && (m_slot[stage].word & 0xfeff) == 0x8807 && m_slot[2].address == ((m_slot[stage].address & 0x7f0000) | u16(m_slot[stage].address + 1)))
-				{
-					// SPRU131G 7.5.7.1: STLM can overwrite the younger BRAF update.
-					logerror("%s: staged adjacent STLM ST1/RPTB hazard is unsupported\n", machine().describe_context()); m_illegal = true; return;
-				}
-		if (m_slot[2].valid && (word & 0xfeff) == 0x8821 &&
-			(m_pipeline_delay_decode_words || m_pipeline_repeat_active || m_pipeline_xc_active || m_slot[2].block_body))
-		{
-			logerror("%s: staged BSP STLM control/repeat composition is unsupported\n", machine().describe_context()); m_illegal = true; return;
-		}
 		bool const direct_move = fact(decode_fact::direct_move);
-		if (m_slot[2].valid && staged_delay_copy(word) && (m_pipeline_repeat_active || m_pipeline_xc_active || m_slot[2].block_body))
-		{
-			logerror("%s: staged LTD/DELAY repeat/block/XC composition is unsupported\n", machine().describe_context()); m_illegal = true; return;
-		}
 		bool const program_move = fact(decode_fact::program_move);
-		if (m_slot[2].valid && staged_extended_program_move(word) && (m_pipeline_xc_active || m_slot[2].block_body))
-		{
-			logerror("%s: staged extended MVPD block/XC composition is unsupported\n", machine().describe_context()); m_illegal = true; return;
-		}
 		bool const read_a = fact(decode_fact::read_a);
-		if (m_slot[2].valid && staged_read_a(word) && u8(word) >= 0xe0 && u8(word) != 0xf8 &&
-			(m_pipeline_delay_decode_words || m_pipeline_repeat_active || m_pipeline_xc_active || m_slot[2].block_body))
-		{
-			logerror("%s: staged offset READA control/repeat composition is unsupported\n", machine().describe_context()); m_illegal = true; return;
-		}
-		if (m_slot[2].valid && staged_data_to_program(word) && (m_pipeline_delay_decode_words || m_pipeline_xc_active || m_slot[2].block_body))
-		{
-			logerror("%s: staged MVDP repeat/control-delay composition is unsupported\n", machine().describe_context()); m_illegal = true; return;
-		}
-		if (m_slot[2].valid && staged_write_a(word) && (m_pipeline_delay_decode_words || m_pipeline_xc_active || m_slot[2].block_body))
-		{
-			logerror("%s: staged WRITA repeat/control-delay composition is unsupported instruction=%06x word=%04x repeat=%u delay=%u xc=%u block=%u\n",
-				machine().describe_context(), unsigned(m_slot[2].address), word, unsigned(m_pipeline_repeat_active),
-				m_pipeline_delay_decode_words, unsigned(m_pipeline_xc_active), unsigned(m_slot[2].block_body)); m_illegal = true; return;
-		}
-		bool const accumulator_status_move = (word == 0x7308 || word == 0x730b) && m_slot[2].immediate == 7;
-		bool const brc_move = direct_move && m_slot[2].immediate == 0x1a;
-		if (m_slot[2].valid && word == 0x721a &&
-			(m_pipeline_block_active || BIT(m_st1,15) || m_pipeline_repeat_active ||
-			 m_pipeline_delay_decode_words || completing_move_delay || m_pipeline_xc_active))
-		{
-			logerror("%s: staged MVDM BRC active-loop or control composition is unsupported\n",machine().describe_context());
-			m_illegal=true;return;
-		}
-		bool const clock_move = staged_clock_destination_move(word, m_slot[2].immediate);
-		if (m_slot[2].valid && clock_move && (completing_move_delay || m_pipeline_delay_decode_words || m_pipeline_xc_active || m_slot[2].block_body || m_pipeline_repeat_active))
-		{
-			logerror("%s: staged CLKMD move repeat/control composition is unsupported\n", machine().describe_context()); m_illegal = true; return;
-		}
-		bool const ordinary_delay_brc_move = completing_move_delay && m_pipeline_control_word != 0xf272;
-		if (m_slot[2].valid && brc_move && ((!ordinary_delay_brc_move && (completing_move_delay || m_pipeline_delay_decode_words)) || m_slot[2].block_body))
-		{
-			logerror("%s: staged memory move BRC in repeat body or control delay is unsupported\n", machine().describe_context()); m_illegal = true; return;
-		}
-		if (m_slot[2].valid && direct_move && !brc_move && !clock_move && !accumulator_status_move && !staged_accumulator_destination_move(word, m_slot[2].immediate) && !staged_t_register_move(word, m_slot[2].immediate) && m_slot[2].immediate < 0x60 &&
-			(m_slot[2].immediate < 0x10 || m_slot[2].immediate > 0x19))
-		{
-			logerror("%s: staged memory move control/peripheral destination is unsupported instruction=%06x word=%04x destination=%04x\n", machine().describe_context(), unsigned(m_slot[2].address), word, m_slot[2].immediate);
-			m_illegal = true;
-			return;
-		}
 		bool const fast_return = fact(decode_fact::fast_return);
-		bool const addm_brc = word == 0x6bf8 && m_slot[2].operand_address == 0x1a;
-		if (m_slot[2].valid && addm_brc && (m_pipeline_block_active || BIT(m_st1, 15) || m_pipeline_repeat_active || m_pipeline_delay_decode_words))
-		{
-			logerror("%s: staged ADDM BRC active-loop or delay composition is unsupported\n", machine().describe_context()); m_illegal = true; return;
-		}
-		if (m_slot[2].valid && word == 0x6bf8 && m_slot[2].operand_address < 0x60 &&
-			(m_slot[2].operand_address < 0x10 || m_slot[2].operand_address > 0x18) && m_slot[2].operand_address != 0x0e && !addm_brc)
-		{
-			logerror("%s: staged ADDM register/peripheral destination is unsupported instruction=%06x word=%04x destination=%04x\n", machine().describe_context(), unsigned(m_slot[2].address), word, m_slot[2].operand_address);
-			m_illegal = true; return;
-		}
 		bool const plain_return = fact(decode_fact::plain_return);
 		bool const delayed_return = fact(decode_fact::delayed_return);
 		bool const far_return = fact(decode_fact::far_return);
 		bool const intm_bit = fact(decode_fact::intm_bit);
-		if (m_slot[2].valid && staged_shifted_smem(word) && (m_slot[2].immediate & 0xfee0) != 0x0c40 && !staged_shifted_memory_store(word, m_slot[2].immediate) && !staged_shifted_memory_arithmetic(m_slot[2].immediate))
-		{
-			logerror("%s: unsupported staged Smem extension %04x/%04x instruction=%06x last_fetch_physical=%06x\n", machine().describe_context(), word, m_slot[2].immediate, unsigned(m_slot[2].address), unsigned(m_slot[2].physical_address));
-			m_illegal = true; return;
-		}
 		bool const data_push = fact(decode_fact::data_push);
-		if (m_slot[2].valid && staged_direct_push(word) && u8(word) >= 0x80 &&
-			(m_pipeline_delay_decode_words || m_pipeline_repeat_active || m_pipeline_xc_active || m_slot[2].block_body))
+		if (BIT(decode_gates, 1)) // decode gate 1
 		{
-			logerror("%s: staged indirect PSHM control/repeat composition is unsupported\n", machine().describe_context()); m_illegal = true; return;
-		}
-		if (m_slot[2].valid && (staged_extended_push(word) || staged_extended_pop(word)) && (m_pipeline_xc_active || m_slot[2].block_body))
-		{
-			logerror("%s: staged extended stack conditional/block composition is unsupported\n", machine().describe_context()); m_illegal = true; return;
-		}
-		if (m_slot[2].valid && (word == 0x8a00 || word == 0x8a01) &&
-			(decoding_control_delay || m_pipeline_repeat_active || m_pipeline_xc_active || m_slot[2].block_body))
-		{
-			logerror("%s: staged interrupt-register POPM repeat/control composition is unsupported\n", machine().describe_context()); m_illegal = true; return;
-		}
-		if (word >= 0x8a1a && word <= 0x8a1c && m_pipeline_block_active && m_slot[2].block_body)
-		{
-			logerror("%s: staged POPM active repeat-control write is unsupported instruction=%06x word=%04x\n", machine().describe_context(), unsigned(m_slot[2].address), word);
-			m_illegal = true; return;
+			if (m_slot[2].valid && staged_shifted_smem(word) && (word & 0xf8) == 0x98 && ((m_slot[2].immediate & 0xfee0) == 0x0c40 || staged_shifted_memory_arithmetic(m_slot[2].immediate)))
+			{
+				logerror("%s: short MOD=3 is write-only, not a shifted memory source\n", machine().describe_context()); m_illegal = true; return;
+			}
+			if (m_slot[2].valid && (short_repeat || (staged_memory_repeat(word) && word != 0x47f8)))
+			{
+				if (m_pipeline_repeat_active) { logerror("%s: nested staged repeat is unsupported\n", machine().describe_context()); m_illegal = true; return; }
+				m_pipeline_repeat_active = true;
+				if (short_repeat) m_slot[2].immediate = u8(word);
+			}
+			// Register/immediate loads, short loads, DP stores and bounded RMW forms.
+			// Other memory/control forms need Access/Read/redirect ownership first.
+			bool const early_braf_clear = word == 0x7707 && pipeline_early_braf_clear(2, m_slot[2].immediate);
+			if (m_slot[2].valid && ((word & 0xfeff) == 0x8807 || word == 0x7707) &&
+				(m_pipeline_delay_decode_words || m_pipeline_repeat_active || m_pipeline_xc_active || (m_slot[2].block_body && !early_braf_clear)))
+			{
+				logerror("%s: staged STLM ST1 control/repeat composition is unsupported instruction=%06x word=%04x delay=%u repeat=%u xc=%u xc_end=%06x block=%u body=%u range=%06x..%06x\n", machine().describe_context(), unsigned(m_slot[2].address), word, m_pipeline_delay_decode_words, unsigned(m_pipeline_repeat_active), unsigned(m_pipeline_xc_active), unsigned(m_pipeline_xc_end), unsigned(m_pipeline_block_active), unsigned(m_slot[2].block_body), unsigned(m_pipeline_block_start), unsigned(m_pipeline_block_end_address)); m_illegal = true; return;
+			}
+			if (m_slot[2].valid && staged_block_repeat(word))
+			{
+				for (unsigned stage = 3; stage < 6; ++stage)
+					if (m_slot[stage].valid && (m_slot[stage].word & 0xfeff) == 0x8807 && m_slot[2].address == ((m_slot[stage].address & 0x7f0000) | u16(m_slot[stage].address + 1)))
+					{
+						// SPRU131G 7.5.7.1: STLM can overwrite the younger BRAF update.
+						logerror("%s: staged adjacent STLM ST1/RPTB hazard is unsupported\n", machine().describe_context()); m_illegal = true; return;
+					}
+			}
+			if (m_slot[2].valid && (word & 0xfeff) == 0x8821 &&
+				(m_pipeline_delay_decode_words || m_pipeline_repeat_active || m_pipeline_xc_active || m_slot[2].block_body))
+			{
+				logerror("%s: staged BSP STLM control/repeat composition is unsupported\n", machine().describe_context()); m_illegal = true; return;
+			}
+			if (m_slot[2].valid && staged_delay_copy(word) && (m_pipeline_repeat_active || m_pipeline_xc_active || m_slot[2].block_body))
+			{
+				logerror("%s: staged LTD/DELAY repeat/block/XC composition is unsupported\n", machine().describe_context()); m_illegal = true; return;
+			}
+			if (m_slot[2].valid && staged_extended_program_move(word) && (m_pipeline_xc_active || m_slot[2].block_body))
+			{
+				logerror("%s: staged extended MVPD block/XC composition is unsupported\n", machine().describe_context()); m_illegal = true; return;
+			}
+			if (m_slot[2].valid && staged_read_a(word) && u8(word) >= 0xe0 && u8(word) != 0xf8 &&
+				(m_pipeline_delay_decode_words || m_pipeline_repeat_active || m_pipeline_xc_active || m_slot[2].block_body))
+			{
+				logerror("%s: staged offset READA control/repeat composition is unsupported\n", machine().describe_context()); m_illegal = true; return;
+			}
+			if (m_slot[2].valid && staged_data_to_program(word) && (m_pipeline_delay_decode_words || m_pipeline_xc_active || m_slot[2].block_body))
+			{
+				logerror("%s: staged MVDP repeat/control-delay composition is unsupported\n", machine().describe_context()); m_illegal = true; return;
+			}
+			if (m_slot[2].valid && staged_write_a(word) && (m_pipeline_delay_decode_words || m_pipeline_xc_active || m_slot[2].block_body))
+			{
+				logerror("%s: staged WRITA repeat/control-delay composition is unsupported instruction=%06x word=%04x repeat=%u delay=%u xc=%u block=%u\n",
+					machine().describe_context(), unsigned(m_slot[2].address), word, unsigned(m_pipeline_repeat_active),
+					m_pipeline_delay_decode_words, unsigned(m_pipeline_xc_active), unsigned(m_slot[2].block_body)); m_illegal = true; return;
+			}
+			bool const accumulator_status_move = (word == 0x7308 || word == 0x730b) && m_slot[2].immediate == 7;
+			bool const brc_move = direct_move && m_slot[2].immediate == 0x1a;
+			if (m_slot[2].valid && word == 0x721a &&
+				(m_pipeline_block_active || BIT(m_st1,15) || m_pipeline_repeat_active ||
+				 m_pipeline_delay_decode_words || completing_move_delay || m_pipeline_xc_active))
+			{
+				logerror("%s: staged MVDM BRC active-loop or control composition is unsupported\n",machine().describe_context());
+				m_illegal=true;return;
+			}
+			// staged_move(word) is implied; spelled out as this check's opcode test.
+			bool const clock_move = staged_move(word) && staged_clock_destination_move(word, m_slot[2].immediate);
+			if (m_slot[2].valid && clock_move && (completing_move_delay || m_pipeline_delay_decode_words || m_pipeline_xc_active || m_slot[2].block_body || m_pipeline_repeat_active))
+			{
+				logerror("%s: staged CLKMD move repeat/control composition is unsupported\n", machine().describe_context()); m_illegal = true; return;
+			}
+			bool const ordinary_delay_brc_move = completing_move_delay && m_pipeline_control_word != 0xf272;
+			if (m_slot[2].valid && brc_move && ((!ordinary_delay_brc_move && (completing_move_delay || m_pipeline_delay_decode_words)) || m_slot[2].block_body))
+			{
+				logerror("%s: staged memory move BRC in repeat body or control delay is unsupported\n", machine().describe_context()); m_illegal = true; return;
+			}
+			if (m_slot[2].valid && direct_move && !brc_move && !clock_move && !accumulator_status_move && !staged_accumulator_destination_move(word, m_slot[2].immediate) && !staged_t_register_move(word, m_slot[2].immediate) && m_slot[2].immediate < 0x60 &&
+				(m_slot[2].immediate < 0x10 || m_slot[2].immediate > 0x19))
+			{
+				logerror("%s: staged memory move control/peripheral destination is unsupported instruction=%06x word=%04x destination=%04x\n", machine().describe_context(), unsigned(m_slot[2].address), word, m_slot[2].immediate);
+				m_illegal = true;
+				return;
+			}
+			bool const addm_brc = word == 0x6bf8 && m_slot[2].operand_address == 0x1a;
+			if (m_slot[2].valid && addm_brc && (m_pipeline_block_active || BIT(m_st1, 15) || m_pipeline_repeat_active || m_pipeline_delay_decode_words))
+			{
+				logerror("%s: staged ADDM BRC active-loop or delay composition is unsupported\n", machine().describe_context()); m_illegal = true; return;
+			}
+			if (m_slot[2].valid && word == 0x6bf8 && m_slot[2].operand_address < 0x60 &&
+				(m_slot[2].operand_address < 0x10 || m_slot[2].operand_address > 0x18) && m_slot[2].operand_address != 0x0e && !addm_brc)
+			{
+				logerror("%s: staged ADDM register/peripheral destination is unsupported instruction=%06x word=%04x destination=%04x\n", machine().describe_context(), unsigned(m_slot[2].address), word, m_slot[2].operand_address);
+				m_illegal = true; return;
+			}
+			if (m_slot[2].valid && staged_shifted_smem(word) && (m_slot[2].immediate & 0xfee0) != 0x0c40 && !staged_shifted_memory_store(word, m_slot[2].immediate) && !staged_shifted_memory_arithmetic(m_slot[2].immediate))
+			{
+				logerror("%s: unsupported staged Smem extension %04x/%04x instruction=%06x last_fetch_physical=%06x\n", machine().describe_context(), word, m_slot[2].immediate, unsigned(m_slot[2].address), unsigned(m_slot[2].physical_address));
+				m_illegal = true; return;
+			}
+			if (m_slot[2].valid && staged_direct_push(word) && u8(word) >= 0x80 &&
+				(m_pipeline_delay_decode_words || m_pipeline_repeat_active || m_pipeline_xc_active || m_slot[2].block_body))
+			{
+				logerror("%s: staged indirect PSHM control/repeat composition is unsupported\n", machine().describe_context()); m_illegal = true; return;
+			}
+			if (m_slot[2].valid && (staged_extended_push(word) || staged_extended_pop(word)) && (m_pipeline_xc_active || m_slot[2].block_body))
+			{
+				logerror("%s: staged extended stack conditional/block composition is unsupported\n", machine().describe_context()); m_illegal = true; return;
+			}
+			if (m_slot[2].valid && (word == 0x8a00 || word == 0x8a01) &&
+				(decoding_control_delay || m_pipeline_repeat_active || m_pipeline_xc_active || m_slot[2].block_body))
+			{
+				logerror("%s: staged interrupt-register POPM repeat/control composition is unsupported\n", machine().describe_context()); m_illegal = true; return;
+			}
+			if (word >= 0x8a1a && word <= 0x8a1c && m_pipeline_block_active && m_slot[2].block_body)
+			{
+				logerror("%s: staged POPM active repeat-control write is unsupported instruction=%06x word=%04x\n", machine().describe_context(), unsigned(m_slot[2].address), word);
+				m_illegal = true; return;
+			}
 		}
 		bool const branch = fact(decode_fact::near_branch) || (m_extended_program && fact(decode_fact::far_branch));
 		bool const block_setup = fact(decode_fact::block_setup);
@@ -2258,30 +2270,33 @@ void tms320c54x_device::pipeline_step()
 			m_pipeline_repeat_address = m_slot[2].address;
 			m_slot[0].valid = m_slot[1].valid = false;
 		}
-		if (m_slot[2].valid && staged_xc(word))
+		if (BIT(decode_gates, 2)) // decode gate 2
 		{
-			// XC 1 also protects two following words (SPRU172C 4-199).
-			m_pipeline_xc_active = true;
-			m_pipeline_xc_end = (m_slot[2].address & 0x7f0000) | u16(m_slot[2].address + 2);
-			if (block_word && !BIT(word, 9) && m_slot[2].address + 1 == m_pipeline_block_end_address && m_brc)
-				// XC 1 selects the endpoint only, but protects the next executed
-				// word too: the repeat's first word, not abandoned fall-through.
-				m_pipeline_xc_end = (m_slot[2].address & 0x7f0000) | u16(m_pipeline_block_start);
-			if (retd_delay_decode)
-				// XC protection counts resumed instruction words, not the
-				// abandoned sequential address beyond RETD's delay window.
-				m_pipeline_xc_end = (m_pipeline_retd_target & 0x7f0000) | u16(m_pipeline_retd_target + retd_delay_index);
-		}
-		if (m_slot[2].valid && staged_idle(word))
-		{
-			// IDLE is a decode barrier: older slots drain, younger words
-			// are discarded and refetched only after the wake boundary.
-			m_pipeline_idle_barrier = true;
-			m_pipeline_idle_resume_address = (m_slot[2].address & 0x7f0000) | u16(m_slot[2].address + 1);
-			m_pipeline_control_address = m_slot[2].address;
-			m_pipeline_control_word = word;
-			m_pipeline_control_words = 1;
-			m_slot[0].valid = m_slot[1].valid = false;
+			if (m_slot[2].valid && staged_xc(word))
+			{
+				// XC 1 also protects two following words (SPRU172C 4-199).
+				m_pipeline_xc_active = true;
+				m_pipeline_xc_end = (m_slot[2].address & 0x7f0000) | u16(m_slot[2].address + 2);
+				if (block_word && !BIT(word, 9) && m_slot[2].address + 1 == m_pipeline_block_end_address && m_brc)
+					// XC 1 selects the endpoint only, but protects the next executed
+					// word too: the repeat's first word, not abandoned fall-through.
+					m_pipeline_xc_end = (m_slot[2].address & 0x7f0000) | u16(m_pipeline_block_start);
+				if (retd_delay_decode)
+					// XC protection counts resumed instruction words, not the
+					// abandoned sequential address beyond RETD's delay window.
+					m_pipeline_xc_end = (m_pipeline_retd_target & 0x7f0000) | u16(m_pipeline_retd_target + retd_delay_index);
+			}
+			if (m_slot[2].valid && staged_idle(word))
+			{
+				// IDLE is a decode barrier: older slots drain, younger words
+				// are discarded and refetched only after the wake boundary.
+				m_pipeline_idle_barrier = true;
+				m_pipeline_idle_resume_address = (m_slot[2].address & 0x7f0000) | u16(m_slot[2].address + 1);
+				m_pipeline_control_address = m_slot[2].address;
+				m_pipeline_control_word = word;
+				m_pipeline_control_words = 1;
+				m_slot[0].valid = m_slot[1].valid = false;
+			}
 		}
 		if (m_slot[2].valid && (fast_return || plain_return || delayed_return || far_return || branch || block_setup))
 		{
