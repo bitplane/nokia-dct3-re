@@ -1095,7 +1095,15 @@ it hears. Twelve seconds after the answer it hangs up, and the bridge
 forwards the BYE as `incoming_call_terminate`. MAME runs throttled, since
 RTP runs in real time. During the call the emulation reaches only about
 40 % of real time (2.0 emulated seconds in 5.0 wall seconds), so the talk
-window is in wall time and long enough for the bridge's 100 frames. A run
+window is in wall time and long enough for the bridge's 100 frames.
+
+The host time is the C54x pipeline model: about 80 % of a profile, spread
+over its per-cycle opcode tests with no single hot spot (the DSP's IDLE
+is already skipped, so every modelled cycle is an executed one).
+`make build-pgo` recompiles that one object under profile-guided
+optimisation, trained on the traffic call. The connected call then costs
+7.2 host seconds per 4 emulated seconds, about 56 % of real time, and a
+whole host-call run 31.2 s of CPU instead of 38.7 s. A run
 gives 239 uplink and 581 downlink frames, and 0.65 of the remote
 recording's energy is the 500 Hz microphone tone.
 
