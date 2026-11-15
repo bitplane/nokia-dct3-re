@@ -3,7 +3,7 @@
 
 Most of pipeline_step's guarded blocks act on an older instruction in Access,
 Read or Execute (stages 3-5) and begin with a test of that instruction's
-opcode, for example `m_pipeline_valid[3] && staged_move(m_pipeline_word[3])`.
+opcode, for example `m_slot[3].valid && staged_move(m_slot[3].word)`.
 Those words cannot change during a clock, so a run of such blocks can be
 skipped with one test when no block's opcode test holds.
 
@@ -15,7 +15,7 @@ In the source, a gated run is wrapped as
 	}
 
 For every block in gate N this tool takes the first conjunct of its condition
-that depends on exactly one of m_pipeline_word[3..5] and nothing else (pure
+that depends on exactly one of m_slot[3..5].word and nothing else (pure
 opcode predicates and constants), provided every earlier conjunct is free of
 side effects. It writes cpu/tms320c54x/tms320c54x_gates.h, whose tables give,
 for each stage and opcode, the gates in which some block's opcode test holds.
@@ -110,12 +110,12 @@ def strip_comments(text):
 def opcode_test(condition, pure):
     """(stage, expression in `word`) for the block's gating conjunct, or None."""
     for term in conjuncts(strip_comments(condition)):
-        stages = set(re.findall(r'm_pipeline_word\[(\d)\]', term))
-        rest = re.sub(r'm_pipeline_word\[\d\]', '', term)
+        stages = set(re.findall(r'm_slot\[(\d)\]\.word', term))
+        rest = re.sub(r'm_slot\[\d\]\.word', '', term)
         names = set(re.findall(r'[A-Za-z_]\w*', rest)) - pure
         names = {name for name in names if not re.fullmatch(r'x[0-9a-fA-F]+', name)}
         if len(stages) == 1 and stages <= set('345') and not names:
-            return int(stages.pop()), re.sub(r'm_pipeline_word\[\d\]', 'word', term)
+            return int(stages.pop()), re.sub(r'm_slot\[\d\]\.word', 'word', term)
         # Any call other than a pure predicate may have side effects: the
         # original evaluation order must then decide the block alone.
         calls = set(re.findall(r'([A-Za-z_]\w*)\s*\(', re.sub(r'm_\w+', '', term))) - pure

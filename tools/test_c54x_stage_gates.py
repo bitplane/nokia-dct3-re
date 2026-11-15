@@ -15,32 +15,32 @@ def source(*blocks):
 
 class OpcodeTestTest(unittest.TestCase):
     def test_takes_the_first_word_only_conjunct(self):
-        self.assertEqual(opcode_test('m_pipeline_valid[3] && staged_move(m_pipeline_word[3]) && m_x', PURE),
+        self.assertEqual(opcode_test('m_slot[3].valid && staged_move(m_slot[3].word) && m_x', PURE),
                          (3, 'staged_move(word)'))
 
     def test_accepts_masks_and_disjunctions(self):
-        self.assertEqual(opcode_test('m_pipeline_valid[4] && ((m_pipeline_word[4] & 0xfff8) == 0x7688 || staged_banz(m_pipeline_word[4]))', PURE),
+        self.assertEqual(opcode_test('m_slot[4].valid && ((m_slot[4].word & 0xfff8) == 0x7688 || staged_banz(m_slot[4].word))', PURE),
                          (4, '((word & 0xfff8) == 0x7688 || staged_banz(word))'))
 
     def test_rejects_a_test_after_a_call_with_side_effects(self):
-        self.assertIsNone(opcode_test('pipeline_execute() && staged_move(m_pipeline_word[3])', PURE))
+        self.assertIsNone(opcode_test('pipeline_execute() && staged_move(m_slot[3].word)', PURE))
 
     def test_rejects_decode_stage_and_mixed_words(self):
-        self.assertIsNone(opcode_test('m_pipeline_valid[2] && staged_move(m_pipeline_word[2])', PURE))
-        self.assertIsNone(opcode_test('m_pipeline_word[3] == m_pipeline_word[4]', PURE))
+        self.assertIsNone(opcode_test('m_slot[2].valid && staged_move(m_slot[2].word)', PURE))
+        self.assertIsNone(opcode_test('m_slot[3].word == m_slot[4].word', PURE))
 
     def test_rejects_a_test_that_reads_other_state(self):
-        self.assertIsNone(opcode_test('staged_move(m_pipeline_word[3]) == m_flag', PURE))
+        self.assertIsNone(opcode_test('staged_move(m_slot[3].word) == m_flag', PURE))
 
 
 class GateParseTest(unittest.TestCase):
     def test_collects_each_blocks_test(self):
-        text = source('\t\tif (m_pipeline_valid[3] && staged_move(m_pipeline_word[3]))\n\t\t\tx = 1;',
-                      '\t\tif (m_pipeline_valid[5] && u8(m_pipeline_word[5]) == 0xf8)\n\t\t{\n\t\t\ty();\n\t\t}')
+        text = source('\t\tif (m_slot[3].valid && staged_move(m_slot[3].word))\n\t\t\tx = 1;',
+                      '\t\tif (m_slot[5].valid && u8(m_slot[5].word) == 0xf8)\n\t\t{\n\t\t\ty();\n\t\t}')
         self.assertEqual(gates(text, PURE), {0: [(3, 'staged_move(word)'), (5, 'u8(word) == 0xf8')]})
 
     def test_rejects_an_else(self):
-        text = source('\t\tif (staged_move(m_pipeline_word[3]))\n\t\t\tx = 1;\n\t\telse\n\t\t\tx = 2;')
+        text = source('\t\tif (staged_move(m_slot[3].word))\n\t\t\tx = 1;\n\t\telse\n\t\t\tx = 2;')
         with self.assertRaisesRegex(ValueError, 'else'):
             gates(text, PURE)
 
@@ -49,7 +49,7 @@ class GateParseTest(unittest.TestCase):
             gates(source('\t\tif (m_flag)\n\t\t\tx = 1;'), PURE)
 
     def test_rejects_a_statement_between_blocks(self):
-        text = source('\t\tx = 0;', '\t\tif (staged_move(m_pipeline_word[3]))\n\t\t\tx = 1;')
+        text = source('\t\tx = 0;', '\t\tif (staged_move(m_slot[3].word))\n\t\t\tx = 1;')
         with self.assertRaisesRegex(ValueError, 'outside its blocks'):
             gates(text, PURE)
 

@@ -300,20 +300,8 @@ private:
 	bool m_illegal = false;
 	// Prefetch, Fetch, Decode, Access, Read, Execute. Addresses and words are
 	// owned by their slots; no speculative instruction executes at acceptance.
-	std::array<u32, 6> m_pipeline_address = {};
-	std::array<u32, 6> m_pipeline_physical_address = {};
-	std::array<u16, 6> m_pipeline_word = {};
-	std::array<bool, 6> m_pipeline_annulled = {};
-	std::array<u16, 6> m_pipeline_operand_address = {};
-	std::array<u16, 6> m_pipeline_operand = {};
-	std::array<u16, 6> m_pipeline_immediate = {};
 	// Original first extension for three-word diagnostic tuples; DAGEN may
 	// subsequently replace operand_address with the resolved address.
-	std::array<u16, 6> m_pipeline_extension_first = {};
-	std::array<bool, 6> m_pipeline_valid = {};
-	std::array<bool, 6> m_pipeline_block_first_final = {};
-	std::array<bool, 6> m_pipeline_block_end = {};
-	std::array<bool, 6> m_pipeline_block_body = {};
 	bool m_pipeline_decode_block_body = false;
 	bool m_pipeline_block_active = false;
 	bool m_pipeline_block_fetch_enabled = false;
@@ -321,21 +309,9 @@ private:
 	u32 m_pipeline_block_start = 0;
 	u32 m_pipeline_block_end_address = 0;
 	u32 m_pipeline_block_fetch_remaining = 0;
-	std::array<bool, 6> m_pipeline_early_write_deferred = {};
-	std::array<bool, 6> m_pipeline_peripheral_wait_paid = {};
 	bool m_pipeline_peripheral_read_pending = false;
-	std::array<bool, 6> m_pipeline_io_wait_paid = {};
 	u8 m_pipeline_io_wait_remaining = 0;
 	bool m_pipeline_io_ready_required = false;
-	std::array<bool, 6> m_pipeline_intm_protected = {};
-	std::array<u16, 6> m_pipeline_direct_status = {};
-	std::array<u16, 6> m_pipeline_alu_mode = {};
-	std::array<u16, 6> m_pipeline_t = {};
-	std::array<bool, 6> m_pipeline_cmpt = {};
-	std::array<u16, 6> m_pipeline_bk = {};
-	std::array<u16, 6> m_pipeline_direct_sp = {};
-	std::array<u8, 6> m_pipeline_far_call_page = {};
-	std::array<u16, 6> m_pipeline_far_call_stack = {};
 	u16 m_pipeline_compiler_sp_previous = 0;
 	u8 m_pipeline_compiler_sp_wait = 0;
 	bool m_pipeline_idle_barrier = false;
@@ -409,6 +385,36 @@ private:
 		std::map<std::array<u16, 4>, extension_observation> extensions;
 		u64 dropped_tuples = 0;
 	};
+	// Each pipeline stage's slot: the instruction it holds and what that
+	// instruction has sampled so far. Slots move one stage older per clock.
+	struct stage_slot
+	{
+		u32 address = {};
+		u32 physical_address = {};
+		u16 word = {};
+		u16 operand_address = {};
+		u16 operand = {};
+		u16 immediate = {};
+		u16 extension_first = {};
+		u16 direct_status = {};
+		u16 alu_mode = {};
+		u16 t = {};
+		u16 bk = {};
+		u16 direct_sp = {};
+		u16 far_call_stack = {};
+		u8 far_call_page = {};
+		bool valid = {};
+		bool block_first_final = {};
+		bool block_end = {};
+		bool block_body = {};
+		bool annulled = {};
+		bool early_write_deferred = {};
+		bool peripheral_wait_paid = {};
+		bool io_wait_paid = {};
+		bool intm_protected = {};
+		bool cmpt = {};
+	};
+	std::array<stage_slot, 6> m_slot = {};
 	std::unique_ptr<opcode_coverage> m_coverage;
 	// Development state-trace oracle (see start_state_trace); off unless set.
 	std::FILE *m_state_trace = nullptr;

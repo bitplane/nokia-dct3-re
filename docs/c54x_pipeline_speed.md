@@ -51,9 +51,13 @@ and `make check-c54x-state-trace` checks each change over the whole call
   generator reads, and the generator refuses a test that reads anything
   but `m_op`. `--convert-chain LINE` performed the conversion, keeping
   every comment.
-- **Stage advance.** Each clock moves all 24 per-stage fields one stage
-  older. Each field's six slots are now copied as one small value and
-  stored back shifted, instead of moving 120 elements one at a time.
+- **Stage slots.** Each clock moves every stage one older. The 24
+  per-stage arrays (`m_pipeline_word[k]` and the rest) are now one
+  `stage_slot` struct per stage (`m_slot[k].word`), moved with a single
+  fixed-size copy instead of 120 element moves. Save states register each
+  field with `STRUCT_MEMBER`, so states saved before this change do not
+  load. `make verify-5110-lab-traffic-state` round-trips the call three
+  times.
 
 | Change | Host-call run CPU (s), no PGO |
 | --- | ---: |
@@ -62,3 +66,5 @@ and `make check-c54x-state-trace` checks each change over the whole call
 | Stage gates (24 gates, 82 blocks) | 29.6 |
 | Execute dispatch (76 cases) | 27.2 |
 | Stage advance | 26.7 |
+| ARM flash trace hooks | 26.0 |
+| Stage slots | 25.7 |

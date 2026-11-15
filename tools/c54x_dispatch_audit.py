@@ -401,7 +401,7 @@ def audit(source_path, header, directory, compiler='g++', library=None, callee='
                for i in range(len(reader.words)-7)):
         raise ValueError('the residual opcode parameter must be const for this proof')
     execute, step, residual = [reader.function(name) for name in ('pipeline_execute', 'pipeline_step', callee)]
-    gate = ('m_pipeline_valid [ 2 ] && ! BIT ( staged_opcode_descriptor [ word ] , '
+    gate = ('m_slot [ 2 ] . valid && ! BIT ( staged_opcode_descriptor [ word ] , '
             'm_extended_program ? 5 : 4 ) && ! staged_bus_control ( word )')
     admission = [node for node in reader.walk(step) if node.kind == 'if' and node.expression == gate]
     if len(admission) != 1:
