@@ -87,3 +87,28 @@ followed by two host-call runs.
 | Inline slot moves; flash hook test at the call | 24.0 |
 | 32-bit ARM flash reads (no unit splitter) | 23.8 |
 | PMST read directly on DSP program fetches | 23.1 |
+
+## Where it stands
+
+With `make build-pgo`, the native traffic call's connected segment (23-27 s
+emulated) costs about 4.7 CPU seconds per 4 emulated seconds, about 85 % of
+real time. It was 40 % before this work: 56 % from PGO alone, the rest from
+the steps above. The host executes about 1,400 instructions per DSP clock,
+down from about 2,160.
+
+These tried and made no measurable difference:
+
+- Bit tests from a per-opcode table for single opcode checks, without
+  skipping any.
+- `-march=native` for the core.
+- PGO across the ARM core, the board devices and the scheduler as well.
+- Native 32-bit ARM RAM handlers.
+- A read-array fast path past the flash device's virtual read.
+- Gating the decode block's guards, because state-dependent locals
+  interleave them.
+- 16-byte alignment of the stage slots.
+
+What remains is spread thinly. The largest pieces are `pipeline_step`'s
+per-clock bookkeeping and decode guards (about a third of the process, no
+line above 2 %), `pipeline_execute`'s bodies, peripheral arbitration and
+the pending-transfer checks (2-3 % each), and the MCU's own execution.
