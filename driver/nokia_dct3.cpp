@@ -996,7 +996,9 @@ void nokia_dct3_state::dsp_ram_w(offs_t offset, uint16_t data, uint16_t mem_mask
 uint16_t nokia_dct3_state::flash_r(offs_t offset, uint16_t mem_mask)
 {
 #if DCT3_RESEARCH_TRACES
-	const u32 pc = m_maincpu->pc();
+	// Every ARM flash access passes here; read the PC directly, not through
+	// the generic state table.
+	const u32 pc = downcast<arm7_cpu_device &>(*m_maincpu).current_pc();
 	const u32 addr = NOKIA_FLASH1_BASE + (offset << 1);
 	flash_firmware_traces(pc, addr);
 #endif

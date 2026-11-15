@@ -1,0 +1,29 @@
+diff --git a/src/devices/cpu/arm7/arm7.h b/src/devices/cpu/arm7/arm7.h
+--- a/src/devices/cpu/arm7/arm7.h
++++ b/src/devices/cpu/arm7/arm7.h
+@@ -32,6 +32,10 @@
+ class arm7_cpu_device : public cpu_device, public arm7_disassembler::config
+ {
+ public:
++	// The address of the instruction being executed, without a state-table
++	// lookup: trace hooks query it on every memory access.
++	uint32_t current_pc() const;
++
+ 	enum
+ 	{
+ 		ARM7_IRQ_LINE=0, ARM7_FIRQ_LINE,
+diff --git a/src/devices/cpu/arm7/arm7.cpp b/src/devices/cpu/arm7/arm7.cpp
+--- a/src/devices/cpu/arm7/arm7.cpp
++++ b/src/devices/cpu/arm7/arm7.cpp
+@@ -1094,6 +1094,11 @@
+ 	save_item(NAME(DTCM));
+ }
+ 
++uint32_t arm7_cpu_device::current_pc() const
++{
++	return GET_PC;
++}
++
+ void arm7_cpu_device::state_export(const device_state_entry &entry)
+ {
+ 	switch (entry.index())

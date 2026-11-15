@@ -68,7 +68,8 @@ uint32_t nokia_dct3_state::fw_dword(offs_t address) const
 
 void nokia_dct3_state::flash_firmware_traces(u32 pc, u32 addr)
 {
-	if (!m_trace_enabled)
+	// Every hook below observes the fetch of its own instruction.
+	if (!m_trace_enabled || pc != addr)
 		return;
 	// NHM-6 relocates the NSE-8 five-digit phone-code verifier. Observe its
 	// transformed attempt and four-byte PMM-derived comparison record.
