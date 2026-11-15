@@ -2034,6 +2034,8 @@ void tms320c54x_device::pipeline_step()
 			m_pipeline_valid[2] = false;
 		}
 		u16 const word = m_pipeline_word[2];
+		u64 const facts = decode_facts[word];
+		auto const fact = [facts](decode_fact f) { return bool(BIT(facts, unsigned(f))); };
 		if (m_pipeline_valid[2] && staged_program_coefficient(word) &&
 			(m_pipeline_xc_active || m_pipeline_block_body[2] || m_pipeline_control_words ||
 			 (m_pipeline_repeat_active && !staged_pipelined_repeat(word))))
@@ -2059,12 +2061,12 @@ void tms320c54x_device::pipeline_step()
 		{
 			logerror("%s: staged control-delay Smem extension is not an admitted shifted load instruction=%06x word=%04x operation=%04x\n", machine().describe_context(), unsigned(m_pipeline_address[2]), word, m_pipeline_immediate[2]); m_illegal = true; return;
 		}
-		bool const software_intr = staged_software_intr(word);
+		bool const software_intr = fact(decode_fact::software_intr);
 		if (m_pipeline_valid[2] && staged_shifted_smem(word) && (word & 0xf8) == 0x98 && ((m_pipeline_immediate[2] & 0xfee0) == 0x0c40 || staged_shifted_memory_arithmetic(m_pipeline_immediate[2])))
 		{
 			logerror("%s: short MOD=3 is write-only, not a shifted memory source\n", machine().describe_context()); m_illegal = true; return;
 		}
-		bool const short_repeat = staged_short_repeat(word);
+		bool const short_repeat = fact(decode_fact::short_repeat);
 		if (m_pipeline_valid[2] && (short_repeat || (staged_memory_repeat(word) && word != 0x47f8)))
 		{
 			if (m_pipeline_repeat_active) { logerror("%s: nested staged repeat is unsupported\n", machine().describe_context()); m_illegal = true; return; }
@@ -2073,8 +2075,6 @@ void tms320c54x_device::pipeline_step()
 		}
 		// Register/immediate loads, short loads, DP stores and bounded RMW forms.
 		// Other memory/control forms need Access/Read/redirect ownership first.
-		bool const short_load = staged_memory_load(word);
-		bool const direct_store = staged_store(word) || staged_accumulator_mmr_store(word);
 		bool const early_braf_clear = word == 0x7707 && pipeline_early_braf_clear(2, m_pipeline_immediate[2]);
 		if (m_pipeline_valid[2] && ((word & 0xfeff) == 0x8807 || word == 0x7707) &&
 			(m_pipeline_delay_decode_words || m_pipeline_repeat_active || m_pipeline_xc_active || (m_pipeline_block_body[2] && !early_braf_clear)))
@@ -2093,22 +2093,17 @@ void tms320c54x_device::pipeline_step()
 		{
 			logerror("%s: staged BSP STLM control/repeat composition is unsupported\n", machine().describe_context()); m_illegal = true; return;
 		}
-		bool const direct_long_load = staged_dld(word);
-		bool const direct_long_store = staged_dst(word);
-		bool const long_arithmetic = staged_long_arithmetic(word);
-		bool const memory_dp = staged_memory_dp(word);
-		bool const direct_move = staged_move(word);
-		bool const data_copy = staged_data_copy(word) || staged_delay_copy(word);
+		bool const direct_move = fact(decode_fact::direct_move);
 		if (m_pipeline_valid[2] && staged_delay_copy(word) && (m_pipeline_repeat_active || m_pipeline_xc_active || m_pipeline_block_body[2]))
 		{
 			logerror("%s: staged LTD/DELAY repeat/block/XC composition is unsupported\n", machine().describe_context()); m_illegal = true; return;
 		}
-		bool const program_move = staged_program_move(word);
+		bool const program_move = fact(decode_fact::program_move);
 		if (m_pipeline_valid[2] && staged_extended_program_move(word) && (m_pipeline_xc_active || m_pipeline_block_body[2]))
 		{
 			logerror("%s: staged extended MVPD block/XC composition is unsupported\n", machine().describe_context()); m_illegal = true; return;
 		}
-		bool const read_a = staged_read_a(word) || staged_write_a(word) || staged_data_to_program(word);
+		bool const read_a = fact(decode_fact::read_a);
 		if (m_pipeline_valid[2] && staged_read_a(word) && u8(word) >= 0xe0 && u8(word) != 0xf8 &&
 			(m_pipeline_delay_decode_words || m_pipeline_repeat_active || m_pipeline_xc_active || m_pipeline_block_body[2]))
 		{
@@ -2150,9 +2145,7 @@ void tms320c54x_device::pipeline_step()
 			m_illegal = true;
 			return;
 		}
-		bool const immediate_store = (word & 0xff00) == 0x7600 && (u8(word) == 0xf8 || u8(word) < 0xa0 || staged_indexed_immediate_store(word) || staged_extended_immediate_store(word));
-		bool const rmw = staged_rmw(word) && staged_rmw_addressing(word);
-		bool const fast_return = word == 0xf49b || word == 0xf69b;
+		bool const fast_return = fact(decode_fact::fast_return);
 		bool const addm_brc = word == 0x6bf8 && m_pipeline_operand_address[2] == 0x1a;
 		if (m_pipeline_valid[2] && addm_brc && (m_pipeline_block_active || BIT(m_st1, 15) || m_pipeline_repeat_active || m_pipeline_delay_decode_words))
 		{
@@ -2164,17 +2157,16 @@ void tms320c54x_device::pipeline_step()
 			logerror("%s: staged ADDM register/peripheral destination is unsupported instruction=%06x word=%04x destination=%04x\n", machine().describe_context(), unsigned(m_pipeline_address[2]), word, m_pipeline_operand_address[2]);
 			m_illegal = true; return;
 		}
-		bool const plain_return = word == 0xfc00 || word == 0xf4eb || staged_conditional_return(word);
-		bool const delayed_return = word == 0xfe00 || staged_delayed_conditional_return(word);
-		bool const far_return = (word & 0xfdfe) == 0xf4e4;
-		bool const intm_bit = word == 0xf6bb || word == 0xf7bb;
-		bool const smem_arithmetic = staged_smem_arithmetic(word) || staged_smem_special(word) || staged_shifted_smem(word);
+		bool const plain_return = fact(decode_fact::plain_return);
+		bool const delayed_return = fact(decode_fact::delayed_return);
+		bool const far_return = fact(decode_fact::far_return);
+		bool const intm_bit = fact(decode_fact::intm_bit);
 		if (m_pipeline_valid[2] && staged_shifted_smem(word) && (m_pipeline_immediate[2] & 0xfee0) != 0x0c40 && !staged_shifted_memory_store(word, m_pipeline_immediate[2]) && !staged_shifted_memory_arithmetic(m_pipeline_immediate[2]))
 		{
 			logerror("%s: unsupported staged Smem extension %04x/%04x instruction=%06x last_fetch_physical=%06x\n", machine().describe_context(), word, m_pipeline_immediate[2], unsigned(m_pipeline_address[2]), unsigned(m_pipeline_physical_address[2]));
 			m_illegal = true; return;
 		}
-		bool const data_push = (word & 0xff00) == 0x4b00 && (u8(word) < 0x98 || staged_extended_push(word));
+		bool const data_push = fact(decode_fact::data_push);
 		if (m_pipeline_valid[2] && staged_direct_push(word) && u8(word) >= 0x80 &&
 			(m_pipeline_delay_decode_words || m_pipeline_repeat_active || m_pipeline_xc_active || m_pipeline_block_body[2]))
 		{
@@ -2184,7 +2176,6 @@ void tms320c54x_device::pipeline_step()
 		{
 			logerror("%s: staged extended stack conditional/block composition is unsupported\n", machine().describe_context()); m_illegal = true; return;
 		}
-		bool const data_pop = (word & 0xff00) == 0x8b00 && (u8(word) < 0x98 || staged_extended_pop(word));
 		if (m_pipeline_valid[2] && (word == 0x8a00 || word == 0x8a01) &&
 			(decoding_control_delay || m_pipeline_repeat_active || m_pipeline_xc_active || m_pipeline_block_body[2]))
 		{
@@ -2195,50 +2186,54 @@ void tms320c54x_device::pipeline_step()
 			logerror("%s: staged POPM active repeat-control write is unsupported instruction=%06x word=%04x\n", machine().describe_context(), unsigned(m_pipeline_address[2]), word);
 			m_illegal = true; return;
 		}
-		bool const branch = staged_banz(word) || staged_block_repeat(word) || word == 0xf073 || word == 0xf273 || staged_conditional_branch(word) || staged_call(word) || staged_accumulator_near_call(word) || staged_accumulator_near_branch(word) || (m_extended_program && (staged_far_branch(word) || staged_far_call(word) || staged_accumulator_far_call(word) || staged_accumulator_far_branch(word)));
-		bool const block_setup = staged_block_repeat(word);
+		bool const branch = fact(decode_fact::near_branch) || (m_extended_program && fact(decode_fact::far_branch));
+		bool const block_setup = fact(decode_fact::block_setup);
 		bool const block_word = m_pipeline_block_body[2];
-		u32 const block_branch_target = (m_pipeline_address[2] & 0x7f0000) | m_pipeline_operand[2];
-		bool const internal_block_branch = (word == 0xf073 || (staged_banz(word) && !BIT(word, 9)) || (staged_conditional_branch(word) && !staged_conditional_call(word) && !BIT(word, 9))) &&
-			m_pipeline_address[2] + (staged_extended_banz(word) ? 2 : 1) < m_pipeline_block_end_address && block_branch_target >= m_pipeline_block_start && block_branch_target <= m_pipeline_block_end_address;
-		bool const forward_block_exit = (word == 0xf073 || (staged_conditional_branch(word) && !staged_conditional_call(word) && !BIT(word, 9))) &&
-			(m_pipeline_address[2] + 1 < m_pipeline_block_end_address ||
-			 (staged_conditional_branch(word) && m_pipeline_address[2] + 1 == m_pipeline_block_end_address)) &&
-			block_branch_target > m_pipeline_block_end_address;
-		// A conditional BCD may also end its delay words at REA: the endpoint keeps
-		// its Decode-owned BRC decrement and the retained branch redirect wins.
-		bool const delayed_forward_block_exit = ((word == 0xf273 || (staged_accumulator_branch(word) && !staged_conditional_call(word) && BIT(word, 9))) &&
-			m_pipeline_address[2] + 3 < m_pipeline_block_end_address && block_branch_target > m_pipeline_block_end_address) ||
-			((staged_accumulator_branch(word) || staged_tc_branch(word)) && !staged_conditional_call(word) && BIT(word, 9) &&
-			 m_pipeline_address[2] + 3 == m_pipeline_block_end_address && block_branch_target > m_pipeline_block_end_address);
-		bool const internal_delayed_block_branch = (word == 0xf273 || ((staged_accumulator_branch(word) || staged_tc_branch(word) || (word & 0xfdfb) == 0xf808 || (word & 0xfde7) == 0xf860) && !staged_conditional_call(word) && BIT(word, 9))) &&
-			m_pipeline_address[2] + 3 < m_pipeline_block_end_address && block_branch_target >= m_pipeline_block_start && block_branch_target <= m_pipeline_block_end_address;
-		u32 const far_call_target = (u32(word & 0x7f) << 16) | m_pipeline_operand[2];
-		bool const block_far_call = staged_far_call(word) &&
-			(BIT(word, 9) ? m_pipeline_address[2] + 3 <= m_pipeline_block_end_address : m_pipeline_address[2] + 1 < m_pipeline_block_end_address) &&
-			(far_call_target < m_pipeline_block_start || far_call_target > m_pipeline_block_end_address);
-		bool const block_conditional_call = staged_conditional_call(word) && !staged_tc_branch(word) && BIT(word, 9) &&
-			m_pipeline_address[2] + 3 <= m_pipeline_block_end_address &&
-			(block_branch_target < m_pipeline_block_start || block_branch_target > m_pipeline_block_end_address);
-		bool const block_near_call = staged_call(word) &&
-			m_pipeline_address[2] + (BIT(word, 9) ? 3 : 1) <= m_pipeline_block_end_address &&
-			(block_branch_target < m_pipeline_block_start || block_branch_target > m_pipeline_block_end_address);
-		bool const internal_block_xc = staged_xc(word) && m_pipeline_address[2] + (BIT(word, 9) ? 2 : 1) <= m_pipeline_block_end_address;
-		bool const internal_memory_repeat = staged_memory_repeat(word) &&
-			m_pipeline_address[2] + (word == 0x47f8 ? 2 : 1) <= m_pipeline_block_end_address;
-		bool const internal_immediate_repeat = staged_immediate_repeat(word) && m_pipeline_address[2] + 2 <= m_pipeline_block_end_address;
-		bool const internal_conditional_return = staged_conditional_return(word) && m_pipeline_address[2] < m_pipeline_block_end_address;
-		// Direct STLM 60..7f writes ordinary RAM, not loop-control state.
-		if (m_pipeline_valid[2] && block_word && ((branch && !internal_block_branch && !forward_block_exit && !delayed_forward_block_exit && !internal_delayed_block_branch && !block_far_call && !block_conditional_call && !block_near_call) || software_intr || block_setup || (plain_return && !internal_conditional_return) || delayed_return || far_return || fast_return ||
-			(staged_immediate_repeat(word) && !internal_immediate_repeat) || (staged_memory_repeat(word) && !internal_memory_repeat) || staged_immediate_loop_register(word) || (short_repeat && m_pipeline_address[2] == m_pipeline_block_end_address) || (staged_xc(word) && !internal_block_xc) || staged_idle(word) ||
-			((word & 0xfe00) == 0x8800 && u8(word) >= 0x1a && (u8(word) < 0x60 || u8(word) >= 0x80))))
+		if (m_pipeline_valid[2] && block_word)
 		{
-			logerror("%s: staged block control/count modification is unsupported instruction=%06x word=%04x block=%06x..%06x\n",
-				machine().describe_context(), unsigned(m_pipeline_address[2]), word, unsigned(m_pipeline_block_start), unsigned(m_pipeline_block_end_address)); m_illegal = true; return;
+			// These block-repeat forms only matter for a word inside a repeat body.
+			u32 const block_branch_target = (m_pipeline_address[2] & 0x7f0000) | m_pipeline_operand[2];
+			bool const internal_block_branch = (word == 0xf073 || (staged_banz(word) && !BIT(word, 9)) || (staged_conditional_branch(word) && !staged_conditional_call(word) && !BIT(word, 9))) &&
+				m_pipeline_address[2] + (staged_extended_banz(word) ? 2 : 1) < m_pipeline_block_end_address && block_branch_target >= m_pipeline_block_start && block_branch_target <= m_pipeline_block_end_address;
+			bool const forward_block_exit = (word == 0xf073 || (staged_conditional_branch(word) && !staged_conditional_call(word) && !BIT(word, 9))) &&
+				(m_pipeline_address[2] + 1 < m_pipeline_block_end_address ||
+				 (staged_conditional_branch(word) && m_pipeline_address[2] + 1 == m_pipeline_block_end_address)) &&
+				block_branch_target > m_pipeline_block_end_address;
+			// A conditional BCD may also end its delay words at REA: the endpoint keeps
+			// its Decode-owned BRC decrement and the retained branch redirect wins.
+			bool const delayed_forward_block_exit = ((word == 0xf273 || (staged_accumulator_branch(word) && !staged_conditional_call(word) && BIT(word, 9))) &&
+				m_pipeline_address[2] + 3 < m_pipeline_block_end_address && block_branch_target > m_pipeline_block_end_address) ||
+				((staged_accumulator_branch(word) || staged_tc_branch(word)) && !staged_conditional_call(word) && BIT(word, 9) &&
+				 m_pipeline_address[2] + 3 == m_pipeline_block_end_address && block_branch_target > m_pipeline_block_end_address);
+			bool const internal_delayed_block_branch = (word == 0xf273 || ((staged_accumulator_branch(word) || staged_tc_branch(word) || (word & 0xfdfb) == 0xf808 || (word & 0xfde7) == 0xf860) && !staged_conditional_call(word) && BIT(word, 9))) &&
+				m_pipeline_address[2] + 3 < m_pipeline_block_end_address && block_branch_target >= m_pipeline_block_start && block_branch_target <= m_pipeline_block_end_address;
+			u32 const far_call_target = (u32(word & 0x7f) << 16) | m_pipeline_operand[2];
+			bool const block_far_call = staged_far_call(word) &&
+				(BIT(word, 9) ? m_pipeline_address[2] + 3 <= m_pipeline_block_end_address : m_pipeline_address[2] + 1 < m_pipeline_block_end_address) &&
+				(far_call_target < m_pipeline_block_start || far_call_target > m_pipeline_block_end_address);
+			bool const block_conditional_call = staged_conditional_call(word) && !staged_tc_branch(word) && BIT(word, 9) &&
+				m_pipeline_address[2] + 3 <= m_pipeline_block_end_address &&
+				(block_branch_target < m_pipeline_block_start || block_branch_target > m_pipeline_block_end_address);
+			bool const block_near_call = staged_call(word) &&
+				m_pipeline_address[2] + (BIT(word, 9) ? 3 : 1) <= m_pipeline_block_end_address &&
+				(block_branch_target < m_pipeline_block_start || block_branch_target > m_pipeline_block_end_address);
+			bool const internal_block_xc = staged_xc(word) && m_pipeline_address[2] + (BIT(word, 9) ? 2 : 1) <= m_pipeline_block_end_address;
+			bool const internal_memory_repeat = staged_memory_repeat(word) &&
+				m_pipeline_address[2] + (word == 0x47f8 ? 2 : 1) <= m_pipeline_block_end_address;
+			bool const internal_immediate_repeat = staged_immediate_repeat(word) && m_pipeline_address[2] + 2 <= m_pipeline_block_end_address;
+			bool const internal_conditional_return = staged_conditional_return(word) && m_pipeline_address[2] < m_pipeline_block_end_address;
+			// Direct STLM 60..7f writes ordinary RAM, not loop-control state.
+			if (((branch && !internal_block_branch && !forward_block_exit && !delayed_forward_block_exit && !internal_delayed_block_branch && !block_far_call && !block_conditional_call && !block_near_call) || software_intr || block_setup || (plain_return && !internal_conditional_return) || delayed_return || far_return || fast_return ||
+				(staged_immediate_repeat(word) && !internal_immediate_repeat) || (staged_memory_repeat(word) && !internal_memory_repeat) || staged_immediate_loop_register(word) || (short_repeat && m_pipeline_address[2] == m_pipeline_block_end_address) || (staged_xc(word) && !internal_block_xc) || staged_idle(word) ||
+				((word & 0xfe00) == 0x8800 && u8(word) >= 0x1a && (u8(word) < 0x60 || u8(word) >= 0x80))))
+			{
+				logerror("%s: staged block control/count modification is unsupported instruction=%06x word=%04x block=%06x..%06x\n",
+					machine().describe_context(), unsigned(m_pipeline_address[2]), word, unsigned(m_pipeline_block_start), unsigned(m_pipeline_block_end_address)); m_illegal = true; return;
+			}
 		}
-		bool const dagen_immediate = (word & 0xff00) == 0x7700 && u8(word) >= 0x10 && u8(word) <= 0x19;
-		bool const immediate_loop = staged_immediate_loop_register(word);
-		bool const immediate_t = word == 0x770e;
+		bool const dagen_immediate = fact(decode_fact::dagen_immediate);
+		bool const immediate_loop = fact(decode_fact::immediate_loop);
+		bool const immediate_t = fact(decode_fact::immediate_t);
 		if (m_pipeline_valid[2] && !BIT(staged_opcode_descriptor[word], m_extended_program ? 5 : 4) && !staged_bus_control(word))
 		{
 			logerror("%s: unsupported staged C54x form %04x at %06x\n",
@@ -2330,7 +2325,7 @@ void tms320c54x_device::pipeline_step()
 			m_pipeline_bk[2] = m_bk;
 			// Basic direct operands sample CPL/DP in Decode, before a preceding
 			// RSBX/SSBX retires (SPRU131G tables 7-18 and 7-19).
-			if (staged_cmps(word) || staged_memory_repeat(word) || staged_bitfield(word) || staged_memory_immediate_multiply(word) || smem_arithmetic || immediate_store || staged_port_read(word) || staged_port_write(word) || rmw || staged_memory_logic(word) || short_load || direct_store || direct_long_load || direct_long_store || long_arithmetic || memory_dp || direct_move || data_copy || program_move || read_a || data_push || data_pop)
+			if (fact(decode_fact::direct_status_sample))
 			{
 				m_pipeline_direct_status[2] = (m_st0 & 0x1ff) | (m_st1 & 0x4000);
 				// Table 7-17 gives LD #k,DP zero latency. Forward the nearest

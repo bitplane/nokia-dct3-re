@@ -1051,6 +1051,63 @@ inline const std::array<u8, 65536> staged_opcode_descriptor = []
 	return result;
 }();
 
+
+// Decode-stage facts that depend only on the opcode word, evaluated once per
+// opcode with the decode block's own expressions. pipeline_step then reads
+// one table entry per decoded word instead of re-deriving each from scratch.
+enum class decode_fact : unsigned
+{
+	software_intr, short_repeat, short_load, direct_store, direct_long_load, direct_long_store,
+	long_arithmetic, memory_dp, direct_move, data_copy, program_move, read_a, immediate_store,
+	rmw, fast_return, plain_return, delayed_return, far_return, intm_bit, smem_arithmetic,
+	data_push, data_pop, near_branch, far_branch, block_setup, dagen_immediate, immediate_loop,
+	immediate_t, direct_status_sample, count
+};
+
+inline u64 decode_facts_of(u16 word)
+{
+	bool const short_load = staged_memory_load(word);
+	bool const direct_store = staged_store(word) || staged_accumulator_mmr_store(word);
+	bool const direct_long_load = staged_dld(word);
+	bool const direct_long_store = staged_dst(word);
+	bool const long_arithmetic = staged_long_arithmetic(word);
+	bool const memory_dp = staged_memory_dp(word);
+	bool const direct_move = staged_move(word);
+	bool const data_copy = staged_data_copy(word) || staged_delay_copy(word);
+	bool const program_move = staged_program_move(word);
+	bool const read_a = staged_read_a(word) || staged_write_a(word) || staged_data_to_program(word);
+	bool const immediate_store = (word & 0xff00) == 0x7600 && (u8(word) == 0xf8 || u8(word) < 0xa0 || staged_indexed_immediate_store(word) || staged_extended_immediate_store(word));
+	bool const rmw = staged_rmw(word) && staged_rmw_addressing(word);
+	bool const smem_arithmetic = staged_smem_arithmetic(word) || staged_smem_special(word) || staged_shifted_smem(word);
+	bool const data_push = (word & 0xff00) == 0x4b00 && (u8(word) < 0x98 || staged_extended_push(word));
+	bool const data_pop = (word & 0xff00) == 0x8b00 && (u8(word) < 0x98 || staged_extended_pop(word));
+	bool const facts[] = {
+		staged_software_intr(word), staged_short_repeat(word), short_load, direct_store, direct_long_load, direct_long_store,
+		long_arithmetic, memory_dp, direct_move, data_copy, program_move, read_a, immediate_store,
+		rmw, word == 0xf49b || word == 0xf69b, word == 0xfc00 || word == 0xf4eb || staged_conditional_return(word),
+		word == 0xfe00 || staged_delayed_conditional_return(word), (word & 0xfdfe) == 0xf4e4, word == 0xf6bb || word == 0xf7bb, smem_arithmetic,
+		data_push, data_pop,
+		staged_banz(word) || staged_block_repeat(word) || word == 0xf073 || word == 0xf273 || staged_conditional_branch(word) || staged_call(word) || staged_accumulator_near_call(word) || staged_accumulator_near_branch(word),
+		staged_far_branch(word) || staged_far_call(word) || staged_accumulator_far_call(word) || staged_accumulator_far_branch(word),
+		staged_block_repeat(word), (word & 0xff00) == 0x7700 && u8(word) >= 0x10 && u8(word) <= 0x19, staged_immediate_loop_register(word),
+		word == 0x770e,
+		staged_cmps(word) || staged_memory_repeat(word) || staged_bitfield(word) || staged_memory_immediate_multiply(word) || smem_arithmetic || immediate_store || staged_port_read(word) || staged_port_write(word) || rmw || staged_memory_logic(word) || short_load || direct_store || direct_long_load || direct_long_store || long_arithmetic || memory_dp || direct_move || data_copy || program_move || read_a || data_push || data_pop,
+	};
+	static_assert(std::size(facts) == unsigned(decode_fact::count));
+	u64 result = 0;
+	for (unsigned index = 0; index < std::size(facts); ++index)
+		result |= u64(facts[index]) << index;
+	return result;
+}
+
+inline const std::array<u64, 65536> decode_facts = []
+{
+	std::array<u64, 65536> result{};
+	for (unsigned word = 0; word < result.size(); ++word)
+		result[word] = decode_facts_of(u16(word));
+	return result;
+}();
+
 } // namespace c54x_decode
 
 #endif
