@@ -1024,6 +1024,20 @@ uint16_t nokia_dct3_state::flash_r(offs_t offset, uint16_t mem_mask)
 	return data;
 }
 
+// The ARM fetches through a 32-bit bus. Reading both halfwords here replaces
+// MAME's unit splitter with one handler call, in the splitter's own order:
+// the low bits (the higher-addressed halfword on this big-endian bus) first,
+// each only when the access selects it.
+uint32_t nokia_dct3_state::flash_r32(offs_t offset, uint32_t mem_mask)
+{
+	uint32_t result = 0;
+	if (mem_mask & 0x0000ffff)
+		result |= flash_r(offset * 2 + 1, mem_mask & 0xffff);
+	if (mem_mask & 0xffff0000)
+		result |= uint32_t(flash_r(offset * 2, mem_mask >> 16)) << 16;
+	return result;
+}
+
 void nokia_dct3_state::flash_w(offs_t offset, uint16_t data, uint16_t mem_mask)
 {
 #if DCT3_RESEARCH_TRACES
@@ -1335,7 +1349,7 @@ void nokia_dct3_state::dct3_map(address_map &map)
 	map(0x00030000, 0x00030003).mirror(0x8fffc).rw(FUNC(nokia_dct3_state::mad2_dspif_r), FUNC(nokia_dct3_state::mad2_dspif_w));   // DSPIF (API control register)
 	map(0x00040000, 0x00040003).mirror(0x8fffc).rw(FUNC(nokia_dct3_state::mad2_mcuif_r), FUNC(nokia_dct3_state::mad2_mcuif_w));   // MCUIF (Secondary I/O range, configures memory ranges)
 	map(0x00100000, 0x0017ffff).rw(FUNC(nokia_dct3_state::ram_r), FUNC(nokia_dct3_state::ram_w));                                   // RAMSelX
-	map(0x00200000, 0x005fffff).rw(FUNC(nokia_dct3_state::flash_r), FUNC(nokia_dct3_state::flash_w));     // ROM1SelX
+	map(0x00200000, 0x005fffff).r(FUNC(nokia_dct3_state::flash_r32)).w(FUNC(nokia_dct3_state::flash_w));     // ROM1SelX
 	map(0x00600000, 0x009fffff).rw(FUNC(nokia_dct3_state::rom2_mirror_r), FUNC(nokia_dct3_state::rom2_mirror_w));   // ROM2SelX mirror/window
 	// Supported boards have no parallel device attached to EEPROMSelX.
 	// Their permanent memory is either serial I2C or flash-backed.
@@ -1380,7 +1394,7 @@ void nokia_dct3_state::dct3_nse3_map(address_map &map)
 	// ROM2/alias decode remains unmapped rather than borrowing a later board.
 	map(0x00100000, 0x0010ffff).rw(FUNC(nokia_dct3_state::ram_r), FUNC(nokia_dct3_state::ram_w));       // 64 KiB SRAM
 	map(0x00110000, 0x001fffff).unmaprw();
-	map(0x00200000, 0x002fffff).rw(FUNC(nokia_dct3_state::flash_r), FUNC(nokia_dct3_state::flash_w));   // 1 MiB TE28F800
+	map(0x00200000, 0x002fffff).r(FUNC(nokia_dct3_state::flash_r32)).w(FUNC(nokia_dct3_state::flash_w));   // 1 MiB TE28F800
 	map(0x00300000, 0x009fffff).unmaprw();
 	// The 24C64 is reached through PUP's documented serial signals. No NSE-3
 	// evidence establishes a parallel EEPROMSelX alias.

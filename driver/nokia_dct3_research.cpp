@@ -1477,7 +1477,7 @@ void nokia_dct3_state::dct3_nsm1_research_map(address_map &map)
 	map(0x030000, 0x030003).rw(FUNC(nokia_dct3_state::mad2_dspif_r), FUNC(nokia_dct3_state::mad2_dspif_w));
 	map(0x040000, 0x040003).rw(FUNC(nokia_dct3_state::mad2_mcuif_r), FUNC(nokia_dct3_state::mad2_mcuif_w));
 	map(0x100000, 0x11ffff).rw(FUNC(nokia_dct3_state::ram_r), FUNC(nokia_dct3_state::ram_w));
-	map(0x200000, 0x3fffff).rw(FUNC(nokia_dct3_state::flash_r), FUNC(nokia_dct3_state::flash_w));
+	map(0x200000, 0x3fffff).r(FUNC(nokia_dct3_state::flash_r32)).w(FUNC(nokia_dct3_state::flash_w));
 }
 
 void nokia_dct3_state::dct3_nse6_research_map(address_map &map)
@@ -1490,7 +1490,7 @@ void nokia_dct3_state::dct3_nse6_research_map(address_map &map)
 	map(0x030000, 0x030003).rw(FUNC(nokia_dct3_state::mad2_dspif_r), FUNC(nokia_dct3_state::mad2_dspif_w));
 	map(0x040000, 0x040003).rw(FUNC(nokia_dct3_state::mad2_mcuif_r), FUNC(nokia_dct3_state::mad2_mcuif_w));
 	map(0x100000, 0x13ffff).rw(FUNC(nokia_dct3_state::ram_r), FUNC(nokia_dct3_state::ram_w));
-	map(0x200000, 0x3fffff).rw(FUNC(nokia_dct3_state::flash_r), FUNC(nokia_dct3_state::flash_w));
+	map(0x200000, 0x3fffff).r(FUNC(nokia_dct3_state::flash_r32)).w(FUNC(nokia_dct3_state::flash_w));
 }
 
 INPUT_PORTS_START( nmp5stage )

@@ -187,6 +187,7 @@ private:
 	uint16_t dsp_ram_r(offs_t offset);
 	void dsp_ram_w(offs_t offset, uint16_t data, uint16_t mem_mask = ~0);
 	uint16_t flash_r(offs_t offset, uint16_t mem_mask = ~0);
+	uint32_t flash_r32(offs_t offset, uint32_t mem_mask = ~0);
 #if DCT3_RESEARCH_TRACES
 	void flash_firmware_traces(u32 pc, u32 addr);
 	u8 trace_running_task() const;

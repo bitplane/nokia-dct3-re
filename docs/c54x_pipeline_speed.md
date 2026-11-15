@@ -60,6 +60,13 @@ and `make check-c54x-state-trace` checks each change over the whole call
   load. `make verify-5110-lab-traffic-state` round-trips the call three
   times.
 
+The MCU side matters too. Every ARM fetch from flash went through MAME's
+16-to-32-bit unit splitter into two 16-bit handler calls. A native 32-bit
+`flash_r32` reads both halfwords in the splitter's own order. That order is
+the low bits first, which is the higher-addressed halfword on this
+big-endian bus, and each half is read only when the access selects it.
+This saved more than the splitter's own samples suggested.
+
 | Change | Host-call run CPU (s), no PGO |
 | --- | ---: |
 | Before | 38.6 |
@@ -70,3 +77,4 @@ and `make check-c54x-state-trace` checks each change over the whole call
 | ARM flash trace hooks | 26.0 |
 | Stage slots | 25.7 |
 | Inline slot moves; flash hook test at the call | 24.0 |
+| 32-bit ARM flash reads (no unit splitter) | 19.5 |
