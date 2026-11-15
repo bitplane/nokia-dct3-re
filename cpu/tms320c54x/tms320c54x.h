@@ -35,6 +35,8 @@ public:
 	// This resets execution state, not architectural registers or peripherals.
 	void reset_execution_pipeline();
 	u64 pipeline_cycles() const { return m_pipeline_cycles; }
+	// PMST for board memory maps that depend on it on every access (OVLY).
+	u16 pmst() const { return m_pmst; }
 	auto bio_in_cb() { return m_bio_in_cb.bind(); }
 	auto xf_out_cb() { return m_xf_out_cb.bind(); }
 	auto peripheral_clock_stop_cb() { return m_peripheral_clock_stop_cb.bind(); }

@@ -65,7 +65,15 @@ The MCU side matters too. Every ARM fetch from flash went through MAME's
 `flash_r32` reads both halfwords in the splitter's own order. That order is
 the low bits first, which is the higher-addressed halfword on this
 big-endian bus, and each half is read only when the access selects it.
-This saved more than the splitter's own samples suggested.
+It saves about 1 %.
+(An earlier note claimed 19 %; that run had a PGO-built core.)
+
+On every program fetch, the DSP board map tested PMST's OVLY bit through
+MAME's generic state table (`state_int(STATE_PMST)`). It now reads the
+register with `tms320c54x_device::pmst()`.
+
+Each figure below comes from a plain (non-PGO) rebuild of the core
+followed by two host-call runs.
 
 | Change | Host-call run CPU (s), no PGO |
 | --- | ---: |
@@ -77,4 +85,5 @@ This saved more than the splitter's own samples suggested.
 | ARM flash trace hooks | 26.0 |
 | Stage slots | 25.7 |
 | Inline slot moves; flash hook test at the call | 24.0 |
-| 32-bit ARM flash reads (no unit splitter) | 19.5 |
+| 32-bit ARM flash reads (no unit splitter) | 23.8 |
+| PMST read directly on DSP program fetches | 23.1 |

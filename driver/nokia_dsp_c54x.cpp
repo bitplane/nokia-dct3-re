@@ -359,7 +359,8 @@ TIMER_CALLBACK_MEMBER(nokia_dsp_c54x_device::port36_complete)
 bool nokia_dsp_c54x_device::overlay_address(u16 address) const
 {
 	// The overlay extent belongs to the configured DSP memory geometry.
-	return BIT(m_cpu->state_int(tms320c54x_device::STATE_PMST), 5) &&
+	// Every program fetch asks; read PMST directly, not via the state table.
+	return BIT(m_cpu->pmst(), 5) &&
 			address >= 0x0080 && address < m_overlay_end;
 }
 
