@@ -12,7 +12,10 @@ timeslot 1: FACCH SABM/UA, RR Assignment Complete and its acknowledgement,
 and SACCH/TF Measurement Reports. On the late incoming call the lab's
 1 kHz downlink tone reaches the earpiece through the native FR decoder, its
 500 Hz microphone tone returns in uplink speech frames, and physical End
-clears the call on FACCH back to the idle screen. Physical capture timing, carrier tuning and fitted mask/clock
+clears the call on FACCH back to the idle screen. The dialled call can be
+answered by a host over the lab's host call protocol (`--host-call`): the
+host receives the dialled digits, the call connects on FACCH, host media
+flows both ways, and physical End clears it. Physical capture timing, carrier tuning and fitted mask/clock
 identity remain separate open contracts; none is promoted by the lab results.
 
 The acquired-ROM6 **8210 NSM-3 v5.31** composition `nsm3r6` already issues
@@ -86,7 +89,7 @@ results do not retire the physical request/acknowledgement or tuning contract.
 | Uniquely identified laboratory pages | 27 native page payloads match distinct external TMSIs and exact source block-ending FN;20 after common-control return;five early results use native two-burst erasures | Continuous DRX/camping and physical carrier selection |
 | Addressed paging/new-link setup | Uplink-derived IMSI page, native Paging Response, raw second-link UA and native CC SETUP admission under the explicit33dBm record fixture | Stable camping and physical carrier selection |
 | Native call control with SACCH | Native Alerting, physical Answer-to-CONNECT, complete rejected-call clearing; outgoing physical dial/CM admission/SETUP/CALL PROCEEDING decode and acknowledgement | Connected traffic, speech, arbitrary transactions and loss recovery |
-| Native traffic assignment | Outgoing and late incoming: TCH/F on timeslot 1 with FACCH SABM/UA, RR Assignment Complete acknowledged, SACCH/TF SI5/SI6 decode and Measurement Reports, exact uplink block decodes. Late incoming: lab tones through the native FR codecs both ways (475 of 501 earpiece and 475 of 492 uplink blocks) and physical End clearing (DISCONNECT, RELEASE, RELEASE COMPLETE, Channel Release, DISC/UA) | Speech on the outgoing call (no network CONNECT without a host), the early incoming variant (its page is not answered, independently of page 1), fitted microphone/earpiece gains |
+| Native traffic assignment | Outgoing and late incoming: TCH/F on timeslot 1 with FACCH SABM/UA, RR Assignment Complete acknowledged, SACCH/TF SI5/SI6 decode and Measurement Reports, exact uplink block decodes. Late incoming: lab tones through the native FR codecs both ways (475 of 501 earpiece and 475 of 492 uplink blocks) and physical End clearing (DISCONNECT, RELEASE, RELEASE COMPLETE, Channel Release, DISC/UA). Outgoing with `--host-call`: digits 1234567 at the host, ALERTING/CONNECT on FACCH, 559 host media frames each way (93 % of uplink energy the microphone tone; earpiece tone in 540 of 577 blocks) and End clearing | The early incoming variant (its page is not answered, independently of page 1), fitted microphone/earpiece gains |
 
 The CPU additions needed by the normal-burst frontend have generic focused
 tests. The rebuilt native ROM6 menu/storage/save-state scenarios, ROM4
@@ -983,6 +986,9 @@ handset decodes SI5/SI6 as SACCH/TF: blocks end at FN mod 104 = 103 (TS
 .venv/bin/python tools/run_npe3_native.py --reference-clock --seconds 36 --scenario outgoing --adc-source fcch-sch-broadcast --capture-start p09 --tx-release p05 --raw-agch --provision-records --cell-power-policy handset33 --sacch --accept-outgoing-service --proceed-outgoing-call
 # Traffic assignment; TCH/F establishment passes on captured page 1.
 .venv/bin/python tools/run_npe3_native.py --reference-clock --seconds 36 --scenario outgoing --adc-source fcch-sch-broadcast --capture-start p09 --tx-release p05 --raw-agch --provision-records --cell-power-policy handset33 --sacch --accept-outgoing-service --proceed-outgoing-call --traffic-assignment
+# The dialled call answered by a synthetic host on HTTP port 18766, cleared
+# by physical End at 40 s; host media and FACCH clearing pass:
+.venv/bin/python tools/run_npe3_native.py --reference-clock --seconds 44 --scenario outgoing --adc-source fcch-sch-broadcast --capture-start p09 --tx-release p05 --raw-agch --provision-records --cell-power-policy handset33 --sacch --accept-outgoing-service --proceed-outgoing-call --traffic-assignment --host-call 18766 --end-call-at 40
 ```
 
 ### Native traffic program-page boundary
@@ -1469,7 +1475,7 @@ or a program-page mirror to turn these results into broader acceptance.
 | --- | --- | --- |
 | Physically selected RF carrier | Own firmware's command words/channel arithmetic are known; SCU-to-HAGAR shift, select, enable and settling semantics are not | A matched SCU/HAGAR register/serial contract, or a correlated command/pin capture identifying those fields and edges |
 | Physical receive timing/camping | P09/P0a/P0b/P05 laboratory policies work, but do not identify ADC/transfer/INT0 ownership or the physical counter epoch | Matched MFI/SCU timing documentation or a correlated counter/control/ADC/INT0 capture; a successful decoded payload alone is insufficient |
-| Connected traffic/speech | TCH/F establishment, lab-tone speech both ways and physical End clearing are qualified on the late incoming call; the outgoing call has no network CONNECT without a host | A host-call path for the 6210 as for ROM4; higher program pages if execution reaches them |
+| Connected traffic/speech | TCH/F establishment, speech both ways and physical End clearing are qualified on the late incoming call (lab tones) and the host-answered dialled call (host media) | Network-cleared and host-placed incoming 6210 calls; higher program pages if execution reaches them |
 | Fitted 6210 mask/clock identity | The acquired ROM6 and 45.5 MHz are explicitly reference inputs | Product-matched mask/multiplier documentation or measured provenance, not another fitted execution rate |
 
 The existing traces cannot distinguish hardware implementations that share
