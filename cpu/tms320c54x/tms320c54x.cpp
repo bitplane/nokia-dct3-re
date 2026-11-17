@@ -2183,7 +2183,7 @@ void tms320c54x_device::pipeline_step()
 		bool const branch = fact(decode_fact::near_branch) || (m_extended_program && fact(decode_fact::far_branch));
 		bool const block_setup = fact(decode_fact::block_setup);
 		bool const block_word = m_slot[2].block_body;
-		if (m_slot[2].valid && block_word)
+		if (fact(decode_fact::block_control) && m_slot[2].valid && block_word)
 		{
 			// These block-repeat forms only matter for a word inside a repeat body.
 			u32 const block_branch_target = (m_slot[2].address & 0x7f0000) | m_slot[2].operand;

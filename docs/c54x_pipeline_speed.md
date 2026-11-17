@@ -74,6 +74,12 @@ and `make check-c54x-state-trace` checks each change over the whole call
   rest of the clock. A `// Decode marker` line ORs in a stage-2 table, so
   later blocks that test the Decode slot's word can be gated as well. The
   generator refuses the marker if any slot word is written after it.
+- **Block-body refusals.** For each word inside a block-repeat body,
+  Decode built a dozen locals (branch targets against the block's end and
+  so on) only to refuse unsupported control forms. Every alternative of
+  that refusal needs the word to be one of a few control classes, which the
+  `block_control` decode fact records. The check now tests that fact first,
+  so ordinary ALU words in speech loops skip it.
 
 ## Polling loops
 
@@ -155,9 +161,10 @@ traffic call (`SECS=27`), after a plain rebuild.
 | Decode gates (3) | 365.5 G | 15.2 |
 | Decode-word gates (22, 23, 25) | 358.4 G | 15.0 |
 | Polling loops skipped | 340.0 G | 14.4 |
+| Block-body refusals keyed on the word | 325.4 G | 13.7 |
 
-The last two CPU figures are each the mean of two back-to-back runs, an A/B
-of the same tree with and without the change. Single runs vary by about
+The 15.0 and 14.4 s figures are each the mean of two back-to-back runs, an A/B
+of the same tree with and without the change; 13.7 s is one run. Single runs vary by about
 0.5 s.
 
 ## Where it stands

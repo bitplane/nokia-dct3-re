@@ -1061,7 +1061,7 @@ enum class decode_fact : unsigned
 	long_arithmetic, memory_dp, direct_move, data_copy, program_move, read_a, immediate_store,
 	rmw, fast_return, plain_return, delayed_return, far_return, intm_bit, smem_arithmetic,
 	data_push, data_pop, near_branch, far_branch, block_setup, dagen_immediate, immediate_loop,
-	immediate_t, direct_status_sample, count
+	immediate_t, direct_status_sample, block_control, count
 };
 
 inline u64 decode_facts_of(u16 word)
@@ -1081,17 +1081,31 @@ inline u64 decode_facts_of(u16 word)
 	bool const smem_arithmetic = staged_smem_arithmetic(word) || staged_smem_special(word) || staged_shifted_smem(word);
 	bool const data_push = (word & 0xff00) == 0x4b00 && (u8(word) < 0x98 || staged_extended_push(word));
 	bool const data_pop = (word & 0xff00) == 0x8b00 && (u8(word) < 0x98 || staged_extended_pop(word));
+	bool const fast_return = word == 0xf49b || word == 0xf69b;
+	bool const plain_return = word == 0xfc00 || word == 0xf4eb || staged_conditional_return(word);
+	bool const delayed_return = word == 0xfe00 || staged_delayed_conditional_return(word);
+	bool const far_return = (word & 0xfdfe) == 0xf4e4;
+	bool const near_branch = staged_banz(word) || staged_block_repeat(word) || word == 0xf073 || word == 0xf273 || staged_conditional_branch(word) || staged_call(word) || staged_accumulator_near_call(word) || staged_accumulator_near_branch(word);
+	bool const far_branch = staged_far_branch(word) || staged_far_call(word) || staged_accumulator_far_call(word) || staged_accumulator_far_branch(word);
+	// Every word that pipeline_step's block-body check can refuse: each of
+	// that check's alternatives needs one of these.
+	bool const block_control = near_branch || far_branch || staged_software_intr(word) || staged_block_repeat(word) ||
+		plain_return || delayed_return || far_return || fast_return ||
+		staged_immediate_repeat(word) || staged_memory_repeat(word) || staged_immediate_loop_register(word) ||
+		staged_short_repeat(word) || staged_xc(word) || staged_idle(word) ||
+		((word & 0xfe00) == 0x8800 && u8(word) >= 0x1a && (u8(word) < 0x60 || u8(word) >= 0x80));
 	bool const facts[] = {
 		staged_software_intr(word), staged_short_repeat(word), short_load, direct_store, direct_long_load, direct_long_store,
 		long_arithmetic, memory_dp, direct_move, data_copy, program_move, read_a, immediate_store,
-		rmw, word == 0xf49b || word == 0xf69b, word == 0xfc00 || word == 0xf4eb || staged_conditional_return(word),
-		word == 0xfe00 || staged_delayed_conditional_return(word), (word & 0xfdfe) == 0xf4e4, word == 0xf6bb || word == 0xf7bb, smem_arithmetic,
+		rmw, fast_return, plain_return,
+		delayed_return, far_return, word == 0xf6bb || word == 0xf7bb, smem_arithmetic,
 		data_push, data_pop,
-		staged_banz(word) || staged_block_repeat(word) || word == 0xf073 || word == 0xf273 || staged_conditional_branch(word) || staged_call(word) || staged_accumulator_near_call(word) || staged_accumulator_near_branch(word),
-		staged_far_branch(word) || staged_far_call(word) || staged_accumulator_far_call(word) || staged_accumulator_far_branch(word),
+		near_branch,
+		far_branch,
 		staged_block_repeat(word), (word & 0xff00) == 0x7700 && u8(word) >= 0x10 && u8(word) <= 0x19, staged_immediate_loop_register(word),
 		word == 0x770e,
 		staged_cmps(word) || staged_memory_repeat(word) || staged_bitfield(word) || staged_memory_immediate_multiply(word) || smem_arithmetic || immediate_store || staged_port_read(word) || staged_port_write(word) || rmw || staged_memory_logic(word) || short_load || direct_store || direct_long_load || direct_long_store || long_arithmetic || memory_dp || direct_move || data_copy || program_move || read_a || data_push || data_pop,
+		block_control,
 	};
 	static_assert(std::size(facts) == unsigned(decode_fact::count));
 	u64 result = 0;
