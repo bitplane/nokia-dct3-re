@@ -40,10 +40,11 @@ public:
 	// program reads, have no side effects and change only between timeslices.
 	// Lets execute_run skip the identical iterations of a polling loop.
 	void set_pure_reads(u16 data_start) { m_pure_data_start = data_start; }
-	// PMST for board memory maps that depend on it on every access (OVLY).
-	u16 pmst() const { return m_pmst; }
 	auto bio_in_cb() { return m_bio_in_cb.bind(); }
 	auto xf_out_cb() { return m_xf_out_cb.bind(); }
+	// PMST.OVLY level, driven on every change (and at reset and state load)
+	// so a board can switch its program-space overlay map.
+	auto ovly_cb() { return m_ovly_cb.bind(); }
 	auto peripheral_clock_stop_cb() { return m_peripheral_clock_stop_cb.bind(); }
 	auto pll_clock_stop_cb() { return m_pll_clock_stop_cb.bind(); }
 	auto system_clock_cb() { return m_system_clock_cb.bind(); }
@@ -136,6 +137,7 @@ private:
 	u64 timer_remaining_ticks() const;
 	void leave_idle();
 	void update_xf(bool force = false);
+	void update_ovly(bool force = false);
 	u16 fetch();
 	u32 logical_program_address(u16 address) const { return (u32(m_extended_program ? m_xpc : 0) << 16) | address; }
 	u32 physical_program_address(u32 address) const
@@ -227,6 +229,8 @@ private:
 	devcb_read_line m_ready_in_cb;
 	devcb_write_line m_xf_out_cb;
 	bool m_xf_level = true;
+	devcb_write_line m_ovly_cb;
+	bool m_ovly_level = false;
 	devcb_write_line m_peripheral_clock_stop_cb;
 	devcb_write_line m_pll_clock_stop_cb;
 

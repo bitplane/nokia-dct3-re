@@ -131,8 +131,12 @@ It saves about 1 %.
 (An earlier note claimed 19 %; that run had a PGO-built core.)
 
 On every program fetch, the DSP board map tested PMST's OVLY bit through
-MAME's generic state table (`state_int(STATE_PMST)`). It now reads the
-register with `tms320c54x_device::pmst()`.
+MAME's generic state table (`state_int(STATE_PMST)`), and later through
+`tms320c54x_device::pmst()`. Program space is now the mask ROM installed
+directly, with the DARAM overlay as a `memory_view` over 0080 to the overlay
+end. The core drives a new `ovly_cb` line when OVLY changes, at reset, on a
+debugger PMST write and after a state load, and the board selects or
+disables the view. Fetches no longer call a handler.
 
 Each figure below comes from a plain (non-PGO) rebuild of the core
 followed by two host-call runs.
@@ -162,6 +166,7 @@ traffic call (`SECS=27`), after a plain rebuild.
 | Decode-word gates (22, 23, 25) | 358.4 G | 15.0 |
 | Polling loops skipped | 340.0 G | 14.4 |
 | Block-body refusals keyed on the word | 325.4 G | 13.7 |
+| Program ROM mapped directly, OVLY as a view | 322.5 G | 13.7 |
 
 The 15.0 and 14.4 s figures are each the mean of two back-to-back runs, an A/B
 of the same tree with and without the change; 13.7 s is one run. Single runs vary by about

@@ -93,16 +93,15 @@ private:
 	void arm_frame_timer();
 	u32 frame_period() const;
 	u16 frame_counter() const;
-	void program_map(address_map &map) ATTR_COLD;
 	void data_map(address_map &map) ATTR_COLD;
 	void io_map(address_map &map) ATTR_COLD;
-	u16 program_r(offs_t offset);
-	void program_w(offs_t offset, u16 data);
+	u16 overlay_r(offs_t offset);
+	void overlay_w(offs_t offset, u16 data);
+	void ovly_w(int state);
 	u16 data_r(offs_t offset);
 	void data_w(offs_t offset, u16 data);
 	u16 io_r(offs_t offset);
 	void io_w(offs_t offset, u16 data);
-	bool overlay_address(u16 address) const;
 	u16 host_request() const;
 	void acknowledge_host_command(u16 mask);
 	void update_host_command_line();
@@ -118,6 +117,7 @@ private:
 	devcb_write_line m_rf_reset_cb;
 	bool m_external_rf_receive = false;
 	std::array<u16, 0x10000> m_program{};
+	memory_view m_overlay;
 	std::array<u16, 0x10000> m_data{};
 	std::array<u16, 0x100> m_io{};
 	tms320c54x_bsp_state m_bsp;

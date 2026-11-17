@@ -68,6 +68,7 @@ tms320c54x_device::tms320c54x_device(const machine_config &mconfig,
 	m_bio_in_cb(*this, 1),
 	m_ready_in_cb(*this, 1),
 	m_xf_out_cb(*this),
+	m_ovly_cb(*this),
 	m_peripheral_clock_stop_cb(*this),
 	m_pll_clock_stop_cb(*this),
 	m_clkout_divisor_cb(*this),
@@ -145,7 +146,7 @@ void tms320c54x_device::device_start()
 	state_add(STATE_SP, "SP", m_sp).formatstr("%04X");
 	state_add(STATE_ST0, "ST0", m_st0).formatstr("%04X");
 	state_add(STATE_ST1, "ST1", m_st1).callimport().formatstr("%04X");
-	state_add(STATE_PMST, "PMST", m_pmst).formatstr("%04X");
+	state_add(STATE_PMST, "PMST", m_pmst).callimport().formatstr("%04X");
 	for (unsigned i = 0; i != std::size(m_ar); ++i)
 		state_add(STATE_AR0 + i, string_format("AR%u", i).c_str(), m_ar[i]).formatstr("%04X");
 	state_add(STATE_BRC, "BRC", m_brc).formatstr("%04X");
@@ -402,6 +403,7 @@ void tms320c54x_device::device_reset()
 	m_st1 = 0x2900;
 	update_xf(true);
 	m_pmst = 0xffa0;
+	update_ovly(true);
 	std::fill(std::begin(m_ar), std::end(m_ar), 0);
 	m_brc = 0;
 	m_bk = 0;
@@ -665,6 +667,8 @@ void tms320c54x_device::state_import(const device_state_entry &entry)
 	}
 	else if (entry.index() == STATE_BSCR)
 		publish_bus_controls();
+	else if (entry.index() == STATE_PMST)
+		update_ovly();
 	else if (entry.index() >= STATE_TIM && entry.index() <= STATE_TCR)
 		data_write(0x24 + entry.index() - STATE_TIM, m_debug_timer);
 	else if (entry.index() == STATE_IDLE && !m_idle)
@@ -682,11 +686,22 @@ void tms320c54x_device::update_xf(bool force)
 	}
 }
 
+void tms320c54x_device::update_ovly(bool force)
+{
+	bool const level = BIT(m_pmst, 5);
+	if (force || level != m_ovly_level)
+	{
+		m_ovly_level = level;
+		m_ovly_cb(level);
+	}
+}
+
 void tms320c54x_device::device_post_load()
 {
 	m_st1 &= ~ST1_RESERVED;
 	// The output cache is derived; re-drive the restored architectural level.
 	update_xf(true);
+	update_ovly(true);
 	m_peripheral_clock_stop_cb(m_idle_mode >= 2);
 	m_pll_clock_stop_cb(m_idle_mode == 3);
 	m_system_clock_cb(clock());
@@ -864,7 +879,10 @@ void tms320c54x_device::register_write(u16 address, u16 value)
 	else if (address == 0x1c)
 		m_rea = value;
 	else if (address == 0x1d)
+	{
 		m_pmst = value;
+		update_ovly();
+	}
 	else if (address == 0x1e && m_extended_program)
 	{
 		// SPRU131G table 6-3 excludes ordinary data writes from XPC loads.
