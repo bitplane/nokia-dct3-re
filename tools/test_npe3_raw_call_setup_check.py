@@ -19,7 +19,9 @@ class RawCallSetupTest(unittest.TestCase):
         result=check_traffic_channel(text,6244)
         self.assertTrue(result['assignment_complete_qualified'])
         self.assertFalse(result['speech_transport_qualified'])
-        for bad in (text.replace('timeslot=1','timeslot=2'),text.replace('062900','062901'),
+        # A host-answered dialled call acknowledges it with ALERTING's N(R).
+        self.assertTrue(check_traffic_channel(text.replace('kind=rr','kind=cc_alerting'),6244)['traffic_channel_qualified'])
+        for bad in (text.replace('timeslot=1','timeslot=2'),text.replace('kind=rr','kind=cc_connect'),text.replace('062900','062901'),
                     text.replace('kind=rr','kind=ua'),text.replace('exact_code=1','exact_code=0',1),
                     '\n'.join(rows[:-1]),text+'\nnative_dsp_reset_line: released=0',
                     text.replace('first_frame=6248','first_frame=6246')):

@@ -25,6 +25,10 @@ ADC_LU_MENU_SHA256 = '5adef93609b763a40d0e3c9dca356d388a910bb393a518e99a53eec2c7
 ADC_FRAME_PAGE_MENU_SHA256 = '1c3932a7ea93beb30fa751369fa457c164e6605fda68ab3f904ce4cb6ea84fa2'
 
 
+# The outgoing scenario's physical digits.
+DIALLED='1234567'
+
+
 def configure_cell_power(directory,model,policy,*,incoming_call=False,
                          traffic_assignment=False,call_ack=False,clear_call=False,
                          sacch=False,assignment_after_connect=False,
@@ -176,17 +180,26 @@ def main():
                         help='1 kHz downlink and 500 Hz microphone tones on the late-assigned TCH/F')
     parser.add_argument('--end-call-at',type=int,metavar='SECONDS',
                         help='physical End on the late-assigned TCH/F; the lab answers its clearing')
+    parser.add_argument('--host-call',type=int,metavar='HTTP_PORT',
+                        help='a synthetic host answers the dialled call over the host call protocol; End clears it')
     parser.add_argument('--provision-records', action='store_true',
                         help='explicit synthetic record fixture; acquired PMM remains unchanged')
     args = parser.parse_args()
-    # The traffic call with speech or End runs on to 36 s.
+    # The traffic call with speech or End runs on to 36 s; the host-answered
+    # dialled call, assigned at about 29 s, runs on to 44 s.
     page_seconds=36 if args.speech or args.end_call_at is not None else 24
+    outgoing_seconds=44 if args.host_call is not None else 36
+    if args.host_call is not None:
+        if not (args.scenario=='outgoing' and args.traffic_assignment and args.end_call_at is not None):
+            parser.error('the host call is the assigned dialled call, cleared by End')
+        # The microphone tone, and the lab answering the handset's clearing.
+        args.speech=True
     if args.accept_outgoing_service and args.scenario!='outgoing':
         parser.error('outgoing service admission requires the bounded outgoing scenario')
     if args.proceed_outgoing_call and not args.accept_outgoing_service:
         parser.error('outgoing CALL PROCEEDING requires explicit CM admission')
     if args.scenario=='outgoing' and (args.cell_power_policy!='handset33' or
-            args.seconds!=36 or args.input_at!=20 or not args.sacch or
+            args.seconds!=outgoing_seconds or args.input_at!=20 or not args.sacch or
             args.incoming_call or args.page_at is not None):
         parser.error('outgoing scout requires the separate36s 33dBm/SACCH cell,no page,and physical input at20s')
     if args.reject_call and (not args.incoming_call or args.traffic_assignment):
@@ -197,7 +210,7 @@ def main():
         parser.error('standalone CC acknowledgement requires SETUP without assignment')
     if args.assignment_after_connect and not (args.traffic_assignment and args.answer_call and args.ack_call_control and args.sacch):
         parser.error('late assignment requires traffic assignment,physical Answer,CC acknowledgement and SACCH')
-    if (args.speech or args.end_call_at is not None) and not args.assignment_after_connect:
+    if (args.speech or args.end_call_at is not None) and not (args.assignment_after_connect or args.host_call is not None):
         parser.error('speech and End are defined for the late-assigned answered call')
     if args.speech and args.end_call_at is None:
         parser.error('the tone summary needs the traffic channel cleared by End')
@@ -212,7 +225,7 @@ def main():
     if args.incoming_call and (args.cell_power_policy!='handset33' or args.page_at is None):
         parser.error('raw incoming call requires the separate33dBm addressed-page fixture')
     if args.cell_power_policy!='legacy39' and (not args.raw_agch or not args.provision_records or
-            not (args.scenario=='menu' and args.seconds==page_seconds or args.scenario=='outgoing' and args.seconds==36)):
+            not (args.scenario=='menu' and args.seconds==page_seconds or args.scenario=='outgoing' and args.seconds==outgoing_seconds)):
         parser.error('33dBm cell experiment requires the explicit24s menu or36s outgoing raw-AGCH record fixture')
     if args.page_at is not None and (not args.raw_agch or not 16<=args.page_at<=20 or args.seconds!=page_seconds):
         parser.error(f'addressed-page observation requires raw AGCH,16..20s input and the bounded {page_seconds}s run')
@@ -301,9 +314,23 @@ def main():
         if args.page_at is not None:env['NPE3_NATIVE_PAGE_AT']=str(args.page_at)
         env.pop('NPE3_NATIVE_END_AT',None)
         if args.end_call_at is not None:env['NPE3_NATIVE_END_AT']=str(args.end_call_at)
+        client=None
+        if args.host_call is not None:
+            from tools.lab_host_call_client import HostCallClient
+            cmd+=['-http','-http_port',str(args.host_call)]
+            # The client's timeout is wall time; the run is slower than real time.
+            client=HostCallClient(f'ws://127.0.0.1:{args.host_call}/nokia/dct3/calls',
+                                  hangup_after=None,outgoing=True,timeout=900)
+            client.start()
         with (directory / 'console.log').open('w') as output:
             subprocess.run(cmd, cwd=directory, env=env, stdout=output,
-                           stderr=subprocess.STDOUT, check=True, timeout=600)
+                           stderr=subprocess.STDOUT, check=True, timeout=900)
+        if client is not None:
+            client.join(10)
+            (directory/'host_call.json').write_text(json.dumps(client.result(),indent=2)+'\n')
+            if client.error is not None:
+                raise ValueError(f'host client: {client.error!r}')
+            execute.host=client.result()
         text = (directory / 'error.log').read_text(errors='replace')
         check_execution(text, (directory/'npe3_loader2.be16').read_bytes(),
                         (directory/'npe3_terminal_program.be16').read_bytes(), flash,
@@ -353,6 +380,11 @@ def main():
             if args.traffic_assignment:
                 from tools.npe3_raw_call_setup_check import check_traffic_channel
                 report['traffic_channel']=check_traffic_channel(text,report['outgoing_progress']['assignment_start_frame'])
+            if args.host_call is not None:
+                from tools.npe3_raw_call_setup_check import check_traffic_clearing
+                from tools.rom4_lab_registration_check import check_host_call
+                report['traffic_clearing']=check_traffic_clearing(text,args.end_call_at)
+                report['host_call']=check_host_call(text,execute.host,outgoing=True,digits=DIALLED)
         if args.page_at is not None:
             from tools.npe3_native_paging_response_check import check as check_native_page_response
             report['paging_response']=check_native_page_response(text,(first/'rom6_radio_writes.tsv').read_text())

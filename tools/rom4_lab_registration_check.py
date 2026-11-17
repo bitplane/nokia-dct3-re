@@ -255,10 +255,10 @@ def check_host_lab(text, phases=('paged', 'alerting', 'connected', 'network_clea
     return dict(earpiece_tone_blocks=int(audio[0][1]))
 
 
-def check_host_call(text, client, outgoing=False):
+def check_host_call(text, client, outgoing=False, digits='123'):
     """Check a host-placed call that the host clears, or a dialled one the handset clears."""
     if outgoing:
-        if client['digits'] != '123':
+        if client['digits'] != digits:
             raise ValueError(f'host saw dialled digits {client["digits"]!r}')
         result = check_host_lab(text, OUTGOING_PHASES, HANDSET_CLEARING, 'phase=connected')
     else:

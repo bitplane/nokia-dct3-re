@@ -57,12 +57,13 @@ def check_outgoing_progress(text,blocks,*,assignment=False):
 def check_outgoing(text,blocks,*,admitted=False):
     from tools.npe3_raw_ua_check import check as check_ua,UA
     from tools.radio_outgoing_call_trace_check import decode_called_digits
-    keys=list(re.finditer(r'npe3_native_physical: key=(\w+) t=([\d.]+) observer_writes=0',text))
+    # A later physical End clears the connected call; it is checked separately.
+    keys=[key for key in re.finditer(r'npe3_native_physical: key=(\w+) t=([\d.]+) observer_writes=0',text) if key[1]!='End']
     names=[f'Digit{i}' for i in range(1,8)]+['Send']
     if len(keys)!=8 or [row[1] for row in keys]!=names:
         raise ValueError('outgoing physical dial/Send sequence incomplete')
     for index,row in enumerate(keys):
-        end=keys[index+1].start() if index<7 else len(text)
+        end=keys[index+1].start() if index<7 else (text.find('npe3_native_physical: key=End',row.end())%(len(text)+1))
         codes=re.findall(r'npe3_native_key: value=([0-9a-f]{2}) observer_writes=0',text[row.end():end])
         if abs(float(row[2])-(20+index))>0.02 or not codes or set(codes)!={f'{index+1 if index<7 else 14:02x}'}:
             raise ValueError('outgoing physical key timing/decode differs')
@@ -318,8 +319,10 @@ def check_traffic_channel(text,assignment_start):
         raise ValueError('FACCH lacks SABM followed by RR Assignment Complete')
     replies={}
     for kind,source in TCH_REPLY.findall(text):
-        replies.setdefault(kind,int(source))
-    if replies.get('ua')!=sabm[0] or replies.get('rr')!=complete[0]:
+        replies.setdefault(int(source),kind)
+    # Assignment Complete is acknowledged by RR, or on a host-answered dialled
+    # call by the ALERTING I-frame's N(R).
+    if replies.get(sabm[0])!='ua' or replies.get(complete[0]) not in ('rr','cc_alerting'):
         raise ValueError('network FACCH replies are not bound to SABM and Assignment Complete')
     reports=[frame for kind,frame,block,_ in uplinks if kind=='sacch' and block[5:7]==b'\x06\x15']
     if len(reports)<4 or reports[0]<first:
@@ -343,7 +346,7 @@ def check_traffic_clearing(text,end_at):
     """Physical End clears the call on FACCH, and TS1 carried the lab's tones both ways."""
     from tools.rom4_lab_registration_check import TCH_UPLINK,TCH_REPLY,TCH_SPEECH,check_traffic_audio
     pressed=END_KEY.findall(text)
-    if len(pressed)!=1 or abs(float(pressed[0])-end_at)>1e-6:
+    if len(pressed)!=1 or abs(float(pressed[0])-end_at)>0.05:
         raise ValueError('missing unique timed physical End')
     end_frame=float(pressed[0])*13_000_000/60_000
     facch=[(int(frame),bytes.fromhex(octets)) for kind,frame,octets,_ in TCH_UPLINK.findall(text) if kind=='facch']

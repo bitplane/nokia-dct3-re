@@ -97,6 +97,16 @@ if scenario=='outgoing' then
         if not press(0,'Send','Send') then return end
         if not emu.wait(3) then return end
         machine.screens[':screen']:snapshot('npe3_outgoing_call.png')
+        -- Optional physical End on the connected call.
+        local end_at=tonumber(os.getenv('NPE3_NATIVE_END_AT') or '')
+        if not end_at then return end
+        local now=machine.time:as_double()
+        assert(end_at>=now+1)
+        if not emu.wait(end_at-now) then return end
+        machine.screens[':screen']:snapshot('npe3_before_end.png')
+        if not press(0,'End','End') then return end
+        if not emu.wait(2) then return end
+        machine.screens[':screen']:snapshot('npe3_after_end.png')
     end)
     assert(coroutine.resume(_G.npe3_native_input))
     return
