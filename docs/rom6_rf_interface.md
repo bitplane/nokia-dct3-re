@@ -6,10 +6,11 @@ The 6210 reference-clock laboratory composition qualifies native LU/SIM
 persistence, addressed paging/new-link UA, incoming CC admission and physical
 Answer/rejection, SACCH-assisted rejected-call clearing, and outgoing
 CM admission/SETUP/[CALL PROCEEDING](#native-outgoing-cc-progression).
-All tested traffic-assignment dialogues reach the same
-[unbacked program address `1:a50d`](#native-traffic-program-page-boundary).
-Command decoding and one TSC2 burst do not establish traffic completion or
-speech. Physical capture timing, carrier tuning and fitted mask/clock
+With the captured [program page 1](#native-traffic-program-page-boundary),
+the outgoing and late incoming traffic assignments establish TCH/F on
+timeslot 1: FACCH SABM/UA, RR Assignment Complete and its acknowledgement,
+and SACCH/TF Measurement Reports. Speech, a connected-call audio path and
+clearing on the traffic channel are not qualified. Physical capture timing, carrier tuning and fitted mask/clock
 identity remain separate open contracts; none is promoted by the lab results.
 
 The acquired-ROM6 **8210 NSM-3 v5.31** composition `nsm3r6` already issues
@@ -83,7 +84,7 @@ results do not retire the physical request/acknowledgement or tuning contract.
 | Uniquely identified laboratory pages | 27 native page payloads match distinct external TMSIs and exact source block-ending FN;20 after common-control return;five early results use native two-burst erasures | Continuous DRX/camping and physical carrier selection |
 | Addressed paging/new-link setup | Uplink-derived IMSI page, native Paging Response, raw second-link UA and native CC SETUP admission under the explicit33dBm record fixture | Stable camping and physical carrier selection |
 | Native call control with SACCH | Native Alerting, physical Answer-to-CONNECT, complete rejected-call clearing; outgoing physical dial/CM admission/SETUP/CALL PROCEEDING decode and acknowledgement | Connected traffic, speech, arbitrary transactions and loss recovery |
-| Native traffic assignment | Incoming early/late and outgoing command decodes; one outgoing TSC2 normal burst before the shared `1:a50d` program escape | Backed traffic execution, complete traffic blocks, assigned-slot timing, Assignment Complete and speech |
+| Native traffic assignment | Outgoing and late incoming: TCH/F on timeslot 1 with FACCH SABM/UA, RR Assignment Complete acknowledged, SACCH/TF SI5/SI6 decode and Measurement Reports, exact uplink block decodes | Speech in either direction, traffic-channel call clearing, the early incoming variant (its page is not answered, independently of page 1) |
 
 The CPU additions needed by the normal-burst frontend have generic focused
 tests. The rebuilt native ROM6 menu/storage/save-state scenarios, ROM4
@@ -957,28 +958,50 @@ transmit windows/releases, and 20 successful SACCH blocks with no failures.
 Adding `--traffic-assignment` waits for that real acknowledgement, then sends
 Assignment 6244: `032421062e094023006301` plus padding. Network N(S)=2/N(R)=1
 continues the same link. Native decoding completes at 28.834481231 seconds.
-The handset requests traffic configuration and an empty traffic SABM, but
-FCALLD at `8fba` accesses unbacked `1:a50d` at 28.906205429. This is the same
-XPC 1 / SP `02b3` boundary as both incoming variants. The full run is red.
+The handset requests traffic configuration, and FCALLD at `8fba` enters
+program page 1 at `1:a50d`. With the [captured page](#native-traffic-program-page-boundary)
+mapped, the 36-second run passes with zero unbacked reads. The fixture's
+TCH/F starts at frame 6248 on timeslot 1 with TSC 2. The handset's FACCH
+SABM (frame 6266) gets UA, and its RR Assignment Complete `06 29 00` (frame
+6287) gets an RR acknowledgement. Fifteen SACCH Measurement Reports follow.
+All uplink blocks decode exactly; after the first four, every uplink speech
+block decodes too. The fixture sends no downlink speech, so neither direction
+of speech is qualified.
 
-All 65 projected/released transmit transactions precede the first escape;
-the last release is at 28.903862385. Independent decoding yields 15 complete
-TSC0 control blocks, two trailing TSC0 bursts, and one normal burst using
-the assigned TSC2, both xCCH stealing flags set, with 114 payload bits.
-The last burst's P27 words are:
-`51ff 0f55 50ae 1f55 0aaf 0b00 9770 1709 fff5 002f f544 0aef e142 fffe 01ff`.
-This qualifies single-burst framing only: no complete traffic/FACCH block,
-assigned-slot timing, Assignment Complete or speech is established. The
-whole-stream TSC0/four-burst control checker must not be weakened to accept
-this bearer transition as a successful call.
+The checks split the uplink as the fixture does. Bursts released from the
+TCH start frame in the TS1 uplink phase are traffic bursts, checked by
+`check_traffic_channel`. The releases before the first of them are the
+control stream, still checked as exact TSC0 access and four-burst control
+blocks. The channel change may cut the last control block short; only bursts
+released after the TCH start may form that block. After the assignment the
+handset decodes SI5/SI6 as SACCH/TF: blocks end at FN mod 104 = 103 (TS
+45.002 table 1, timeslot 1), even blocks SI5 and odd blocks SI6.
 
 ```sh
 .venv/bin/python tools/run_npe3_native.py --reference-clock --seconds 36 --scenario outgoing --adc-source fcch-sch-broadcast --capture-start p09 --tx-release p05 --raw-agch --provision-records --cell-power-policy handset33 --sacch --accept-outgoing-service --proceed-outgoing-call
-# Separate traffic investigation: expected red at the program-backing boundary.
+# Traffic assignment; TCH/F establishment passes on captured page 1.
 .venv/bin/python tools/run_npe3_native.py --reference-clock --seconds 36 --scenario outgoing --adc-source fcch-sch-broadcast --capture-start p09 --tx-release p05 --raw-agch --provision-records --cell-power-policy handset33 --sacch --accept-outgoing-service --proceed-outgoing-call --traffic-assignment
 ```
 
 ### Native traffic program-page boundary
+
+Program page 1 (A[16]=1) is now captured. djr-747's
+[`nokia-dct3-emu`](https://github.com/djr-747/nokia-dct3-emu) commit
+`1e6c0422` carries `analysis/dsp/rom6/acquisition/page1.be16` (SHA-256
+`ad6fc9dc…8eff48`), read on the bench with ROM READA at A[16]=1. Five words
+were re-read from hardware afterwards, including `1:a50d` = `ea00`, and match.
+Full coverage is bench-reported; the raw transport frames were not kept.
+Higher address bits are untested, so pages 2 and up stay unmapped.
+
+`make audit-dsp-rom6` pins the image and checks those five words. The
+prepared `nsm3_rom6_program_page1.be16` zeroes `0080..1fff`. With OVLY set
+that window shows on-chip DARAM on every page, so the capture read RAM there:
+7,416 of its words are nonzero and differ from page 0's padding. The board
+maps page 1 at `0x10000` with the same DARAM overlay view. The observers
+count a read of `0080..1fff` on either page with OVLY clear, or any read from
+page 2 up, as unbacked.
+
+The rest of this section records the boundary as it stood before the capture.
 
 The current full24s gate is red at an unbacked program
 page,not a newly unsupported opcode. Observed program words8fba..8fbd are
@@ -1073,9 +1096,9 @@ first-escape address/time and missing-read count above.
 # Separate positive paging fixture;the default39dBm control is unchanged.
 .venv/bin/python tools/run_npe3_native.py --reference-clock --seconds 24 --adc-source fcch-sch-broadcast --capture-start p09 --tx-release p05 --raw-agch --provision-records --page-at 18 --cell-power-policy handset33
 # Add --incoming-call for the separate raw CC SETUP/native confirmation fixture.
-# Add --traffic-assignment to that fixture for the currently failing native
-# traffic-initialization investigation;this is not a green call gate.
-# Separate late-assignment investigation, also expected red until backing exists:
+# Adding only --traffic-assignment to that fixture is red: its page is not
+# answered (the same before page 1 was mapped).
+# Late assignment after physical Answer and CONNECT; TCH/F establishment passes:
 .venv/bin/python tools/run_npe3_native.py --reference-clock --seconds 24 --adc-source fcch-sch-broadcast --capture-start p09 --tx-release p05 --raw-agch --provision-records --page-at 18 --cell-power-policy handset33 --incoming-call --ack-call-control --sacch --answer-call --traffic-assignment --assignment-after-connect
 ```
 
@@ -1441,7 +1464,7 @@ or a program-page mirror to turn these results into broader acceptance.
 | --- | --- | --- |
 | Physically selected RF carrier | Own firmware's command words/channel arithmetic are known; SCU-to-HAGAR shift, select, enable and settling semantics are not | A matched SCU/HAGAR register/serial contract, or a correlated command/pin capture identifying those fields and edges |
 | Physical receive timing/camping | P09/P0a/P0b/P05 laboratory policies work, but do not identify ADC/transfer/INT0 ownership or the physical counter epoch | Matched MFI/SCU timing documentation or a correlated counter/control/ADC/INT0 capture; a successful decoded payload alone is insufficient |
-| Connected traffic/speech | Incoming early/late and outgoing assignments reach the same unbacked program address `1:a50d` | Full-address program reads at `1:a50d` and `0:a50d`, with PMST/XPC/mask provenance; preferably the complete page-1 upper bank, or a reliable MAD2 program-address decode contract |
+| Connected traffic/speech | TCH/F establishment is qualified on captured page 1; the fixture sends no downlink speech and no traffic-channel clearing | A downlink speech source and TCH clearing in the 6210 fixture, then audio checks as for ROM4; higher program pages if execution reaches them |
 | Fitted 6210 mask/clock identity | The acquired ROM6 and 45.5 MHz are explicitly reference inputs | Product-matched mask/multiplier documentation or measured provenance, not another fitted execution rate |
 
 The existing traces cannot distinguish hardware implementations that share

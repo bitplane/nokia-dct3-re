@@ -26,6 +26,30 @@ class DedicatedSubmissionTest(unittest.TestCase):
             with patch('tools.rom6_adc_measure_check.check_rx_publications',return_value=dict(packets=[dict(native[0],time='0.01'),native[1]])):
                 with self.assertRaises(ValueError):check_sacch(text,5)
 
+    def test_sacch_follows_the_slot1_traffic_schedule_after_assignment(self):
+        si2=bytes([0x59,6,0x1a])+bytes(20)
+        si3=bytearray(23);si3[:3]=bytes([0x49,6,0x1b]);si3[3:10]=bytes.fromhex('000100f1100001')
+        blocks=[bytes.fromhex('0500030349061d')+bytes(16),
+                bytes.fromhex('050003032d061e000100f110000120ff')+b'\x2b'*7]
+        text=(f'rf_adc_broadcast_si: index=1 arfcn=35 octets={si2.hex()} physical_claim=0\n'
+              f'rf_adc_broadcast_si: index=2 arfcn=35 octets={si3.hex()} physical_claim=0\n')
+        text+='\n'.join(f'npe3_bts_sacch: index={i} starts=42 period=102 octets={b.hex()} tsc=0 raw_adc_only=1 physical_claim=0'
+                         for i,b in enumerate(blocks))
+        tch='\nnpe3_tch_start: first_frame=6248 timeslot=1 tsc=2 sacch=si5,si6 speech=empty codec=gsm_06_10 raw_adc_only=1 physical_claim=0'
+        def publish(rows):
+            return [dict(type=128,payload='702a00'+frame.to_bytes(3,'big').hex()+'00230001'+blocks[kind].hex(),
+                         time=str(frame*60000/13000000+0.01)) for frame,kind in rows]
+        # SACCH/TF on TS1 ends at FN mod 104 = 103; even blocks carry SI5.
+        good=publish([(45,0),(147,1),(6343,0),(6447,1)])
+        with patch('tools.rom6_adc_measure_check.check_rx_publications',return_value=dict(packets=good)):
+            self.assertEqual(check_sacch(text+tch,5)['traffic_sacch_end_frames'],[6343,6447])
+            for bad in (text,text+tch+tch,text+tch.replace('timeslot=1','timeslot=2')):
+                with self.assertRaises(ValueError):check_sacch(bad,5)
+        for rows in ([(45,0),(147,1),(6343,1),(6447,0)],[(45,0),(147,1),(6342,0),(6447,1)],
+                     [(45,0),(147,1),(6343,0)]):
+            with patch('tools.rom6_adc_measure_check.check_rx_publications',return_value=dict(packets=publish(rows))):
+                with self.assertRaises(ValueError):check_sacch(text+tch,5)
+
     def text(self):
         return ('npe3_mcu_tx_commit: sequence=1 t=12.098916000 previous=0000 producer=000d '
                 'words=1802,042a,0000,0000,0040,8000,0023,4000,0000,0000,0000,0000,0000 '

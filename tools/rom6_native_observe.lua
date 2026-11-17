@@ -6,14 +6,17 @@ assert(not machine.devices[':dsp_hle'] and not machine.devices[':dsp_staged'])
 machine:logerror('rom6_native_composition: hle=0 staged=0 observer_writes=0\n')
 local handles = {}
 local missing_program=0
-handles[#handles+1]=cpu.spaces.program:install_read_tap(0x80,0x1fff,'rom6_program_coverage',function(address)
-    if (cpu.state.PMST.value&0x20)==0 then
-        missing_program=missing_program+1
-        if missing_program<=8 then
-            machine:logerror(string.format('rom6_native_unacquired_program: address=%04x observer_writes=0\n',address))
+-- With OVLY clear, 0080..1fff of either captured page is zero padding.
+for _,base in ipairs({0x0000,0x10000}) do
+    handles[#handles+1]=cpu.spaces.program:install_read_tap(base+0x80,base+0x1fff,'rom6_program_coverage',function(address)
+        if (cpu.state.PMST.value&0x20)==0 then
+            missing_program=missing_program+1
+            if missing_program<=8 then
+                machine:logerror(string.format('rom6_native_unacquired_program: address=%04x observer_writes=0\n',address))
+            end
         end
-    end
-end)
+    end)
+end
 local captured={}
 for _,region in ipairs({{'loader2',0x0a00,623,'data'}, {'installed',0x0590,422,'program'}}) do
     local trigger=region[1]=='loader2' and 0x0a00 or 0x2c75

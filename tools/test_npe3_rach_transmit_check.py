@@ -99,6 +99,13 @@ class NativeAccessTransmitTest(unittest.TestCase):
                     marker+row.replace('network_reply=0','network_reply=1')):
             with self.assertRaises(ValueError):check_releases(bad,[burst],windows)
         with self.assertRaises(ValueError):check(self.text+'\n'+marker,self.journal())
+        # A traffic boundary qualifies only a complete prefix of the releases.
+        later=row.replace('sequence=1','sequence=2').replace('2.300000000','2.400000000')
+        self.assertTrue(check_releases(marker+row+'\n'+later,[burst],windows,prefix=True)['timed_candidate_release_qualified'])
+        with self.assertRaises(ValueError):check_releases(marker+row+'\n'+later,[burst],windows)
+        with self.assertRaises(ValueError):check_releases(marker,[burst],windows,prefix=True)
+        with self.assertRaises(ValueError):
+            check(self.text,self.journal(),require_releases=True,traffic_first_frame=100)
 
 
 if __name__=='__main__':unittest.main()

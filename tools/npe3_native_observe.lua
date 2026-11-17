@@ -40,12 +40,16 @@ _G.npe3_native_control=dsp.spaces.io:install_write_tap(0x36,0x36,'npe3_native_co
     end
 end)
 local missing_program=0
+-- With OVLY clear, 0080..1fff of either captured page is zero padding.
 _G.npe3_native_coverage=dsp.spaces.program:install_read_tap(0x80,0x1fff,'npe3_native_coverage',function()
     if dsp.state.PMST.value&0x20==0 then missing_program=missing_program+1 end
 end)
+_G.npe3_native_page1_coverage=dsp.spaces.program:install_read_tap(0x10080,0x11fff,'npe3_native_page1_coverage',function()
+    if dsp.state.PMST.value&0x20==0 then missing_program=missing_program+1 end
+end)
 local upper_reads=0
-_G.npe3_native_upper_coverage=dsp.spaces.program:install_read_tap(0x10000,0x7fffff,'npe3_native_upper_coverage',function(address,value)
-    -- This composition maps only page0. Count escapes even if unbacked words
+_G.npe3_native_upper_coverage=dsp.spaces.program:install_read_tap(0x20000,0x7fffff,'npe3_native_upper_coverage',function(address,value)
+    -- Only pages 0 and 1 are captured. Count escapes even if unbacked words
     -- happen to decode legally; terminal ILLEGAL alone is insufficient.
     missing_program=missing_program+1;upper_reads=upper_reads+1
     if upper_reads==1 then

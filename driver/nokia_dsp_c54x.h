@@ -117,7 +117,10 @@ private:
 	devcb_write_line m_rf_reset_cb;
 	bool m_external_rf_receive = false;
 	std::array<u16, 0x10000> m_program{};
+	// Program page 1 (XPC bit 0), when the program region supplies it.
+	std::unique_ptr<std::array<u16, 0x10000>> m_program_page1;
 	memory_view m_overlay;
+	memory_view m_overlay_page1;
 	std::array<u16, 0x10000> m_data{};
 	std::array<u16, 0x100> m_io{};
 	tms320c54x_bsp_state m_bsp;

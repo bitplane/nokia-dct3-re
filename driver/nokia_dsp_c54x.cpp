@@ -22,7 +22,8 @@ nokia_dsp_c54x_device::nokia_dsp_c54x_device(const machine_config &mconfig,
 	m_rf_receive_cb(*this, 0),
 	m_rf_control_cb(*this),
 	m_rf_reset_cb(*this),
-	m_overlay(*this, "overlay")
+	m_overlay(*this, "overlay"),
+	m_overlay_page1(*this, "overlay_page1")
 {
 }
 
@@ -59,6 +60,20 @@ void nokia_dsp_c54x_device::device_start()
 	m_overlay[0].install_readwrite_handler(0x0080, m_overlay_end - 1,
 			read16sm_delegate(*this, FUNC(nokia_dsp_c54x_device::overlay_r)),
 			write16sm_delegate(*this, FUNC(nokia_dsp_c54x_device::overlay_w)));
+	// A two-page region also backs program page 1. Its overlay window shows
+	// the same DARAM (a page-1 capture there read RAM, not ROM). Higher
+	// pages stay unmapped: no capture covers them.
+	if (m_program_rom.bytes() >= 0x40000)
+	{
+		m_program_page1 = std::make_unique<std::array<u16, 0x10000>>();
+		std::copy_n(&m_program_rom[0x10000], m_program_page1->size(), m_program_page1->begin());
+		program.install_rom(0x10000, 0x1ffff, m_program_page1->data());
+		program.nop_write(0x10000, 0x1ffff);
+		program.install_view(0x10080, 0x10000 + m_overlay_end - 1, m_overlay_page1);
+		m_overlay_page1[0].install_readwrite_handler(0x10080, 0x10000 + m_overlay_end - 1,
+				read16sm_delegate(*this, FUNC(nokia_dsp_c54x_device::overlay_r)),
+				write16sm_delegate(*this, FUNC(nokia_dsp_c54x_device::overlay_w)));
+	}
 	m_slot_timer = timer_alloc(FUNC(nokia_dsp_c54x_device::slot_timer_expired), this);
 	m_transfer_timer = timer_alloc(FUNC(nokia_dsp_c54x_device::transfer_timer_expired), this);
 	m_frame_timer = timer_alloc(FUNC(nokia_dsp_c54x_device::frame_timer_expired), this);
@@ -376,6 +391,13 @@ void nokia_dsp_c54x_device::ovly_w(int state)
 		m_overlay.select(0);
 	else
 		m_overlay.disable();
+	if (m_program_page1)
+	{
+		if (state)
+			m_overlay_page1.select(0);
+		else
+			m_overlay_page1.disable();
+	}
 }
 
 // Handler offsets count from the view's start.

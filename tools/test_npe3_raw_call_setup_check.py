@@ -1,9 +1,30 @@
 import unittest
 from unittest.mock import patch
-from tools.npe3_raw_call_setup_check import check,check_assignment,check_call_rr,check_call_clearing,check_outgoing,check_outgoing_progress
+from tools.npe3_raw_call_setup_check import check,check_assignment,check_call_rr,check_call_clearing,check_outgoing,check_outgoing_progress,check_traffic_channel
 
 
 class RawCallSetupTest(unittest.TestCase):
+    def test_traffic_channel_requires_sabm_assignment_complete_and_reports(self):
+        def uplink(kind,frame,octets,exact=1):
+            return (f'npe3_tch_uplink: channel={kind} start_frame={frame} octets={octets} exact_code={exact} '
+                    'speech_blocks=0 bad_speech_blocks=0 unreadable_bursts=0 downlink_speech_blocks=0 port_bits_only=1 physical_claim=0')
+        report='0500010349061500400000000000000000000000000000'
+        rows=['npe3_tch_start: first_frame=6248 timeslot=1 tsc=2 sacch=si5,si6 speech=empty codec=gsm_06_10 raw_adc_only=1 physical_claim=0',
+              uplink('facch',6266,'013f01'+'2b'*20),
+              'npe3_tch_facch: kind=ua uplink_start_frame=6266 octets=017301'+'2b'*20+' raw_adc_only=1 physical_claim=0',
+              uplink('facch',6287,'01000d062900'+'2b'*17),
+              'npe3_tch_facch: kind=rr uplink_start_frame=6287 octets=012101'+'2b'*20+' raw_adc_only=1 physical_claim=0']
+        rows+=[uplink('sacch',6265+104*n,report) for n in range(4)]
+        text='\n'.join(rows)
+        result=check_traffic_channel(text,6244)
+        self.assertTrue(result['assignment_complete_qualified'])
+        self.assertFalse(result['speech_transport_qualified'])
+        for bad in (text.replace('timeslot=1','timeslot=2'),text.replace('062900','062901'),
+                    text.replace('kind=rr','kind=ua'),text.replace('exact_code=1','exact_code=0',1),
+                    '\n'.join(rows[:-1]),text+'\nnative_dsp_reset_line: released=0',
+                    text.replace('first_frame=6248','first_frame=6246')):
+            with self.assertRaises(ValueError):check_traffic_channel(bad,6244)
+
     def test_outgoing_progress_requires_setup_real_ack_and_native_downlinks(self):
         proceeding='0322098302'+'2b'*18
         assignment='032421062e094023006301'+'2b'*12

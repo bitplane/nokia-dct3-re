@@ -23,19 +23,33 @@ def check_sacch(text,ms_power_level):
     if (len(rows)!=2 or len(rows)!=text.count('npe3_bts_sacch:') or
             [(int(row[1]),bytes.fromhex(row[2])) for row in rows]!=list(enumerate(blocks))):
         raise ValueError('SACCH source differs from cell data and physical header policy')
-    good=[];failed=0;types=set()
+    # After an assignment the fixture serves the same SI5/SI6 blocks as
+    # SACCH/TF on timeslot 1: TS 45.002 table 1 places its bursts at
+    # FN mod 104 = 25,51,77,103, and block n carries SI5 (even) or SI6 (odd).
+    tch=re.findall(r'npe3_tch_start: first_frame=(\d+) timeslot=(\d+) ',text)
+    if len(tch)>1 or text.count('npe3_tch_start:')!=len(tch):raise ValueError('ambiguous TCH start')
+    if tch and tch[0][1]!='1':raise ValueError('SACCH/TF schedule is qualified for timeslot 1 only')
+    tch_first=int(tch[0][0]) if tch else None
+    good=[];tch_good=[];failed=0;types=set();tch_types=set()
     for packet in check_rx_publications(text)['packets']:
         body=bytes.fromhex(packet['payload'])
         if packet['type']!=128 or body[:1]!=b'\x70':continue
         if len(body)!=33 or body[1]!=42:raise ValueError('malformed SACCH publication')
         if body[2]:failed+=1;continue
-        frame=int.from_bytes(body[3:6],'big');kind=(frame//102)&1
-        if (frame%102!=45 or body[6:8]!=b'\0\x23' or body[10:]!=blocks[kind] or
+        frame=int.from_bytes(body[3:6],'big')
+        traffic=tch_first is not None and frame>=tch_first
+        if traffic:
+            kind=((frame//26-3)//4)&1;on_schedule=frame%104==103
+        else:
+            kind=(frame//102)&1;on_schedule=frame%102==45
+        if (not on_schedule or body[6:8]!=b'\0\x23' or body[10:]!=blocks[kind] or
                 float(packet['time'])<=frame*60000/13000000):
             raise ValueError('native SACCH differs from the exact scheduled SI5/SI6 waveform')
-        good.append(frame);types.add(kind)
+        (tch_good if traffic else good).append(frame);(tch_types if traffic else types).add(kind)
     if len(good)<2 or types!={0,1}:raise ValueError('native SI5/SI6 SACCH reception incomplete')
+    if tch_good and tch_types!={0,1}:raise ValueError('native SACCH/TF reception incomplete')
     return dict(native_sacch_decode_qualified=True,successful_end_frames=good,
+                traffic_sacch_end_frames=tch_good,
                 failed_blocks=failed,si_types=[5,6],physical_rf_tuning_qualified=False,
                 stable_camping_qualified=False)
 

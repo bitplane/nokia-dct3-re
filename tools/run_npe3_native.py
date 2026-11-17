@@ -325,12 +325,16 @@ def main():
         if args.scenario=='outgoing':
             from tools.npe3_rach_transmit_check import check as check_access
             from tools.npe3_raw_call_setup_check import check_outgoing
+            # Control transmissions end where the assigned traffic channel starts.
             access=check_access(text,(first/'rom6_radio_writes.tsv').read_text(),
                                 require_windows=True,require_releases=True,allow_normal=True)
             report['outgoing']=check_outgoing(text,access['normal_control_blocks'],admitted=args.accept_outgoing_service)
             if args.proceed_outgoing_call:
                 from tools.npe3_raw_call_setup_check import check_outgoing_progress
                 report['outgoing_progress']=check_outgoing_progress(text,access['normal_control_blocks'],assignment=args.traffic_assignment)
+            if args.traffic_assignment:
+                from tools.npe3_raw_call_setup_check import check_traffic_channel
+                report['traffic_channel']=check_traffic_channel(text,report['outgoing_progress']['assignment_start_frame'])
         if args.page_at is not None:
             from tools.npe3_native_paging_response_check import check as check_native_page_response
             report['paging_response']=check_native_page_response(text,(first/'rom6_radio_writes.tsv').read_text())
@@ -345,6 +349,8 @@ def main():
             if args.traffic_assignment:
                 from tools.npe3_raw_call_setup_check import check_assignment
                 report['traffic_assignment']=check_assignment(text,access['normal_control_blocks'],after_connect=args.assignment_after_connect)
+                from tools.npe3_raw_call_setup_check import check_traffic_channel
+                report['traffic_channel']=check_traffic_channel(text,report['traffic_assignment']['start_frame'])
             if args.ack_call_control:
                 from tools.npe3_raw_call_setup_check import check_call_rr
                 report['call_rr']=check_call_rr(text,access['normal_control_blocks'])

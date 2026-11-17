@@ -24,10 +24,10 @@ multiplier unresolved.
 
 `nsm3r6` selects the C54x backend without `dsp_hle` or `dsp_staged`, separate
 program/data regions, the `0080..1fff` executable overlay and the extended
-program instruction grammar. Only page zero has an acquired program map.
-The 6210 raw traffic experiment now executes FCALLD to `1:a50d`, outside
-that input; see the [page/mapping boundary](rom6_rf_interface.md#native-traffic-program-page-boundary).
-Do not confuse page-0 completion with acquisition of the full extended ROM.
+program instruction grammar. Program pages 0 and 1 are acquired; page 1's
+DARAM overlay window is zeroed. The 6210 traffic experiments execute FCALLD
+to `1:a50d` and establish TCH/F; see the [page/mapping boundary](rom6_rf_interface.md#native-traffic-program-page-boundary).
+Higher pages are not captured and stay unmapped.
 The independent SDCCH path supports native Alerting, physical rejection,
 SACCH SI5/SI6 reception, complete rejected-call clearing, and physical
 outgoing dial/CM service admission/SETUP. These do not enter or qualify the

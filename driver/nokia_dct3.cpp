@@ -3019,9 +3019,13 @@ ROM_END
 ROM_START( npe3r6 )
 	ROM_REGION16_BE(0x10000, "boot_rom", ROMREGION_ERASEFF)
 	ROM_LOAD("mad2_mask_rom.bin", 0, 0x10000, NO_DUMP)
-	ROM_REGION16_BE(0x20000, "dsp_program", ROMREGION_ERASEFF)
+	ROM_REGION16_BE(0x40000, "dsp_program", ROMREGION_ERASEFF)
 	ROM_LOAD("nsm3_rom6_program.be16", 0, 0x20000,
 		CRC(f90ba19a) SHA1(d6b1f40eaa4b2c8a9f7adcb6cb5864d9cc1354fc))
+	// Program page 1 (A[16]=1). The private input auditor zeroes its
+	// 0080..1fff DARAM overlay window, which the capture read as RAM.
+	ROM_LOAD("nsm3_rom6_program_page1.be16", 0x20000, 0x20000,
+		CRC(2770e68f) SHA1(51178fc69b3662a8a05291149832f04a1a2c6032))
 	ROM_REGION16_BE(0x20000, "dsp_data", ROMREGION_ERASE00)
 	ROM_LOAD("nsm3_rom6_data.be16", 0, 0x20000,
 		CRC(bdb0b876) SHA1(845133638256ed1f07e014437fdee3ececc4508f))
@@ -3170,9 +3174,13 @@ ROM_END
 ROM_START( nsm3r6 )
 	ROM_REGION16_BE(0x10000, "boot_rom", ROMREGION_ERASEFF)
 	ROM_LOAD("mad2_mask_rom.bin", 0, 0x10000, NO_DUMP)
-	ROM_REGION16_BE(0x20000, "dsp_program", ROMREGION_ERASEFF)
+	ROM_REGION16_BE(0x40000, "dsp_program", ROMREGION_ERASEFF)
 	ROM_LOAD("nsm3_rom6_program.be16", 0, 0x20000,
 		CRC(f90ba19a) SHA1(d6b1f40eaa4b2c8a9f7adcb6cb5864d9cc1354fc))
+	// Program page 1 (A[16]=1). The private input auditor zeroes its
+	// 0080..1fff DARAM overlay window, which the capture read as RAM.
+	ROM_LOAD("nsm3_rom6_program_page1.be16", 0x20000, 0x20000,
+		CRC(2770e68f) SHA1(51178fc69b3662a8a05291149832f04a1a2c6032))
 	// Captured B000..FFFF data alias plus declared zero initialization,
 	// not a cold-RAM dump. The private input auditor creates this region.
 	ROM_REGION16_BE(0x20000, "dsp_data", ROMREGION_ERASE00)

@@ -358,9 +358,18 @@ The block/subprobe captures cover `0000..007f` and `2000..7fff`; their thirty
 overlapping words agree. Reassembly from the acquired upper-program base and
 ordered sweeps matches the working image byte-for-byte. `0080..1fff` is zero
 padding, not dumped immutable ROM or a cold-RAM snapshot.
-No higher XPC page is present in these inputs. The6210 native traffic path
-executes FCALLD to1:a50d;further acquisition or a proven MAD2 bank-decode
-contract is needed there. See the [native radio boundary](../docs/rom6_rf_interface.md).
+Program page 1 (A[16]=1) is a separate later input,
+`acquisition/page1.be16` with its `page1.json`, copied from the same
+repository at commit `1e6c042207457dfb56f04e1e4b5955300b728cd2`:
+
+| Input | Bytes | SHA-256 |
+| --- | ---: | --- |
+| Program page 1 | 131,072 | `ad6fc9dc87779a22fb23fd02e9789dfc23170d12a88c6bbd25538e292d8eff48` |
+
+The auditor checks five words re-read from hardware after the capture and
+prepares `nsm3_rom6_program_page1.be16` with `0080..1fff` zeroed, because
+that DARAM overlay window read RAM. No page above 1 is present. See the
+[native radio boundary](../docs/rom6_rf_interface.md#native-traffic-program-page-boundary).
 
 The 20,480-word `b000..ffff` data alias differs from the program view at 12,277
 addresses (`b4f8`: data `fa60`, program `f074`). Keep the views separate: using

@@ -18,7 +18,10 @@ PINNED = {
     'sweeps/block-words.txt': '738d3c52a6161ae2629008abfe2e31aa0bcafb233ac63c923cf53cdbadc1d1e8',
     'sweeps/subprobe-words.txt': 'debc557a678538c1180f63b9363c97655cf50b6f71bf580eb311cc5b069a789d',
     'working/rom6_program.be16': 'b450413a3b29a83f691533584f5c923f475e0a720c85acc1ec50097c63eee4cf',
+    'acquisition/page1.be16': 'ad6fc9dc87779a22fb23fd02e9789dfc23170d12a88c6bbd25538e292d8eff48',
 }
+# Single words re-read from hardware after the page-1 capture (A[16]=1).
+PAGE1_SPOT_WORDS = {0x8000: 0x10f8, 0xa50d: 0xea00, 0xa776: 0xed00, 0xaee5: 0xf074, 0xbffe: 0x7c2a}
 SWEEP = re.compile(r'([0-9A-Fa-f]{4}) ([0-9A-Fa-f]{4}) (ok|ok-confirmed3x)')
 ALIAS = re.compile(r'\s*([0-9A-Fa-f]{4}):\s*([0-9A-Fa-f]{4})\s*')
 
@@ -44,6 +47,22 @@ def program_page_audit(program):
         scanned_word_pairs=len(words)-1,
         scope='raw adjacent-word patterns; includes data and operands; not a control-flow or absence proof',
         nonzero_page_candidates=candidates)
+
+
+def prepare_page1(page1):
+    """Program page 1 (A[16]=1) with its DARAM overlay window zeroed.
+
+    With OVLY set, 0080..1fff of every page reads on-chip DARAM, so the
+    capture's words there are RAM contents, not ROM. Zeros there are padding,
+    as in page 0."""
+    if len(page1) != 0x20000:
+        raise ValueError('expected exactly one page-1 program page')
+    for address, value in PAGE1_SPOT_WORDS.items():
+        if int.from_bytes(page1[2*address:2*address+2], 'big') != value:
+            raise ValueError(f'page-1 spot word differs at 1:{address:04x}')
+    prepared = bytearray(page1)
+    prepared[2*0x80:2*0x2000] = bytes(2*(0x2000 - 0x80))
+    return bytes(prepared)
 
 
 def parse_rows(data, expression, first, last):
@@ -112,13 +131,16 @@ def audit(root, pins=PINNED):
         parse_rows(inputs['acquisition/drom.txt'], ALIAS, 0xb000, 0xffff))
     if program != inputs['working/rom6_program.be16']:
         raise ValueError('program reconstruction differs from promoted image')
-    report = dict(program_sha256=digest(program), data_region_sha256=digest(data),
+    page1 = prepare_page1(inputs['acquisition/page1.be16'])
+    report = dict(program_sha256=digest(program), program_page1_sha256=digest(page1),
+        data_region_sha256=digest(data),
         program_bytes=len(program), low_capture_words=12288, data_alias_words=20480,
         program_padding='0080..1fff: zeros, not immutable ROM',
+        program_page1='A[16]=1 capture; 0080..1fff zeroed (DARAM overlay window); higher pages not captured',
         data_initialization='outside B000..FFFF: zeros, not a captured reset state',
         program_page_coverage=program_page_audit(program),
         fitted_mask_compatibility=False, execution_validated=False)
-    return program, data, report
+    return program, page1, data, report
 
 
 def main():
@@ -127,10 +149,11 @@ def main():
     parser.add_argument('--prepare', type=Path, help='write derived research regions after all checks pass')
     args = parser.parse_args()
     try:
-        program, data, report = audit(args.root)
+        program, page1, data, report = audit(args.root)
         if args.prepare:
             args.prepare.mkdir(parents=True, exist_ok=True)
             (args.prepare/'nsm3_rom6_program.be16').write_bytes(program)
+            (args.prepare/'nsm3_rom6_program_page1.be16').write_bytes(page1)
             (args.prepare/'nsm3_rom6_data.be16').write_bytes(data)
             (args.prepare/'rom6-input-audit.json').write_text(json.dumps(report, indent=2)+'\n')
     except (OSError, UnicodeError, ValueError) as error:

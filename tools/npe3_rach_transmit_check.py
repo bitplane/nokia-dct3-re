@@ -9,6 +9,39 @@ from tools.rom6_adc_measure_check import check_rx_publications
 
 WINDOW=re.compile(r'npe3_tx_window: sequence=(\d+) t=([\d.]+) words=(\d+) counter=([0-9a-f]{4}) controls=([0-9a-f,]+) deadlines=([\d.,-]+) observer_writes=0 physical_claim=0')
 RELEASE=re.compile(r'npe3_tx_release: sequence=(\d+) t=([\d.]+) target=([0-9a-f]{4}) counter=([0-9a-f]{4}) words=([0-9a-f,]+) network_reply=0 physical_claim=0')
+TCH_START=re.compile(r'npe3_tch_start: first_frame=(\d+) ')
+
+
+def traffic_boundary(text):
+    """First frame of the fixture's unique traffic channel, or None.
+
+    Bursts released from that frame on are TCH/F bursts with their own
+    checks; the access and dedicated-control checks here stop before it."""
+    if 'npe3_tch_start:' not in text:return None
+    starts=TCH_START.findall(text)
+    if len(starts)!=1 or text.count('npe3_tch_start:')!=1:raise ValueError('ambiguous traffic-channel start')
+    return int(starts[0])
+
+
+def release_frame(release):
+    return int(float(release[2])*13000000)//60000%2715648
+
+
+def control_release_count(text,boundary):
+    """Releases before the first traffic-channel burst.
+
+    As in the fixture, a TCH/F burst is one released from the traffic
+    channel's first frame on in the TS1 uplink phase (TDMA phase 4). After
+    the first one, every release must be a traffic burst."""
+    rows=list(RELEASE.finditer(text))
+    if boundary is None:return len(rows)
+    traffic=[release_frame(row)>=boundary and int(float(row[2])*13000000)%60000//7500==4 for row in rows]
+    count=traffic.index(True) if True in traffic else len(rows)
+    if not all(traffic[count:]):
+        raise ValueError('control transmissions continue on the traffic channel')
+    return count
+
+
 AGCH=re.compile(r'npe3_raw_agch: ra=([0-9a-f]{2}) access_frame=(\d+) start_frame=(\d+) octets=([0-9a-f]{46}) raw_adc_only=1 tuned_air_source=0 physical_claim=0')
 
 
@@ -17,7 +50,9 @@ def check_agch(text, *, require_native=True,allow_normal=False):
     combined='npe3_bts_layout: combined_ccch=1 sdcch4=1 timeslot=0 agch_endings=9,15,19 physical_claim=0' in text
     releases=[]
     normal=0
-    for release in RELEASE.finditer(text):
+    limit=control_release_count(text,traffic_boundary(text)) if allow_normal else None
+    for index,release in enumerate(RELEASE.finditer(text)):
+        if limit is not None and index>=limit:break
         words=[int(word,16) for word in release[5].split(',')]
         try:decode_p27_access(words,42)
         except ValueError:
@@ -103,10 +138,11 @@ def transactions(writes):
     return result
 
 
-def check_windows(text,bursts,frames):
+def check_windows(text,bursts,frames,*,prefix=False):
     rows=list(WINDOW.finditer(text))
-    if len(rows)!=len(bursts) or len(rows)!=text.count('npe3_tx_window:'):
+    if len(rows)!=text.count('npe3_tx_window:') or len(rows)<len(bursts) or (len(rows)!=len(bursts) and not prefix):
         raise ValueError('incomplete projected transmit windows')
+    rows=rows[:len(bursts)]
     source_frames=[]
     p05_deadlines=[]
     for index,(row,burst) in enumerate(zip(rows,bursts),1):
@@ -132,13 +168,15 @@ def check_windows(text,bursts,frames):
                 declared_counter_hz='13000000/12',physical_release_qualified=False)
 
 
-def check_releases(text,bursts,windows):
+def check_releases(text,bursts,windows,*,prefix=False):
     identity='npe3_tx_candidate: p05_start=1 port_buffer_only=1 network_reply=0 physical_claim=0'
     rows=list(RELEASE.finditer(text))
     deadlines=windows.get('p05_deadlines',[])
     if (text.count(identity)!=1 or text.count('npe3_tx_candidate:')!=1 or
-            len(rows)!=len(bursts) or len(deadlines)!=len(bursts) or len(rows)!=text.count('npe3_tx_release:')):
+            len(rows)<len(bursts) or (len(rows)!=len(bursts) and not prefix) or
+            len(deadlines)!=len(bursts) or len(rows)!=text.count('npe3_tx_release:')):
         raise ValueError('missing explicit complete P05 laboratory releases')
+    rows=rows[:len(bursts)]
     for index,(row,burst,due) in enumerate(zip(rows,bursts,deadlines),1):
         sequence,stamp,target,counter,words=row.groups()
         if (int(sequence)!=index or target!=counter or int(target,16)!=burst[3][0] or
@@ -149,8 +187,21 @@ def check_releases(text,bursts,windows):
                 network_reply=False,physical_release_qualified=False)
 
 
-def check(text,writes,bsic=42,*,require_windows=False,require_releases=False,allow_normal=False):
+def check(text,writes,bsic=42,*,require_windows=False,require_releases=False,allow_normal=False,
+          traffic_first_frame=None):
+    """traffic_first_frame: qualify only the dedicated-control transmissions
+    released before that TDMA frame; the traffic channel has its own checks.
+    By default it is the fixture's unique traffic-channel start, if any."""
     all_bursts=transactions(writes)
+    if traffic_first_frame is None:
+        traffic_first_frame=traffic_boundary(text)
+    prefix=traffic_first_frame is not None
+    if prefix:
+        if not (allow_normal and require_releases):
+            raise ValueError('a traffic boundary requires timed mixed releases')
+        count=control_release_count(text,traffic_first_frame)
+        if count>len(all_bursts):raise ValueError('releases exceed serializer transactions')
+        all_bursts=all_bursts[:count]
     access_indices=[]
     normal=[]
     for index,burst in enumerate(all_bursts):
@@ -185,18 +236,27 @@ def check(text,writes,bsic=42,*,require_windows=False,require_releases=False,all
         window_frames=frames
         if allow_normal:
             releases=list(RELEASE.finditer(text))
-            if len(releases)!=len(all_bursts):raise ValueError('mixed transmit release count differs')
+            if len(releases)<len(all_bursts) or (len(releases)!=len(all_bursts) and not prefix):
+                raise ValueError('mixed transmit release count differs')
+            releases=releases[:len(all_bursts)]
             window_frames=[int(float(row[2])*13000000)//60000%2715648 for row in releases]
             if [window_frames[index] for index in access_indices]!=frames:
                 raise ValueError('timed native access frames differ from RA_INFO')
-        result['candidate_windows']=check_windows(text,all_bursts,window_frames)
+        result['candidate_windows']=check_windows(text,all_bursts,window_frames,prefix=prefix)
     if require_releases:
-        result['candidate_releases']=check_releases(text,all_bursts,result['candidate_windows'])
+        result['candidate_releases']=check_releases(text,all_bursts,result['candidate_windows'],prefix=prefix)
     elif 'npe3_tx_release:' in text or 'npe3_tx_candidate:' in text:
         raise ValueError('no-release control unexpectedly enabled the transmit candidate')
     if allow_normal:
+        # The channel change may cut the last control block short; only bursts
+        # released after the traffic channel starts may form that block.
+        interrupted=len(normal)%4 if prefix else 0
+        if interrupted and any(window_frames[index]<traffic_first_frame for index,_ in normal[-interrupted:]):
+            raise ValueError('incomplete control block precedes the traffic channel')
+        normal=normal[:len(normal)-interrupted]
         if not normal or len(normal)%4:
             raise ValueError('native normal transmit stream lacks complete four-burst blocks')
+        result['interrupted_control_bursts']=interrupted
         blocks=[]
         for at in range(0,len(normal),4):
             group=normal[at:at+4]

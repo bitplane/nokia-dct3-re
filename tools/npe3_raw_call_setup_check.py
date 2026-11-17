@@ -288,3 +288,43 @@ def check_call_clearing(text,blocks):
                 disc_frame=disc,closing_ua_frame=ua,native_decode_times=times,
                 common_configuration_time=common[0]['time'],stable_camping_qualified=False,
                 traffic_channel_qualified=False,connected_call_qualified=False,speech_transport_qualified=False)
+
+
+TCH_START=re.compile(r'npe3_tch_start: first_frame=(\d+) timeslot=(\d+) tsc=(\d+) ')
+
+
+def check_traffic_channel(text,assignment_start):
+    """The native TCH/F after an Assignment Command, from the fixture's exact decodes.
+
+    Establishment only: FACCH SABM/UA, RR Assignment Complete and its
+    acknowledgement, and SACCH Measurement Reports. Speech is not qualified."""
+    from tools.rom4_lab_registration_check import FAULT,TCH_UPLINK,TCH_REPLY
+    starts=TCH_START.findall(text)
+    if len(starts)!=1 or text.count('npe3_tch_start:')!=1:
+        raise ValueError('missing unique traffic channel start')
+    first,timeslot,tsc=(int(value) for value in starts[0])
+    if timeslot!=1 or tsc!=2 or first<assignment_start+4:
+        raise ValueError('traffic channel does not follow the assigned TCH/F')
+    after=text[text.find('npe3_tch_start:'):]
+    if 'native_dsp_reset_line:' in after or FAULT.search(after):
+        raise ValueError('native DSP reset or faulted on the traffic channel')
+    uplinks=[(kind,int(frame),bytes.fromhex(octets),code=='1') for kind,frame,octets,code in TCH_UPLINK.findall(text)]
+    if len(uplinks)!=text.count('npe3_tch_uplink:') or not all(exact for *_,exact in uplinks):
+        raise ValueError('traffic-channel uplink block without an exact convolutional decode')
+    facch=[(frame,block) for kind,frame,block,_ in uplinks if kind=='facch']
+    sabm=[frame for frame,block in facch if block[:3]==b'\x01\x3f\x01']
+    complete=[frame for frame,block in facch if block[3:6]==b'\x06\x29\x00']
+    if not sabm or not complete or complete[0]<=sabm[0] or facch[0][0]!=sabm[0]:
+        raise ValueError('FACCH lacks SABM followed by RR Assignment Complete')
+    replies={}
+    for kind,source in TCH_REPLY.findall(text):
+        replies.setdefault(kind,int(source))
+    if replies.get('ua')!=sabm[0] or replies.get('rr')!=complete[0]:
+        raise ValueError('network FACCH replies are not bound to SABM and Assignment Complete')
+    reports=[frame for kind,frame,block,_ in uplinks if kind=='sacch' and block[5:7]==b'\x06\x15']
+    if len(reports)<4 or reports[0]<first:
+        raise ValueError('too few SACCH Measurement Reports on the traffic channel')
+    return dict(traffic_channel_qualified=True,tch_first_frame=first,sabm_frame=sabm[0],
+                assignment_complete_frame=complete[0],measurement_reports=len(reports),
+                assignment_complete_qualified=True,connected_call_qualified=False,
+                speech_transport_qualified=False)
