@@ -36,6 +36,10 @@ public:
 	// This resets execution state, not architectural registers or peripherals.
 	void reset_execution_pipeline();
 	u64 pipeline_cycles() const { return m_pipeline_cycles; }
+	// The board's promise that data reads at or above data_start, and all
+	// program reads, have no side effects and change only between timeslices.
+	// Lets execute_run skip the identical iterations of a polling loop.
+	void set_pure_reads(u16 data_start) { m_pure_data_start = data_start; }
 	// PMST for board memory maps that depend on it on every access (OVLY).
 	u16 pmst() const { return m_pmst; }
 	auto bio_in_cb() { return m_bio_in_cb.bind(); }
@@ -442,6 +446,38 @@ private:
 	void start_state_trace();
 	void trace_mix(u64 value);
 	void trace_cycle();
+	void trace_clock(std::array<u64, 7> const &values);
+	// Spin skipping (see spin_backward). Every access with an effect outside
+	// the core bumps m_effects; reads below m_pure_data_start count too.
+	static constexpr unsigned SPIN_PERIOD_MAX = 64;
+	struct spin_watch
+	{
+		u32 head = ~0U;
+		u32 last = ~0U;
+		u32 run = 0;
+		u64 cycles = 0;
+		u64 effects = 0;
+		u64 period = 0;
+		bool armed = false;
+	};
+	u32 m_pure_data_start = 0x10000;
+	u64 m_effects = 0;
+	u32 m_run_serial = 0;
+	spin_watch m_spin;
+	std::vector<u8> m_spin_state;
+	std::array<std::array<u64, 7>, SPIN_PERIOD_MAX> m_spin_trace{};
+	// Opcodes counted by coverage since the last backward jump.
+	std::array<u16, SPIN_PERIOD_MAX> m_spin_ops{};
+	unsigned m_spin_op_count = 0;
+	void spin_backward(u32 address);
+	bool spin_state(bool compare);
+	u16 data_word_r(u16 address) { m_effects += address < m_pure_data_start; return m_data.read_word(address); }
+	void data_word_w(u16 address, u16 value) { ++m_effects; m_data.write_word(address, value); }
+	void program_word_w(u32 address, u16 value) { ++m_effects; m_program.write_word(address, value); }
+	u16 io_word_r(u16 address) { ++m_effects; return m_io.read_word(address); }
+	void io_word_w(u16 address, u16 value) { ++m_effects; m_io.write_word(address, value); }
+	bool bio() { ++m_effects; return m_bio_in_cb(); }
+	bool ready() { ++m_effects; return m_ready_in_cb(); }
 	int m_icount = 0;
 };
 

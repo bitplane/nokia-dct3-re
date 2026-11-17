@@ -677,6 +677,7 @@ void tms320c54x_device::update_xf(bool force)
 	if (force || level != m_xf_level)
 	{
 		m_xf_level = level;
+		++m_effects;
 		m_xf_out_cb(level);
 	}
 }
@@ -718,7 +719,7 @@ void tms320c54x_device::state_export(const device_state_entry &entry)
 
 u16 tms320c54x_device::data_read(u16 address)
 {
-	return m_data.read_word(address);
+	return data_word_r(address);
 }
 
 void tms320c54x_device::data_write(u16 address, u16 value, unsigned owner_stage)
@@ -733,7 +734,7 @@ void tms320c54x_device::data_write(u16 address, u16 value, unsigned owner_stage)
 		m_illegal = true; return;
 	}
 	bool const braf_before = bool(m_st1 & ST1_BRAF);
-	m_data.write_word(address, value);
+	data_word_w(address, value);
 	if (address == 7 && m_slot[owner_stage].valid &&
 		bool(m_st1 & ST1_BRAF) != braf_before)
 		pipeline_update_braf(m_slot[owner_stage].address);
@@ -1248,7 +1249,7 @@ void tms320c54x_device::interrupt_entry_step()
 		m_pc = m_interrupt_vector_pc;
 		break;
 	case 4:
-		m_data.write_word(m_interrupt_stack_address, m_rtn);
+		data_word_w(m_interrupt_stack_address, m_rtn);
 		m_interrupt_entry_stage = 0;
 		break;
 	}
@@ -1411,7 +1412,7 @@ inline ATTR_FORCE_INLINE tms320c54x_device::pipeline_cycle_result tms320c54x_dev
 			// Hold the retained slot before the actual I/O side effect. Clock
 			// consumers continue; no new interrupt is accepted mid-transfer.
 			if (m_pipeline_io_wait_remaining) { --m_pipeline_io_wait_remaining; return pipeline_cycle_result::consumed; }
-			if (m_pipeline_io_ready_required && !m_ready_in_cb()) return pipeline_cycle_result::consumed;
+			if (m_pipeline_io_ready_required && !ready()) return pipeline_cycle_result::consumed;
 			m_pipeline_io_ready_required = false;
 		}
 	}
@@ -1428,7 +1429,7 @@ tms320c54x_device::pipeline_cycle_result tms320c54x_device::pipeline_service_pen
 	}
 	if (m_hold.long_store)
 	{
-		m_data.write_word(m_slot[5].operand_address ^ 1, m_slot[5].immediate);
+		data_word_w(m_slot[5].operand_address ^ 1, m_slot[5].immediate);
 		m_hold.long_store = false;
 		pipeline_accept_interrupt();
 		return pipeline_cycle_result::consumed;
@@ -1600,7 +1601,7 @@ void tms320c54x_device::pipeline_step()
 				? u16(m_pipeline_repeat_sp + mode) : u16((m_pipeline_repeat_status & 0x1ff) << 7) | mode;
 			// SUBC never writes T/TRN, so those mapped sources are plain per-issue reads.
 			if (address < 0x60 && address != 0x0e && address != 0x0f) { logerror("%s: repeated SUBC register/peripheral source is unsupported\n", machine().describe_context()); m_illegal = true; return; }
-			u16 const value = m_data.read_word(address);
+			u16 const value = data_word_r(address);
 			u64 &source = accumulator(BIT(m_pipeline_repeat_word, 8));
 			source = conditional_subtract(source, value, BIT(m_pipeline_repeat_word, 8));
 			if (BIT(mode, 7) && !preincrement) indirect_modify(mode);
@@ -1626,7 +1627,7 @@ void tms320c54x_device::pipeline_step()
 			u16 const value = data_read(source);
 			if (BIT(mode, 7)) indirect_modify(mode);
 			u32 const destination = (m_pipeline_repeat_address & 0x7f0000) | u16(m_pipeline_repeat_source + m_rpt_iteration);
-			m_program.write_word(physical_program_address(destination), value);
+			program_word_w(physical_program_address(destination), value);
 		}
 		else if (staged_write_a(m_pipeline_repeat_word))
 		{
@@ -1636,7 +1637,7 @@ void tms320c54x_device::pipeline_step()
 			if (source < 0x60) { logerror("%s: repeated WRITA register/peripheral source is unsupported\n", machine().describe_context()); m_illegal = true; return; }
 			u16 const value = data_read(source);
 			if (BIT(mode, 7)) indirect_modify(mode);
-			m_program.write_word(physical_program_address(m_pipeline_repeat_program_source + m_rpt_iteration), value);
+			program_word_w(physical_program_address(m_pipeline_repeat_program_source + m_rpt_iteration), value);
 		}
 		else if (m_pipeline_repeat_word != 0xf495)
 		{
@@ -1796,7 +1797,7 @@ void tms320c54x_device::pipeline_step()
 			bool const overflow = (m_slot[4].word & 0xfde7) == 0xf860;
 			u16 const overflow_mask = 1U << (10 - BIT(m_slot[4].word, 3));
 			bool const taken = staged_bio_branch(m_slot[4].word)
-				? (BIT(m_slot[4].word, 0) ? !m_bio_in_cb() : bool(m_bio_in_cb())) : staged_tc_branch(m_slot[4].word)
+				? (BIT(m_slot[4].word, 0) ? !bio() : bool(bio())) : staged_tc_branch(m_slot[4].word)
 				? BIT(m_st0, 12) == BIT(m_slot[4].word, 4) : (m_slot[4].word & 0xfdfb) == 0xf808
 				? BIT(m_st0, 11) == BIT(m_slot[4].word, 2) : overflow ? bool(m_st0 & overflow_mask) == BIT(m_slot[4].word, 4) : staged_accumulator_condition(m_slot[4].word, accumulator(BIT(m_slot[4].word, 3)));
 			if (overflow) m_st0 &= ~overflow_mask;
@@ -1824,7 +1825,7 @@ void tms320c54x_device::pipeline_step()
 		if (m_slot[4].valid && staged_bio_branch(m_slot[4].word) && BIT(m_slot[4].word, 9))
 			// BIO is a physical line, sampled once in Read for BC and BCD
 			// (SPRU131G 8.3.1), not at later delay-word retirement.
-			m_slot[4].immediate = BIT(m_slot[4].word, 0) ? !m_bio_in_cb() : bool(m_bio_in_cb());
+			m_slot[4].immediate = BIT(m_slot[4].word, 0) ? !bio() : bool(bio());
 		if (m_slot[3].valid && (m_slot[3].word & 0xfcf8) == 0xf4a8)
 		{
 			// Category-I CMPR reads ARx/AR0 in Access, before older Read or
@@ -1840,7 +1841,7 @@ void tms320c54x_device::pipeline_step()
 	if (m_slot[3].valid && staged_xc(m_slot[3].word))
 	{
 		u16 const word = m_slot[3].word;
-		bool execute = (word & 0xfe) == 2 ? (bool(m_bio_in_cb()) != BIT(word, 0)) : BIT(word, 6) ? (word & 7) == 0 || staged_accumulator_condition(word, accumulator(BIT(word, 3))) :
+		bool execute = (word & 0xfe) == 2 ? (bool(bio()) != BIT(word, 0)) : BIT(word, 6) ? (word & 7) == 0 || staged_accumulator_condition(word, accumulator(BIT(word, 3))) :
 			BIT(word, 5) ? BIT(m_st0, 12) == BIT(word, 4) : BIT(word, 3) ? BIT(m_st0, 11) == BIT(word, 2) : true;
 		if (BIT(word, 6) && BIT(word, 5))
 		{
@@ -3311,7 +3312,7 @@ void tms320c54x_device::pipeline_step()
 		if (m_slot[4].valid && ((m_slot[4].word & 0xfeff) == 0xf066 || (m_slot[4].word & 0xfcff) == 0xf067))
 			m_slot[4].operand = m_t;
 		if (m_slot[4].valid && staged_port_read(m_slot[4].word))
-			m_slot[4].operand = m_io.read_word(m_slot[4].immediate);
+			m_slot[4].operand = io_word_r(m_slot[4].immediate);
 		if (m_slot[4].valid && (staged_dld(m_slot[4].word) || staged_long_arithmetic(m_slot[4].word)))
 		{
 			m_slot[4].t = m_t;
@@ -3613,7 +3614,7 @@ void tms320c54x_device::pipeline_step()
 			// fields; register_write preserves siblings and masks AG/BG to 8 bits.
 			// Table 7-3: non-accumulator T moves are visible to the next consumer.
 			// CLKMD uses this retained write after its separately paid access clock.
-			m_data.write_word(m_slot[4].immediate, m_slot[4].operand);
+			data_word_w(m_slot[4].immediate, m_slot[4].operand);
 		if (m_slot[4].valid && (m_slot[4].word == 0x7308 || m_slot[4].word == 0x730b) && m_slot[4].immediate == 7)
 			// Publish at the move's Read clock, not its later Execute clock:
 			// SPRU131G table 7-14 permits an immediately following RPTB.
@@ -3626,7 +3627,7 @@ void tms320c54x_device::pipeline_step()
 			// mapped read has no accumulator conflict. Sample after older mapped
 			// Execute, without changing direct-ALU producer latency. RPTZ's
 			// sequence-opening clear likewise precedes the first MVMD sample.
-			m_slot[3].operand = m_data.read_word(m_slot[3].operand_address);
+			m_slot[3].operand = data_word_r(m_slot[3].operand_address);
 			u16 const destination = m_slot[3].immediate;
 			if (((destination >= 0x10 && destination <= 0x19) || destination == 0x1a) && !m_slot[3].early_write_deferred)
 			{
@@ -3675,7 +3676,7 @@ void tms320c54x_device::pipeline_step()
 		}
 		if (m_slot[4].valid && (staged_call(m_slot[4].word) || staged_far_call(m_slot[4].word)))
 			// The opcode's Execute precedes the complete two-word slot's Execute.
-			m_data.write_word(m_slot[4].operand_address, m_slot[4].immediate);
+			data_word_w(m_slot[4].operand_address, m_slot[4].immediate);
 		if (m_slot[4].valid && staged_conditional_branch(m_slot[4].word) && !staged_bio_branch(m_slot[4].word) && BIT(m_slot[4].word, 9))
 		{
 			// Our complete two-word slot reaches Read at the opcode's Evaluate
@@ -3711,7 +3712,7 @@ void tms320c54x_device::pipeline_step()
 			// Consume older accumulator/TC publications before retaining the
 			// decision. Execute must not retest a subsequently changed source.
 			u16 const word = m_slot[4].word & 0xfdff;
-			bool const taken = (word & 0xfe) == 2 ? (bool(m_bio_in_cb()) != BIT(word, 0)) : (word & 0xffef) == 0xfc20 ? BIT(m_st0, 12) == BIT(word, 4) :
+			bool const taken = (word & 0xfe) == 2 ? (bool(bio()) != BIT(word, 0)) : (word & 0xffef) == 0xfc20 ? BIT(m_st0, 12) == BIT(word, 4) :
 				staged_accumulator_condition(word, accumulator(BIT(word, 3)));
 			m_slot[4].immediate = taken;
 			if (staged_delayed_conditional_return(m_slot[4].word))
@@ -3738,7 +3739,7 @@ void tms320c54x_device::pipeline_step()
 		// Class 5A takes three clocks but has zero DP-consumer latency
 		// (SPRU172C 4-71, SPRU131G table 7-17). Retain one memory sample
 		// and forward it to younger direct operands before the two held clocks.
-		m_slot[4].operand = m_data.read_word(m_slot[4].operand_address);
+		m_slot[4].operand = data_word_r(m_slot[4].operand_address);
 		m_hold.dp_wait = 2;
 		for (unsigned stage = 2; stage < 4; ++stage)
 		{
@@ -3853,9 +3854,15 @@ bool tms320c54x_device::pipeline_execute()
 	// XC's replacement NOP consumes a slot, not an original instruction entry.
 	if (!m_slot[5].annulled && !m_instruction_observer_cb.isunset()) m_instruction_observer_cb(address, m_op);
 	++m_pc;
-	if (m_coverage && !m_coverage->count[m_op]++) m_coverage->first_pc[m_op] = address;
+	if (m_coverage)
+	{
+		if (!m_coverage->count[m_op]++) m_coverage->first_pc[m_op] = address;
+		if (m_spin_op_count < SPIN_PERIOD_MAX) m_spin_ops[m_spin_op_count++] = m_op;
+		else ++m_effects;
+	}
 	if (m_coverage && staged_shifted_smem(m_op))
 	{
+		++m_effects; // a skipped iteration would not count its extension tuple
 		bool const extended = u8(m_op) >= 0xe0;
 		std::array<u16, 4> const words = {u16(extended ? 3 : 2), m_op,
 			extended ? m_slot[5].extension_first : m_slot[5].immediate,
@@ -3890,7 +3897,7 @@ bool tms320c54x_device::pipeline_execute()
 		}
 		break;
 	case 3: // staged_software_intr(m_op)
-		m_data.write_word(m_slot[5].operand_address, m_slot[5].immediate);
+		data_word_w(m_slot[5].operand_address, m_slot[5].immediate);
 		break;
 	case 4: // m_op == 0xf49b || m_op == 0xf69b
 		m_st1 &= ~u16(0x0800);
@@ -4023,7 +4030,7 @@ bool tms320c54x_device::pipeline_execute()
 		break;
 	case 17: // staged_write_a(m_op)
 		{
-			m_program.write_word(m_pipeline_write_a_target, m_slot[5].operand);
+			program_word_w(m_pipeline_write_a_target, m_slot[5].operand);
 			if (u8(m_op) >= 0xe0) ++m_pc;
 		}
 		break;
@@ -4036,7 +4043,7 @@ bool tms320c54x_device::pipeline_execute()
 		break;
 	case 19: // staged_data_to_program(m_op)
 		{
-			m_program.write_word((u32(m_slot[5].immediate) << 16) | m_slot[5].operand_address, m_slot[5].operand);
+			program_word_w((u32(m_slot[5].immediate) << 16) | m_slot[5].operand_address, m_slot[5].operand);
 			m_pc += u8(m_op) >= 0xe0 ? 2 : 1;
 			if (m_pipeline_repeat_active && m_pipeline_repeat_body_latched && address == m_pipeline_repeat_address)
 			{
@@ -4131,7 +4138,7 @@ bool tms320c54x_device::pipeline_execute()
 		break;
 	case 33: // staged_dst(m_op)
 		{
-			m_data.write_word(m_slot[5].operand_address, m_slot[5].operand);
+			data_word_w(m_slot[5].operand_address, m_slot[5].operand);
 			m_hold.long_store = true;
 			if (staged_extended_dst(m_op)) ++m_pc;
 		}
@@ -4207,7 +4214,7 @@ bool tms320c54x_device::pipeline_execute()
 		break;
 	case 41: // staged_port_write(m_op)
 		{
-			m_io.write_word(m_slot[5].immediate, m_slot[5].operand);
+			io_word_w(m_slot[5].immediate, m_slot[5].operand);
 			m_pc += u8(m_op) >= 0xe0 ? 2 : 1;
 			if (m_pipeline_repeat_active && m_pipeline_repeat_body_latched && address == m_pipeline_repeat_address) pipeline_begin_repeat_stream();
 		}
@@ -4761,12 +4768,12 @@ void tms320c54x_device::pipeline_repeat_port()
 		if (write) return; // Retain the RAM Read before the port Write.
 	}
 	if (m_pipeline_io_wait_remaining) { --m_pipeline_io_wait_remaining; return; }
-	if (m_pipeline_io_ready_required && !m_ready_in_cb()) return;
+	if (m_pipeline_io_ready_required && !ready()) return;
 	m_pipeline_io_ready_required = false;
-	if (write) m_io.write_word(m_pipeline_repeat_source, m_pipeline_repeat_io_value);
+	if (write) io_word_w(m_pipeline_repeat_source, m_pipeline_repeat_io_value);
 	else if (!m_pipeline_repeat_store_pending)
 	{
-		m_pipeline_repeat_io_value = m_io.read_word(m_pipeline_repeat_source);
+		m_pipeline_repeat_io_value = io_word_r(m_pipeline_repeat_source);
 		m_pipeline_repeat_store_pending = true;
 		return;
 	}
@@ -4982,7 +4989,7 @@ u16 tms320c54x_device::pipeline_observed_read(u16 address, unsigned stage)
 	m_observed_data_address = address;
 	m_observed_data_instruction = m_slot[stage].address;
 	m_observed_data_opcode = m_slot[stage].word;
-	u16 const value = m_data.read_word(address);
+	u16 const value = data_word_r(address);
 	m_observed_data_read = false;
 	return value;
 }
@@ -5232,6 +5239,7 @@ void tms320c54x_device::execute_register_effects(u16 const op)
 
 void tms320c54x_device::execute_run()
 {
+	++m_run_serial;
 	while (m_icount > 0)
 	{
 		if (m_illegal || m_idle) { m_icount = 0; break; }
@@ -5245,7 +5253,75 @@ void tms320c54x_device::execute_run()
 		pipeline_step();
 		--m_icount;
 		if (m_state_trace) trace_cycle();
+		if (m_slot[5].valid)
+		{
+			if (m_slot[5].address < m_spin.last && m_pure_data_start < 0x10000)
+				spin_backward(m_slot[5].address);
+			m_spin.last = m_slot[5].address;
+		}
 	}
+}
+
+// A polling loop waits on memory that only another agent can change, and
+// other agents run only between timeslices. When the Execute stage jumps
+// back to the same instruction with the same period, no access with an
+// outside effect in between, and a byte-identical core state, every later
+// iteration in this timeslice is identical too: skip them whole. Only
+// m_pipeline_cycles advances; with the state trace on, the skipped clocks
+// replay the last iteration's per-clock trace, so the oracle sees them.
+void tms320c54x_device::spin_backward(u32 address)
+{
+	u64 const period = m_pipeline_cycles - m_spin.cycles;
+	unsigned const ops = m_spin_op_count;
+	m_spin_op_count = 0;
+	bool const repeat = address == m_spin.head && m_spin.run == m_run_serial && m_spin.effects == m_effects &&
+			period <= SPIN_PERIOD_MAX;
+	m_spin.head = address;
+	m_spin.run = m_run_serial;
+	m_spin.cycles = m_pipeline_cycles;
+	m_spin.effects = m_effects;
+	if (!repeat || !m_instruction_observer_cb.isunset() || (machine().debug_flags & DEBUG_FLAG_ENABLED))
+	{
+		m_spin.armed = false;
+		return;
+	}
+	if (!m_spin.armed || period != m_spin.period || !spin_state(true))
+	{
+		spin_state(false);
+		m_spin.period = period;
+		m_spin.armed = true;
+		return;
+	}
+	u64 const clocks = u64(m_icount) / period * period;
+	if (m_state_trace)
+		for (u64 n = 0; n < clocks; ++n)
+		{
+			++m_pipeline_cycles;
+			trace_clock(m_spin_trace[(m_pipeline_cycles - period) % SPIN_PERIOD_MAX]);
+		}
+	else
+		m_pipeline_cycles += clocks;
+	if (m_coverage)
+		for (unsigned n = 0; n < ops; ++n)
+			m_coverage->count[m_spin_ops[n]] += clocks / period;
+	m_icount -= int(clocks);
+	m_spin.cycles = m_pipeline_cycles;
+}
+
+// The core's whole mutable state: m_pc through the hold flags (everything
+// before m_pipeline_cycles), then the stage slots. Compare or store it.
+bool tms320c54x_device::spin_state(bool compare)
+{
+	auto const *const core = reinterpret_cast<u8 const *>(&m_pc);
+	size_t const core_size = reinterpret_cast<u8 const *>(&m_pipeline_cycles) - core;
+	auto const *const slots = reinterpret_cast<u8 const *>(m_slot.data());
+	size_t const slots_size = sizeof(m_slot);
+	if (compare)
+		return !std::memcmp(m_spin_state.data(), core, core_size) && !std::memcmp(m_spin_state.data() + core_size, slots, slots_size);
+	m_spin_state.resize(core_size + slots_size);
+	std::memcpy(m_spin_state.data(), core, core_size);
+	std::memcpy(m_spin_state.data() + core_size, slots, slots_size);
+	return true;
 }
 
 // Development oracle for restructuring the pipeline model: with
@@ -5280,14 +5356,23 @@ void tms320c54x_device::trace_mix(u64 value)
 
 void tms320c54x_device::trace_cycle()
 {
+	std::array<u64, 7> const values = {
+		(u64(m_xpc) << 48) | (u64(m_pc) << 32) | (u32(m_st0) << 16) | m_st1,
+		m_a,
+		m_b,
+		(u64(m_ar[0]) << 48) | (u64(m_ar[1]) << 32) | (u32(m_ar[2]) << 16) | m_ar[3],
+		(u64(m_ar[4]) << 48) | (u64(m_ar[5]) << 32) | (u32(m_ar[6]) << 16) | m_ar[7],
+		(u64(m_sp) << 48) | (u64(m_t) << 32) | (u32(m_brc) << 16) | m_bk,
+		(u64(m_ifr) << 48) | (u64(m_imr) << 32) | (u32(m_idle) << 16) | u32(m_illegal) };
+	trace_clock(values);
+}
+
+void tms320c54x_device::trace_clock(std::array<u64, 7> const &values)
+{
 	trace_mix(m_pipeline_cycles);
-	trace_mix((u64(m_xpc) << 48) | (u64(m_pc) << 32) | (u32(m_st0) << 16) | m_st1);
-	trace_mix(m_a);
-	trace_mix(m_b);
-	trace_mix((u64(m_ar[0]) << 48) | (u64(m_ar[1]) << 32) | (u32(m_ar[2]) << 16) | m_ar[3]);
-	trace_mix((u64(m_ar[4]) << 48) | (u64(m_ar[5]) << 32) | (u32(m_ar[6]) << 16) | m_ar[7]);
-	trace_mix((u64(m_sp) << 48) | (u64(m_t) << 32) | (u32(m_brc) << 16) | m_bk);
-	trace_mix((u64(m_ifr) << 48) | (u64(m_imr) << 32) | (u32(m_idle) << 16) | u32(m_illegal));
+	for (u64 value : values)
+		trace_mix(value);
+	m_spin_trace[m_pipeline_cycles % SPIN_PERIOD_MAX] = values;
 	if (!(m_pipeline_cycles & ((u64(1) << 20) - 1)))
 		std::fprintf(m_state_trace, "%llu %016llx %.9f\n", (unsigned long long)m_pipeline_cycles,
 				(unsigned long long)m_state_trace_hash, machine().time().as_double());

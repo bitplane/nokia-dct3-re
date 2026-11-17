@@ -75,6 +75,47 @@ and `make check-c54x-state-trace` checks each change over the whole call
   later blocks that test the Decode slot's word can be gated as well. The
   generator refuses the marker if any slot word is written after it.
 
+## Polling loops
+
+Over the 35 s lab call the DSP executes about 349 million clocks. (IDLE is
+already skipped, so far fewer than the DSP clock rate implies.) About 11 % of
+them sit in two polling loops. Each loads a word, compares it, and branches
+back with a delayed `BCD` until another agent changes the word.
+
+Other agents run only between the core's timeslices, so within one slice a
+polling loop that has reached a fixed point stays there. `execute_run`
+watches for the Execute stage jumping back to the same instruction. It
+skips the slice's remaining whole iterations, advancing only
+`m_pipeline_cycles`, when all of these hold:
+
+- two successive iterations have the same period, at most 64 clocks;
+- nothing with an outside effect happened in the iteration: any memory or
+  I/O write, I/O read, BIO/READY sample, XF change, or data read below the
+  board's pure-read boundary (MMRs, the timer, the BSP);
+- the core state is byte-identical to the previous iteration's, from `m_pc`
+  through the hold flags and all six stage slots.
+
+A board opts in with `set_pure_reads(first)`. That promises data reads from
+`first` up, and all program reads, have no side effects and change only
+between timeslices. The DCT3 board passes 0x0060. Its only side-effecting
+reads are the BSP registers, and the HPI window is shared RAM. Boards that
+do not opt in never skip. Neither does a run with the debugger or an
+instruction observer attached.
+
+Skipping is exact. With the state trace on, each skipped clock replays the
+last iteration's per-clock trace values, and the oracle still matches on
+every clock. Opcode coverage (`-verbose`) adds each logged opcode once per
+skipped iteration. The census is byte-identical to a run without skipping.
+A loop that records a shifted-Smem extension tuple is not skipped.
+
+The skip covers 29 million clocks (8.3 %) of the call. Slices limit it. The
+lab RF fixture's receive-word timer fires about 121,000 times a second, so
+most DSP slices are only 32-63 clocks long. Detection costs two iterations
+per slice. Making that timer lazy would lengthen the slices. But the
+fixture's samples depend on the current time and on lab state, and fewer
+slice boundaries would coarsen ARM/DSP interleaving. That changes the
+emulation, so it is not done.
+
 The MCU side matters too. Every ARM fetch from flash went through MAME's
 16-to-32-bit unit splitter into two 16-bit handler calls. A native 32-bit
 `flash_r32` reads both halfwords in the splitter's own order. That order is
@@ -112,13 +153,21 @@ traffic call (`SECS=27`), after a plain rebuild.
 | Before | 427.4 G | 17.5 |
 | Idle services skipped | 395.0 G | |
 | Decode gates (3) | 365.5 G | 15.2 |
-| Decode-word gates (22, 23, 25) | 358.4 G | 14.4 |
+| Decode-word gates (22, 23, 25) | 358.4 G | 15.0 |
+| Polling loops skipped | 340.0 G | 14.4 |
+
+The last two CPU figures are each the mean of two back-to-back runs, an A/B
+of the same tree with and without the change. Single runs vary by about
+0.5 s.
 
 ## Where it stands
 
 With `make build-pgo`, the native traffic call's connected segment (23-27 s
-emulated) costs about 4.1 CPU seconds per 4 emulated seconds, about 97 % of
-real time on this host. The figure is the difference in user time between
+emulated) costs 4.1-4.4 CPU seconds per 4 emulated seconds, 91-97 % of real
+time on this host (mean of five runs 4.27 s, about 94 %). The polling-loop
+skip does not move this figure beyond run-to-run noise. In the connected
+call the DSP is busy with speech and spends little time polling. Its 4 %
+gain is in the rest of the run. The figure is the difference in user time between
 runs stopped at 23 and at 27 emulated seconds. It was 40 % before this work:
 56 % from PGO alone, 85 % after the steps in the first table, and the rest
 from the later steps.

@@ -30,6 +30,9 @@ void nokia_dsp_c54x_device::device_add_mconfig(machine_config &config)
 	TMS320C54X(config, m_cpu, clock());
 	m_cpu->reset_execution_pipeline();
 	m_cpu->set_standard_swwsr(true);
+	// data_r's only side-effecting reads are the BSP registers at 0x20-0x22;
+	// RAM, ROM and the HPI DARAM window change only between timeslices.
+	m_cpu->set_pure_reads(0x0060);
 	// ROM4 ORs its operational masks into retained IMR state and assigns its
 	// CTSI receiver to INT0. The MAD2/Lead cold-entry contract supplies bit 0;
 	// subsequent reset pulses preserve firmware-written IMR in the CPU core.
