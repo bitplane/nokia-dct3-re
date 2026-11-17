@@ -26,7 +26,8 @@ multiplier unresolved.
 program/data regions, the `0080..1fff` executable overlay and the extended
 program instruction grammar. Program pages 0 and 1 are acquired; page 1's
 DARAM overlay window is zeroed. The 6210 traffic experiments execute FCALLD
-to `1:a50d` and establish TCH/F; see the [page/mapping boundary](rom6_rf_interface.md#native-traffic-program-page-boundary).
+to `1:a50d` and establish TCH/F; the late incoming call carries the lab's
+tones through the native speech codecs both ways and clears on physical End; see the [page/mapping boundary](rom6_rf_interface.md#native-traffic-program-page-boundary).
 Higher pages are not captured and stay unmapped.
 The independent SDCCH path supports native Alerting, physical rejection,
 SACCH SI5/SI6 reception, complete rejected-call clearing, and physical

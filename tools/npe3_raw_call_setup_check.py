@@ -328,3 +328,45 @@ def check_traffic_channel(text,assignment_start):
                 assignment_complete_frame=complete[0],measurement_reports=len(reports),
                 assignment_complete_qualified=True,connected_call_qualified=False,
                 speech_transport_qualified=False)
+
+
+# Handset clearing on FACCH after physical End (GSM 04.08 5.4.3): DISCONNECT,
+# the lab's RELEASE, RELEASE COMPLETE, Channel Release, then DISC/UA.
+CLEARING=(('disconnect',lambda block:block[3]&15==3 and block[4]&0x3f==0x25),
+          ('release_complete',lambda block:block[3]&15==3 and block[4]&0x3f==0x2a),
+          ('disc',lambda block:block[:3]==b'\x01\x53\x01'))
+CLEARING_REPLIES=(('cc_release','disconnect'),('channel_release','release_complete'),('disc_ua','disc'))
+END_KEY=re.compile(r'npe3_native_physical: key=End t=([0-9.]+) ')
+
+
+def check_traffic_clearing(text,end_at):
+    """Physical End clears the call on FACCH, and TS1 carried the lab's tones both ways."""
+    from tools.rom4_lab_registration_check import TCH_UPLINK,TCH_REPLY,TCH_SPEECH,check_traffic_audio
+    pressed=END_KEY.findall(text)
+    if len(pressed)!=1 or abs(float(pressed[0])-end_at)>1e-6:
+        raise ValueError('missing unique timed physical End')
+    end_frame=float(pressed[0])*13_000_000/60_000
+    facch=[(int(frame),bytes.fromhex(octets)) for kind,frame,octets,_ in TCH_UPLINK.findall(text) if kind=='facch']
+    frames={}
+    for frame,block in facch:
+        for name,match in CLEARING:
+            if match(block):frames.setdefault(name,frame)
+    if list(frames)!=[name for name,_ in CLEARING] or not end_frame<frames['disconnect']<frames['release_complete']<frames['disc']:
+        raise ValueError(f'traffic-channel clearing missing or out of order: {list(frames)}')
+    if frames['disconnect']>end_frame+217:
+        raise ValueError('DISCONNECT did not follow physical End within one second')
+    replies={}
+    for kind,source in TCH_REPLY.findall(text):
+        replies.setdefault(kind,int(source))
+    for kind,message in CLEARING_REPLIES:
+        if replies.get(kind)!=frames[message]:
+            raise ValueError(f'{kind} is not bound to the first {message}')
+    result={f'tch_{name}_frame':frame for name,frame in frames.items()}
+    result['end_frame']=int(end_frame)
+    result['traffic_clearing_qualified']=True
+    if TCH_SPEECH.search(text):
+        result.update(check_traffic_audio(text))
+        result['speech_transport_qualified']=True
+    elif 'npe3_tch_audio:' not in text:
+        raise ValueError('traffic channel did not stop after DISC')
+    return result

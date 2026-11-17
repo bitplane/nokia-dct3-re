@@ -1,6 +1,6 @@
 import unittest
 from unittest.mock import patch
-from tools.npe3_raw_call_setup_check import check,check_assignment,check_call_rr,check_call_clearing,check_outgoing,check_outgoing_progress,check_traffic_channel
+from tools.npe3_raw_call_setup_check import check,check_assignment,check_call_rr,check_call_clearing,check_outgoing,check_outgoing_progress,check_traffic_channel,check_traffic_clearing
 
 
 class RawCallSetupTest(unittest.TestCase):
@@ -24,6 +24,34 @@ class RawCallSetupTest(unittest.TestCase):
                     '\n'.join(rows[:-1]),text+'\nnative_dsp_reset_line: released=0',
                     text.replace('first_frame=6248','first_frame=6246')):
             with self.assertRaises(ValueError):check_traffic_channel(bad,6244)
+
+    def test_traffic_clearing_requires_timed_end_bound_replies_and_tones(self):
+        def uplink(frame,octets):
+            return (f'npe3_tch_uplink: channel=facch start_frame={frame} octets={octets} exact_code=1 '
+                    'speech_blocks=0 bad_speech_blocks=0 unreadable_bursts=0 downlink_speech_blocks=0 port_bits_only=1 physical_claim=0')
+        def reply(kind,frame):
+            return f'npe3_tch_facch: kind={kind} uplink_start_frame={frame} octets=01 raw_adc_only=1 physical_claim=0'
+        rows=['npe3_tch_start: first_frame=4415 timeslot=1 tsc=2 sacch=si5,si6 speech=tone_1000hz codec=gsm_06_10 raw_adc_only=1 physical_claim=0',
+              '[luaengine] npe3_native_physical: key=End t=30.000000000 observer_writes=0',
+              uplink(6508,'010215836502e090'+'2b'*15),reply('cc_release',6508),
+              uplink(6530,'012409832a'+'2b'*18),reply('channel_release',6530),
+              uplink(6552,'015301'+'2b'*20),reply('disc_ua',6552),
+              'npe3_tch_audio: earpiece_hz=1000 earpiece_blocks=501 earpiece_tone_blocks=475 earpiece_tone_amplitude=1853 '
+              'microphone_hz=500 uplink_blocks=492 uplink_tone_blocks=475 uplink_tone_amplitude=38874 physical_claim=0']
+        text='\n'.join(rows)
+        result=check_traffic_clearing(text,30)
+        self.assertTrue(result['traffic_clearing_qualified'])
+        self.assertTrue(result['speech_transport_qualified'])
+        self.assertEqual(result['tch_disconnect_frame'],6508)
+        for bad in (text.replace('t=30.0','t=31.0'),text.replace('kind=cc_release','kind=rr'),
+                    text.replace('836502','836102'),text.replace('6508','6800'),
+                    text.replace('uplink_start_frame=6552','uplink_start_frame=6530'),
+                    text.replace('uplink_tone_blocks=475','uplink_tone_blocks=40'),
+                    text.replace('earpiece_tone_blocks=475','earpiece_tone_blocks=200'),
+                    '\n'.join(rows[:-1])):
+            with self.assertRaises(ValueError):check_traffic_clearing(bad,30)
+        silent=text.replace('speech=tone_1000hz','speech=empty')
+        self.assertNotIn('speech_transport_qualified',check_traffic_clearing(silent,30))
 
     def test_outgoing_progress_requires_setup_real_ack_and_native_downlinks(self):
         proceeding='0322098302'+'2b'*18

@@ -119,5 +119,18 @@ _G.npe3_native_input=coroutine.create(function()
     key:set_value(0)
     if not emu.wait(3) then return end
     machine.screens[':screen']:snapshot('npe3_after_menu.png')
+    -- Optional physical End on the connected call.
+    local end_at=tonumber(os.getenv('NPE3_NATIVE_END_AT') or '')
+    if not end_at then return end
+    assert(name=='Send' and end_at>=input_at+6)
+    if not emu.wait(end_at-input_at-3.15) then return end
+    machine.screens[':screen']:snapshot('npe3_before_end.png')
+    local finish=assert(machine.ioport.ports[':COL.0'].fields['End'])
+    machine:logerror(string.format('npe3_native_physical: key=End t=%.9f observer_writes=0\n',machine.time:as_double()))
+    finish:set_value(1)
+    if not emu.wait(0.15) then finish:set_value(0);return end
+    finish:set_value(0)
+    if not emu.wait(3) then return end
+    machine.screens[':screen']:snapshot('npe3_after_end.png')
 end)
 assert(coroutine.resume(_G.npe3_native_input))

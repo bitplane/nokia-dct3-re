@@ -28,7 +28,8 @@ ADC_FRAME_PAGE_MENU_SHA256 = '1c3932a7ea93beb30fa751369fa457c164e6605fda68ab3f90
 def configure_cell_power(directory,model,policy,*,incoming_call=False,
                          traffic_assignment=False,call_ack=False,clear_call=False,
                          sacch=False,assignment_after_connect=False,
-                         accept_outgoing_service=False,proceed_outgoing_call=False,frame_pages=False):
+                         accept_outgoing_service=False,proceed_outgoing_call=False,frame_pages=False,
+                         speech=False):
     if policy=='legacy39':return
     if policy!='handset33':raise ValueError('unsupported cell power policy')
     config=ET.Element('mameconfig',version='10')
@@ -53,6 +54,8 @@ def configure_cell_power(directory,model,policy,*,incoming_call=False,
         ET.SubElement(ports,'port',tag=':LAB_BTS',type='CONFIG',mask='512',defvalue='0',value='512')
     if frame_pages:
         ET.SubElement(ports,'port',tag=':LAB_BTS',type='CONFIG',mask='1024',defvalue='0',value='1024')
+    if speech:
+        ET.SubElement(ports,'port',tag=':LAB_BTS',type='CONFIG',mask='2048',defvalue='0',value='2048')
     destination=directory/'cfg';destination.mkdir()
     ET.ElementTree(config).write(destination/f'{model}.cfg',encoding='utf-8',xml_declaration=True)
 
@@ -169,9 +172,15 @@ def main():
                         help='raw CM SERVICE ACCEPT only after actual identity-matched call service request')
     parser.add_argument('--proceed-outgoing-call',action='store_true',
                         help='raw CALL PROCEEDING after actual native outgoing SETUP')
+    parser.add_argument('--speech',action='store_true',
+                        help='1 kHz downlink and 500 Hz microphone tones on the late-assigned TCH/F')
+    parser.add_argument('--end-call-at',type=int,metavar='SECONDS',
+                        help='physical End on the late-assigned TCH/F; the lab answers its clearing')
     parser.add_argument('--provision-records', action='store_true',
                         help='explicit synthetic record fixture; acquired PMM remains unchanged')
     args = parser.parse_args()
+    # The traffic call with speech or End runs on to 36 s.
+    page_seconds=36 if args.speech or args.end_call_at is not None else 24
     if args.accept_outgoing_service and args.scenario!='outgoing':
         parser.error('outgoing service admission requires the bounded outgoing scenario')
     if args.proceed_outgoing_call and not args.accept_outgoing_service:
@@ -188,6 +197,12 @@ def main():
         parser.error('standalone CC acknowledgement requires SETUP without assignment')
     if args.assignment_after_connect and not (args.traffic_assignment and args.answer_call and args.ack_call_control and args.sacch):
         parser.error('late assignment requires traffic assignment,physical Answer,CC acknowledgement and SACCH')
+    if (args.speech or args.end_call_at is not None) and not args.assignment_after_connect:
+        parser.error('speech and End are defined for the late-assigned answered call')
+    if args.speech and args.end_call_at is None:
+        parser.error('the tone summary needs the traffic channel cleared by End')
+    if args.end_call_at is not None and not args.input_at+6<=args.end_call_at<=args.seconds-4:
+        parser.error('End must follow Answer by 6 s and leave 4 s for clearing')
     if args.clear_rejected_call and not (args.reject_call and args.ack_call_control):
         parser.error('call clearing requires explicit physical Reject and CC acknowledgement')
     if args.sacch and (not args.raw_agch or args.cell_power_policy!='handset33'):
@@ -197,10 +212,10 @@ def main():
     if args.incoming_call and (args.cell_power_policy!='handset33' or args.page_at is None):
         parser.error('raw incoming call requires the separate33dBm addressed-page fixture')
     if args.cell_power_policy!='legacy39' and (not args.raw_agch or not args.provision_records or
-            not (args.scenario=='menu' and args.seconds==24 or args.scenario=='outgoing' and args.seconds==36)):
+            not (args.scenario=='menu' and args.seconds==page_seconds or args.scenario=='outgoing' and args.seconds==36)):
         parser.error('33dBm cell experiment requires the explicit24s menu or36s outgoing raw-AGCH record fixture')
-    if args.page_at is not None and (not args.raw_agch or not 16<=args.page_at<=20 or args.seconds!=24):
-        parser.error('addressed-page observation requires raw AGCH,16..20s input and the bounded24s run')
+    if args.page_at is not None and (not args.raw_agch or not 16<=args.page_at<=20 or args.seconds!=page_seconds):
+        parser.error(f'addressed-page observation requires raw AGCH,16..20s input and the bounded {page_seconds}s run')
     if args.frame_pages and (args.cell_power_policy!='handset33' or args.page_at is not None or
                              args.scenario!='menu' or args.seconds!=24):
         parser.error('frame pages require the separate 24s 33dBm menu fixture without addressed paging')
@@ -266,10 +281,11 @@ def main():
         directory.mkdir()
         configure_cell_power(directory,model,args.cell_power_policy,incoming_call=args.incoming_call,
                              traffic_assignment=args.traffic_assignment,call_ack=args.ack_call_control,
-                             clear_call=args.clear_rejected_call,sacch=args.sacch,
+                             clear_call=args.clear_rejected_call or args.end_call_at is not None,sacch=args.sacch,
                              assignment_after_connect=args.assignment_after_connect,
                              accept_outgoing_service=args.accept_outgoing_service,
-                             proceed_outgoing_call=args.proceed_outgoing_call,frame_pages=args.frame_pages)
+                             proceed_outgoing_call=args.proceed_outgoing_call,frame_pages=args.frame_pages,
+                             speech=args.speech)
         cmd = command.copy()
         cmd[-1] = str(seconds)
         if not persist:
@@ -283,6 +299,8 @@ def main():
         env['NPE3_NATIVE_SECONDS'] = str(seconds)
         env.pop('NPE3_NATIVE_PAGE_AT',None)
         if args.page_at is not None:env['NPE3_NATIVE_PAGE_AT']=str(args.page_at)
+        env.pop('NPE3_NATIVE_END_AT',None)
+        if args.end_call_at is not None:env['NPE3_NATIVE_END_AT']=str(args.end_call_at)
         with (directory / 'console.log').open('w') as output:
             subprocess.run(cmd, cwd=directory, env=env, stdout=output,
                            stderr=subprocess.STDOUT, check=True, timeout=600)
@@ -351,6 +369,9 @@ def main():
                 report['traffic_assignment']=check_assignment(text,access['normal_control_blocks'],after_connect=args.assignment_after_connect)
                 from tools.npe3_raw_call_setup_check import check_traffic_channel
                 report['traffic_channel']=check_traffic_channel(text,report['traffic_assignment']['start_frame'])
+                if args.end_call_at is not None:
+                    from tools.npe3_raw_call_setup_check import check_traffic_clearing
+                    report['traffic_clearing']=check_traffic_clearing(text,args.end_call_at)
             if args.ack_call_control:
                 from tools.npe3_raw_call_setup_check import check_call_rr
                 report['call_rr']=check_call_rr(text,access['normal_control_blocks'])
