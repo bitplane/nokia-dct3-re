@@ -25,8 +25,9 @@ ADC_LU_MENU_SHA256 = '5adef93609b763a40d0e3c9dca356d388a910bb393a518e99a53eec2c7
 ADC_FRAME_PAGE_MENU_SHA256 = '1c3932a7ea93beb30fa751369fa457c164e6605fda68ab3f904ce4cb6ea84fa2'
 
 
-# The outgoing scenario's physical digits.
+# The outgoing scenario's physical digits, and the host's caller number.
 DIALLED='1234567'
+HOST_CALLER='4420'
 
 
 def configure_cell_power(directory,model,policy,*,incoming_call=False,
@@ -181,15 +182,24 @@ def main():
     parser.add_argument('--end-call-at',type=int,metavar='SECONDS',
                         help='physical End on the late-assigned TCH/F; the lab answers its clearing')
     parser.add_argument('--host-call',type=int,metavar='HTTP_PORT',
-                        help='a synthetic host answers the dialled call over the host call protocol; End clears it')
+                        help='a synthetic host answers the dialled call (End clears it), or with --incoming-call places the call and hangs up')
     parser.add_argument('--provision-records', action='store_true',
                         help='explicit synthetic record fixture; acquired PMM remains unchanged')
     args = parser.parse_args()
-    # The traffic call with speech or End runs on to 36 s; the host-answered
-    # dialled call, assigned at about 29 s, runs on to 44 s.
-    page_seconds=36 if args.speech or args.end_call_at is not None else 24
+    # The traffic call with speech or End runs on to 36 s; the host-placed
+    # call, which the host hangs up 3 s after it connects, to 30 s; the
+    # host-answered dialled call, assigned at about 29 s, to 44 s.
+    host_incoming=args.host_call is not None and args.incoming_call
+    page_seconds=36 if args.end_call_at is not None else 30 if host_incoming else 24
     outgoing_seconds=44 if args.host_call is not None else 36
-    if args.host_call is not None:
+    if host_incoming:
+        # The host's own page replaces the scripted one; its 1 kHz tone, the
+        # lab's microphone tone and network clearing need these fixtures.
+        if not (args.traffic_assignment and not args.assignment_after_connect and args.answer_call and
+                args.ack_call_control and args.sacch and args.page_at is None and args.end_call_at is None):
+            parser.error('the host-placed call is the early-assigned answered call, paged and cleared by the host')
+        args.speech=True;args.clear_rejected_call=False
+    elif args.host_call is not None:
         if not (args.scenario=='outgoing' and args.traffic_assignment and args.end_call_at is not None):
             parser.error('the host call is the assigned dialled call, cleared by End')
         # The microphone tone, and the lab answering the handset's clearing.
@@ -206,13 +216,13 @@ def main():
         parser.error('call rejection requires incoming SETUP without traffic assignment')
     if args.answer_call and (not args.incoming_call or args.reject_call):
         parser.error('physical Answer requires incoming SETUP and excludes Reject')
-    if args.ack_call_control and (not args.incoming_call or (args.traffic_assignment and not args.assignment_after_connect)):
+    if args.ack_call_control and not args.incoming_call:
         parser.error('standalone CC acknowledgement requires SETUP without assignment')
     if args.assignment_after_connect and not (args.traffic_assignment and args.answer_call and args.ack_call_control and args.sacch):
         parser.error('late assignment requires traffic assignment,physical Answer,CC acknowledgement and SACCH')
-    if (args.speech or args.end_call_at is not None) and not (args.assignment_after_connect or args.host_call is not None):
-        parser.error('speech and End are defined for the late-assigned answered call')
-    if args.speech and args.end_call_at is None:
+    if (args.speech or args.end_call_at is not None) and not (args.traffic_assignment and (args.answer_call or args.host_call is not None)):
+        parser.error('speech and End are defined for the assigned answered call')
+    if args.speech and args.end_call_at is None and not host_incoming:
         parser.error('the tone summary needs the traffic channel cleared by End')
     if args.end_call_at is not None and not args.input_at+6<=args.end_call_at<=args.seconds-4:
         parser.error('End must follow Answer by 6 s and leave 4 s for clearing')
@@ -222,10 +232,10 @@ def main():
         parser.error('SACCH source requires the separate 33dBm raw BTS fixture')
     if args.traffic_assignment and not (args.incoming_call or args.scenario=='outgoing' and args.proceed_outgoing_call):
         parser.error('traffic assignment requires incoming call or admitted outgoing CALL PROCEEDING')
-    if args.incoming_call and (args.cell_power_policy!='handset33' or args.page_at is None):
+    if args.incoming_call and (args.cell_power_policy!='handset33' or (args.page_at is None and not host_incoming)):
         parser.error('raw incoming call requires the separate33dBm addressed-page fixture')
     if args.cell_power_policy!='legacy39' and (not args.raw_agch or not args.provision_records or
-            not (args.scenario=='menu' and args.seconds==page_seconds or args.scenario=='outgoing' and args.seconds==outgoing_seconds)):
+            not (args.scenario=='menu' and args.seconds==(page_seconds if args.page_at is not None or host_incoming else 24) or args.scenario=='outgoing' and args.seconds==outgoing_seconds)):
         parser.error('33dBm cell experiment requires the explicit24s menu or36s outgoing raw-AGCH record fixture')
     if args.page_at is not None and (not args.raw_agch or not 16<=args.page_at<=20 or args.seconds!=page_seconds):
         parser.error(f'addressed-page observation requires raw AGCH,16..20s input and the bounded {page_seconds}s run')
@@ -294,7 +304,7 @@ def main():
         directory.mkdir()
         configure_cell_power(directory,model,args.cell_power_policy,incoming_call=args.incoming_call,
                              traffic_assignment=args.traffic_assignment,call_ack=args.ack_call_control,
-                             clear_call=args.clear_rejected_call or args.end_call_at is not None,sacch=args.sacch,
+                             clear_call=args.clear_rejected_call or args.end_call_at is not None or host_incoming,sacch=args.sacch,
                              assignment_after_connect=args.assignment_after_connect,
                              accept_outgoing_service=args.accept_outgoing_service,
                              proceed_outgoing_call=args.proceed_outgoing_call,frame_pages=args.frame_pages,
@@ -320,7 +330,7 @@ def main():
             cmd+=['-http','-http_port',str(args.host_call)]
             # The client's timeout is wall time; the run is slower than real time.
             client=HostCallClient(f'ws://127.0.0.1:{args.host_call}/nokia/dct3/calls',
-                                  hangup_after=None,outgoing=True,timeout=900)
+                                  hangup_after=150 if host_incoming else None,outgoing=not host_incoming,timeout=900)
             client.start()
         with (directory / 'console.log').open('w') as output:
             subprocess.run(cmd, cwd=directory, env=env, stdout=output,
@@ -385,7 +395,7 @@ def main():
                 from tools.rom4_lab_registration_check import check_host_call
                 report['traffic_clearing']=check_traffic_clearing(text,args.end_call_at)
                 report['host_call']=check_host_call(text,execute.host,outgoing=True,digits=DIALLED)
-        if args.page_at is not None:
+        if args.page_at is not None or host_incoming:
             from tools.npe3_native_paging_response_check import check as check_native_page_response
             report['paging_response']=check_native_page_response(text,(first/'rom6_radio_writes.tsv').read_text())
             from tools.npe3_rach_transmit_check import check as check_access
@@ -395,16 +405,27 @@ def main():
             report['raw_ua']=check_ua(text,access['normal_control_blocks'])
             if args.incoming_call:
                 from tools.npe3_raw_call_setup_check import check as check_call_setup
-                report['call_setup']=check_call_setup(text,access['normal_control_blocks'])
+                report['call_setup']=check_call_setup(text,access['normal_control_blocks'],
+                                                      caller=HOST_CALLER if host_incoming else '5551234')
             if args.traffic_assignment:
                 from tools.npe3_raw_call_setup_check import check_assignment
-                report['traffic_assignment']=check_assignment(text,access['normal_control_blocks'],after_connect=args.assignment_after_connect)
+                report['traffic_assignment']=check_assignment(text,access['normal_control_blocks'],after_connect=args.assignment_after_connect,
+                                                              caller=HOST_CALLER if host_incoming else '5551234')
                 from tools.npe3_raw_call_setup_check import check_traffic_channel
                 report['traffic_channel']=check_traffic_channel(text,report['traffic_assignment']['start_frame'])
-                if args.end_call_at is not None:
+                early=not args.assignment_after_connect
+                if host_incoming:
+                    from tools.rom4_lab_registration_check import check_host_call
+                    report['host_call']=check_host_call(text,execute.host)
+                elif early and args.end_call_at is not None:
+                    # ALERTING, CONNECT and clearing all on FACCH, as on the 5110.
+                    from tools.rom4_lab_registration_check import check_traffic_call
+                    report['traffic_call']=check_traffic_call(text)
+                elif args.end_call_at is not None:
                     from tools.npe3_raw_call_setup_check import check_traffic_clearing
                     report['traffic_clearing']=check_traffic_clearing(text,args.end_call_at)
-            if args.ack_call_control:
+            # Early assignment acknowledges Call Confirmed itself; no standalone RR.
+            if args.ack_call_control and not (args.traffic_assignment and not args.assignment_after_connect):
                 from tools.npe3_raw_call_setup_check import check_call_rr
                 report['call_rr']=check_call_rr(text,access['normal_control_blocks'])
             if args.reject_call:
@@ -424,8 +445,16 @@ def main():
                     raise ValueError('physical Send was not decoded after input')
                 report['physical_answer_key_decoded']=True
                 if args.ack_call_control and args.sacch:
-                    connects=[frame for frame in report['call_setup']['native_connect_frames']
-                              if frame*60000/13000000>args.input_at]
+                    early_connect=args.traffic_assignment and not args.assignment_after_connect
+                    if early_connect:
+                        from tools.rom4_lab_registration_check import TCH_UPLINK
+                        sources=[int(frame) for kind,frame,octets,exact in TCH_UPLINK.findall(text)
+                                 if kind=='facch' and exact=='1' and octets[6:8]=='83' and int(octets[8:10],16)&0x3f==7]
+                    else:
+                        sources=report['call_setup']['native_connect_frames']
+                    connects=[frame for frame in sources if frame*60000/13000000>args.input_at]
+                    # LAPDm may repeat CONNECT on FACCH; every copy must follow Send.
+                    if early_connect:connects=connects[:1] if len(connects)==len(sources) else []
                     if len(connects)!=1:
                         raise ValueError('missing unique timed CONNECT after physical Send')
                     report['native_answer_to_connect_qualified']=True

@@ -1,6 +1,6 @@
 import unittest
 from unittest.mock import patch
-from tools.npe3_raw_call_setup_check import check,check_assignment,check_call_rr,check_call_clearing,check_outgoing,check_outgoing_progress,check_traffic_channel,check_traffic_clearing
+from tools.npe3_raw_call_setup_check import check,check_assignment,check_call_rr,check_call_clearing,check_outgoing,check_outgoing_progress,check_traffic_channel,check_traffic_clearing,incoming_setup
 
 
 class RawCallSetupTest(unittest.TestCase):
@@ -26,6 +26,11 @@ class RawCallSetupTest(unittest.TestCase):
                     '\n'.join(rows[:-1]),text+'\nnative_dsp_reset_line: released=0',
                     text.replace('first_frame=6248','first_frame=6246')):
             with self.assertRaises(ValueError):check_traffic_channel(bad,6244)
+
+    def test_incoming_setup_encodes_the_caller(self):
+        self.assertEqual(incoming_setup('5551234').hex(),'030045030504046002008134015c0581551532f4'+'2b'*3)
+        # The host's even-length caller has no f filler nibble.
+        self.assertEqual(incoming_setup('4420').hex(),'03003d030504046002008134015c03814402'+'2b'*5)
 
     def test_traffic_clearing_requires_timed_end_bound_replies_and_tones(self):
         def uplink(frame,octets):

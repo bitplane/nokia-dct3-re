@@ -112,14 +112,22 @@ def check_outgoing(text,blocks,*,admitted=False):
     return report
 
 
-def check(text,blocks):
+def incoming_setup(caller):
+    """The lab's SETUP: speech bearer, signal IE and an international calling number."""
+    digits=[int(d) for d in caller]+([15] if len(caller)%2 else [])
+    number=bytes([0x81])+bytes(digits[i]|digits[i+1]<<4 for i in range(0,len(digits),2))
+    l3=bytes.fromhex('03050404600200813401')+bytes([0x5c,len(number)])+number
+    return bytes([3,0,len(l3)<<2|1])+l3+b'\x2b'*(20-len(l3))
+
+
+def check(text,blocks,caller='5551234'):
     rows=list(SETUP.finditer(text))
     if len(rows)!=1 or text.count('npe3_raw_call_setup:')!=1:
         raise ValueError('missing unique raw incoming SETUP')
     row=rows[0];source,start=int(row[1]),int(row[2])
-    expected=bytes.fromhex('030045030504046002008134015c0581551532f4'+'2b'*3)
+    expected=incoming_setup(caller)
     if bytes.fromhex(row[3])!=expected:
-        raise ValueError('SETUP differs from declared speech/caller5551234 policy')
+        raise ValueError(f'SETUP differs from declared speech/caller{caller} policy')
     requests=[b for b in blocks if b['start_frame']==source and b['octets'].startswith('013f410627')]
     if len(requests)!=1 or start!=((source+3)//51+1)*51+22+51:
         raise ValueError('SETUP is not sequenced after the actual Paging Response UA')
@@ -151,8 +159,8 @@ def check(text,blocks):
                 speech_transport_qualified=False,physical_rf_tuning_qualified=False)
 
 
-def check_assignment(text,blocks,*,after_connect=False):
-    setup=check(text,blocks)
+def check_assignment(text,blocks,*,after_connect=False,caller='5551234'):
+    setup=check(text,blocks,caller)
     pattern=LATE_ASSIGNMENT if after_connect else ASSIGNMENT
     marker='npe3_raw_late_assignment:' if after_connect else 'npe3_raw_assignment:'
     rows=list(pattern.finditer(text))
