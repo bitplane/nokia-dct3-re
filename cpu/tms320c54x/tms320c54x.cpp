@@ -132,6 +132,16 @@ void tms320c54x_device::device_start()
 	space(AS_PROGRAM).specific(m_program);
 	space(AS_DATA).specific(m_data);
 	space(AS_IO).specific(m_io);
+	m_fetch_pages = std::make_unique<direct_page[]>(DIRECT_FETCH_LIMIT >> DIRECT_SHIFT);
+	m_data_read_pages = std::make_unique<direct_page[]>(0x10000 >> DIRECT_SHIFT);
+	m_data_write_pages = std::make_unique<direct_page[]>(0x10000 >> DIRECT_SHIFT);
+	m_program_change = space(AS_PROGRAM).add_change_notifier([this] (read_or_write mode) {
+		if (u32(mode) & u32(read_or_write::READ)) ++m_fetch_generation;
+	});
+	m_data_change = space(AS_DATA).add_change_notifier([this] (read_or_write mode) {
+		if (u32(mode) & u32(read_or_write::READ)) ++m_data_read_generation;
+		if (u32(mode) & u32(read_or_write::WRITE)) ++m_data_write_generation;
+	});
 
 	set_icountptr(m_icount);
 
@@ -640,8 +650,44 @@ u16 tms320c54x_device::fetch()
 		value = m_vector_prefetch_word;
 	}
 	else
-		value = m_cache.read_word(program_address(m_pc++));
+		value = fetch_word(program_address(m_pc++));
 	return value;
+}
+
+// A page is direct only if every word in it maps to consecutive plain
+// memory; anything else (a handler, a tap, a split) keeps the access path.
+template <typename Lookup>
+u16 *tms320c54x_device::direct_page_base(u32 first, Lookup &&lookup)
+{
+	u16 *const base = static_cast<u16 *>(lookup(first));
+	if (!base) return nullptr;
+	for (u32 word = 1; word < (1 << DIRECT_SHIFT); ++word)
+		if (static_cast<u16 *>(lookup(first + word)) != base + word) return nullptr;
+	return base;
+}
+
+u16 *tms320c54x_device::fetch_page(u32 address)
+{
+	direct_page &page = m_fetch_pages[address >> DIRECT_SHIFT];
+	page.base = direct_page_base(address & ~((1 << DIRECT_SHIFT) - 1), [this] (u32 a) { return m_cache.read_ptr(a); });
+	page.generation = m_fetch_generation;
+	return page.base;
+}
+
+u16 *tms320c54x_device::data_read_page(u16 address)
+{
+	direct_page &page = m_data_read_pages[address >> DIRECT_SHIFT];
+	page.base = direct_page_base(address & ~((1 << DIRECT_SHIFT) - 1), [this] (u32 a) { return space(AS_DATA).get_read_ptr(a); });
+	page.generation = m_data_read_generation;
+	return page.base;
+}
+
+u16 *tms320c54x_device::data_write_page(u16 address)
+{
+	direct_page &page = m_data_write_pages[address >> DIRECT_SHIFT];
+	page.base = direct_page_base(address & ~((1 << DIRECT_SHIFT) - 1), [this] (u32 a) { return space(AS_DATA).get_write_ptr(a); });
+	page.generation = m_data_write_generation;
+	return page.base;
 }
 
 void tms320c54x_device::state_import(const device_state_entry &entry)
@@ -1507,7 +1553,7 @@ tms320c54x_device::pipeline_cycle_result tms320c54x_device::pipeline_service_pen
 		// program bus for its four extra clocks. Placement is partial.
 		if (m_hold.read_a_wait == 4) m_pipeline_read_a_source = u32(m_a);
 		if (!--m_hold.read_a_wait)
-			m_slot[4].operand = m_program.read_word(physical_program_address(m_pipeline_read_a_source));
+			m_slot[4].operand = fetch_word(physical_program_address(m_pipeline_read_a_source));
 		return pipeline_cycle_result::consumed;
 	}
 	if (m_hold.program_move)
@@ -1515,7 +1561,7 @@ tms320c54x_device::pipeline_cycle_result tms320c54x_device::pipeline_service_pen
 		// MVPD's extra program-bus clock holds Read and younger slots.
 		// Retain the sampled word; exact bus phase is a partial model.
 		u32 const source = (m_slot[4].address & 0x7f0000) | m_slot[4].immediate;
-		m_slot[4].operand = m_program.read_word(physical_program_address(source));
+		m_slot[4].operand = fetch_word(physical_program_address(source));
 		m_hold.program_move = false;
 		return pipeline_cycle_result::consumed;
 	}
@@ -1523,7 +1569,7 @@ tms320c54x_device::pipeline_cycle_result tms320c54x_device::pipeline_service_pen
 	{
 		// Class 8 owns an extra program-bus cycle. Hold the sampled X/Y
 		// operands and captured physical coefficient address across it.
-		m_slot[4].immediate = m_program.read_word(m_pipeline_coefficient_source);
+		m_slot[4].immediate = fetch_word(m_pipeline_coefficient_source);
 		m_hold.coefficient = false;
 		return pipeline_cycle_result::consumed;
 	}
@@ -1667,7 +1713,7 @@ void tms320c54x_device::pipeline_step()
 			if (destination < 0x60) { logerror("%s: repeated MVPD register/peripheral destination is unsupported\n", machine().describe_context()); m_illegal = true; return; }
 			u32 const source = staged_read_a(m_pipeline_repeat_word) ? m_pipeline_repeat_program_source + m_rpt_iteration :
 				(m_pipeline_repeat_address & 0x7f0000) | u16(m_pipeline_repeat_source + m_rpt_iteration);
-			u16 const value = m_program.read_word(physical_program_address(source));
+			u16 const value = fetch_word(physical_program_address(source));
 			data_write(destination, value);
 			if (BIT(mode, 7) && !preincrement) indirect_modify(mode);
 		}
@@ -1746,7 +1792,7 @@ void tms320c54x_device::pipeline_step()
 		{
 			m_pc = u16(address + 1);
 			m_xpc = (address >> 16) & 0x7f;
-			m_slot[1].word = m_cache.read_word(m_slot[1].physical_address);
+			m_slot[1].word = fetch_word(m_slot[1].physical_address);
 		}
 	}
 	if (m_slot[3].valid && staged_banz(m_slot[3].word))
@@ -4743,7 +4789,7 @@ void tms320c54x_device::pipeline_request_coefficient(u16 address)
 		m_slot[4].address == m_pipeline_repeat_address;
 	if (repeated && m_pipeline_repeat_coefficient_started)
 		// A running repeat uses PB for coefficients, not opcode refetches.
-		m_slot[4].immediate = m_program.read_word(source);
+		m_slot[4].immediate = fetch_word(source);
 	else
 	{
 		m_pipeline_coefficient_source = source;

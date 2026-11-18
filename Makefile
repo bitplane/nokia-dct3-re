@@ -512,6 +512,7 @@ help:
 	@echo "make verify-5110-lab-traffic-state save, replay and reload that call while ringing, connected and clearing"
 	@echo "make verify-5110-lab-host-call a host-protocol remote places the traffic call, swaps GSM-FR speech and hangs up"
 	@echo "make build-pgo       build, then recompile the C54x core with profile-guided optimisation (real-time native calls)"
+	@echo "make bench-6210-call this host's speed for the native 6210 call, as a fraction of real time (1.0 keeps up)"
 	@echo "make verify-5110-lab-sip-call a real PJSUA SIP call through dct3_sip_bridge.py to the native handset (needs make sip-build)"
 	@echo "make verify-5110-lab-host-outgoing-call the handset dials 123; a host-protocol remote answers; the handset hangs up"
 	@echo "make verify-5110-lab-sip-outgoing-call the same dialled call to a real PJSUA SIP remote through dct3_sip_bridge.py"
@@ -869,6 +870,12 @@ build: overlay roms
 .PHONY: build-pgo
 build-pgo: build
 	$(PYTHON) tools/build_pgo_core.py --mame-dir $(MAME_DIR)
+
+# The connected 6210 call's speed on this host, without research observers
+# or the debugger. Measures the binary as built: run after build-pgo.
+.PHONY: bench-6210-call
+bench-6210-call:
+	$(VENV)/bin/python tools/bench_6210_call.py --mame $(MAME_DIR)/mame
 
 .PHONY: build-handsets build-conformance build-c54x-isa
 build-c54x-isa:

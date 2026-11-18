@@ -98,6 +98,7 @@ private:
 	u16 frame_counter() const;
 	void data_map(address_map &map) ATTR_COLD;
 	void io_map(address_map &map) ATTR_COLD;
+	template <typename Space> void map_data_reads(Space &space, offs_t base, u16 first, u16 last);
 	u16 overlay_r(offs_t offset);
 	void overlay_w(offs_t offset, u16 data);
 	u16 unacquired_r(offs_t offset);

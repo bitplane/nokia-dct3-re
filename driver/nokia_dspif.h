@@ -39,6 +39,8 @@ public:
 	u16 shared_r(offs_t offset);
 	void shared_w(offs_t offset, u16 data, u16 mem_mask = ~0);
 	u16 shared_word(offs_t offset) const { return m_ram[offset & 0x7ff]; }
+	// The DSP side maps its HPI window reads straight onto this array.
+	u16 *dsp_window() { return m_ram; }
 	void peer_shared_w(offs_t offset, u16 data);
 	u16 dsp_data_r(u16 address) const;
 	void dsp_data_w(u16 address, u16 data);

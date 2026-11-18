@@ -62,6 +62,15 @@ void nokia_dsp_c54x_device::device_start()
 	m_overlay[0].install_readwrite_handler(0x0080, m_overlay_end - 1,
 			read16sm_delegate(*this, FUNC(nokia_dsp_c54x_device::overlay_r)),
 			write16sm_delegate(*this, FUNC(nokia_dsp_c54x_device::overlay_w)));
+	map_data_reads(m_overlay[0], 0x0000, 0x0080, m_overlay_end - 1);
+	// Data words with no side effects, read or written, are plain memory:
+	// the board handlers keep the BSP and MMR-range words (below 0060), the
+	// HPI window's writes (packet notifications), and mask-ROM writes.
+	address_space &data = m_cpu->space(AS_DATA);
+	map_data_reads(data, 0x0000, 0x0060, 0xffff);
+	data.install_writeonly(0x0060, 0x07ff, &m_data[0x0060]);
+	data.install_writeonly(0x1000, 0xafff, &m_data[0x1000]);
+	data.install_writeonly(0xf000, 0xffff, &m_data[0xf000]);
 	// A two-page region also backs program page 1. Its overlay window shows
 	// the same DARAM (a page-1 capture there read RAM, not ROM). Higher
 	// pages stay unmapped: no capture covers them.
@@ -75,6 +84,7 @@ void nokia_dsp_c54x_device::device_start()
 		m_overlay_page1[0].install_readwrite_handler(0x10080, 0x10000 + m_overlay_end - 1,
 				read16sm_delegate(*this, FUNC(nokia_dsp_c54x_device::overlay_r)),
 				write16sm_delegate(*this, FUNC(nokia_dsp_c54x_device::overlay_w)));
+		map_data_reads(m_overlay_page1[0], 0x10000, 0x0080, m_overlay_end - 1);
 		// The captured pages hold only zero padding under the overlay window
 		// (OVLY clear selects entry 1) and nothing above page 1. Healthy
 		// firmware reads neither, so the counting handlers cost nothing.
@@ -441,6 +451,25 @@ u16 nokia_dsp_c54x_device::program_escape_r(offs_t offset)
 }
 
 // Handler offsets count from the view's start.
+// Map reads of data words first..last (at base + address) straight onto
+// their backing arrays: the DSP's own words, and the HPI window's. Both
+// read without side effects, and taps still apply to installed memory.
+template <typename Space>
+void nokia_dsp_c54x_device::map_data_reads(Space &space, offs_t base, u16 first, u16 last)
+{
+	u16 const window = nokia_dspif_device::hpi_daram_base;
+	u16 const window_end = window + nokia_dspif_device::hpi_daram_words - 1;
+	if (first < window)
+		space.install_rom(base + first, base + std::min<u16>(last, window - 1), &m_data[first]);
+	if (first <= window_end && last >= window)
+	{
+		u16 const from = std::max(first, window), to = std::min(last, window_end);
+		space.install_rom(base + from, base + to, m_transport->dsp_window() + (from - window));
+	}
+	if (last > window_end)
+		space.install_rom(base + std::max<u16>(first, window_end + 1), base + last, &m_data[std::max<u16>(first, window_end + 1)]);
+}
+
 u16 nokia_dsp_c54x_device::overlay_r(offs_t offset)
 {
 	return data_r(0x0080 + offset);

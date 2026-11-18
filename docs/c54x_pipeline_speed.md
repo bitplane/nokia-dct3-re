@@ -249,7 +249,6 @@ dumps byte-identical.
   history, filter and mixer taps once 1024 ADC reads have passed. They are
   now removed a millisecond after that, from a coroutine, since a tap must
   not remove itself while it runs.
-
 - **I/O census.** `rom6_native_radio.lua` tapped every DSP I/O read and
   write (about 6 M in the run) to build the per-port summaries and the
   `rom6_radio_writes.tsv` write stream that `rom6_radio_census.py` checks.
@@ -262,3 +261,54 @@ dumps byte-identical.
 What remains: the formatter-store tap over 1000-26ff costs about 2.4 s, and
 the debugger's instruction hook, which the observers' breakpoints need,
 about 5 %. The C54x core is now most of the process.
+
+## The lean 6210 call
+
+The lab gates load research observers and the debugger, which a live call
+does not need. `make bench-6210-call` (`tools/bench_6210_call.py`) runs the
+same early incoming call with only its inputs (`tools/npe3_call_bench.lua`:
+page at 18 s, Send at 20 s, End at 30 s), unthrottled, to 20 s and to 30 s,
+and reports the connected ten seconds as a fraction of real time. It fails
+if the call does not connect. Run it after `make build-pgo` to measure what
+a host can sustain.
+
+In that call the DSP executes about 31 M clocks per emulated second (68 %
+of the 45.5 MHz policy clock; IDLE is skipped), and none of it is a
+skippable polling loop. Block-repeat bodies are 55 % of executed clocks
+(the Viterbi add-compare-select loop at 9015 alone is 12 %) and
+single-instruction repeats 9 %. It is signal processing, so the per-clock
+cost is what matters.
+
+Two exact changes to memory access:
+
+- **DSP data RAM mapped directly.** The board's data map sent every access
+  through one handler that tested for the BSP registers, the HPI window and
+  the mask ROM. Reads from 0060 up, and writes to the plain RAM ranges
+  (0060-07ff, 1000-afff, f000-ffff), are now installed memory; the HPI
+  window's reads map onto the transport's array. The handler keeps the
+  BSP and MMR-range words, HPI writes (packet notifications) and mask-ROM
+  writes. The program overlay's reads of DARAM are mapped the same way.
+- **Direct pages in the core.** Program fetches, program-operand reads and
+  data reads and writes look up a 64-word page table of direct pointers
+  before the address space. A page is direct only if all 64 words are
+  consecutive plain memory, so a handler, tap, watchpoint or view boundary
+  anywhere in it keeps the ordinary path. The space change notifiers
+  (OVLY view switches, tap and handler installs) bump a generation that
+  invalidates every page, so Lua taps and the debugger still see every
+  access they cover.
+
+Both leave the full observer run's `error.log`, write stream and dumps
+byte-identical, the state-trace oracle identical on all 343 M clocks, and
+all 528 conformance sections passing.
+
+| Lean call, PGO core (two alternating runs) | Connected 10 s | Real time |
+| --- | ---: | ---: |
+| Before | 11.72, 11.95 CPU s | 0.84-0.85x |
+| Direct data RAM and direct pages | 11.11, 10.97 CPU s | 0.90-0.91x |
+
+This host is a Ryzen 9 9950X3D (5.7 GHz). The core is still about 80 % of
+the lean call at roughly 900 host instructions per DSP clock. Excluding
+the research traces (`make build-tracefree`) saves about 2 %; the ARM's
+flash reads cost about 4 %. Real time on ordinary hosts needs the
+pipeline model itself to become several times cheaper per clock.
+

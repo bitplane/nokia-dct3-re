@@ -239,6 +239,31 @@ private:
 	memory_access<16, 1, -1, ENDIANNESS_LITTLE>::specific m_data;
 	memory_access<16, 1, -1, ENDIANNESS_LITTLE>::specific m_io;
 
+	// Direct word pointers for 64-word pages that are plain memory (no
+	// handler, tap or view boundary inside). A page whose base is null takes
+	// the ordinary access path. Any map change (an OVLY view switch, a tap or
+	// watchpoint) bumps the generation, so pages are rebuilt on next use.
+	struct direct_page { u16 *base = nullptr; u32 generation = 0; };
+	static constexpr unsigned DIRECT_SHIFT = 6;
+	static constexpr u32 DIRECT_FETCH_LIMIT = 0x20000;
+	std::unique_ptr<direct_page[]> m_fetch_pages, m_data_read_pages, m_data_write_pages;
+	u32 m_fetch_generation = 1, m_data_read_generation = 1, m_data_write_generation = 1;
+	util::notifier_subscription m_program_change, m_data_change;
+	template <typename Lookup> static u16 *direct_page_base(u32 first, Lookup &&lookup);
+	u16 *fetch_page(u32 address);
+	u16 *data_read_page(u16 address);
+	u16 *data_write_page(u16 address);
+	u16 fetch_word(u32 address)
+	{
+		if (address < DIRECT_FETCH_LIMIT)
+		{
+			direct_page const &page = m_fetch_pages[address >> DIRECT_SHIFT];
+			u16 *const base = page.generation == m_fetch_generation ? page.base : fetch_page(address);
+			if (base) return base[address & ((1 << DIRECT_SHIFT) - 1)];
+		}
+		return m_cache.read_word(address);
+	}
+
 	u16 m_pc = 0;
 	u8 m_xpc = 0;
 	u32 m_debug_pc = 0;
@@ -475,8 +500,21 @@ private:
 	unsigned m_spin_op_count = 0;
 	void spin_backward(u32 address);
 	bool spin_state(bool compare);
-	u16 data_word_r(u16 address) { m_effects += address < m_pure_data_start; return m_data.read_word(address); }
-	void data_word_w(u16 address, u16 value) { ++m_effects; m_data.write_word(address, value); }
+	u16 data_word_r(u16 address)
+	{
+		m_effects += address < m_pure_data_start;
+		direct_page const &page = m_data_read_pages[address >> DIRECT_SHIFT];
+		u16 *const base = page.generation == m_data_read_generation ? page.base : data_read_page(address);
+		return base ? base[address & ((1 << DIRECT_SHIFT) - 1)] : m_data.read_word(address);
+	}
+	void data_word_w(u16 address, u16 value)
+	{
+		++m_effects;
+		direct_page const &page = m_data_write_pages[address >> DIRECT_SHIFT];
+		u16 *const base = page.generation == m_data_write_generation ? page.base : data_write_page(address);
+		if (base) base[address & ((1 << DIRECT_SHIFT) - 1)] = value;
+		else m_data.write_word(address, value);
+	}
 	void program_word_w(u32 address, u16 value) { ++m_effects; m_program.write_word(address, value); }
 	u16 io_word_r(u16 address) { ++m_effects; return m_io.read_word(address); }
 	void io_word_w(u16 address, u16 value) { ++m_effects; m_io.write_word(address, value); }
