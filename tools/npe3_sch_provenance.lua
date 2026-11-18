@@ -1,6 +1,8 @@
 -- Read-only last-window provenance. Queue items are inspected, never popped.
 local machine=manager.machine
 local cpu=assert(machine.devices[':dsp_c54x:cpu'])
+-- State entries cached once: cpu.state[...] costs a container lookup per call.
+local cpu_state=setmetatable({},{__index=function(t,k) local e=cpu.state[k]; rawset(t,k,e); return e end})
 local mfi=assert(machine.devices[':mfi_rx'])
 local function item(name)
     local index=assert(mfi.items['0/'..name],name)
@@ -25,9 +27,19 @@ local function in_window()
     return not finished and t>=3 and t<=3.4
 end
 local handles={}
+-- Taps that can only return once their window has closed are removed a
+-- millisecond later (a tap must not remove itself while it runs): the rest
+-- of the run would otherwise call into Lua for every access.
+local function retire(list)
+    local co=coroutine.create(function()
+        emu.wait(0.001)
+        for _,handle in ipairs(list) do handle:remove() end
+    end)
+    assert(coroutine.resume(co))
+end
 local seeds=0
 handles[#handles+1]=cpu.spaces.data:install_write_tap(0x2f57,0x2f57,'npe3_search_index_seed',function(_,value)
-    local owner=cpu.state.EXECPC.value
+    local owner=cpu_state.EXECPC.value
     if finished or not ((owner==0xb7f and value==9) or (owner==0xb8f and value==26) or (owner==0xbba and value==27)) then return end
     seeds=seeds+1
     if seeds>16 then return end
@@ -41,23 +53,24 @@ handles[#handles+1]=cpu.spaces.io:install_read_tap(0x27,0x27,'npe3_sch_raw_prove
     assert(consumed:read(0)>0 and values:read(slot)==value,'queue read ownership differs')
     total=total+1
     raw[(total-1)%1024+1]={time=machine.time:as_double(),value=value,
-        tick=ticks:read(slot),sequence=consumed:read(0),owner=cpu.state.READPC.value}
+        tick=ticks:read(slot),sequence=consumed:read(0),owner=cpu_state.READPC.value}
 end)
 handles[#handles+1]=cpu.spaces.data:install_write_tap(0xd8,0x197,'npe3_sch_sample_provenance',function(address,value)
     if not in_window() then return end
-    writers[address]={value=value,time=machine.time:as_double(),owner=cpu.state.EXECPC.value,
-        ar2=cpu.state.AR2.value,ar3=cpu.state.AR3.value}
+    writers[address]={value=value,time=machine.time:as_double(),owner=cpu_state.EXECPC.value,
+        ar2=cpu_state.AR2.value,ar3=cpu_state.AR3.value}
 end)
 handles[#handles+1]=cpu.spaces.data:install_write_tap(0x10,0x10,'npe3_sch_provenance_commit',function(_,value)
-    local owner=cpu.state.EXECPC.value
+    local owner=cpu_state.EXECPC.value
     if in_window() and not filter_captured and value==1 and owner>=0x7942 and owner<=0x7946 then
         filter_captured=true
-        local source=cpu.state.AR2.value
+        local source=cpu_state.AR2.value
         machine:logerror(string.format('npe3_sch_filter_input: t=%.9f source=%04x samples=%s coefficients=%s history=%s st1=%04x observer_writes=0\n',
-            machine.time:as_double(),source,words(source,source+195),words(0x524,0x526),words(0x218,0x21b),cpu.state.ST1.value))
+            machine.time:as_double(),source,words(source,source+195),words(0x524,0x526),words(0x218,0x21b),cpu_state.ST1.value))
     end
     if finished or value~=0x7737 or owner<0x76a7 or owner>0x76d9 then return end
     finished=true
+    retire({handles[1],handles[2],handles[3],handles[4]})
     for ordinal=math.max(1,total-1023),total do
         local row=raw[(ordinal-1)%1024+1]
         machine:logerror(string.format('npe3_sch_raw: ordinal=%d t=%.9f value=%04x source_tick=%d capture_sequence=%d owner=%06x observer_writes=0\n',
@@ -78,11 +91,11 @@ end)
 _G.npe3_sch_provenance=handles
 local crc_writes=0
 handles[#handles+1]=cpu.spaces.data:install_write_tap(0x2f20,0x2f20,'npe3_sch_crc',function(_,value)
-    local owner=cpu.state.READPC.value
+    local owner=cpu_state.READPC.value
     if owner~=0x4f5d or cpu.spaces.data:read_u16(0x2f02)~=0x40 then return end
     crc_writes=crc_writes+1
     if crc_writes>16 then return end
     -- MVMD publishes this status at Read, not Execute.
     machine:logerror(string.format('npe3_sch_crc: sequence=%d t=%.9f status=%04x remainder=%04x words=%s read_owner=%06x class=0040 observer_writes=0\n',
-        crc_writes,machine.time:as_double(),value,cpu.state.A.value&0x3ff,words(0x2f80,0x2f82),owner))
+        crc_writes,machine.time:as_double(),value,cpu_state.A.value&0x3ff,words(0x2f80,0x2f82),owner))
 end)

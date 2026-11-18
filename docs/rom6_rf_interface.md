@@ -1121,7 +1121,7 @@ first-escape address/time and missing-read count above.
 # which pages, is answered at 20 s and hangs up 3 s later:
 .venv/bin/python tools/run_npe3_native.py --reference-clock --seconds 30 --adc-source fcch-sch-broadcast --capture-start p09 --tx-release p05 --raw-agch --provision-records --cell-power-policy handset33 --incoming-call --ack-call-control --sacch --answer-call --traffic-assignment --host-call 18768
 # The same call placed by a PJSUA SIP remote through dct3_sip_bridge.py; it
-# talks 20 s of wall time (about 4 s emulated) after the answer, then hangs up.
+# talks 10 s of wall time (about 5 s emulated) after the answer, then hangs up.
 # make verify-6210-lab-sip-call runs this; verify-6210-lab-sip-outgoing-call
 # adds the SIP options to the host-answered dialled call (44 s, End at 40):
 .venv/bin/python tools/run_npe3_native.py --reference-clock --seconds 36 --adc-source fcch-sch-broadcast --capture-start p09 --tx-release p05 --raw-agch --provision-records --cell-power-policy handset33 --incoming-call --ack-call-control --sacch --answer-call --traffic-assignment --host-call 18111 --sip-port 25180 --sip-pjsua PJSUA --sip-pjsua2 PJSUA2_PYTHONPATH
@@ -1494,7 +1494,7 @@ or a program-page mirror to turn these results into broader acceptance.
 | --- | --- | --- |
 | Physically selected RF carrier | Own firmware's command words/channel arithmetic are known; SCU-to-HAGAR shift, select, enable and settling semantics are not | A matched SCU/HAGAR register/serial contract, or a correlated command/pin capture identifying those fields and edges |
 | Physical receive timing/camping | P09/P0a/P0b/P05 laboratory policies work, but do not identify ADC/transfer/INT0 ownership or the physical counter epoch | Matched MFI/SCU timing documentation or a correlated counter/control/ADC/INT0 capture; a successful decoded payload alone is insufficient |
-| Connected traffic/speech | TCH/F establishment, speech both ways and clearing are qualified on the early and late incoming calls (lab tones, physical End), the host-placed incoming call (host media, host hang-up) and the host-answered dialled call (host media, physical End), each host call also with a PJSUA SIP remote through the bridge | Real-time speed: the throttled 6210 runs a call at about 20 % of real time, so SIP RTP downlink outpaces it (late frames dropped); higher program pages if execution reaches them |
+| Connected traffic/speech | TCH/F establishment, speech both ways and clearing are qualified on the early and late incoming calls (lab tones, physical End), the host-placed incoming call (host media, host hang-up) and the host-answered dialled call (host media, physical End), each host call also with a PJSUA SIP remote through the bridge | Real-time speed: the 6210 runs a call at about 50 % of real time (see `docs/c54x_pipeline_speed.md`), so SIP RTP downlink outpaces it (late frames dropped); higher program pages if execution reaches them |
 | Fitted 6210 mask/clock identity | The acquired ROM6 and 45.5 MHz are explicitly reference inputs | Product-matched mask/multiplier documentation or measured provenance, not another fitted execution rate |
 
 The existing traces cannot distinguish hardware implementations that share

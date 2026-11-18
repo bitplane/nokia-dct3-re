@@ -1,6 +1,8 @@
 -- Observe actual DSP-side ring commits; never construct or deliver packets.
 local machine=manager.machine
 local cpu=assert(machine.devices[':dsp_c54x:cpu'])
+-- State entries cached once: cpu.state[...] costs a container lookup per call.
+local cpu_state=setmetatable({},{__index=function(t,k) local e=cpu.state[k]; rawset(t,k,e); return e end})
 local cap=(machine.system.name=='npe3sp9' or machine.system.name=='npe3tp5' or machine.system.name=='npe3ap5') and 256 or 64
 if machine.system.name=='npe3ap5' and tonumber(os.getenv('NPE3_NATIVE_SECONDS') or '24')>24 then cap=2048 end
 local commits=0
@@ -18,7 +20,7 @@ local tap=cpu.spaces.data:install_write_tap(0x8e4,0x8e4,'rom6_measure_rx_commit'
         end
     end
     machine:logerror(string.format('rom6_measure_rx_commit: sequence=%d t=%.9f previous=%04x producer=%04x consumer=%04x words=%s mask=%04x cpu_pc=%06x observer_writes=0\n',
-        commits,machine.time:as_double(),previous,value,cpu.spaces.data:read_u16(0x8e5),table.concat(packed,','),mask,cpu.state.GENPC.value))
+        commits,machine.time:as_double(),previous,value,cpu.spaces.data:read_u16(0x8e5),table.concat(packed,','),mask,cpu_state.GENPC.value))
 end)
 local stop=emu.add_machine_stop_notifier(function()
     machine:logerror(string.format('rom6_measure_rx_complete: commits=%d cap=%d observer_writes=0\n',commits,cap))

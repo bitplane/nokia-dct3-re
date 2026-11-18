@@ -2,6 +2,8 @@
 local machine=manager.machine
 if not os.getenv('NPE3_NATIVE_PAGE_AT') then return end
 local cpu=assert(machine.devices[':maincpu'])
+-- State entries cached once: cpu.state[...] costs a container lookup per call.
+local cpu_state=setmetatable({},{__index=function(t,k) local e=cpu.state[k]; rawset(t,k,e); return e end})
 local space=cpu.spaces.program
 local begin=tonumber(os.getenv('NPE3_NATIVE_PAGE_AT'))
 local handles,counts={},{}
@@ -12,20 +14,20 @@ for _,entry in ipairs({0x457db8,0x457dd0,0x457e2a,0x457e6e,0x457e80,0x457ebe,0x4
     counts[entry]=0
     handles[#handles+1]=space:install_read_tap(entry&~3,(entry&~3)+3,'npe3_paging_'..entry,function()
         local now=machine.time:as_double()
-        if busy or now<begin or now>24 or cpu.state.PC.value~=entry then return end
+        if busy or now<begin or now>24 or cpu_state.PC.value~=entry then return end
         counts[entry]=counts[entry]+1
         if counts[entry]>32 then return end
         busy=true
-        local pointer=(entry==0x457db8 or entry==0x457a32) and cpu.state.R0.value or cpu.state.R4.value
+        local pointer=(entry==0x457db8 or entry==0x457a32) and cpu_state.R0.value or cpu_state.R4.value
         local object={}
         if pointer>=0x100000 and pointer+37<=0x180000 then
             for at=pointer,pointer+36 do object[#object+1]=string.format('%02x',space:read_u8(at)) end
         end
         local stack={}
-        for at=0x14,0x16 do stack[#stack+1]=string.format('%02x',space:read_u8(cpu.state.R13.value+at)) end
+        for at=0x14,0x16 do stack[#stack+1]=string.format('%02x',space:read_u8(cpu_state.R13.value+at)) end
         machine:logerror(string.format('npe3_paging_admission: entry=%08x hit=%d t=%.9f r0=%08x r1=%08x r2=%08x r3=%08x r5=%08x r6=%08x r7=%08x caller=%08x controller=%08x control=%04x group=%s object=%s observer_writes=0\n',
-            entry,counts[entry],now,cpu.state.R0.value,cpu.state.R1.value,cpu.state.R2.value,cpu.state.R3.value,
-            cpu.state.R5.value,cpu.state.R6.value,cpu.state.R7.value,cpu.state.R14.value,
+            entry,counts[entry],now,cpu_state.R0.value,cpu_state.R1.value,cpu_state.R2.value,cpu_state.R3.value,
+            cpu_state.R5.value,cpu_state.R6.value,cpu_state.R7.value,cpu_state.R14.value,
             space:read_u32(0x172518),space:read_u16(0x16b26c),table.concat(stack),table.concat(object)))
         busy=false
     end)
@@ -33,10 +35,10 @@ end
 local posts=0
 handles[#handles+1]=space:install_read_tap(0x3c22c0,0x3c22c3,'npe3_page_post',function()
     local now=machine.time:as_double()
-    if busy or now<begin or now>24 or cpu.state.PC.value~=0x3c22c0 then return end
-    local target=cpu.state.R0.value
+    if busy or now<begin or now>24 or cpu_state.PC.value~=0x3c22c0 then return end
+    local target=cpu_state.R0.value
     if target~=15 and target~=18 then return end
-    local pointer=cpu.state.R1.value
+    local pointer=cpu_state.R1.value
     if pointer<0x100000 or pointer+40>0x180000 then return end
     busy=true
     local header=space:read_u16(pointer)
@@ -50,15 +52,15 @@ end)
 local parsed=0
 handles[#handles+1]=space:install_read_tap(0x3cd154,0x3cd157,'npe3_page_parser_return',function()
     local now=machine.time:as_double()
-    if busy or now<begin or now>24 or cpu.state.PC.value~=0x3cd154 then return end
-    local pointer=cpu.state.R5.value
+    if busy or now<begin or now>24 or cpu_state.PC.value~=0x3cd154 then return end
+    local pointer=cpu_state.R5.value
     if pointer<0x100000 or pointer+12>0x180000 then return end
     busy=true
     if space:read_u16(pointer)==0x5eb then
         parsed=parsed+1
         if parsed<=8 then
             machine:logerror(string.format('npe3_paging_parser_return: sequence=%d t=%.9f event=%04x message=%08x context=%08x observer_writes=0\n',
-                parsed,now,cpu.state.R0.value,pointer,cpu.state.R4.value))
+                parsed,now,cpu_state.R0.value,pointer,cpu_state.R4.value))
         end
     end
     busy=false

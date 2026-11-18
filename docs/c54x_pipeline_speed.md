@@ -202,3 +202,55 @@ process, but no line in it costs more than 2 %. The largest line is the
 per-clock slot move. Next come `pipeline_execute`'s bodies, prefetch, the
 MCU's own execution and flash reads, at 2-8 % each. Each further gate would
 save one or two percent.
+
+## The 6210 call
+
+The 6210 (`npe3ap5`, ROM6 lab cell) ran its connected call at about 21 % of
+real time, against the 5110's 94 %. Most of the time was not the C54x core
+but the Lua observers that every lab call run loads for its research checks.
+Figures are user CPU seconds for the lab-tone early incoming call
+(`--page-at 18 --speech --end-call-at 30`), unthrottled, with the PGO core:
+the run to 20 s (boot, registration, page, ringing) and to 30 s, whose
+difference is the connected call.
+
+| Change | To 20 s | To 30 s | Connected 20-30 s | Real time |
+| --- | ---: | ---: | ---: | ---: |
+| Before | 57.4 | 104.5 | 47.2 | 21 % |
+| Unacquired-program check native | 24.4 | 55.3 | 30.9 | 32 % |
+| State entries cached in the observers | 18.4 | 41.1 | 22.7 | 44 % |
+| Windowed taps retired | 16.5 | 36.3 | 19.8 | 50 % |
+| (No research observers at all) | 10.6 | 25.8 | 15.2 | 66 % |
+
+Every step leaves `error.log`, `rom6_radio_writes.tsv` and the captured
+dumps byte-identical.
+
+- **Unacquired-program check.** `npe3_native_observe.lua` tapped DSP program
+  reads of 0080-1fff and 10080-11fff to count fetches of the captured pages'
+  zero padding (OVLY clear), and everything above 1ffff. Internal-RAM code
+  runs from that window, so the taps entered Lua on almost every fetch, and
+  they also defeated the direct ROM mapping. The C54x backend now selects a
+  second overlay view entry while OVLY is clear on a captured (two-page)
+  image, whose handler counts reads, and maps a counting handler above page
+  1. `c54x_program_coverage: unacquired_reads=0 escapes=0` replaces
+  `npe3_native_coverage`. Healthy firmware never takes either path, so the
+  check costs nothing.
+- **Loader capture.** A MAME tap is installed only into the view entry
+  selected at install time (`populate_passthrough` follows `m_u_dispatch`),
+  so the one-word program tap at 0a00 that captured the uploaded loader had
+  worked only because the wide coverage taps changed the dispatch. A
+  breakpoint at 0a00 now saves the words with `saved` as it is hit; by the
+  next frame the loader has overwritten its first words.
+- **State entries.** Each `cpu.state.X.value` in a tap indexes the state
+  container through sol: a string hash, a `dynamic_cast` and a metatable
+  check per call. The observers in the 6210 chain look each entry up once.
+- **Retired taps.** The SCH provenance and FCCH schedule taps can only
+  return once the SCH aperture has been seen (about 3.4 s), and the ADC lab's
+  history, filter and mixer taps once 1024 ADC reads have passed. They are
+  now removed a millisecond after that, from a coroutine, since a tap must
+  not remove itself while it runs.
+
+What remains: the I/O census in `rom6_native_radio.lua` (every DSP port
+access, about 6 M in the run, which `rom6_radio_census.py` checks) costs
+about 6.7 s of the 36, the formatter-store tap over 1000-26ff about 2.4 s,
+and the debugger's instruction hook, which the observers' breakpoints need,
+about 5 %. The C54x core is now half the process.

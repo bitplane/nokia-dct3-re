@@ -4,6 +4,8 @@ local machine=manager.machine
 local npe3=machine.system.name=='npe3ref' or machine.system.name=='npe3r6' or machine.system.name=='npe3afs' or machine.system.name=='npe3ad0' or machine.system.name=='npe3cp9' or machine.system.name=='npe3zp9' or machine.system.name=='npe3bp9' or machine.system.name=='npe3sp9' or machine.system.name=='npe3tp5' or machine.system.name=='npe3ap5'
 dofile(directory..(npe3 and 'rom6_reset_policy_observe.lua' or 'rom6_native_ui.lua'))
 local cpu=assert(machine.devices[':dsp_c54x:cpu'])
+-- State entries cached once: cpu.state[...] costs a container lookup per call.
+local cpu_state=setmetatable({},{__index=function(t,k) local e=cpu.state[k]; rawset(t,k,e); return e end})
 local stream=assert(io.open('rom6_radio_writes.tsv','wb'))
 local stats,handles={},{}
 local writes,overflow=0,false
@@ -16,7 +18,8 @@ end
 local captured_output_overlay=false
 local function observe(direction,address,value,mask)
     local now=machine.time:as_double()
-    local key=string.format('%s:%04x',direction,address)
+    -- A numeric key (writes above reads) sorts as 'R:xxxx'/'W:xxxx' did, unformatted.
+    local key=(direction=='W' and 0x10000 or 0)+address
     local item=stats[key]
     if not item then
         item={direction=direction,address=address,count=0,first=now,last=now,
@@ -29,7 +32,7 @@ local function observe(direction,address,value,mask)
         else item.values_capped=true end
     end
     -- Bus-time CPU state is context, not a claim about the issuing pipeline slot.
-    local pc=cpu.state.GENPC.value
+    local pc=cpu_state.GENPC.value
     if not item.pcs[pc] then
         if item.pc_count<32 then item.pcs[pc]=true; item.pc_count=item.pc_count+1
         else item.pcs_capped=true end

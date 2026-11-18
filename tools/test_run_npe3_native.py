@@ -168,7 +168,7 @@ class Native6210EvidenceTest(unittest.TestCase):
             'npe3_native_selftest: command=0d faults=00 flag=c4 observer_writes=0',
             'npe3_native_terminal: t=30.016667 arm=005078a8 dsp=003999 illegal=0 idle=1 pmst=07ac observer_writes=0',
             'native_dsp_terminal_timing: released=1 clock=13000000',
-            'npe3_native_coverage: missing_program_reads=0 observer_writes=0',
+            'c54x_program_coverage: unacquired_reads=0 escapes=0',
         ))
 
     def check(self, text=None, loader=None, program=None):
@@ -200,9 +200,10 @@ class Native6210EvidenceTest(unittest.TestCase):
                  self.text + '\n' + self.text,
                  self.text.replace('illegal=0', 'illegal=1'),
                  self.text.replace('faults=00', 'faults=01'),
-                 self.text.replace('missing_program_reads=0', 'missing_program_reads=1'),
+                 self.text.replace('unacquired_reads=0', 'unacquired_reads=1'),
+                 self.text.replace('escapes=0', 'escapes=1'),
                  self.text+'\n[:dsp_c54x:cpu] unmapped program memory read from 01A50D',
-                 self.text+'\nnpe3_native_program_escape: address=01a50d',
+                 self.text+'\nc54x_program_escape: t=1.0 address=01a50d',
                  self.text.replace('hle=0', 'hle=1'),
                  self.text.replace('readback=05', 'readback=00'),
                  self.text.replace('npe3_native_terminal:', 'missing_terminal:'),

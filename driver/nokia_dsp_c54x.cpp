@@ -73,6 +73,18 @@ void nokia_dsp_c54x_device::device_start()
 		m_overlay_page1[0].install_readwrite_handler(0x10080, 0x10000 + m_overlay_end - 1,
 				read16sm_delegate(*this, FUNC(nokia_dsp_c54x_device::overlay_r)),
 				write16sm_delegate(*this, FUNC(nokia_dsp_c54x_device::overlay_w)));
+		// The captured pages hold only zero padding under the overlay window
+		// (OVLY clear selects entry 1) and nothing above page 1. Healthy
+		// firmware reads neither, so the counting handlers cost nothing.
+		m_captured_program = true;
+		m_overlay[1].install_read_handler(0x0080, m_overlay_end - 1,
+				read16sm_delegate(*this, FUNC(nokia_dsp_c54x_device::unacquired_r)));
+		m_overlay[1].nop_write(0x0080, m_overlay_end - 1);
+		m_overlay_page1[1].install_read_handler(0x10080, 0x10000 + m_overlay_end - 1,
+				read16sm_delegate(*this, FUNC(nokia_dsp_c54x_device::unacquired_page1_r)));
+		m_overlay_page1[1].nop_write(0x10080, 0x10000 + m_overlay_end - 1);
+		program.install_read_handler(0x20000, 0x7fffff,
+				read16sm_delegate(*this, FUNC(nokia_dsp_c54x_device::program_escape_r)));
 	}
 	m_slot_timer = timer_alloc(FUNC(nokia_dsp_c54x_device::slot_timer_expired), this);
 	m_transfer_timer = timer_alloc(FUNC(nokia_dsp_c54x_device::transfer_timer_expired), this);
@@ -184,6 +196,9 @@ void nokia_dsp_c54x_device::device_reset()
 
 void nokia_dsp_c54x_device::device_stop()
 {
+	if (m_captured_program)
+		machine().logerror("c54x_program_coverage: unacquired_reads=%u escapes=%u\n",
+				m_unacquired_reads, m_program_escapes);
 	machine().logerror("native_dsp_terminal_timing: released=%u clock=%u cycles=%llu frame_enabled=%u frame_remaining=%.9f slot_enabled=%u transfer_enabled=%u\n",
 			m_reset_released, m_cpu->clock(), (unsigned long long)m_cpu->total_cycles(),
 			m_frame_timer->enabled(), m_frame_timer->remaining().as_double(),
@@ -389,15 +404,36 @@ void nokia_dsp_c54x_device::ovly_w(int state)
 {
 	if (state)
 		m_overlay.select(0);
+	else if (m_captured_program)
+		m_overlay.select(1);
 	else
 		m_overlay.disable();
 	if (m_program_page1)
-	{
-		if (state)
-			m_overlay_page1.select(0);
-		else
-			m_overlay_page1.disable();
-	}
+		m_overlay_page1.select(state ? 0 : 1);
+}
+
+u16 nokia_dsp_c54x_device::unacquired_r(offs_t offset)
+{
+	if (!machine().side_effects_disabled())
+		++m_unacquired_reads;
+	return m_program[0x0080 + offset];
+}
+
+u16 nokia_dsp_c54x_device::unacquired_page1_r(offs_t offset)
+{
+	if (!machine().side_effects_disabled())
+		++m_unacquired_reads;
+	return (*m_program_page1)[0x0080 + offset];
+}
+
+u16 nokia_dsp_c54x_device::program_escape_r(offs_t offset)
+{
+	if (!machine().side_effects_disabled() && !m_program_escapes++)
+		machine().logerror("c54x_program_escape: t=%.9f address=%06x pc=%06x xpc=%02x\n",
+				machine().time().as_double(), 0x20000 + offset,
+				u32(m_cpu->state_int(tms320c54x_device::STATE_PC)),
+				u32(m_cpu->state_int(tms320c54x_device::STATE_XPC)));
+	return m_cpu->space(AS_PROGRAM).unmap();
 }
 
 // Handler offsets count from the view's start.

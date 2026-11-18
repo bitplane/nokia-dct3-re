@@ -109,7 +109,7 @@ def check_execution(text, loader, program, flash, *, reference=False, minimum_se
         'npe3_native_entry: kind=loader': 2,
         'npe3_native_entry: kind=resident': 1,
         'npe3_native_selftest: command=0d faults=00 flag=c4': 1,
-        'npe3_native_coverage: missing_program_reads=0 observer_writes=0': 1,
+        'c54x_program_coverage: unacquired_reads=0 escapes=0': 1,
     }
     if reference:
         required['npe3_native_reference_clock: source=8210_documented_rate fitted_clock_claim=0 experiment=1 observer_writes=0'] = 1
@@ -118,7 +118,7 @@ def check_execution(text, loader, program, flash, *, reference=False, minimum_se
             raise ValueError(f'native 6210 marker count changed: {marker}')
     terminals = re.findall(r'npe3_native_terminal: t=([\d.]+) arm=[\da-f]+ dsp=[\da-f]+ illegal=(\d+) idle=[01] pmst=[\da-f]+ observer_writes=0', text)
     if (len(terminals) != 1 or terminals[0][1] != '0' or 'Lua error' in text
-            or re.search(r'staged.*unsupported|unsupported.*staged|unmapped program memory read|npe3_native_program_escape:', text)):
+            or re.search(r'staged.*unsupported|unsupported.*staged|unmapped program memory read|c54x_program_escape:', text)):
         raise ValueError('native 6210 terminal execution is incomplete or illegal')
     if float(terminals[0][0]) < minimum_seconds:
         raise ValueError('native 6210 ended before the required horizon')
@@ -187,9 +187,10 @@ def main():
                         help='with --host-call, a real SIP party (this pjsua) through dct3_sip_bridge.py replaces the synthetic host; MAME is throttled')
     parser.add_argument('--sip-pjsua2',metavar='PYTHONPATH',help='PYTHONPATH entries for the bridge\'s pjsua2 binding')
     parser.add_argument('--sip-port',type=int,default=25190,help='the remote\'s SIP port; the bridge takes the next one')
-    # The 6210 runs at about 20% of real time in a call: 20 s of wall-clock
-    # talk carries about 200 uplink frames (the bridge needs 100).
-    parser.add_argument('--sip-talk',type=int,default=20,help='wall-clock seconds the SIP remote talks after the handset answers')
+    # The 6210 runs at about 50% of real time in a call: 10 s of wall-clock
+    # talk carries about 250 uplink frames (the bridge needs 100), and even at
+    # full speed the hang-up (by 30 s) leaves the 36 s run time to clear.
+    parser.add_argument('--sip-talk',type=int,default=10,help='wall-clock seconds the SIP remote talks after the handset answers')
     parser.add_argument('--provision-records', action='store_true',
                         help='explicit synthetic record fixture; acquired PMM remains unchanged')
     args = parser.parse_args()

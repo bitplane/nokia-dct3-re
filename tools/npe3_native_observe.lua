@@ -6,7 +6,11 @@ local reference=machine.system.name=='npe3ref' or machine.system.name=='npe3afs'
 assert(reference or machine.system.name=='npe3r6')
 assert(not machine.devices[':dsp_hle'] and not machine.devices[':dsp_staged'])
 local arm=assert(machine.devices[':maincpu'])
+-- State entries cached once: arm.state[...] costs a container lookup per call.
+local arm_state=setmetatable({},{__index=function(t,k) local e=arm.state[k]; rawset(t,k,e); return e end})
 local dsp=assert(machine.devices[':dsp_c54x:cpu'])
+-- State entries cached once: dsp.state[...] costs a container lookup per call.
+local dsp_state=setmetatable({},{__index=function(t,k) local e=dsp.state[k]; rawset(t,k,e); return e end})
 machine:logerror(string.format('npe3_native_composition: hle=0 staged=0 clock_policy=%d fitted_mask_claim=0 observer_writes=0\n',reference and 45500000 or 13000000))
 if reference then
     machine:logerror('npe3_native_reference_clock: source=8210_documented_rate fitted_clock_claim=0 experiment=1 observer_writes=0\n')
@@ -36,45 +40,36 @@ _G.npe3_native_control=dsp.spaces.io:install_write_tap(0x36,0x36,'npe3_native_co
     control_writes=control_writes+1
     if control_writes<=32 then
         machine:logerror(string.format('npe3_native_control: sequence=%d t=%.9f value=%04x owner=%06x\n',
-            control_writes,machine.time:as_double(),value,dsp.state.EXECPC.value))
+            control_writes,machine.time:as_double(),value,dsp_state.EXECPC.value))
     end
 end)
-local missing_program=0
--- With OVLY clear, 0080..1fff of either captured page is zero padding.
-_G.npe3_native_coverage=dsp.spaces.program:install_read_tap(0x80,0x1fff,'npe3_native_coverage',function()
-    if dsp.state.PMST.value&0x20==0 then missing_program=missing_program+1 end
-end)
-_G.npe3_native_page1_coverage=dsp.spaces.program:install_read_tap(0x10080,0x11fff,'npe3_native_page1_coverage',function()
-    if dsp.state.PMST.value&0x20==0 then missing_program=missing_program+1 end
-end)
-local upper_reads=0
-_G.npe3_native_upper_coverage=dsp.spaces.program:install_read_tap(0x20000,0x7fffff,'npe3_native_upper_coverage',function(address,value)
-    -- Only pages 0 and 1 are captured. Count escapes even if unbacked words
-    -- happen to decode legally; terminal ILLEGAL alone is insufficient.
-    missing_program=missing_program+1;upper_reads=upper_reads+1
-    if upper_reads==1 then
-        machine:logerror(string.format('npe3_native_program_escape: t=%.9f address=%06x value=%04x pc=%06x readpc=%06x execpc=%06x xpc=%02x sp=%04x observer_writes=0\n',
-            machine.time:as_double(),address,value,dsp.state.GENPC.value,dsp.state.READPC.value,
-            dsp.state.EXECPC.value,dsp.state.XPC.value,dsp.state.SP.value))
-    end
-end)
-_G.npe3_native_loader=dsp.spaces.program:install_read_tap(0x0a00,0x0a00,'npe3_native_loader',function()
-    if captures.loader then return end
-    captures.loader=true
-    local file=assert(io.open('npe3_loader2.be16','wb'))
-    for address=0xa00,0xa00+628 do file:write(string.pack('>I2',dsp.spaces.data:read_u16(address))) end
-    file:close()
-end)
+-- Reads of the unacquired program (zero padding under the overlay window
+-- with OVLY clear, or above the two captured pages) are counted natively by
+-- the C54x backend (c54x_program_coverage); a Lua tap there ran on every
+-- internal-RAM fetch and cost half the run.
+-- Save the uploaded loader when the DSP first executes 0a00. A program tap
+-- there would land only in the overlay view entry selected when it was
+-- installed, and by the next frame the loader has overwritten its first
+-- words, so the breakpoint saves them itself (host-order words, converted at
+-- stop).
+machine.debugger:command('temp3=0')
+dsp.debug:bpset(0x0a00,'temp3==0','temp3=1;saved npe3_loader2.le16,a00:dsp_c54x:cpu,275;g')
 _G.npe3_native_stop=emu.add_machine_stop_notifier(function()
+    local saved=io.open('npe3_loader2.le16','rb')
+    if saved then
+        local words=saved:read('a'); saved:close()
+        local file=assert(io.open('npe3_loader2.be16','wb'))
+        for offset=1,#words-1,2 do file:write(string.pack('>I2',string.unpack('<I2',words,offset))) end
+        file:close()
+    end
     for _,space in ipairs({'program','data'}) do
         local file=assert(io.open('npe3_terminal_'..space..'.be16','wb'))
         for address=0,65535 do file:write(string.pack('>I2',dsp.spaces[space]:read_u16(address))) end
         file:close()
     end
     machine:logerror(string.format('npe3_native_terminal: t=%.6f arm=%08x dsp=%06x illegal=%u idle=%u pmst=%04x observer_writes=0\n',
-        machine.time:as_double(),arm.state.GENPC.value,dsp.state.GENPC.value,
-        dsp.state.ILLEGAL.value,dsp.state.IDLE.value,dsp.state.PMST.value))
-    machine:logerror(string.format('npe3_native_coverage: missing_program_reads=%d observer_writes=0\n',missing_program))
+        machine.time:as_double(),arm_state.GENPC.value,dsp_state.GENPC.value,
+        dsp_state.ILLEGAL.value,dsp_state.IDLE.value,dsp_state.PMST.value))
 end)
 local scenario=os.getenv('NPE3_NATIVE_SCENARIO') or 'menu'
 local input_at=tonumber(os.getenv('NPE3_NATIVE_INPUT_AT') or '20')

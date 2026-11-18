@@ -97,6 +97,9 @@ private:
 	void io_map(address_map &map) ATTR_COLD;
 	u16 overlay_r(offs_t offset);
 	void overlay_w(offs_t offset, u16 data);
+	u16 unacquired_r(offs_t offset);
+	u16 unacquired_page1_r(offs_t offset);
+	u16 program_escape_r(offs_t offset);
 	void ovly_w(int state);
 	u16 data_r(offs_t offset);
 	void data_w(offs_t offset, u16 data);
@@ -121,6 +124,12 @@ private:
 	std::unique_ptr<std::array<u16, 0x10000>> m_program_page1;
 	memory_view m_overlay;
 	memory_view m_overlay_page1;
+	// A captured (two-page) program image has only zero padding under the
+	// overlay window and nothing above page 1. Reads of either are counted
+	// natively, since a Lua tap on every fetch costs half the run time.
+	bool m_captured_program = false;
+	u32 m_unacquired_reads = 0;
+	u32 m_program_escapes = 0;
 	std::array<u16, 0x10000> m_data{};
 	std::array<u16, 0x100> m_io{};
 	tms320c54x_bsp_state m_bsp;

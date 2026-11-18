@@ -1233,7 +1233,7 @@ native DSP firmware carries the speech. The lab takes one call per run and
 does not offer call waiting or restoration through the bridge. During the call the 5110 now runs at about real time,
 so the remote talks for six wall-clock seconds; the 6210 (ROM6 lab,
 `make verify-6210-lab-sip-call` and `verify-6210-lab-sip-outgoing-call`)
-runs a call at about 20 % of real time, so its remote talks for twenty, and
+runs a call at about 50 % of real time, so its remote talks for ten, and
 the bridge's jitter handling absorbs the rate difference.
 
 ## Cross-product SIP acceptance

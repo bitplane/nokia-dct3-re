@@ -1,6 +1,8 @@
 -- Own MCU ring publication only. Never dequeue, acknowledge or deliver.
 local machine=manager.machine
 local cpu=assert(machine.devices[':maincpu'])
+-- State entries cached once: cpu.state[...] costs a container lookup per call.
+local cpu_state=setmetatable({},{__index=function(t,k) local e=cpu.state[k]; rawset(t,k,e); return e end})
 local space=cpu.spaces.program
 local commits,invalid=0,0
 local finish=machine.system.name=='npe3ap5' and 24 or 12
@@ -30,7 +32,7 @@ local tap=space:install_write_tap(0x100a4,0x100a7,'npe3_mcu_tx_ring',function(ad
         words[#words+1]=string.format('%04x',space:read_u16(0x10000+2*cursor))
         cursor=(cursor+1)%82
     end
-    machine:logerror(string.format('npe3_mcu_tx_commit: sequence=%d t=%.9f previous=%04x producer=%04x words=%s pc_context=%08x observer_writes=0\n',commits,now,previous,producer,table.concat(words,','),cpu.state.PC.value))
+    machine:logerror(string.format('npe3_mcu_tx_commit: sequence=%d t=%.9f previous=%04x producer=%04x words=%s pc_context=%08x observer_writes=0\n',commits,now,previous,producer,table.concat(words,','),cpu_state.PC.value))
 end)
 local stop=emu.add_machine_stop_notifier(function()
     machine:logerror(string.format('npe3_mcu_tx_complete: commits=%d cap=%d invalid=%d begin=%d end=%d observer_writes=0\n',commits,cap,invalid,begin,finish))
