@@ -1091,11 +1091,14 @@ blocks.
 `make verify-5110-lab-sip-call` places a real SIP call. PJSUA calls
 `tools/dct3_sip_bridge.py`, which places it on the lab. The handset rings
 and is answered with its own key. The remote plays 1 kHz and records what
-it hears. Twelve seconds after the answer it hangs up, and the bridge
+it hears. Six seconds after the answer it hangs up, and the bridge
 forwards the BYE as `incoming_call_terminate`. MAME runs throttled, since
-RTP runs in real time. During the call the emulation reaches only about
-40 % of real time (2.0 emulated seconds in 5.0 wall seconds), so the talk
-window is in wall time and long enough for the bridge's 100 frames. The
+RTP runs in real time. The talk window is in wall time. It was twelve
+seconds when the emulation reached only about 40 % of real time in a call;
+since the C54x speed work the call runs at about real time, and twelve
+seconds pushed the hang-up to 33 s of the 36 s run, too late for the idle
+screen to return before the final LCD check. Six seconds gives about 240
+frames, well over the bridge's 100. The
 remote offers only G.711, since pjsua otherwise negotiates wideband
 Speex. When the bridge has no handset frame ready it sends a silent one,
 so at this speed the remote hears speech and silence frames alternately.

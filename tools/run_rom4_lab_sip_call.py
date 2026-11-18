@@ -35,21 +35,53 @@ def recorded_fraction(path, hz):
         return tone_fraction(without_gaps(recording.readframes(recording.getnframes())), hz)
 
 
+async def wait_for_http(port, process, attempts=600):
+    """Wait until MAME's HTTP server answers a request; the bridge connects only once."""
+    for _ in range(attempts):
+        if process.returncode is not None:
+            raise RuntimeError('handset exited before its HTTP server started')
+        try:
+            reader, writer = await asyncio.open_connection('127.0.0.1', port)
+            writer.write(b'GET / HTTP/1.0\r\n\r\n')
+            await writer.drain()
+            line = await asyncio.wait_for(reader.readline(), 2)
+            writer.close()
+            if line.startswith(b'HTTP/'):
+                return
+        except (OSError, asyncio.TimeoutError):
+            pass
+        await asyncio.sleep(0.1)
+    raise RuntimeError('the handset HTTP server never answered')
+
+
 async def run(args, root, run_dir):
     cmd = [part for part in command(root, run_dir, 'nse1ap5', args.mame.resolve(), True, True,
                                     http_port=args.http_port, outgoing=args.outgoing) if part != '-nothrottle']
+    await run_sip_call(cmd, run_dir, root=root, pjsua=args.pjsua, pjsua2=args.pjsua2, http_port=args.http_port,
+                       sip_port=args.sip_port, outgoing=args.outgoing, talk=args.talk)
+
+
+async def run_sip_call(cmd, run_dir, *, root, pjsua, pjsua2, http_port, sip_port, outgoing, talk,
+                       handset_env=None, handset_timeout=120):
+    """Run a throttled handset, the SIP bridge and a PJSUA remote party in run_dir.
+
+    The remote calls the handset, which answers, and hangs up talk wall-clock
+    seconds later; or, with outgoing, answers the handset's dialled call.
+    """
     write_tone(run_dir / 'remote.wav', TONE_HZ)
-    environment = dict(os.environ, PYTHONPATH=os.pathsep.join(filter(None, (args.pjsua2, os.environ.get('PYTHONPATH')))))
+    environment = dict(os.environ, PYTHONPATH=os.pathsep.join(filter(None, (pjsua2, os.environ.get('PYTHONPATH')))))
     processes = []
     try:
         with (run_dir / 'console.log').open('wb') as console, (run_dir / 'sip-bridge.log').open('w') as bridge_log, \
                 (run_dir / 'sip-remote.log').open('w') as remote_log:
-            handset = await asyncio.create_subprocess_exec(*cmd, cwd=run_dir, stdout=console, stderr=asyncio.subprocess.STDOUT)
+            handset = await asyncio.create_subprocess_exec(*cmd, cwd=run_dir, env=handset_env, stdout=console,
+                                                           stderr=asyncio.subprocess.STDOUT)
             processes.append(handset)
+            await wait_for_http(http_port, handset)
             bridge = await asyncio.create_subprocess_exec(
                 sys.executable, str(root / 'tools/dct3_sip_bridge.py'),
-                '--url', f'ws://127.0.0.1:{args.http_port}/nokia/dct3/calls',
-                '--destination', f'sip:remote@127.0.0.1:{args.sip_port}', '--sip-port', str(args.sip_port + 1),
+                '--url', f'ws://127.0.0.1:{http_port}/nokia/dct3/calls',
+                '--destination', f'sip:remote@127.0.0.1:{sip_port}', '--sip-port', str(sip_port + 1),
                 '--once', '--require-frames', '100', '--record-pcm', str(run_dir),
                 env=environment, stdout=bridge_log, stderr=asyncio.subprocess.STDOUT)
             processes.append(bridge)
@@ -62,23 +94,23 @@ async def run(args, root, run_dir):
             else:
                 raise RuntimeError('the handset never registered with the bridge')
             remote = await asyncio.create_subprocess_exec(
-                str(args.pjsua.resolve()), '--null-audio', '--no-tcp', '--no-vad', '--clock-rate=8000',
-                '--bound-addr=127.0.0.1', '--ip-addr=127.0.0.1', f'--local-port={args.sip_port}',
+                str(Path(pjsua).resolve()), '--null-audio', '--no-tcp', '--no-vad', '--clock-rate=8000',
+                '--bound-addr=127.0.0.1', '--ip-addr=127.0.0.1', f'--local-port={sip_port}',
                 # Offer only G.711: pjsua prefers wideband Speex, which resamples
                 # and perceptually codes the test tones out of shape.
                 *(f'--dis-codec={codec}' for codec in ('speex', 'iLBC', 'GSM', 'G722', 'PCMA')),
                 f'--play-file={run_dir / "remote.wav"}', '--auto-play',
                 f'--rec-file={run_dir / "remote-received.wav"}', '--auto-rec',
-                '--id', f'sip:4420@127.0.0.1:{args.sip_port}',
+                '--id', f'sip:4420@127.0.0.1:{sip_port}',
                 # The remote answers the handset's call, or places one to it.
-                *(['--auto-answer=200'] if args.outgoing else [f'sip:dct3@127.0.0.1:{args.sip_port + 1}']),
+                *(['--auto-answer=200'] if outgoing else [f'sip:dct3@127.0.0.1:{sip_port + 1}']),
                 stdin=asyncio.subprocess.PIPE, stdout=remote_log, stderr=asyncio.subprocess.STDOUT)
             processes.append(remote)
-            if args.outgoing:
+            if outgoing:
                 # The handset dials, talks and hangs up on its own schedule.
                 if await asyncio.wait_for(bridge.wait(), 180):
                     raise RuntimeError('SIP bridge failed; inspect sip-bridge.log')
-                if await asyncio.wait_for(handset.wait(), 120):
+                if await asyncio.wait_for(handset.wait(), handset_timeout):
                     raise RuntimeError('handset exited unsuccessfully')
                 return
             # pjsua's --duration runs from the INVITE, so ringing would eat the
@@ -91,12 +123,12 @@ async def run(args, root, run_dir):
                 await asyncio.sleep(0.05)
             else:
                 raise RuntimeError('the handset never answered')
-            await asyncio.sleep(args.talk)
+            await asyncio.sleep(talk)
             remote.stdin.write(b'h\n')
             await remote.stdin.drain()
             if await asyncio.wait_for(bridge.wait(), 120):
                 raise RuntimeError('SIP bridge failed; inspect sip-bridge.log')
-            if await asyncio.wait_for(handset.wait(), 120):
+            if await asyncio.wait_for(handset.wait(), handset_timeout):
                 raise RuntimeError('handset exited unsuccessfully')
     finally:
         for process in reversed(processes):
@@ -124,9 +156,15 @@ def verify(run_dir, outgoing=False):
         result = check(text[:page] if page >= 0 else text)
         result.update(check_host_lab(text))
     check_lcd(run_dir / 'snap', NSE1_LCD_SHA256)
+    result.update(check_sip_call(run_dir, outgoing))
+    return result
+
+
+def check_sip_call(run_dir, outgoing=False, digits='123'):
+    """Check the bridge and remote logs, and that the remote heard the microphone."""
     bridge = (run_dir / 'sip-bridge.log').read_text(errors='replace')
     remote = (run_dir / 'sip-remote.log').read_text(errors='replace')
-    markers = (('SIP dial identity=', 'digits=123') if outgoing else
+    markers = (('SIP dial identity=', f'digits={digits}') if outgoing else
                ('SIP incoming identity=', 'caller=4420', 'SIP physical answer identity=', 'SIP confirmed status=200'))
     for marker in markers:
         if marker not in bridge:
@@ -139,10 +177,9 @@ def verify(run_dir, outgoing=False):
     remote_microphone = recorded_fraction(run_dir / 'remote-received.wav', MICROPHONE_HZ)
     if remote_microphone < 0.5:
         raise ValueError(f'the remote did not hear the handset microphone tone ({remote_microphone:.3f})')
-    result.update(sip_uplink_frames=counts['uplink'], sip_downlink_frames=counts['downlink'],
-                  rtp_sent=counts['pcm_transmitted'], rtp_received=counts['pcm_received'],
-                  dropped=counts['dropped'], remote_microphone_fraction=round(remote_microphone, 3))
-    return result
+    return dict(sip_uplink_frames=counts['uplink'], sip_downlink_frames=counts['downlink'],
+                rtp_sent=counts['pcm_transmitted'], rtp_received=counts['pcm_received'],
+                dropped=counts['dropped'], remote_microphone_fraction=round(remote_microphone, 3))
 
 
 def main():
@@ -152,9 +189,10 @@ def main():
     parser.add_argument('--pjsua2', required=True, help='PYTHONPATH entries for the pjsua2 binding')
     parser.add_argument('--http-port', type=int, default=18111)
     parser.add_argument('--sip-port', type=int, default=25180)
-    # The handset's DSP runs at about 40% of real time during a call, so 12 s
-    # of wall-clock talk carries roughly 240 uplink frames (the bridge needs 100).
-    parser.add_argument('--talk', type=int, default=12, help='wall-clock seconds the remote talks after answer')
+    # The handset runs at about real time during a call, so 6 s of wall-clock
+    # talk carries roughly 240 uplink frames (the bridge needs 100) and the
+    # network clearing still finishes, and the idle screen returns, in the run.
+    parser.add_argument('--talk', type=int, default=6, help='wall-clock seconds the remote talks after answer')
     parser.add_argument('--outgoing', action='store_true', help='the handset dials the remote and hangs up')
     parser.add_argument('--keep', action='store_true')
     args = parser.parse_args()

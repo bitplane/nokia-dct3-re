@@ -183,14 +183,25 @@ def main():
                         help='physical End on the late-assigned TCH/F; the lab answers its clearing')
     parser.add_argument('--host-call',type=int,metavar='HTTP_PORT',
                         help='a synthetic host answers the dialled call (End clears it), or with --incoming-call places the call and hangs up')
+    parser.add_argument('--sip-pjsua',type=Path,metavar='PJSUA',
+                        help='with --host-call, a real SIP party (this pjsua) through dct3_sip_bridge.py replaces the synthetic host; MAME is throttled')
+    parser.add_argument('--sip-pjsua2',metavar='PYTHONPATH',help='PYTHONPATH entries for the bridge\'s pjsua2 binding')
+    parser.add_argument('--sip-port',type=int,default=25190,help='the remote\'s SIP port; the bridge takes the next one')
+    # The 6210 runs at about 20% of real time in a call: 20 s of wall-clock
+    # talk carries about 200 uplink frames (the bridge needs 100).
+    parser.add_argument('--sip-talk',type=int,default=20,help='wall-clock seconds the SIP remote talks after the handset answers')
     parser.add_argument('--provision-records', action='store_true',
                         help='explicit synthetic record fixture; acquired PMM remains unchanged')
     args = parser.parse_args()
+    sip=args.sip_pjsua is not None
+    if sip and (args.host_call is None or not args.sip_pjsua2):
+        parser.error('the SIP call takes the host endpoint port (--host-call) and --sip-pjsua2')
     # The traffic call with speech or End runs on to 36 s; the host-placed
-    # call, which the host hangs up 3 s after it connects, to 30 s; the
+    # call, which the host hangs up 3 s after it connects, to 30 s (36 s for
+    # a SIP remote, whose wall-clock talk varies with emulation speed); the
     # host-answered dialled call, assigned at about 29 s, to 44 s.
     host_incoming=args.host_call is not None and args.incoming_call
-    page_seconds=36 if args.end_call_at is not None else 30 if host_incoming else 24
+    page_seconds=36 if args.end_call_at is not None or host_incoming and args.sip_pjsua else 30 if host_incoming else 24
     outgoing_seconds=44 if args.host_call is not None else 36
     if host_incoming:
         # The host's own page replaces the scripted one; its 1 kHz tone, the
@@ -299,6 +310,17 @@ def main():
         '-debug','-debugger','none','-log','-autoboot_delay','0',
         '-autoboot_script',str(ROOT/'tools'/observer),'-seconds_to_run',str(args.seconds)]
     (run/'command.json').write_text(json.dumps(command,indent=2)+'\n')
+    def check_remote_party(text,directory,outgoing):
+        """The synthetic host's own account of the call, or the SIP bridge's and remote's."""
+        from tools.rom4_lab_registration_check import (HANDSET_CLEARING,OUTGOING_PHASES,check_host_call,
+                                                       check_host_lab)
+        if not sip:
+            return check_host_call(text,execute.host,outgoing=outgoing,digits=DIALLED)
+        from tools.run_rom4_lab_sip_call import check_sip_call
+        result=(check_host_lab(text,OUTGOING_PHASES,HANDSET_CLEARING,'phase=connected') if outgoing
+                else check_host_lab(text))
+        result.update(check_sip_call(directory,outgoing,digits=DIALLED))
+        return result
     def execute(phase, scenario, seconds, persist=False):
         directory = run / phase
         directory.mkdir()
@@ -325,16 +347,28 @@ def main():
         env.pop('NPE3_NATIVE_END_AT',None)
         if args.end_call_at is not None:env['NPE3_NATIVE_END_AT']=str(args.end_call_at)
         client=None
-        if args.host_call is not None:
+        if sip:
+            import asyncio
+            from tools.run_rom4_lab_sip_call import run_sip_call
+            # SIP media runs in real time, so MAME is throttled.
+            cmd=[part for part in cmd if part!='-nothrottle']+['-http','-http_port',str(args.host_call)]
+            try:
+                asyncio.run(run_sip_call(cmd,directory,root=ROOT,pjsua=args.sip_pjsua,pjsua2=args.sip_pjsua2,
+                                         http_port=args.host_call,sip_port=args.sip_port,outgoing=not host_incoming,
+                                         talk=args.sip_talk,handset_env=env,handset_timeout=300))
+            except RuntimeError as error:
+                raise ValueError(f'SIP call: {error}')
+        elif args.host_call is not None:
             from tools.lab_host_call_client import HostCallClient
             cmd+=['-http','-http_port',str(args.host_call)]
             # The client's timeout is wall time; the run is slower than real time.
             client=HostCallClient(f'ws://127.0.0.1:{args.host_call}/nokia/dct3/calls',
                                   hangup_after=150 if host_incoming else None,outgoing=not host_incoming,timeout=900)
             client.start()
-        with (directory / 'console.log').open('w') as output:
-            subprocess.run(cmd, cwd=directory, env=env, stdout=output,
-                           stderr=subprocess.STDOUT, check=True, timeout=900)
+        if not sip:
+            with (directory / 'console.log').open('w') as output:
+                subprocess.run(cmd, cwd=directory, env=env, stdout=output,
+                               stderr=subprocess.STDOUT, check=True, timeout=900)
         if client is not None:
             client.join(10)
             (directory/'host_call.json').write_text(json.dumps(client.result(),indent=2)+'\n')
@@ -392,9 +426,8 @@ def main():
                 report['traffic_channel']=check_traffic_channel(text,report['outgoing_progress']['assignment_start_frame'])
             if args.host_call is not None:
                 from tools.npe3_raw_call_setup_check import check_traffic_clearing
-                from tools.rom4_lab_registration_check import check_host_call
                 report['traffic_clearing']=check_traffic_clearing(text,args.end_call_at)
-                report['host_call']=check_host_call(text,execute.host,outgoing=True,digits=DIALLED)
+                report['sip_call' if sip else 'host_call']=check_remote_party(text,first,True)
         if args.page_at is not None or host_incoming:
             from tools.npe3_native_paging_response_check import check as check_native_page_response
             report['paging_response']=check_native_page_response(text,(first/'rom6_radio_writes.tsv').read_text())
@@ -415,8 +448,7 @@ def main():
                 report['traffic_channel']=check_traffic_channel(text,report['traffic_assignment']['start_frame'])
                 early=not args.assignment_after_connect
                 if host_incoming:
-                    from tools.rom4_lab_registration_check import check_host_call
-                    report['host_call']=check_host_call(text,execute.host)
+                    report['sip_call' if sip else 'host_call']=check_remote_party(text,first,False)
                 elif early and args.end_call_at is not None:
                     # ALERTING, CONNECT and clearing all on FACCH, as on the 5110.
                     from tools.rom4_lab_registration_check import check_traffic_call
