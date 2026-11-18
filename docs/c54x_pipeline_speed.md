@@ -219,6 +219,7 @@ difference is the connected call.
 | Unacquired-program check native | 24.4 | 55.3 | 30.9 | 32 % |
 | State entries cached in the observers | 18.4 | 41.1 | 22.7 | 44 % |
 | Windowed taps retired | 16.5 | 36.3 | 19.8 | 50 % |
+| I/O census native | | 31.7 | | |
 | (No research observers at all) | 10.6 | 25.8 | 15.2 | 66 % |
 
 Every step leaves `error.log`, `rom6_radio_writes.tsv` and the captured
@@ -249,8 +250,15 @@ dumps byte-identical.
   now removed a millisecond after that, from a coroutine, since a tap must
   not remove itself while it runs.
 
-What remains: the I/O census in `rom6_native_radio.lua` (every DSP port
-access, about 6 M in the run, which `rom6_radio_census.py` checks) costs
-about 6.7 s of the 36, the formatter-store tap over 1000-26ff about 2.4 s,
-and the debugger's instruction hook, which the observers' breakpoints need,
-about 5 %. The C54x core is now half the process.
+- **I/O census.** `rom6_native_radio.lua` tapped every DSP I/O read and
+  write (about 6 M in the run) to build the per-port summaries and the
+  `rom6_radio_writes.tsv` write stream that `rom6_radio_census.py` checks.
+  The C54x backend now keeps the census itself when an observer writes the
+  stream cap into its `m_io_census_cap` save item; the Lua keeps only a
+  one-shot port-31 tap for the first-output overlay capture. The summary and
+  footer lines lose their `[luaengine]` prefix; the stream, dumps and line
+  contents are otherwise identical.
+
+What remains: the formatter-store tap over 1000-26ff costs about 2.4 s, and
+the debugger's instruction hook, which the observers' breakpoints need,
+about 5 %. The C54x core is now most of the process.

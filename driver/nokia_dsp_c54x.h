@@ -13,6 +13,9 @@
 #include "tms320c54x_bsp_state.h"
 
 #include <array>
+#include <cstdio>
+#include <memory>
+#include <vector>
 
 class nokia_dsp_c54x_device : public device_t, public nokia_dsp_backend_interface
 {
@@ -103,8 +106,12 @@ private:
 	void ovly_w(int state);
 	u16 data_r(offs_t offset);
 	void data_w(offs_t offset, u16 data);
-	u16 io_r(offs_t offset);
-	void io_w(offs_t offset, u16 data);
+	u16 io_r(offs_t offset, u16 mem_mask);
+	void io_w(offs_t offset, u16 data, u16 mem_mask);
+	u16 io_port_r(offs_t offset);
+	void io_port_w(offs_t offset, u16 data);
+	void io_census(bool write, offs_t address, u16 value, u16 mem_mask);
+	void io_census_stop();
 	u16 host_request() const;
 	void acknowledge_host_command(u16 mask);
 	void update_host_command_line();
@@ -169,6 +176,22 @@ private:
 	u32 m_rf_port32_writes = 0;
 	u32 m_completion_strobes = 0;
 	u32 m_boot_mailbox_writes = 0;
+	// Passive observer census of every I/O access (rom6_native_radio.lua),
+	// kept natively because a Lua tap on all ports costs a fifth of a run.
+	// An observer enables it by writing the write-stream cap into this save
+	// item; zero (the default) leaves the I/O path untouched.
+	struct io_census_port
+	{
+		u32 count = 0;
+		double first = 0, last = 0;
+		std::vector<u32> values, pcs;
+		bool values_capped = false, pcs_capped = false;
+	};
+	u32 m_io_census_cap = 0;
+	u32 m_io_census_writes = 0;
+	bool m_io_census_overflow = false;
+	std::FILE *m_io_census_stream = nullptr;
+	std::vector<std::unique_ptr<io_census_port>> m_io_census_ports;
 };
 
 DECLARE_DEVICE_TYPE(NOKIA_DSP_C54X, nokia_dsp_c54x_device)

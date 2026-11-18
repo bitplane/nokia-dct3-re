@@ -6,6 +6,8 @@
 #include "nokia_dsp_c54x.h"
 #include "nokia_dsp_compare_clock.h"
 
+#include <algorithm>
+
 DEFINE_DEVICE_TYPE(NOKIA_DSP_C54X, nokia_dsp_c54x_device, "nokia_dsp_c54x",
 		"Nokia DCT3 C54x DSP backend")
 
@@ -154,6 +156,7 @@ void nokia_dsp_c54x_device::device_start()
 	save_item(NAME(m_rf_port32_writes));
 	save_item(NAME(m_completion_strobes));
 	save_item(NAME(m_boot_mailbox_writes));
+	save_item(NAME(m_io_census_cap));
 }
 
 void nokia_dsp_c54x_device::device_reset()
@@ -196,6 +199,7 @@ void nokia_dsp_c54x_device::device_reset()
 
 void nokia_dsp_c54x_device::device_stop()
 {
+	io_census_stop();
 	if (m_captured_program)
 		machine().logerror("c54x_program_coverage: unacquired_reads=%u escapes=%u\n",
 				m_unacquired_reads, m_program_escapes);
@@ -641,7 +645,7 @@ void nokia_dsp_c54x_device::update_host_command_line()
 	m_host_command_vector = vector;
 }
 
-u16 nokia_dsp_c54x_device::io_r(offs_t offset)
+u16 nokia_dsp_c54x_device::io_port_r(offs_t offset)
 {
 	if (m_port36_handshake && (offset & 0xff) == 0x36)
 		return m_port36.read();
@@ -679,7 +683,7 @@ u16 nokia_dsp_c54x_device::io_r(offs_t offset)
 	}
 }
 
-void nokia_dsp_c54x_device::io_w(offs_t offset, u16 data)
+void nokia_dsp_c54x_device::io_port_w(offs_t offset, u16 data)
 {
 	const u8 port = offset & 0xff;
 	if (port == 0x03 || port == 0x04 || port == 0x0e || port == 0x0f)
@@ -818,6 +822,82 @@ void nokia_dsp_c54x_device::data_map(address_map &map)
 {
 	map(0x0000, 0xffff).rw(FUNC(nokia_dsp_c54x_device::data_r),
 			FUNC(nokia_dsp_c54x_device::data_w));
+}
+
+u16 nokia_dsp_c54x_device::io_r(offs_t offset, u16 mem_mask)
+{
+	u16 const data = io_port_r(offset);
+	// A Lua read tap saw the handler's result; this records the same value.
+	if (m_io_census_cap) io_census(false, offset, data, mem_mask);
+	return data;
+}
+
+void nokia_dsp_c54x_device::io_w(offs_t offset, u16 data, u16 mem_mask)
+{
+	if (m_io_census_cap) io_census(true, offset, data, mem_mask);
+	io_port_w(offset, data);
+}
+
+void nokia_dsp_c54x_device::io_census(bool write, offs_t address, u16 value, u16 mem_mask)
+{
+	double const now = machine().time().as_double();
+	if (m_io_census_ports.empty()) m_io_census_ports.resize(0x20000);
+	// Writes sort after reads, as the observer's R:/W: keys did.
+	auto &slot = m_io_census_ports[(write ? 0x10000 : 0) + (address & 0xffff)];
+	if (!slot)
+	{
+		slot = std::make_unique<io_census_port>();
+		slot->first = now;
+	}
+	io_census_port &item = *slot;
+	++item.count;
+	item.last = now;
+	if (std::find(item.values.begin(), item.values.end(), value) == item.values.end())
+	{
+		if (item.values.size() < 16) item.values.push_back(value);
+		else item.values_capped = true;
+	}
+	// Bus-time CPU state is context, not a claim about the issuing pipeline slot.
+	u32 const pc = u32(m_cpu->state_int(STATE_GENPC));
+	if (std::find(item.pcs.begin(), item.pcs.end(), pc) == item.pcs.end())
+	{
+		if (item.pcs.size() < 32) item.pcs.push_back(pc);
+		else item.pcs_capped = true;
+	}
+	if (!write) return;
+	if (m_io_census_writes >= m_io_census_cap) { m_io_census_overflow = true; return; }
+	if (!m_io_census_stream)
+	{
+		m_io_census_stream = std::fopen("rom6_radio_writes.tsv", "wb");
+		if (!m_io_census_stream) fatalerror("I/O census: cannot open rom6_radio_writes.tsv\n");
+		std::setvbuf(m_io_census_stream, nullptr, _IOFBF, 1 << 20);
+	}
+	++m_io_census_writes;
+	std::fprintf(m_io_census_stream, "%.9f\t%06x\t%04x\t%04x\t%04x\n", now, pc, address & 0xffff, value, mem_mask);
+}
+
+void nokia_dsp_c54x_device::io_census_stop()
+{
+	if (!m_io_census_cap) return;
+	if (m_io_census_stream && std::fclose(m_io_census_stream) != 0)
+		fatalerror("I/O census: write stream failed\n");
+	m_io_census_stream = nullptr;
+	auto const words = [] (std::vector<u32> list) {
+		std::sort(list.begin(), list.end());
+		std::string result;
+		for (u32 value : list) result += util::string_format(result.empty() ? "%04x" : ",%04x", value);
+		return result;
+	};
+	for (size_t key = 0; key < m_io_census_ports.size(); ++key)
+	{
+		if (!m_io_census_ports[key]) continue;
+		io_census_port const &item = *m_io_census_ports[key];
+		machine().logerror("rom6_radio_port: direction=%c address=%04x count=%u first=%.9f last=%.9f values=%s values_capped=%d cpu_pcs=%s pcs_capped=%d\n",
+				key >= 0x10000 ? 'W' : 'R', unsigned(key & 0xffff), item.count, item.first, item.last,
+				words(item.values), item.values_capped ? 1 : 0, words(item.pcs), item.pcs_capped ? 1 : 0);
+	}
+	machine().logerror("rom6_radio_capture: writes=%u overflow=%d observer_writes=0\n",
+			m_io_census_writes, m_io_census_overflow ? 1 : 0);
 }
 
 void nokia_dsp_c54x_device::io_map(address_map &map)
