@@ -238,6 +238,17 @@ class SipEndpoint:
         self.endpoint.libDestroy()
 
 
+async def open_handset(websockets, url, attempts=10):
+    """Open the handset's call socket; MAME's HTTP server can drop a handshake early in boot."""
+    for attempt in range(attempts):
+        try:
+            return await websockets.connect(url, ping_interval=None, max_size=4096)
+        except (OSError, websockets.exceptions.InvalidHandshake):
+            if attempt + 1 == attempts:
+                raise
+            await asyncio.sleep(0.5)
+
+
 async def bridge(args, pj):
     import websockets
     endpoint = SipEndpoint(pj, args.sip_port)
@@ -265,7 +276,7 @@ async def bridge(args, pj):
                 output = wave.open(str(args.record_pcm / name), 'wb')
                 output.setparams((1, 2, 8000, 0, 'NONE', 'not compressed'))
                 recordings[direction] = output
-        async with websockets.connect(args.url, ping_interval=None, max_size=4096) as websocket:
+        async with await open_handset(websockets, args.url) as websocket:
             receive = asyncio.create_task(websocket.recv())
             try:
                 while True:
