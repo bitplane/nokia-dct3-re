@@ -44,6 +44,8 @@ private:
 	void io_map(address_map &map);
 	u16 program_r(offs_t offset);
 	void verify_loader2();
+	bool uploaded(u32 address) const;
+	void leave_uploaded_code(u16 pc);
 	void program_w(offs_t offset, u16 data);
 	u16 data_r(offs_t offset);
 	void data_w(offs_t offset, u16 data);

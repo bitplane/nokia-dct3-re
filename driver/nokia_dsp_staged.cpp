@@ -144,6 +144,15 @@ u16 nokia_dsp_staged_device::program_r(offs_t offset)
 		return m_program_ram[offset];
 	if (offset >= 0x0800 && offset < 0x1000)
 		return m_transport->dsp_data_r(offset);
+	if (m_active && !machine().side_effects_disabled() && (m_runtime_hle || m_observe_after_missing_code))
+	{
+		// The pipeline fetches a branch target in the clock that executes the
+		// branch, before any guard tick. Stop here: the CPU is suspended and
+		// its timeslice ends before this word can reach Execute.
+		if (!m_observation_halted)
+			leave_uploaded_code(u16(offset));
+		return 0xffff;
+	}
 	if (m_active)
 	{
 		logerror("staged_dsp: unavailable_program address=%04x pc=%04x stage=%s t=%.6f\n",
@@ -231,52 +240,66 @@ void nokia_dsp_staged_device::io_w(offs_t offset, u16 data)
 		throw emu_fatalerror(1, "Staged DSP needs unsupported port write %04x", u16(offset));
 }
 
+bool nokia_dsp_staged_device::uploaded(u32 address) const
+{
+	return (address >= 0x0f00 && address < m_program_end) ||
+			(m_loader2_verified && address >= 0x0a00 && address < 0x0a00 + m_loader2_words);
+}
+
+// Control has reached pc outside the uploaded program. Halt or hand off
+// before any instruction there executes, or fail closed.
+void nokia_dsp_staged_device::leave_uploaded_code(u16 pc)
+{
+	unsigned installed = 0;
+	unsigned first = m_program_valid.size();
+	unsigned last = 0;
+	for (unsigned index = 0; index < m_program_valid.size(); ++index)
+		if (m_program_valid[index])
+		{
+			++installed;
+			first = std::min(first, index);
+			last = index;
+		}
+	logerror("staged_dsp: installed_program words=%u first=%04x last=%04x target_data=%04x pmst=%04x\n",
+			installed, first, last, data_r(pc), u16(m_cpu->state_int(tms320c54x_device::STATE_PMST)));
+	logerror("staged_dsp: outside_uploaded_code pc=%04x t=%.6f\n", pc, machine().time().as_double());
+	const bool handoff = m_runtime_hle && !m_verifier && m_loader2_verified && pc == 0x2c75;
+	if (!handoff && !m_observe_after_missing_code)
+		throw emu_fatalerror(1, "Staged DSP escaped uploaded program: pc=%04x", pc);
+	m_observation_halted = true;
+	m_guard->adjust(attotime::never);
+	m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
+	machine().scheduler().abort_timeslice();
+	if (handoff)
+		// Selected hybrid backend: no missing instruction is executed and
+		// no native return/cookie is fabricated. HLE owns later transport.
+		logerror("staged_dsp: runtime_hle_handoff pc=%04x native_suspended=1\n", pc);
+	else
+		// Diagnostic isolation, not a substitute helper or hardware claim.
+		// Keep ownership active so HLE cannot manufacture acknowledgements
+		// while the MCU is observed with an explicitly silent DSP.
+		logerror("staged_dsp: observation_halt pc=%04x ownership_retained=1\n", pc);
+}
+
 TIMER_CALLBACK_MEMBER(nokia_dsp_staged_device::check_execution)
 {
+	if (m_observation_halted)
+		return;
 	const u16 pc = m_cpu->state_int(tms320c54x_device::STATE_PC);
 	// A cycle guard can observe the loader entry before its first fetch.
 	if (!m_verifier && pc == 0x0a00)
 		verify_loader2();
-	if ((pc < 0x0f00 || pc >= m_program_end) &&
-			!(m_loader2_verified && pc >= 0x0a00 && pc < 0x0a00 + m_loader2_words))
+	if (!uploaded(pc))
 	{
-		unsigned installed = 0;
-		unsigned first = m_program_valid.size();
-		unsigned last = 0;
-		for (unsigned index = 0; index < m_program_valid.size(); ++index)
-			if (m_program_valid[index])
-			{
-				++installed;
-				first = std::min(first, index);
-				last = index;
-			}
-		logerror("staged_dsp: installed_program words=%u first=%04x last=%04x target_data=%04x pmst=%04x\n",
-				installed, first, last, data_r(pc), u16(m_cpu->state_int(tms320c54x_device::STATE_PMST)));
-		logerror("staged_dsp: outside_uploaded_code pc=%04x t=%.6f\n", pc, machine().time().as_double());
-		if (m_runtime_hle && !m_verifier && m_loader2_verified && pc == 0x2c75)
-		{
-			// Selected hybrid backend: no missing instruction is executed and
-			// no native return/cookie is fabricated. HLE owns later transport.
-			m_observation_halted = true;
-			m_guard->adjust(attotime::never);
-			m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
-			machine().scheduler().abort_timeslice();
-			logerror("staged_dsp: runtime_hle_handoff pc=%04x native_suspended=1\n", pc);
+		// PC is the fetch address. The pipeline prefetches past a final RET
+		// into shared RAM, which program_r serves without side effects; only
+		// an instruction that reaches Execute there has left the program.
+		// Fetches from absent program memory stop in program_r instead.
+		const u32 executing = u32(m_cpu->state_int(tms320c54x_device::STATE_EXECPC));
+		if (pc >= 0x0800 && pc < 0x1000 && (executing == 0xffffffff || uploaded(executing & 0xffff)))
 			return;
-		}
-		if (m_observe_after_missing_code)
-		{
-			// Diagnostic isolation, not a substitute helper or hardware claim.
-			// Keep ownership active so HLE cannot manufacture acknowledgements
-			// while the MCU is observed with an explicitly silent DSP.
-			m_observation_halted = true;
-			m_guard->adjust(attotime::never);
-			m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
-			machine().scheduler().abort_timeslice();
-			logerror("staged_dsp: observation_halt pc=%04x ownership_retained=1\n", pc);
-			return;
-		}
-		throw emu_fatalerror(1, "Staged DSP escaped uploaded program: pc=%04x", pc);
+		leave_uploaded_code(pc);
+		return;
 	}
 	if (m_verifier && !m_published && m_transport->dsp_data_r(0x0801) != 0xffff)
 	{
