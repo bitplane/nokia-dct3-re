@@ -927,6 +927,8 @@ uint16_t nokia_dct3_state::dsp_ram_r(offs_t offset)
 {
 	offset &= 0x7ff;
 	const uint16_t data = m_dspif->shared_r(offset);
+	if (!m_trace_enabled)
+		return data;
 	const uint32_t pc = m_maincpu->pc();
 	const uint64_t trace_key = (uint64_t(pc) << 11) | offset;
 	const unsigned byte_offset = offset << 1;
@@ -996,6 +998,9 @@ void nokia_dct3_state::dsp_ram_w(offs_t offset, uint16_t data, uint16_t mem_mask
 uint16_t nokia_dct3_state::flash_r(offs_t offset, uint16_t mem_mask)
 {
 #if DCT3_RESEARCH_TRACES
+	// Both traces below log only under -verbose; skip the PC read otherwise.
+	if (!m_trace_enabled)
+		return m_flash->read(offset) & mem_mask;
 	// Every ARM flash access passes here; read the PC directly, not through
 	// the generic state table.
 	const u32 pc = downcast<arm7_cpu_device &>(*m_maincpu).current_pc();
@@ -1006,8 +1011,7 @@ uint16_t nokia_dct3_state::flash_r(offs_t offset, uint16_t mem_mask)
 #endif
 	const u16 data = m_flash->read(offset) & mem_mask;
 #if DCT3_RESEARCH_TRACES
-	if (m_trace_enabled && m_product.flash_persistent_start &&
-			addr >= m_product.flash_persistent_start)
+	if (m_product.flash_persistent_start && addr >= m_product.flash_persistent_start)
 	{
 		// One record per caller/page captures catalogue scans and checksum
 		// walks without logging every halfword in a large erased partition.

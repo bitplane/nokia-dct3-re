@@ -312,3 +312,43 @@ the research traces (`make build-tracefree`) saves about 2 %; the ARM's
 flash reads cost about 4 %. Real time on ordinary hosts needs the
 pipeline model itself to become several times cheaper per clock.
 
+
+### Why the per-clock cost is hard to cut
+
+Measured on the lean call (30 emulated seconds, about 500 M DSP clocks):
+
+- **The checks run every clock; the gated work hardly ever does.** With
+  gcov, `pipeline_step` executes about 140 source lines per clock, and
+  about 100 of those run on every clock: the peripheral arbitration, the
+  slot shift, the state-flag tests and the stage gates themselves. No
+  stage gate's blocks are entered on more than 41 % of clocks, and most
+  on under 5 %. The gate tables already skip the opcode-specific work.
+  What remains is many cheap tests, roughly 140 host branches per clock.
+- **The host core is front-end bound.** About 48 % of dispatch slots go
+  unused because the front end supplies no instructions. There are about
+  2 G L1 instruction-cache refills from L2 per 100 G cycles: 90 % of the
+  samples fall in 25 KB of code, and the ARM emulator shares the same
+  32 KB L1i. Branch misses (under one per clock) and L1 data misses
+  matter far less. Packing the eight per-opcode tables into one 32-byte
+  record cut L1 data misses by 78 % and saved no time.
+- **Layout noise is about ±5 %.** Changing a driver function's code moved
+  `pipeline_step`'s cost by 4-5 % with the core's own code byte-identical.
+  The difference was entirely in front-end stalls. Compare builds by
+  `perf stat -e instructions:u` (repeatable to five digits) as well as
+  by time, and alternate runs.
+- **Compiler options do not help.** `-march=x86-64-v3`, turning off
+  Ubuntu's hardening defaults and `-falign-*` all stay within noise;
+  `-O2` is slower and `-Os` is three times slower.
+- **A fast path for quiet clocks would be a second core.** 74 % of clocks
+  have no pipeline special state (no repeat stream, hold, wait, flush,
+  delay slot, control guard or pending interrupt). Covering half of them
+  would still need about 200 distinct opcode words with their full stage
+  behaviour, because the hot code uses 1663.
+- **Redundant interrupt-line writes are holding the ARM and DSP in step.**
+  MAD2 rewrites the ARM's FIQ and IRQ lines on every update (about 90 k
+  times per second, nearly all unchanged), and each `set_input_line`
+  ends the scheduler's timeslice. Sending only real changes makes the ARM
+  run further ahead of the DSP between timers. The 5110 traffic call then
+  registers about 20 s late and fails its gate. Removing those writes
+  needs an explicit scheduler quantum, so the coupling stops being
+  incidental.
