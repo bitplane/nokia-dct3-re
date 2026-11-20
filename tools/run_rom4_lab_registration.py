@@ -52,7 +52,8 @@ OUTGOING_KEYS = '1,2,3,menu,' + 'wait,' * 9 + 'menu'
 OUTGOING_BTS_BITS = (8, 16, 32, 64, 128, 256, 512, 2048)
 
 
-def command(root, run, machine, mame, call=False, traffic=False, roundtrip=None, http_port=None, outgoing=False):
+def command(root, run, machine, mame, call=False, traffic=False, roundtrip=None, http_port=None, outgoing=False,
+            degraded=False):
     if machine == 'nse1ap5':
         nvram = run / 'nvram/nse1ap5'
         nvram.mkdir(parents=True)
@@ -61,7 +62,9 @@ def command(root, run, machine, mame, call=False, traffic=False, roundtrip=None,
             (root / 'roms/noki5110/nse-1.bin').read_bytes(),
             (root / 'roms/noki5110/5110f530.fls').read_bytes()))
         if call:
-            write_bts_config(run, machine, OUTGOING_BTS_BITS if outgoing else TRAFFIC_BTS_BITS if traffic else CALL_BTS_BITS)
+            bits = OUTGOING_BTS_BITS if outgoing else TRAFFIC_BTS_BITS if traffic else CALL_BTS_BITS
+            # Lab option 0x2000: 208 frames of 1/3 bit errors on speech/FACCH both ways.
+            write_bts_config(run, machine, (*bits, 0x2000) if degraded else bits)
             os.environ.update(CALL_INPUTS)
         if roundtrip is not None:
             # Lua key timers are outside the machine image, so every press
@@ -125,12 +128,14 @@ def main():
                         help='a synthetic host places the traffic-channel call over the host call protocol and hangs up (nse1ap5)')
     parser.add_argument('--host-outgoing-call', type=int, metavar='HTTP_PORT',
                         help='the handset dials 123; a synthetic host answers it, and the handset hangs up (nse1ap5)')
+    parser.add_argument('--degraded-frames', action='store_true',
+                        help='impair the traffic-channel call mid-call and require native RXQUAL and recovery (nse1ap5)')
     parser.add_argument('--keep', action='store_true', help='retain the run directory after a pass')
     args = parser.parse_args()
     outgoing = args.host_outgoing_call is not None
     if outgoing:
         args.host_call = args.host_outgoing_call
-    args.traffic_channel |= args.state_roundtrip is not None or args.host_call is not None
+    args.traffic_channel |= args.state_roundtrip is not None or args.host_call is not None or args.degraded_frames
     args.incoming_call |= args.traffic_channel
     if args.incoming_call and args.machine != 'nse1ap5':
         parser.error('the incoming-call scenario is defined for nse1ap5')
@@ -141,7 +146,7 @@ def main():
     os.rmdir(run)  # prepare_native requires a new directory
     try:
         cmd = command(root, run, args.machine, (args.mame or root / 'mame/mame').resolve(), args.incoming_call,
-                      args.traffic_channel, args.state_roundtrip, args.host_call, outgoing)
+                      args.traffic_channel, args.state_roundtrip, args.host_call, outgoing, args.degraded_frames)
         run.mkdir(exist_ok=True)
         os.environ['NOKIA_DCT3_SNAPSHOT_DIR'] = str(run / 'snap')
         client = None
@@ -173,6 +178,9 @@ def main():
             check_lcd_sequence(run / 'snap', (RINGING_LCD_SHA256, CALL_LCD_SHA256), NSE1_LCD_SHA256)
             if args.state_roundtrip is not None:
                 result.update(check_roundtrip(text))
+            if args.degraded_frames:
+                from tools.npe3_tch_impairment_check import check as check_impairment
+                result.update(check_impairment(text))
         else:
             result = check(text)
         if args.machine == 'nse1ap5':
@@ -186,6 +194,7 @@ def main():
     scenario = ('dialled traffic-channel call answered by the host' if outgoing else
                 'host-placed traffic-channel call' if args.host_call is not None else
                 'traffic-channel call with state round trip' if args.state_roundtrip is not None else
+                'traffic-channel call with degraded frames' if args.degraded_frames else
                 'traffic-channel call' if args.traffic_channel else
                 'incoming call' if args.incoming_call else 'Location Updating')
     print(f'NSE ROM4 {args.machine} native laboratory {scenario}: PASS')

@@ -160,6 +160,10 @@ private:
 	std::vector<facch_information> m_facch_outstanding;
 	u64 m_facch_t200=~u64(0);
 	u64 m_tch_stop_frame=~u64(0),m_tch_samples_frame=~u64(0);
+	// Traffic-channel impairment window [first,last): speech/FACCH bursts
+	// both ways take bit errors; SACCH is left intact.
+	u64 m_impair_first=~u64(0),m_impair_last=~u64(0);
+	bool tch_impaired(u64 frame) const;
 	std::array<std::array<s16,2>,148*4> m_tch_samples{};
 	// Downlink speech: a continuous 1 kHz tone, GSM 06.10-encoded per block.
 	nokia_gsm_fr_codec m_tch_codec,m_tch_uplink_codec;

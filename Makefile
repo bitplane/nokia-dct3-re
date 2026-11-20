@@ -511,6 +511,7 @@ help:
 	@echo "make verify-5110-lab-incoming-call page the registered nse1ap5, answer and end a call on SDCCH (no traffic channel)"
 	@echo "make verify-5110-lab-traffic-call the same call assigned to TCH/F timeslot 1, with FACCH/SACCH, speech both ways and clearing"
 	@echo "make verify-5110-lab-traffic-state save, replay and reload that call while ringing, connected and clearing"
+	@echo "make verify-5110-lab-degraded-call  impair the traffic call both ways; native RXQUAL rises and speech recovers"
 	@echo "make verify-5110-lab-host-call a host-protocol remote places the traffic call, swaps GSM-FR speech and hangs up"
 	@echo "make build-pgo       build, then recompile the C54x core with profile-guided optimisation (real-time native calls)"
 	@echo "make bench-6210-call this host's speed for the native 6210 call, as a fraction of real time (1.0 keeps up)"
@@ -520,6 +521,7 @@ help:
 	@echo "make verify-5110-lab-sip-outgoing-call the same dialled call to a real PJSUA SIP remote through dct3_sip_bridge.py"
 	@echo "make verify-6210-lab-sip-call       a PJSUA SIP remote calls the 6210 on the ROM6 lab cell; it answers on TCH/F"
 	@echo "make verify-6210-lab-sip-outgoing-call the 6210 dials a PJSUA SIP remote, talks and hangs up with End"
+	@echo "make verify-6210-lab-degraded-call  impair the 6210's traffic call both ways; native RXQUAL rises and speech recovers"
 	@echo "make verify-6210-lab-physical-duplex host audio into the native 6210's MIC2 and out of EAR on a lab call (PulseAudio, ffmpeg)"
 	@echo "make verify-5110i-lab-registration complete native ROM4 Location Updating on nse2ap5 with provisioned security records and no restart"
 	@echo "make verify-5110-power-lifecycle check short and sustained NSE-1 power presses (staged CPU by default; NSE1_MACHINE overrides composition)"
@@ -1879,6 +1881,9 @@ verify-5110-lab-incoming-call: build
 verify-5110-lab-traffic-call: build
 	$(PYTHON) tools/run_rom4_lab_registration.py nse1ap5 --traffic-channel
 
+verify-5110-lab-degraded-call: build
+	$(PYTHON) tools/run_rom4_lab_registration.py nse1ap5 --degraded-frames
+
 verify-5110-lab-traffic-state: build
 	@set -e; for at in 22.0 24.5 27.46; do \
 		$(PYTHON) tools/run_rom4_lab_registration.py nse1ap5 --state-roundtrip $$at; \
@@ -1920,6 +1925,12 @@ verify-6210-lab-sip-call: build
 
 verify-6210-lab-sip-outgoing-call: build
 	$(NPE3_LAB_SIP) --seconds 44 --scenario outgoing --accept-outgoing-service --proceed-outgoing-call --end-call-at 40
+
+verify-6210-lab-degraded-call: build
+	$(VENV)/bin/python tools/run_npe3_native.py --reference-clock --seconds 36 --adc-source fcch-sch-broadcast \
+		--capture-start p09 --tx-release p05 --raw-agch --provision-records --page-at 18 \
+		--cell-power-policy handset33 --incoming-call --ack-call-control --sacch --answer-call \
+		--traffic-assignment --speech --end-call-at 30 --impair-traffic
 
 verify-6210-lab-physical-duplex: build
 	$(VENV)/bin/python tools/run_npe3_physical_duplex.py $(RUN_DIR)

@@ -984,6 +984,18 @@ replay diverges after 4 ms. Lua key timers are outside the machine image,
 so every press after the save comes from the restored branch at the
 ordinary run's time (Answer 23.0 s, End 27.22 s).
 
+`make verify-5110-lab-degraded-call` (and `verify-6210-lab-degraded-call`
+on the ROM6 lab) adds lab option `0x2000`. From 520 frames after the traffic
+channel starts, for 208 frames (two SACCH reporting periods), the lab flips
+every third data bit of each speech/FACCH burst both ways. Tails, training
+sequence and stealing flags stay intact, and SACCH is not touched. The
+evidence is each receiver's own judgement. The handset's Measurement Reports
+show RXQUAL-FULL 6, 7 and 5 for the impaired periods (from 0 and occasional
+2 before), then 0 again. The lab's GSM-FR decoder counts 49 bad uplink
+frames in the window, no more after it, and good speech resumes. The 6210
+gives RXQUAL 4, 7, 6, then 0, with 48 bad uplink frames
+(`npe3_tch_impairment_check.py`).
+
 Five problems were in the emulation, not the lab:
 
 - **Staged core.** The DSP first fell silent 0.08 s after the command on a

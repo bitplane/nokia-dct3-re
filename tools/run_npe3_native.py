@@ -37,7 +37,7 @@ def configure_cell_power(directory,model,policy,*,incoming_call=False,
                          traffic_assignment=False,call_ack=False,clear_call=False,
                          sacch=False,assignment_after_connect=False,
                          accept_outgoing_service=False,proceed_outgoing_call=False,frame_pages=False,
-                         speech=False,host_microphone=False):
+                         speech=False,host_microphone=False,impair_traffic=False):
     if policy=='legacy39':return
     if policy!='handset33':raise ValueError('unsupported cell power policy')
     config=ET.Element('mameconfig',version='10')
@@ -66,6 +66,8 @@ def configure_cell_power(directory,model,policy,*,incoming_call=False,
         ET.SubElement(ports,'port',tag=':LAB_BTS',type='CONFIG',mask='2048',defvalue='0',value='2048')
     if host_microphone:
         ET.SubElement(ports,'port',tag=':LAB_BTS',type='CONFIG',mask='4096',defvalue='0',value='4096')
+    if impair_traffic:
+        ET.SubElement(ports,'port',tag=':LAB_BTS',type='CONFIG',mask='8192',defvalue='0',value='8192')
     destination=directory/'cfg';destination.mkdir()
     ET.ElementTree(config).write(destination/f'{model}.cfg',encoding='utf-8',xml_declaration=True)
 
@@ -187,6 +189,9 @@ def main():
     parser.add_argument('--host-audio',action='store_true',
                         help='with --speech, MIC2 takes host input instead of the lab tone and EAR plays to the host; '
                              'MAME is throttled with -sound pulse (see run_npe3_physical_duplex.py)')
+    parser.add_argument('--impair-traffic',action='store_true',
+                        help='with --speech, the lab BTS gives speech/FACCH bursts both ways 1/3 bit errors '
+                             'for 208 frames mid-call (SACCH intact)')
     parser.add_argument('--wavwrite',type=Path,help='with --host-audio, also record the speaker mix in emulated time')
     parser.add_argument('--end-call-at',type=int,metavar='SECONDS',
                         help='physical End on the late-assigned TCH/F; the lab answers its clearing')
@@ -243,6 +248,8 @@ def main():
         parser.error('late assignment requires traffic assignment,physical Answer,CC acknowledgement and SACCH')
     if (args.speech or args.end_call_at is not None) and not (args.traffic_assignment and (args.answer_call or args.host_call is not None)):
         parser.error('speech and End are defined for the assigned answered call')
+    if args.impair_traffic and not (args.speech and args.end_call_at is not None):
+        parser.error('traffic impairment needs the connected speech call cleared by End')
     if args.wavwrite and not args.host_audio:
         parser.error('--wavwrite records the host-audio speaker mix')
     if args.host_audio and not (args.speech and args.page_at is not None and args.host_call is None):
@@ -344,7 +351,8 @@ def main():
                              assignment_after_connect=args.assignment_after_connect,
                              accept_outgoing_service=args.accept_outgoing_service,
                              proceed_outgoing_call=args.proceed_outgoing_call,frame_pages=args.frame_pages,
-                             speech=args.speech,host_microphone=args.host_audio)
+                             speech=args.speech,host_microphone=args.host_audio,
+                             impair_traffic=args.impair_traffic)
         cmd = command.copy()
         if args.host_audio:
             # Host audio runs in real time: throttle, and open PulseAudio.
@@ -476,6 +484,10 @@ def main():
                 elif args.end_call_at is not None:
                     from tools.npe3_raw_call_setup_check import check_traffic_clearing
                     report['traffic_clearing']=check_traffic_clearing(text,args.end_call_at)
+            if args.impair_traffic:
+                from tools.npe3_tch_impairment_check import check as check_impairment
+                report['degraded_frames']=check_impairment(text)
+                print('Native6210 degraded frames: PASS',report['degraded_frames'])
             # Early assignment acknowledges Call Confirmed itself; no standalone RR.
             if args.ack_call_control and not (args.traffic_assignment and not args.assignment_after_connect):
                 from tools.npe3_raw_call_setup_check import check_call_rr

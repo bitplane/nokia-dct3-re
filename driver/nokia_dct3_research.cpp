@@ -949,6 +949,7 @@ template <typename F> void dct3_rf_adc_fixture_state::visit_tch_state(F &&field)
 	field(m_facch_send);field(m_facch_receive);field(m_facch_t200);
 	field(m_facch_window);field(m_facch_window_count);
 	field(m_tch_stop_frame);field(m_tch_samples_frame);field(m_tch_samples);
+	field(m_impair_first);field(m_impair_last);
 	field(m_tch_codec_state);field(m_tch_speech_enabled);
 	field(m_tch_tone_phase);field(m_tch_speech_frames);
 	field(m_tch_speech);field(m_tch_bad_speech);field(m_tch_unreadable);
@@ -1047,6 +1048,21 @@ void dct3_rf_adc_fixture_state::start_traffic_channel(u64 frame)
 		unsigned(m_tch.first_frame()),m_host_request ? "host" : m_tch_speech_enabled ? "tone_1000hz" : "empty",m_tch_codec.available() ? "gsm_06_10" : "unavailable");
 	if (m_host_microphone)
 		machine().logerror("npe3_tch_microphone: source=host_cobba_mic2 lab_tone=0\n");
+	m_impair_first=m_impair_last=~u64(0);
+	if (ioport("LAB_BTS")->read()&0x2000)
+	{
+		// About 2.4 s into the call, for two SACCH reporting periods.
+		m_impair_first=m_tch.first_frame()+520;
+		m_impair_last=m_impair_first+208;
+		machine().logerror("npe3_tch_impairment: first_frame=%u last_frame=%u bit_errors=1/3 directions=downlink,uplink sacch=intact physical_claim=0\n",
+			unsigned(m_impair_first),unsigned(m_impair_last));
+	}
+}
+
+bool dct3_rf_adc_fixture_state::tch_impaired(u64 frame) const
+{
+	return frame>=m_impair_first && frame<m_impair_last &&
+		gsm::tch_f::full_rate_slot(u32(frame),1)!=gsm::tch_f::tdma_slot_kind::sacch;
 }
 
 void dct3_rf_adc_fixture_state::stop_traffic_channel()
@@ -1109,8 +1125,10 @@ TIMER_CALLBACK_MEMBER(dct3_rf_adc_fixture_state::codec_frame)
 
 void dct3_rf_adc_fixture_state::receive_traffic_uplink(std::array<u16,15> const &words,u64 frame)
 {
-	auto const burst=gsm::normal::decode_p27_traffic(words,2);
+	auto burst=gsm::normal::decode_p27_traffic(words,2);
 	if (!burst) ++m_tch_unreadable;
+	else if (tch_impaired(frame))
+		for (unsigned at=0;at<burst->data.size();at+=3) burst->data[at]^=1;
 	using kind=nokia_rf_lab::traffic_channel::uplink_kind;
 	for (auto const &event:m_tch.uplink(frame,burst))
 	{
@@ -1468,7 +1486,13 @@ u16 dct3_rf_adc_fixture_state::sample_r(offs_t component)
 		{
 			m_tch_samples_frame=frame;
 			if (frame>=m_facch_t200) resend_facch("t200",frame);
-			auto const bits=m_tch.downlink(frame);
+			auto bits=m_tch.downlink(frame);
+			if (bits && tch_impaired(frame))
+			{
+				// Every third data bit; tails, training and stealing flags stay.
+				for (unsigned at=3;at<145;++at)
+					if ((at<60 || at>=88) && !(at%3)) (*bits)[at]^=1;
+			}
 			m_tch_samples=bits ? nokia_rf_lab::gmsk_samples(*bits) : m_dummy_samples;
 		}
 		auto const &sample=m_tch_samples[(tick%60'000-7'500)/12];
