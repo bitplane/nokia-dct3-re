@@ -26,8 +26,24 @@ calls also run against a real SIP party: `make verify-6210-lab-sip-call` and
 `make run-6210-sip` (`tools/run_6210_sip.py`) runs the handset in a MAME
 window with no research observers or debugger, beside the bridge, for one
 call direction per session (`SIP_DIRECTION=incoming|outgoing`,
-`SIP_DESTINATION=` for outgoing). The handset hears the SIP party; its
-microphone still carries the lab tone. Physical capture timing, carrier tuning and fitted mask/clock
+`SIP_DESTINATION=` for outgoing). The SIP party plays through the
+handset's earpiece to MAME's sound output, and the host microphone feeds
+MIC2.
+
+`make verify-6210-lab-physical-duplex` (`tools/run_npe3_physical_duplex.py`)
+checks that host path on the early incoming call. NPE-3 System Module table
+8 connects the internal microphone to COBBA_GJP MIC2P/N and the earpiece to
+EARP/N; `npe3ap5` selects those routes at neutral gain, and lab option
+`0x1000` makes the PCM frame strobe take MIC2 samples instead of the 500 Hz
+table tone. A 500 Hz sine plays into a private PulseAudio null sink. The
+lab BTS's GSM-FR decoder hears it in 489 of 524 uplink blocks, and MAME's
+speaker mix (`-wavwrite`, emulated time) carries the lab's 1 kHz downlink
+for a 9.4 s unbroken run. The live sink capture is only required to be
+non-silent: on the shared reference host the call ran at 63-70 % of real
+time, so live playback has gaps. A MAME patch
+(`mame-pulseaudio-exit.patch`) stops PulseAudio's threaded main loop before
+freeing it; without it, MAME aborted on exit after every PulseAudio run.
+Gains are not recovered. Physical capture timing, carrier tuning and fitted mask/clock
 identity remain separate open contracts; none is promoted by the lab results.
 
 The acquired-ROM6 **8210 NSM-3 v5.31** composition `nsm3r6` already issues

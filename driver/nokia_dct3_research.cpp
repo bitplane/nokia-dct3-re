@@ -195,6 +195,14 @@ void dct3_rf_adc_fixture_state::npe3ap5(machine_config &config)
 {
 	npe3tp5(config);
 	m_raw_agch=true;
+	// NPE-3 System Module table 8: internal MIC2 and EAR on COBBA_GJP, at
+	// neutral gain (connectivity only; the analogue gains are not recovered).
+	// The lab stands in for COBBA's PCM frame strobe, so it fixes the route
+	// the firmware would select over COBBA's serial control.
+	nokia_cobba_device::hle_voice_profile route;
+	route.microphone=nokia_cobba_device::mic2;
+	route.output=nokia_cobba_device::ear;
+	subdevice<nokia_cobba_device>("cobba")->set_hle_voice_profile(route);
 	// Passive comparison with the independently recovered NSM-3 word
 	// grammar. Do not use its candidate as RF readiness or sample gating.
 	auto &hagar=NOKIA_HAGAR(config,"hagar",0);
@@ -945,6 +953,7 @@ template <typename F> void dct3_rf_adc_fixture_state::visit_tch_state(F &&field)
 	field(m_tch_tone_phase);field(m_tch_speech_frames);
 	field(m_tch_speech);field(m_tch_bad_speech);field(m_tch_unreadable);
 	field(m_earpiece);field(m_earpiece_at);field(m_microphone_phase);
+	field(m_microphone);field(m_host_microphone);
 	field(m_earpiece_meter);field(m_uplink_meter);
 }
 
@@ -1020,6 +1029,7 @@ void dct3_rf_adc_fixture_state::start_traffic_channel(u64 frame)
 	m_tch_codec.reset();m_tch_uplink_codec.reset();
 	m_tch_tone_phase=m_tch_speech_frames=0;
 	m_tch_speech_enabled=ioport("LAB_BTS")->read()&0x800;
+	m_host_microphone=ioport("LAB_BTS")->read()&0x1000;
 	set_tch_speech_source();
 	// The Assignment Command's Channel Description: TCH/F, TN1, TSC 2.
 	m_tch.start(frame,1,2,m_sacch_blocks);
@@ -1035,6 +1045,8 @@ void dct3_rf_adc_fixture_state::start_traffic_channel(u64 frame)
 	m_tch_cc_ti_valid=m_host_outgoing;
 	machine().logerror("npe3_tch_start: first_frame=%u timeslot=1 tsc=2 sacch=si5,si6 speech=%s codec=%s raw_adc_only=1 physical_claim=0\n",
 		unsigned(m_tch.first_frame()),m_host_request ? "host" : m_tch_speech_enabled ? "tone_1000hz" : "empty",m_tch_codec.available() ? "gsm_06_10" : "unavailable");
+	if (m_host_microphone)
+		machine().logerror("npe3_tch_microphone: source=host_cobba_mic2 lab_tone=0\n");
 }
 
 void dct3_rf_adc_fixture_state::stop_traffic_channel()
@@ -1078,7 +1090,16 @@ TIMER_CALLBACK_MEMBER(dct3_rf_adc_fixture_state::codec_frame)
 	u16 output=0;
 	backend.codec_transmit_frame(output);
 	static constexpr s16 microphone[16]={0,3135,5793,7568,8192,7568,5793,3135,0,-3135,-5793,-7568,-8192,-7568,-5793,-3135};
-	backend.codec_receive_frame(m_tch_speech_enabled ? u16(microphone[m_microphone_phase++&15]) : 0);
+	u16 uplink=0;
+	if (m_host_microphone)
+	{
+		// The handset's MIC2 through COBBA's converter, one PCM block at a time.
+		if (!m_earpiece_at) codec.read_microphone_pcm(m_microphone);
+		uplink=u16(m_microphone[m_earpiece_at]);
+	}
+	else if (m_tch_speech_enabled)
+		uplink=u16(microphone[m_microphone_phase++&15]);
+	backend.codec_receive_frame(uplink);
 	m_earpiece[m_earpiece_at++]=s16(output);
 	if (m_earpiece_at<m_earpiece.size()) return;
 	m_earpiece_at=0;

@@ -1,0 +1,22 @@
+diff --git a/src/osd/modules/sound/pulse_sound.cpp b/src/osd/modules/sound/pulse_sound.cpp
+--- a/src/osd/modules/sound/pulse_sound.cpp
++++ b/src/osd/modules/sound/pulse_sound.cpp
+@@ -613,12 +613,18 @@
+ 
+ void sound_pulse::exit()
+ {
++	// The threaded mainloop is still running: disconnect under its lock, then
++	// stop it before freeing, or its thread frees deferred events under us.
++	pa_threaded_mainloop_lock(m_mainloop);
+ 	for(const auto &si : m_streams) {
+ 		pa_stream_disconnect(si.second.m_stream);
+ 		pa_stream_unref(si.second.m_stream);
+ 	}
+ 
++	pa_context_disconnect(m_context);
+ 	pa_context_unref(m_context);
++	pa_threaded_mainloop_unlock(m_mainloop);
++	pa_threaded_mainloop_stop(m_mainloop);
+ 	pa_threaded_mainloop_free(m_mainloop);
+ 
+ 	m_nodes.clear();

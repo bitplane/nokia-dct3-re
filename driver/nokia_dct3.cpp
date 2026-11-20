@@ -1887,6 +1887,9 @@ static INPUT_PORTS_START( dct3_lab_bts )
 	PORT_CONFNAME(0x800, 0x00, "Laboratory BTS traffic-channel speech (1 kHz tone)")
 	PORT_CONFSETTING(0x000, DEF_STR( Off ))
 	PORT_CONFSETTING(0x800, DEF_STR( On ))
+	PORT_CONFNAME(0x1000, 0x00, "Laboratory handset microphone")
+	PORT_CONFSETTING(0x0000, "Lab 500 Hz tone")
+	PORT_CONFSETTING(0x1000, "Host input (COBBA MIC2)")
 INPUT_PORTS_END
 
 static INPUT_PORTS_START( npe3_raw_bts )

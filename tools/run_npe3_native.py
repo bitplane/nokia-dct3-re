@@ -37,7 +37,7 @@ def configure_cell_power(directory,model,policy,*,incoming_call=False,
                          traffic_assignment=False,call_ack=False,clear_call=False,
                          sacch=False,assignment_after_connect=False,
                          accept_outgoing_service=False,proceed_outgoing_call=False,frame_pages=False,
-                         speech=False):
+                         speech=False,host_microphone=False):
     if policy=='legacy39':return
     if policy!='handset33':raise ValueError('unsupported cell power policy')
     config=ET.Element('mameconfig',version='10')
@@ -64,6 +64,8 @@ def configure_cell_power(directory,model,policy,*,incoming_call=False,
         ET.SubElement(ports,'port',tag=':LAB_BTS',type='CONFIG',mask='1024',defvalue='0',value='1024')
     if speech:
         ET.SubElement(ports,'port',tag=':LAB_BTS',type='CONFIG',mask='2048',defvalue='0',value='2048')
+    if host_microphone:
+        ET.SubElement(ports,'port',tag=':LAB_BTS',type='CONFIG',mask='4096',defvalue='0',value='4096')
     destination=directory/'cfg';destination.mkdir()
     ET.ElementTree(config).write(destination/f'{model}.cfg',encoding='utf-8',xml_declaration=True)
 
@@ -182,6 +184,10 @@ def main():
                         help='raw CALL PROCEEDING after actual native outgoing SETUP')
     parser.add_argument('--speech',action='store_true',
                         help='1 kHz downlink and 500 Hz microphone tones on the late-assigned TCH/F')
+    parser.add_argument('--host-audio',action='store_true',
+                        help='with --speech, MIC2 takes host input instead of the lab tone and EAR plays to the host; '
+                             'MAME is throttled with -sound pulse (see run_npe3_physical_duplex.py)')
+    parser.add_argument('--wavwrite',type=Path,help='with --host-audio, also record the speaker mix in emulated time')
     parser.add_argument('--end-call-at',type=int,metavar='SECONDS',
                         help='physical End on the late-assigned TCH/F; the lab answers its clearing')
     parser.add_argument('--host-call',type=int,metavar='HTTP_PORT',
@@ -237,6 +243,10 @@ def main():
         parser.error('late assignment requires traffic assignment,physical Answer,CC acknowledgement and SACCH')
     if (args.speech or args.end_call_at is not None) and not (args.traffic_assignment and (args.answer_call or args.host_call is not None)):
         parser.error('speech and End are defined for the assigned answered call')
+    if args.wavwrite and not args.host_audio:
+        parser.error('--wavwrite records the host-audio speaker mix')
+    if args.host_audio and not (args.speech and args.page_at is not None and args.host_call is None):
+        parser.error('host audio replaces the lab tones on the scripted early incoming call with --speech')
     if args.speech and args.end_call_at is None and not host_incoming:
         parser.error('the tone summary needs the traffic channel cleared by End')
     if args.end_call_at is not None and not args.input_at+6<=args.end_call_at<=args.seconds-4:
@@ -334,9 +344,15 @@ def main():
                              assignment_after_connect=args.assignment_after_connect,
                              accept_outgoing_service=args.accept_outgoing_service,
                              proceed_outgoing_call=args.proceed_outgoing_call,frame_pages=args.frame_pages,
-                             speech=args.speech)
+                             speech=args.speech,host_microphone=args.host_audio)
         cmd = command.copy()
+        if args.host_audio:
+            # Host audio runs in real time: throttle, and open PulseAudio.
+            cmd=[part for part in cmd if part!='-nothrottle']
+            cmd[cmd.index('-sound')+1]='pulse'
         cmd[-1] = str(seconds)
+        if args.wavwrite:
+            cmd+=['-wavwrite',str(args.wavwrite.resolve())]
         if not persist:
             cmd.append('-nonvram_save')
         if scenario != 'menu':

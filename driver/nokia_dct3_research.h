@@ -7,6 +7,7 @@
 #include "nokia_dct3_state.h"
 #include "nokia_rf_lab_tx.h"
 #include "nokia_rf_lab_tch.h"
+#include "nokia_cobba.h"
 #include "nokia_gsm_fr_codec.h"
 #include "nokia_lab_call_host.h"
 
@@ -171,6 +172,8 @@ private:
 	void measure_tone(tone_meter &meter,nokia_gsm_fr_codec::pcm_block const &block,double hz);
 	emu_timer *m_codec_timer=nullptr;
 	nokia_gsm_fr_codec::pcm_block m_earpiece{};
+	nokia_cobba_device::pcm_block m_microphone{};
+	bool m_host_microphone=false;
 	unsigned m_earpiece_at=0,m_microphone_phase=0;
 	tone_meter m_earpiece_meter,m_uplink_meter;
 	// Snapshot staging for the serialized block.

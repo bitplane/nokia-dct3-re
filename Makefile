@@ -22,6 +22,7 @@ MAME_PATCHES := patches/mame-nokia-dct3-driver-name.patch \
 	patches/mame-nandflash-mu4.patch \
 	patches/mame-i2cmem-write-cycle.patch \
 	patches/mame-pulseaudio-input.patch \
+	patches/mame-pulseaudio-exit.patch \
 	patches/mame-sound-input-stride.patch \
 	patches/mame-tms320c54x-build.patch \
 	patches/mame-tms320c54x-test.patch \
@@ -519,6 +520,7 @@ help:
 	@echo "make verify-5110-lab-sip-outgoing-call the same dialled call to a real PJSUA SIP remote through dct3_sip_bridge.py"
 	@echo "make verify-6210-lab-sip-call       a PJSUA SIP remote calls the 6210 on the ROM6 lab cell; it answers on TCH/F"
 	@echo "make verify-6210-lab-sip-outgoing-call the 6210 dials a PJSUA SIP remote, talks and hangs up with End"
+	@echo "make verify-6210-lab-physical-duplex host audio into the native 6210's MIC2 and out of EAR on a lab call (PulseAudio, ffmpeg)"
 	@echo "make verify-5110i-lab-registration complete native ROM4 Location Updating on nse2ap5 with provisioned security records and no restart"
 	@echo "make verify-5110-power-lifecycle check short and sustained NSE-1 power presses (staged CPU by default; NSE1_MACHINE overrides composition)"
 	@echo "make verify-5110-save-state restore ROM4/C54x idle then open the menu (staged CPU by default; NSE1_MACHINE overrides composition)"
@@ -1918,6 +1920,9 @@ verify-6210-lab-sip-call: build
 
 verify-6210-lab-sip-outgoing-call: build
 	$(NPE3_LAB_SIP) --seconds 44 --scenario outgoing --accept-outgoing-service --proceed-outgoing-call --end-call-at 40
+
+verify-6210-lab-physical-duplex: build
+	$(VENV)/bin/python tools/run_npe3_physical_duplex.py $(RUN_DIR)
 
 verify-5110-power-lifecycle: build
 	@set -eu; mkdir -p "$(NATIVE_SCRATCH_ROOT)"; tmp=""; \

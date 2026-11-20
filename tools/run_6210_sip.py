@@ -11,9 +11,10 @@ SIP bridge (dct3_sip_bridge.py) joins MAME's call endpoint to SIP:
             --destination, and End hangs up.
 
 The lab cell supports one call direction per session, each exactly as its
-gate (verify-6210-lab-sip-call / -outgoing-call) configures it. The handset
-hears the SIP party. Until the physical-audio path lands, its microphone
-carries the lab's test tone, not the host's microphone.
+gate (verify-6210-lab-sip-call / -outgoing-call) configures it. The SIP party
+plays through the handset's earpiece (COBBA EAR) to MAME's sound output, and
+the host's default microphone feeds its MIC2 (verify-6210-lab-physical-duplex).
+With --headless there is no sound, and the microphone carries the lab tone.
 
 Needs the PJSUA2 binding (make sip-build; SIP_PYTHON_PATH). Check the host
 can keep up first with `make bench-6210-call` (1.0x or more).
@@ -33,15 +34,16 @@ from tools.run_npe3_native import configure_cell_power  # noqa: E402
 from tools.run_rom4_lab_sip_call import wait_for_http  # noqa: E402
 
 
-def lab_cell(directory, direction):
-    """The lab BTS configuration each SIP gate verifies, and nothing else."""
+def lab_cell(directory, direction, host_microphone):
+    """The lab BTS configuration each SIP gate verifies, plus the MIC2 source."""
     if direction == 'incoming':
         configure_cell_power(directory, MODEL, 'handset33', incoming_call=True, traffic_assignment=True,
-                             call_ack=True, clear_call=True, sacch=True, speech=True)
+                             call_ack=True, clear_call=True, sacch=True, speech=True,
+                             host_microphone=host_microphone)
     else:
         configure_cell_power(directory, MODEL, 'handset33', traffic_assignment=True, clear_call=True,
                              sacch=True, accept_outgoing_service=True, proceed_outgoing_call=True,
-                             speech=True)
+                             speech=True, host_microphone=host_microphone)
 
 
 def handset_command(mame, base, directory, http_port, headless, script=None):
@@ -62,7 +64,7 @@ async def run(args):
     prepare(base)
     directory = base / 'handset'
     directory.mkdir()
-    lab_cell(directory, args.direction)
+    lab_cell(directory, args.direction, host_microphone=not args.headless)
     environment = {k: v for k, v in os.environ.items() if not k.startswith('NOKIA_DCT3_')}
     bridge_environment = dict(os.environ, PYTHONPATH=os.pathsep.join(
         filter(None, (args.pjsua2, os.environ.get('PYTHONPATH')))))
