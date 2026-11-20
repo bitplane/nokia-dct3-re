@@ -2020,6 +2020,54 @@ log with `python3 tools/noki8850_staged_trace_check.py <run>/error.log`.
 The checker requires ordered native publication, loader verification,
 missing-mask suspension and firmware readiness; it rejects an HLE handoff.
 
+### 8850 Native ROM6 Compatibility Trial
+
+Research machine `nsm2r6` runs the 8850's own v5.31 MCU, PMM and uploads
+against the acquired 8210 ROM6 program/data (`roms/nsm3r6`) with no DSP HLE
+or staged takeover, as `npe3r6` does for the 6210. Its bootstrap fragment,
+`0880` control word, 422-word resident install and `2c75` entry match the
+8210's. The DSP runs at the acquired mask's documented NSM-3 rate, 45.5 MHz;
+no NSM-2 System Module page is retained to confirm the 8850's multiplier.
+This is compatibility evidence, not identification of the fitted mask.
+
+Native execution reproduces the uploaded verifier verdict `0000/0006`, the
+613-word second loader from flash `11ae80` and the 422-word resident prefix
+from flash `115368`. The own class-74 self-test `0d` returns no faults. There
+are no illegal DSP instructions or unacquired low-ROM reads. With the
+laboratory SIM, physical `12345` and the left softkey dismiss **Security
+code**. Physical Menu, Inbox and Names presses then reproduce the same reviewed
+title pixels as `nsm2hle`.
+
+One board contract is product-local. After the uploads, own `302e16..302e24`
+ORs bit 1 into CTSI+2, as the 6210's `4dc050` does. MAD2 reads that register
+as running status `10`, so without readback the write cleared release bit 0
+and held the DSP in reset from 1.456 s. `readback_mask = 0x01` retains the
+release bit across that read/modify/write. The MCU's type-`51` requests then
+progress as they do under HLE.
+
+The bounded gate ends at 30 seconds. Without a cell the firmware resets at
+31.96 seconds and again 80 seconds later. This is the 6210's packet-window
+policy, not a watchdog:
+
+- Task loop `307334` counts DSP receive packets.
+- When window timer `20` (`9cd` ticks) expires with a zero count, it calls
+  policy `2f614a` with selector 1.
+- The policy reads NV descriptor `0607=ff` and status `05`, stores reason `68`
+  through `2f6e6c`, and arms reset timer `19` for `7d` ticks.
+- Timer event `d9` (`24385e`) then requests the MCU reset at `309d9e`.
+
+In its first window the native DSP delivers only the four startup type-`74`
+replies; `nsm2hle` delivers 244 packets, including radio types `80`/`83`/`89`.
+The native 8850 therefore has no published radio activity without a sample
+source. Laboratory ADC compositions like the 6210's `npe3sp9` are the next
+step; native radio, registration and speech remain unqualified.
+
+```sh
+make verify-8850-native-menu
+# Negative control: rejects the reason-68 restart.
+.venv/bin/python tools/run_nsm2_native.py --seconds 34
+```
+
 ### 8850 Runtime Self-Test Contract
 
 Research machine `nsm2hle` preserves native verifier/loader execution, then

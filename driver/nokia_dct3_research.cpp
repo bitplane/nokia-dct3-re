@@ -195,14 +195,6 @@ void dct3_rf_adc_fixture_state::npe3ap5(machine_config &config)
 {
 	npe3tp5(config);
 	m_raw_agch=true;
-	// NPE-3 System Module table 8: internal MIC2 and EAR on COBBA_GJP, at
-	// neutral gain (connectivity only; the analogue gains are not recovered).
-	// The lab stands in for COBBA's PCM frame strobe, so it fixes the route
-	// the firmware would select over COBBA's serial control.
-	nokia_cobba_device::hle_voice_profile route;
-	route.microphone=nokia_cobba_device::mic2;
-	route.output=nokia_cobba_device::ear;
-	subdevice<nokia_cobba_device>("cobba")->set_hle_voice_profile(route);
 	// Passive comparison with the independently recovered NSM-3 word
 	// grammar. Do not use its candidate as RF readiness or sample gating.
 	auto &hagar=NOKIA_HAGAR(config,"hagar",0);
@@ -1784,6 +1776,34 @@ void nokia_dct3_state::nsm2stage(machine_config &config)
 	staged.set_observe_after_missing_code(true);
 }
 
+void nokia_dct3_state::nsm2r6(machine_config &config)
+{
+	noki8850(config);
+	// Same release contract as nsm2stage: CTSI+2 bit 0 releases DSP reset.
+	nokia_product_config native = m_product;
+	native.dsp_reset_wiring = { 0x10, 0x01 };
+	// Own 302e16..302e24 ORs bit 1 into CTSI+2 after the uploads (as the
+	// 6210's 4dc050). Retain release bit 0 across that read/modify/write.
+	native.dsp_reset_wiring.readback_mask = 0x01;
+	native.simi_controller = true;
+	native.synthetic_sim_card = true;
+	apply_product_config(native);
+	// Acquired 8210 ROM6 program/data with the 8850's own MCU uploads. Its
+	// bootstrap fragment, 0880 control word and 2c75 entry match the 8210's;
+	// this is a compatibility trial, not identification of the fitted mask.
+	config.device_remove("dsp_hle");
+	// The acquired mask's documented NSM-3 rate (13 MHz x 3.5). No NSM-2
+	// System Module page is retained to confirm the 8850's multiplier.
+	NOKIA_DSP_C54X(config, m_dsp_c54x, 45'500'000);
+	configure_native_dsp_attachments(*m_dsp_c54x);
+	m_dsp_c54x->set_overlay_end(0x2000);
+	m_dsp_c54x->set_port36_handshake(true);
+	auto &cpu = *subdevice<tms320c54x_device>("dsp_c54x:cpu");
+	cpu.set_extended_program(true);
+	cpu.set_power_on_imr(0);
+	m_dsp_c54x->tone_update_cb().set(FUNC(nokia_dct3_state::dsp_tone_update_w));
+}
+
 void nokia_dct3_state::nsm2hle(machine_config &config)
 {
 	nsm2stage(config);
@@ -2364,6 +2384,12 @@ void nokia_dct3_state::npe3r6(machine_config &config)
 	native.ccont_board.channel_defaults[2] = 0x230;
 	native.simi_controller = true;
 	native.synthetic_sim_card = true;
+	// NPE-3 System Module table 8: internal MIC2 and EAR on COBBA_GJP, at
+	// neutral gain (connectivity only; the analogue gains are not recovered).
+	// The lab stands in for COBBA's PCM frame strobe, so it fixes the route
+	// the firmware would select over COBBA's serial control.
+	native.cobba_hle_voice.microphone = nokia_cobba_device::mic2;
+	native.cobba_hle_voice.output = nokia_cobba_device::ear;
 	apply_product_config(native);
 	config.device_remove("dsp_hle");
 	// Compatibility trial at the staged fixture's 13 MHz policy. NPE-3's

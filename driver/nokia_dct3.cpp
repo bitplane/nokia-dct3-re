@@ -3261,6 +3261,24 @@ ROM_START( nsm2stage )
 	ROM_LOAD("8850 virgin eeprom 003d0000.fls", 0x1d0000, 0x030000, CRC(4823f27e) SHA1(b09455302d98fbedf35072c9ecfd7721a04924b0))
 ROM_END
 
+// Acquired NSM-3 ROM6 candidate with NSM-2's own MCU/PMM and uploads.
+// A compatibility experiment, not identification of the fitted NSM-2 mask.
+ROM_START( nsm2r6 )
+	ROM_REGION16_BE(0x10000, "boot_rom", ROMREGION_ERASEFF)
+	ROM_LOAD("mad2_mask_rom.bin", 0, 0x10000, NO_DUMP)
+	ROM_REGION16_BE(0x40000, "dsp_program", ROMREGION_ERASEFF)
+	ROM_LOAD("nsm3_rom6_program.be16", 0, 0x20000,
+		CRC(f90ba19a) SHA1(d6b1f40eaa4b2c8a9f7adcb6cb5864d9cc1354fc))
+	ROM_LOAD("nsm3_rom6_program_page1.be16", 0x20000, 0x20000,
+		CRC(2770e68f) SHA1(51178fc69b3662a8a05291149832f04a1a2c6032))
+	ROM_REGION16_BE(0x20000, "dsp_data", ROMREGION_ERASE00)
+	ROM_LOAD("nsm3_rom6_data.be16", 0, 0x20000,
+		CRC(bdb0b876) SHA1(845133638256ed1f07e014437fdee3ececc4508f))
+	ROM_REGION16_BE(0x200000, "flash", ROMREGION_ERASEFF)
+	ROM_LOAD("8850v531.fls", 0, 0x1d0000, CRC(8864fcb3) SHA1(9f966787403b68a09530680ad911302403eb1521))
+	ROM_LOAD("8850 virgin eeprom 003d0000.fls", 0x1d0000, 0x030000, CRC(4823f27e) SHA1(b09455302d98fbedf35072c9ecfd7721a04924b0))
+ROM_END
+
 ROM_START( nsm2hle )
 	DCT3_SHARED_MAD2_INTERNAL_ROMS
 	ROM_REGION16_BE(0x200000, "flash", ROMREGION_ERASEFF )
@@ -3371,6 +3389,7 @@ SYST( 2000, nsb7stage, noki8290, 0, nsb7stage, noki8290, nokia_dct3_state, empty
 SYST( 2000, nsb7hle, noki8290, 0, nsb7hle, noki8290, nokia_dct3_state, empty_init, "Research", "NSB-7 own uploads with runtime transport HLE", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 1999, noki8850, 0,      0,      noki8850, noki8850, nokia_dct3_state, empty_init, "Nokia", "Nokia 8850", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 1999, nsm2stage, noki8850, 0, nsm2stage, noki8850, nokia_dct3_state, empty_init, "Nokia", "8850 product-local staged DSP (research fixture)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
+SYST( 1999, nsm2r6, noki8850, 0, nsm2r6, noki8850, nokia_dct3_state, empty_init, "Nokia", "8850 acquired ROM6 compatibility trial (research fixture)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 1999, nsm2hle, noki8850, 0, nsm2hle, noki8850, nokia_dct3_state, empty_init, "Nokia", "8850 native uploads with runtime DSP HLE (research fixture)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2000, noki3310, 0,      0,      noki3310, noki3310, nokia_dct3_state, empty_init, "Nokia", "Nokia 3310", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2002, noki3610, 0,      0,      noki3610, noki3310, nokia_dct3_state, empty_init, "Nokia", "Nokia 3610 (NAM-1 bring-up)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )

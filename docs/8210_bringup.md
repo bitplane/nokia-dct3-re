@@ -1007,8 +1007,9 @@ to ROM5 and ROM6; [service bulletin SB-050](https://www.eserviceinfo.com/downloa
 documents the later ROM6 board revision. The current profile selects ROM6.
 A captured 8210 ROM6 reference is now in the separate private research
 collection; [ROM6 native bring-up](rom6_dsp_bringup.md) owns its provenance and
-admission plan. It is not yet bound to this machine or qualified against this
-product's uploads. Uniform-fill audit members remain non-executable evidence.
+admission plan. It is bound to the separate `nsm3r6` composition (see the
+summary at the top of this page); the normal machine still does not load it.
+Uniform-fill audit members remain non-executable evidence.
 
 ## Established contracts
 
@@ -2346,8 +2347,9 @@ publication. A useful physical or independently captured reference must include:
   acknowledgement and any reset, with the raw trace retained and hashed.
 
 A matching raw capture can justify a narrowly declared HLE bootstrap contract;
-a ROM6 memory image/map can support core execution. Neither is currently
-available in the acquired collection. Native UI, SIM, network, call/audio and
-handset save/load acceptance remain unvalidated behind this boundary. The
+a ROM6 memory image/map can support core execution. The acquired ROM6
+reference now supports core execution in the separate `nsm3r6` composition;
+no matching raw bootstrap capture is available, so the normal machine keeps
+this boundary. The
 separate research-HLE profile has the product-local acceptance listed above;
 those results do not establish the missing native silicon publication.

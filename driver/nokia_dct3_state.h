@@ -141,6 +141,7 @@ public:
 	void nsb7hle(machine_config &config);
 	void noki8850(machine_config &config);
 	void nsm2stage(machine_config &config);
+	void nsm2r6(machine_config &config);
 	void nsm2hle(machine_config &config);
 	void nsm3dr6(machine_config &config);
 	void nsm3dhle(machine_config &config);
