@@ -42,6 +42,7 @@ def main():
     parser.add_argument('--mame', type=Path, default=ROOT / 'mame/mame')
     parser.add_argument('--keep', action='store_true')
     args = parser.parse_args()
+    args.mame = args.mame.resolve()  # MAME runs from inside the run directory
     (ROOT / 'tmp').mkdir(exist_ok=True)
     base = Path(tempfile.mkdtemp(prefix='npe3-roundtrip.', dir=ROOT / 'tmp'))
     try:

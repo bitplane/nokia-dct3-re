@@ -117,6 +117,7 @@ def main():
     parser.add_argument('--script', type=Path, help='a Lua autoboot script, e.g. key input for unattended tests')
     parser.add_argument('--calls', type=int, default=0, help='stop after this many calls; zero runs until interrupted')
     args = parser.parse_args()
+    args.mame = args.mame.resolve()  # MAME runs from inside the run directory
     if args.direction == 'outgoing' and not args.destination:
         parser.error('outgoing calls need --destination')
     try:
