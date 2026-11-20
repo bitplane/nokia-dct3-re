@@ -22,7 +22,12 @@ FACCH as on the 5110, and a host can place that call (`--incoming-call
 Answer, host media both ways and the host's hang-up cleared on FACCH. Both
 calls also run against a real SIP party: `make verify-6210-lab-sip-call` and
 `verify-6210-lab-sip-outgoing-call` put PJSUA behind `dct3_sip_bridge.py`
-(`--sip-pjsua`), with MAME throttled. Physical capture timing, carrier tuning and fitted mask/clock
+(`--sip-pjsua`), with MAME throttled. For real calls rather than gates,
+`make run-6210-sip` (`tools/run_6210_sip.py`) runs the handset in a MAME
+window with no research observers or debugger, beside the bridge, for one
+call direction per session (`SIP_DIRECTION=incoming|outgoing`,
+`SIP_DESTINATION=` for outgoing). The handset hears the SIP party; its
+microphone still carries the lab tone. Physical capture timing, carrier tuning and fitted mask/clock
 identity remain separate open contracts; none is promoted by the lab results.
 
 The acquired-ROM6 **8210 NSM-3 v5.31** composition `nsm3r6` already issues
@@ -1508,7 +1513,7 @@ or a program-page mirror to turn these results into broader acceptance.
 | --- | --- | --- |
 | Physically selected RF carrier | Own firmware's command words/channel arithmetic are known; SCU-to-HAGAR shift, select, enable and settling semantics are not | A matched SCU/HAGAR register/serial contract, or a correlated command/pin capture identifying those fields and edges |
 | Physical receive timing/camping | P09/P0a/P0b/P05 laboratory policies work, but do not identify ADC/transfer/INT0 ownership or the physical counter epoch | Matched MFI/SCU timing documentation or a correlated counter/control/ADC/INT0 capture; a successful decoded payload alone is insufficient |
-| Connected traffic/speech | TCH/F establishment, speech both ways and clearing are qualified on the early and late incoming calls (lab tones, physical End), the host-placed incoming call (host media, host hang-up) and the host-answered dialled call (host media, physical End), each host call also with a PJSUA SIP remote through the bridge | Real-time speed: the 6210 runs a call at about 50 % of real time (see `docs/c54x_pipeline_speed.md`), so SIP RTP downlink outpaces it (late frames dropped); higher program pages if execution reaches them |
+| Connected traffic/speech | TCH/F establishment, speech both ways and clearing are qualified on the early and late incoming calls (lab tones, physical End), the host-placed incoming call (host media, host hang-up) and the host-answered dialled call (host media, physical End), each host call also with a PJSUA SIP remote through the bridge | Real-time speed: with the research observers the gates load, a call runs at about 50 % of real time, so SIP RTP downlink outpaces it (late frames dropped); the lean path (`make run-6210-sip`) runs at about 0.9x on the reference host (see `docs/c54x_pipeline_speed.md`); higher program pages if execution reaches them |
 | Fitted 6210 mask/clock identity | The acquired ROM6 and 45.5 MHz are explicitly reference inputs | Product-matched mask/multiplier documentation or measured provenance, not another fitted execution rate |
 
 The existing traces cannot distinguish hardware implementations that share

@@ -513,6 +513,7 @@ help:
 	@echo "make verify-5110-lab-host-call a host-protocol remote places the traffic call, swaps GSM-FR speech and hangs up"
 	@echo "make build-pgo       build, then recompile the C54x core with profile-guided optimisation (real-time native calls)"
 	@echo "make bench-6210-call this host's speed for the native 6210 call, as a fraction of real time (1.0 keeps up)"
+	@echo "make run-6210-sip   the native 6210 as a live SIP phone in a MAME window (SIP_DIRECTION=incoming|outgoing, SIP_DESTINATION=uri)"
 	@echo "make verify-5110-lab-sip-call a real PJSUA SIP call through dct3_sip_bridge.py to the native handset (needs make sip-build)"
 	@echo "make verify-5110-lab-host-outgoing-call the handset dials 123; a host-protocol remote answers; the handset hangs up"
 	@echo "make verify-5110-lab-sip-outgoing-call the same dialled call to a real PJSUA SIP remote through dct3_sip_bridge.py"
@@ -873,6 +874,15 @@ build-pgo: build
 
 # The connected 6210 call's speed on this host, without research observers
 # or the debugger. Measures the binary as built: run after build-pgo.
+# The native 6210 as a live SIP phone: no observers or debugger, throttled,
+# with the handset in a MAME window. Not a gate; see tools/run_6210_sip.py.
+SIP_DIRECTION ?= incoming
+SIP_DESTINATION ?=
+.PHONY: run-6210-sip
+run-6210-sip:
+	$(VENV)/bin/python tools/run_6210_sip.py --mame $(MAME_DIR)/mame --direction $(SIP_DIRECTION) \
+		$(if $(SIP_DESTINATION),--destination "$(SIP_DESTINATION)") --pjsua2 "$(SIP_PYTHON_PATH)"
+
 .PHONY: bench-6210-call
 bench-6210-call:
 	$(VENV)/bin/python tools/bench_6210_call.py --mame $(MAME_DIR)/mame
