@@ -521,6 +521,7 @@ help:
 	@echo "make verify-5110-lab-sip-outgoing-call the same dialled call to a real PJSUA SIP remote through dct3_sip_bridge.py"
 	@echo "make verify-6210-lab-sip-call       a PJSUA SIP remote calls the 6210 on the ROM6 lab cell; it answers on TCH/F"
 	@echo "make verify-6210-lab-sip-outgoing-call the 6210 dials a PJSUA SIP remote, talks and hangs up with End"
+	@echo "make verify-6210-lab-traffic-state save, replay and reload the 6210's lab call while ringing, connected and clearing"
 	@echo "make verify-6210-lab-degraded-call  impair the 6210's traffic call both ways; native RXQUAL rises and speech recovers"
 	@echo "make verify-6210-lab-physical-duplex host audio into the native 6210's MIC2 and out of EAR on a lab call (PulseAudio, ffmpeg)"
 	@echo "make verify-5110i-lab-registration complete native ROM4 Location Updating on nse2ap5 with provisioned security records and no restart"
@@ -1925,6 +1926,11 @@ verify-6210-lab-sip-call: build
 
 verify-6210-lab-sip-outgoing-call: build
 	$(NPE3_LAB_SIP) --seconds 44 --scenario outgoing --accept-outgoing-service --proceed-outgoing-call --end-call-at 40
+
+verify-6210-lab-traffic-state: build
+	@set -e; for at in 19.0 24.5 30.5; do \
+		$(VENV)/bin/python tools/run_npe3_call_roundtrip.py $$at --mame $(MAME_DIR)/mame; \
+	done
 
 verify-6210-lab-degraded-call: build
 	$(VENV)/bin/python tools/run_npe3_native.py --reference-clock --seconds 36 --adc-source fcch-sch-broadcast \

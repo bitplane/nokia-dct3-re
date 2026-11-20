@@ -30,6 +30,18 @@ call direction per session (`SIP_DIRECTION=incoming|outgoing`,
 handset's earpiece to MAME's sound output, and the host microphone feeds
 MIC2.
 
+`make verify-6210-lab-traffic-state` (`tools/run_npe3_call_roundtrip.py`)
+saves the early incoming call at 19.0 s (ringing), 24.5 s (connected) and
+30.5 s (clearing). Each run records 200 ms of DSP I/O, reloads, and requires
+the same writes: 7,969, 12,350 and 10,249 of them. It then completes the call
+with the ordinary traffic-call, FACCH, SACCH and tone checks, and its frames
+and counts match an uninterrupted run. The round trip runs without research
+observers, because their Lua sequence counters live outside the machine
+image. Loading cancels every pending `emu.wait`, so the restored branch
+schedules the remaining inputs itself.
+`verify-6210-lab-degraded-call` impairs the same call; see
+[ROM4 RF control](rom4_rf_control.md) for the shared lab option `0x2000`.
+
 `make verify-6210-lab-physical-duplex` (`tools/run_npe3_physical_duplex.py`)
 checks that host path on the early incoming call. NPE-3 System Module table
 8 connects the internal microphone to COBBA_GJP MIC2P/N and the earpiece to

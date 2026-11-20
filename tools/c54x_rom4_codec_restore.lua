@@ -56,5 +56,7 @@ emu.register_frame_done(function()
     machine:logerror(string.format('rom4_codec_replay: result=%s reference_events=%d restored_events=%d window=%.9f\n', passed and 'pass' or 'fail', #reference, #restored_events, window))
 end)
 _G.rom4_codec_restore = {before, after, writes}
+-- Callers that run their own save/load (npe3_lab_call_restore.lua) set this.
+if _G.codec_restore_without_exerciser then return end
 local directory = assert(debug.getinfo(1, 'S').source:match('^@(.*/)'))
 dofile(directory .. '../mame_nokia_dct3_input_exerciser.lua')
