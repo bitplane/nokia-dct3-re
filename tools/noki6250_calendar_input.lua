@@ -40,7 +40,13 @@ local input = coroutine.create(function()
         machine:logerror('6250_calendar_physical: event=cold_presented\n')
         return
     end
-    for index, value in ipairs(_G.noki6250_calendar_time or {'1', '3', '4', '7'}) do
+    local entered = os.getenv('NOKIA_DCT3_6250_CALENDAR_TIME')
+    local digits = _G.noki6250_calendar_time
+    if not digits and entered then
+        assert(entered:match('^%d%d%d%d$'), 'calendar time must be HHMM')
+        digits = {entered:sub(1, 1), entered:sub(2, 2), entered:sub(3, 3), entered:sub(4, 4)}
+    end
+    for index, value in ipairs(digits or {'1', '3', '4', '7'}) do
         if not press(digit(value), 'time_' .. index) then return end
     end
     if not press(cell(1, 1), 'time_confirm') then return end

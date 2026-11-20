@@ -14,6 +14,8 @@ if __package__ in (None, ""):
 from tools.run_noki6250_acceptance import prepare_run
 from tools.run_noki6250_calendar import check_frame
 
+SEED = ("1346", 102)
+SEED_COLD = ("1345", 122)
 FRAMES = {
     "confirm": "753c5b7d172c9e418a4c9689e463c94bbaba0d2522c9972784f6e59716f0e0fd",
     "idle": "380f4d4eaa6a49826c1f95ac205d779ab1a1f22e93322aaabb1654ed39825b05",
@@ -230,8 +232,14 @@ def main():
     try:
         run.mkdir(parents=True, exist_ok=False)
         clock = run / "clock"
+        # Enter 13:46 and save at 13:47:00, so the 13:48 alarm expires at second 60
+        # of the alarm process on the corrected (non-resetting) RTC. The cold
+        # lifecycle's 40-second arming process sits between, so its seed enters
+        # 13:45 and saves 13:46:20; the cold process then also starts at 13:47:00.
+        entered, seconds = SEED_COLD if args.cold else SEED
         subprocess.run([sys.executable, str(root / "tools/run_noki6250_calendar.py"),
-                        str(clock), "--mame", str(mame)], check=True)
+                        str(clock), "--mame", str(mame), "--time", entered,
+                        "--seed-seconds", str(seconds)], check=True)
         phase = run / "alarm"
         prepare_run(phase, root)
         for name in ("nvram", "cfg"):

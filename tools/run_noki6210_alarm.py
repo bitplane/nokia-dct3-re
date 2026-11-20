@@ -246,8 +246,14 @@ def main():
     try:
         run.mkdir(parents=True, exist_ok=False)
         # This fresh, independently checked physical fixture is the only seed.
+        # Enter 13:46 and save at 13:47:00, so the 13:48 alarm expires at second 60
+        # of the alarm process on the corrected (non-resetting) RTC. The cold
+        # lifecycle's 35-second arming process sits between, so its seed enters
+        # 13:45 and saves 13:46:25; the cold boot then also starts at 13:47:00.
+        entered, seconds = ('1345', 118) if args.cold else ('1346', 93)
         subprocess.run([sys.executable, str(root / 'tools/run_noki6210_calendar.py'),
-                        str(run / 'clock'), '--mame', str(mame)], check=True, timeout=400)
+                        str(run / 'clock'), '--mame', str(mame), '--time', entered,
+                        '--entry-seconds', str(seconds)], check=True, timeout=2400)
         alarm = run / ('armed' if args.cold else 'alarm')
         alarm.mkdir()
         shutil.copytree(run / 'clock/entry/nvram', alarm / 'nvram')
@@ -268,7 +274,7 @@ def main():
                    '-nothrottle', '-log', '-verbose']
         with (alarm / 'console.log').open('w') as output:
             subprocess.run(command, cwd=alarm, stdout=output, stderr=subprocess.STDOUT,
-                           check=True, timeout=400 if args.snooze else 180)
+                           check=True, timeout=2400 if args.snooze else 900)
         check_output((alarm / 'console.log').read_text(errors='replace'))
         text = (alarm / 'error.log').read_text(errors='replace')
         if args.restore_off or args.restore_snooze:
@@ -315,7 +321,7 @@ def main():
                 root / 'tools/noki6210_alarm_cold.lua')
             with (cold / 'console.log').open('w') as output:
                 subprocess.run(command, cwd=cold, stdout=output, stderr=subprocess.STDOUT,
-                               check=True, timeout=180)
+                               check=True, timeout=900)
             alarm = cold
             check_output((alarm / 'console.log').read_text(errors='replace'))
             text = (alarm / 'error.log').read_text(errors='replace')

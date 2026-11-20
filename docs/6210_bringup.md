@@ -2325,6 +2325,14 @@ the first natural tick is 13:47:01, and expiry at 13:48 produces the same
 reviewed alarm frame. Physical Stop restores the reviewed operator frame
 and disables the buzzer. The alarm capture is at 77 seconds in both gates;
 an earlier 70-second capture differs and is not used to re-bank the oracle.
+Because the corrected RTC no longer loses seconds, the alarm gates seed with
+physical Calendar time `1346` and a 93-second entry process, saving 13:47:00;
+expiry then stays at second 60 of the alarm process. The cold gate's seed
+enters `1345` for 118 seconds (13:46:25), so its 35-second arming process
+saves 13:47:00 and the cold boot's first tick is again 13:47:01. The
+standalone Calendar gate still enters 13:47. Its cold phase now checks the
+minute it resumes to (the entry's saved clock plus 34 ticks), so the midnight
+and boundary fixtures retain 00:01 rather than an unadvanced 00:00.
 Cold restoration retains hour/minute with seconds starting at zero; no
 offline elapsed time is claimed. Negative tests also reject missing retained
 register reads, cold observation, clock restoration, or replacement alarm entry.

@@ -19,7 +19,19 @@ local input = coroutine.create(function()
         if not press('Scroll Down', 'menu_' .. index) then return end
     end
     if not press('Left Softkey / Menu', 'selected') then return end
-    local time_digits = _G.noki6210_calendar_time_digits or {
+    local time_digits = _G.noki6210_calendar_time_digits
+    local entered = os.getenv('NOKIA_DCT3_6210_CALENDAR_TIME')
+    if not time_digits and entered then
+        assert(entered:match('^%d%d%d%d$'), 'calendar time must be HHMM')
+        -- Keypad digit -> matrix column, as the default and date entries use.
+        local columns = {['0'] = 3, ['1'] = 2, ['2'] = 3, ['3'] = 4, ['4'] = 2,
+                         ['5'] = 3, ['6'] = 4, ['7'] = 2, ['8'] = 3, ['9'] = 4}
+        time_digits = {}
+        for value in entered:gmatch('%d') do
+            time_digits[#time_digits + 1] = {columns[value], 'Keypad ' .. value}
+        end
+    end
+    time_digits = time_digits or {
         {2, 'Keypad 1'}, {4, 'Keypad 3'}, {2, 'Keypad 4'}, {2, 'Keypad 7'}}
     for index, step in ipairs(time_digits) do
         if not press(step[2], 'time_' .. index, step[1]) then return end

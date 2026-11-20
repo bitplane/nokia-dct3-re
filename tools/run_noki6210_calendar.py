@@ -1,5 +1,6 @@
 """Own-ROM physical Calendar entry and independent cold-process persistence."""
 import argparse
+import os
 from pathlib import Path
 import re
 import shutil
@@ -38,7 +39,10 @@ BOUNDARIES = {
 }
 
 
-def check_entry(text, rtc, *, midnight=False):
+COLD_SECONDS = 34
+
+
+def check_entry(text, rtc, *, midnight=False, entered=(13, 47), saved=(13, 47)):
     actions = ['menu'] + [f'menu_{i}' for i in range(2, 9)] + ['selected']
     actions += [f'time_{i}' for i in range(1, 5)] + ['time_confirm']
     actions += [f'date_{i}' for i in range(1, 9)] + ['date_confirm']
@@ -49,12 +53,12 @@ def check_entry(text, rtc, *, midnight=False):
         if position < 0:
             raise ValueError('missing ordered physical Calendar action: ' + action)
         cursor = position + len(token)
-    minute, hour = ('3b', '97') if midnight else ('2f', '8d')
+    minute, hour = ('3b', '97') if midnight else (f'{entered[1]:02x}', f'{0x80 | entered[0]:02x}')
     if not re.search(rf'event=alarm_write reg=0b data={minute}.*\n.*event=alarm_write reg=0c data={hour}', text):
         raise ValueError('physical time entry did not program the expected CCONT latch')
     if midnight:
         check_midnight(text)
-    check_rtc(rtc, expected=(0, 0) if midnight else (47, 13))
+    check_rtc(rtc, expected=(0, 0) if midnight else (saved[1], saved[0]))
 
 
 def check_rtc(rtc, *, expected=(47, 13)):
@@ -96,8 +100,22 @@ def main():
                         help='enter 23:59, cross midnight organically and cold-read the next day')
     parser.add_argument('--boundary', choices=BOUNDARIES,
                         help='select an independently reviewed boundary-date fixture; implies --midnight')
+    parser.add_argument('--time', default='1347',
+                        help='HHMM physically entered (alarm seeds use 1346)')
+    parser.add_argument('--entry-seconds', type=int, default=52,
+                        help='entry process length; time confirmation lands at about second 33')
     args = parser.parse_args()
     args.midnight = args.midnight or args.boundary is not None
+    if not re.fullmatch(r'([01]\d|2[0-3])[0-5]\d', args.time) or (args.midnight and args.time != '1347'):
+        parser.error('--time must be HHMM and cannot combine with --midnight/--boundary')
+    entered = (int(args.time[:2]), int(args.time[2:]))
+    # The RTC ticks once per emulated second after confirmation near second 33.
+    elapsed = entered[0] * 60 + entered[1] + max(0, args.entry_seconds - 33) // 60
+    saved = (elapsed // 60 % 24, elapsed % 60)
+    environment = os.environ.copy()
+    environment.pop('NOKIA_DCT3_6210_CALENDAR_TIME', None)
+    if args.time != '1347':
+        environment['NOKIA_DCT3_6210_CALENDAR_TIME'] = args.time
     boundary = BOUNDARIES.get(args.boundary)
     before_hash = boundary['before'] if boundary else CALENDAR_SHA256
     after_hash = boundary['after'] if boundary else MIDNIGHT_SHA256 if args.midnight else CALENDAR_SHA256
@@ -111,10 +129,10 @@ def main():
         run.mkdir(parents=True, exist_ok=False)
         from PIL import Image
         for phase, seconds, script, frame in (
-            ('entry', 135 if args.midnight else 52,
+            ('entry', 135 if args.midnight else args.entry_seconds,
              entry_script,
              '6210_calendar_midnight_result.png' if args.midnight else '6210_calendar_after_date.png'),
-            ('cold', 34, 'calendar_cold_input', '6210_calendar_cold_result.png'),
+            ('cold', COLD_SECONDS, 'calendar_cold_input', '6210_calendar_cold_result.png'),
         ):
             directory = run / phase
             directory.mkdir()
@@ -127,8 +145,8 @@ def main():
                        '-autoboot_delay', '0', '-seconds_to_run', str(seconds),
                        '-video', 'none', '-sound', 'none', '-nothrottle', '-log', '-verbose']
             with (directory / 'console.log').open('w') as output:
-                subprocess.run(command, cwd=directory, stdout=output,
-                               stderr=subprocess.STDOUT, check=True, timeout=180)
+                subprocess.run(command, cwd=directory, stdout=output, env=environment,
+                               stderr=subprocess.STDOUT, check=True, timeout=900)
             check_output((directory / 'console.log').read_text(errors='replace'))
             text = (directory / 'error.log').read_text(errors='replace')
             verify_stage(text, runtime=True, selftest=True)
@@ -137,9 +155,13 @@ def main():
                                preserved_location=phase == 'cold')
             rtc = (storage / 'ccont').read_bytes()
             if phase == 'entry':
-                check_entry(text, rtc, midnight=args.midnight)
+                check_entry(text, rtc, midnight=args.midnight, entered=entered, saved=saved)
+                total = (rtc[2] * 3600 + rtc[1] * 60 + rtc[0] + COLD_SECONDS) % 86400
+                resumed = (total // 60 % 60, total // 3600)
             else:
-                check_cold(text, rtc, expected=(0, 0) if args.midnight else (47, 13))
+                # The cold process resumes the entry's saved clock and ticks once per
+                # emulated second, so its retained minute follows from both.
+                check_cold(text, rtc, expected=resumed)
             if args.midnight and phase == 'entry':
                 with Image.open(directory / 'snap/6210_calendar_after_date.png') as rendered:
                     check_frame(rendered, before_hash, 'original fixture Calendar date')

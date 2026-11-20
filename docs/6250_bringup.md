@@ -1934,6 +1934,17 @@ blink phase and shows Stop/Snooze; an absent title in that phase is not a
 missing alarm presentation. Fresh and preserved registration are checked
 independently in the three processes.
 
+Since the CCONT fix that stopped analog-control writes from clearing RTC
+seconds, the clock keeps real emulated time across the seed process. The
+alarm gates therefore build their own seed with the same Calendar fixture
+but physical time `1346`, run for 102 seconds, and save the clock at
+13:47:00. The alarm process then ticks 13:47:01 at second 1 and expires at
+second 60, the timeline every variant below was reviewed on. The cold gate's seed
+enters `1345` for 122 seconds, so its 40-second arming process saves
+13:47:00 too. Seeding 13:47 directly would leave the alarm confirmation
+after 13:48:00. The standalone
+Calendar gate still enters 13:47.
+
 This establishes natural RTC IRQ consumption and firmware output programming
 in research HLE. It does not establish audible samples,
 native DSP or physical clock accuracy. No alarm cause,
