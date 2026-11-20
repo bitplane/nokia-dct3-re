@@ -1109,7 +1109,10 @@ first-escape address/time and missing-read count above.
 ```sh
 .venv/bin/python tools/run_npe3_native.py --reference-clock --seconds 24 --adc-source fcch-sch-broadcast --capture-start p09 --tx-release p05 --raw-agch --provision-records --page-at 18
 # Separate positive paging fixture;the default39dBm control is unchanged.
-.venv/bin/python tools/run_npe3_native.py --reference-clock --seconds 24 --adc-source fcch-sch-broadcast --capture-start p09 --tx-release p05 --raw-agch --provision-records --page-at 18 --cell-power-policy handset33
+# It now needs the lab's SDCCH SACCH (SI5/SI6), as every real BTS sends:
+# without --sacch the handset skips the page block at 3933 and leaves the
+# 4035 page it decodes unanswered (checked 2026-11-20; cause not traced).
+.venv/bin/python tools/run_npe3_native.py --reference-clock --seconds 24 --adc-source fcch-sch-broadcast --capture-start p09 --tx-release p05 --raw-agch --provision-records --page-at 18 --cell-power-policy handset33 --sacch
 # Add --incoming-call for the separate raw CC SETUP/native confirmation fixture.
 # Adding only --traffic-assignment to that fixture is red: without --sacch
 # its page is not answered (the same before page 1 was mapped).
