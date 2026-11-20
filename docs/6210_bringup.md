@@ -88,7 +88,8 @@ HLE acceptance are unchanged. Reproduce with:
 .venv/bin/python tools/run_npe3_native.py --scenario phonebook
 # Extended stability control: currently rejects the extra reset/loader entries.
 .venv/bin/python tools/run_npe3_native.py --seconds 34
-# Passive policy/ring comparison; the extended 6210 check still rejects reset.
+# Passive policy/ring comparison; the extended 6210 check still rejects reset
+# at 13 MHz (add --reference-clock: passes at 34 s, resets near 93 s, see below).
 .venv/bin/python tools/run_npe3_native.py --seconds 34 --reset-policy
 .venv/bin/python tools/run_rom6_native.py --scenario reset-policy
 ```
