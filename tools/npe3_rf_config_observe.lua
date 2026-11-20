@@ -4,7 +4,7 @@ local cpu=assert(machine.devices[':dsp_c54x:cpu'])
 -- State entries cached once: cpu.state[...] costs a container lookup per call.
 local cpu_state=setmetatable({},{__index=function(t,k) local e=cpu.state[k]; rawset(t,k,e); return e end})
 local handles={}
-local writes,selections=0,0
+local writes,selections,accesses=0,0,0
 local entries=0
 local counter_reads={}
 local stops=0
@@ -28,7 +28,7 @@ handles[#handles+1]=cpu.spaces.data:install_read_tap(0x3ec8,0x3ec8,'npe3_rf_form
         local owner=cpu_state.READPC.value
         if owner~=0x388e and owner~=0x389e then return end
         entries=entries+1
-        if entries>8192 then return end
+        if entries>32768 then return end
         machine:logerror(string.format('npe3_rf_formatter: sequence=%d entry=%04x t=%.9f a=%010x ar2=%04x flags=%04x class=%04x mode=%04x addend0=%04x addend1=%04x observer_writes=0\n',
             entries,owner,machine.time:as_double(),cpu_state.A.value,cpu_state.AR2.value,
             cpu.spaces.data:read_u16(0x3e7e),value,cpu.spaces.data:read_u16(0x51f),
@@ -39,7 +39,7 @@ handles[#handles+1]=cpu.spaces.data:install_write_tap(0x1000,0x26ff,'npe3_rf_for
     local owner=cpu_state.READPC.value
     if owner~=0x38c6 and owner~=0x38c7 then owner=cpu_state.EXECPC.value end
     if owner~=0x38c6 and owner~=0x38c7 then return end
-    if entries==0 or entries>8192 then return end
+    if entries==0 or entries>32768 then return end
     machine:logerror(string.format('npe3_rf_formatter_store: sequence=%d t=%.9f address=%04x value=%04x mask=%04x owner=%06x observer_writes=0\n',
         entries,machine.time:as_double(),address,value,mask,owner))
 end)
@@ -57,15 +57,24 @@ end)
 handles[#handles+1]=cpu.spaces.data:install_write_tap(0x1275,0x1275,'npe3_rf_config_stage',function(_,value,mask)
     if value~=0x4a80 then return end
     selections=selections+1
-    if selections>8192 then return end
+    if selections>32768 then return end
     machine:logerror(string.format('npe3_rf_config_stage: sequence=%d t=%.9f value=%04x source0=%04x source1=%04x route=%04x mask=%04x owner=%06x observer_writes=0\n',
         selections,machine.time:as_double(),cpu.spaces.data:read_u16(0x1274),
         cpu.spaces.data:read_u16(0x3f0f),cpu.spaces.data:read_u16(0x3f10),
         cpu.spaces.data:read_u16(0x3efc),mask,cpu_state.READPC.value))
 end)
+-- Access bursts stage through the separate 1a64..1a6e path: AR3=2602, word
+-- at 2602 and tag 4a80 at 2603, just before the same port-pair writer.
+handles[#handles+1]=cpu.spaces.data:install_write_tap(0x2603,0x2603,'npe3_rf_config_access_stage',function(_,value,mask)
+    if value~=0x4a80 then return end
+    accesses=accesses+1
+    if accesses>32768 then return end
+    machine:logerror(string.format('npe3_rf_config_access_stage: sequence=%d t=%.9f value=%04x mask=%04x owner=%06x observer_writes=0\n',
+        accesses,machine.time:as_double(),cpu.spaces.data:read_u16(0x2602),mask,cpu_state.READPC.value))
+end)
 handles[#handles+1]=emu.add_machine_stop_notifier(function()
     machine:logerror(string.format('npe3_capture_stop_complete: stops=%d cap=16384 observer_writes=0\n',stops))
-    machine:logerror(string.format('npe3_rf_config_complete: writes=%d write_cap=128 stages=%d stage_cap=8192 observer_writes=0\n',writes,selections))
-    machine:logerror(string.format('npe3_rf_formatter_complete: entries=%d cap=8192 observer_writes=0\n',entries))
+    machine:logerror(string.format('npe3_rf_config_complete: writes=%d write_cap=128 stages=%d stage_cap=32768 access_stages=%d observer_writes=0\n',writes,selections,accesses))
+    machine:logerror(string.format('npe3_rf_formatter_complete: entries=%d cap=32768 observer_writes=0\n',entries))
 end)
 _G.npe3_rf_config_observer=handles

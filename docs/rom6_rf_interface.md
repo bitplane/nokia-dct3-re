@@ -624,6 +624,17 @@ boundary,and the HLE semantic/coherent frontier controls also pass.
 .venv/bin/python tools/run_npe3_native.py --reference-clock --seconds 60 --adc-source fcch-sch-broadcast --capture-start p09 --tx-release p05 --raw-agch --provision-records
 ```
 
+Since native Location Updating, this capture also carries the LU access.
+Its 37 RACH configuration pairs are staged by `1a64..1a6e` through AR3=2602
+(word `2602`, tag `4a80` at `2603`), not by the receive selector's
+`1274/1275`, and reach the same `1a80..1a8c` port writer about 1.2 us
+later. The observer logs them as `npe3_rf_config_access_stage`, and the
+provenance check pairs every issued word, in order, with one staging of
+either kind. The 60 s run makes 13,470 formatter entries and 6,690 receive
+stagings, so those caps are 32,768. The menu oracle for this native LU
+profile moved with `ffb4d1b6`'s READA forwarding fix (bisected 2026-11-20);
+see `ADC_LU_MENU_SHA256`.
+
 ### Native idle metadata and forwarding contract
 
 Formatter4ee0 selects primary frame0912/0913,BSIC250a and receiver250e when

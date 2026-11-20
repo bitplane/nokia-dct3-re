@@ -5,6 +5,10 @@ from tools.rom6_tuning_contract import FORMATTER_SHA256,KEYS,fields,pack_scalar
 
 SOURCE=re.compile(r'npe3_rf_config_source: sequence=(\d+) t=([\d.]+) address=([\da-f]{4}) value=([\da-f]{4}) mask=ffff owner=([\da-f]{6,8}) observer_writes=0')
 STAGE=re.compile(r'npe3_rf_config_stage: sequence=(\d+) t=([\d.]+) value=([\da-f]{4}) source0=0502 source1=0308 route=1054 mask=ffff owner=([\da-f]{6,8}) observer_writes=0')
+ACCESS=re.compile(r'npe3_rf_config_access_stage: sequence=(\d+) t=([\d.]+) value=([\da-f]{4}) mask=ffff owner=([\da-f]{6,8}) observer_writes=0')
+# Access bursts stage through 2602/2603 immediately before their port pair,
+# as receive configurations do through 1274/1275.
+ACCESS_LEAD=(0.0,0.00001)
 
 
 def check_formatter(text,program,prefix,stream):
@@ -16,7 +20,7 @@ def check_formatter(text,program,prefix,stream):
     if constants!=[4675,4450,8514,8039]:raise ValueError('6210 formatter addends changed')
     entries=[fields(row) for row in re.findall(r'npe3_rf_formatter: ([^\r\n]+)',text)]
     count=len(entries)
-    if (not 0<count<8192 or text.count(f'npe3_rf_formatter_complete: entries={count} cap=8192 observer_writes=0')!=1
+    if (not 0<count<32768 or text.count(f'npe3_rf_formatter_complete: entries={count} cap=32768 observer_writes=0')!=1
             or [int(row['sequence']) for row in entries]!=list(range(1,count+1))):
         raise ValueError('missing or capped 6210 formatter input coverage')
     stores={}
@@ -75,9 +79,14 @@ def check(text,prefix,mcu,stream):
         raise ValueError('6210 source clear/upload producers changed')
     stages=list(STAGE.finditer(text))
     count=len(stages)
-    if (not 0<count<8192 or count!=text.count('npe3_rf_config_stage:')
+    accesses=list(ACCESS.finditer(text))
+    access_count=len(accesses)
+    if (not 0<count<32768 or count!=text.count('npe3_rf_config_stage:')
             or [int(r[1]) for r in stages]!=list(range(1,count+1))
-            or text.count(f'npe3_rf_config_complete: writes=4 write_cap=128 stages={count} stage_cap=8192 observer_writes=0')!=1):
+            or access_count>=32768 or access_count!=text.count('npe3_rf_config_access_stage:')
+            or [int(r[1]) for r in accesses]!=list(range(1,access_count+1))
+            or text.count(f'npe3_rf_config_complete: writes=4 write_cap=128 stages={count} stage_cap=32768 '
+                          f'access_stages={access_count} observer_writes=0')!=1):
         raise ValueError('missing, malformed or capped 6210 staging evidence')
     issued=[]
     low=None
@@ -88,10 +97,20 @@ def check(text,prefix,mcu,stream):
             if low is None or mask!='ffff' or pc!='001a89':
                 raise ValueError('6210 configuration port source changed')
             issued.append(low)
-    if len(issued)!=count:
+    # Each issued pair follows, within 10 us and in order, either a receive
+    # staging or an access staging.
+    receive=access=0
+    for stamp,value in issued:
+        if receive<count and 0<=float(stamp)-float(stages[receive][2])<0.00001:
+            if stages[receive][3] not in ('0502','0308') or stages[receive][3]!=value:
+                raise ValueError('6210 staged configuration did not reach its port word')
+            receive+=1
+        elif (access<access_count and accesses[access][3]==value
+              and ACCESS_LEAD[0]<=float(stamp)-float(accesses[access][2])<ACCESS_LEAD[1]):
+            access+=1
+        else:
+            raise ValueError('6210 staged/issued configuration count differs')
+    if receive!=count or access!=access_count:
         raise ValueError('6210 staged/issued configuration count differs')
-    for stage,(stamp,value) in zip(stages,issued):
-        if stage[3] not in ('0502','0308') or stage[3]!=value or not 0<=float(stamp)-float(stage[2])<0.00001:
-            raise ValueError('6210 staged configuration did not reach its port word')
-    return dict(source_words=['0502','0308'],staged_and_issued=count,
+    return dict(source_words=['0502','0308'],staged_and_issued=count,access_staged_and_issued=access,
                 physical_bit_meaning_proved=False,rf_readiness=False)

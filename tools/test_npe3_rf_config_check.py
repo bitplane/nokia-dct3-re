@@ -19,7 +19,7 @@ class ConfigProvenanceTest(unittest.TestCase):
         for n,value in enumerate(('0502','0308'),1):
             lines.append(f'npe3_rf_config_stage: sequence={n} t={n}.000000000 value={value} source0=0502 source1=0308 route=1054 mask=ffff owner=ffffffff observer_writes=0')
             stream.extend((f'{n}.000001000 001a85 0031 {value} ffff',f'{n}.000002000 001a89 0032 4a80 ffff'))
-        lines.append('npe3_rf_config_complete: writes=4 write_cap=128 stages=2 stage_cap=8192 observer_writes=0')
+        lines.append('npe3_rf_config_complete: writes=4 write_cap=128 stages=2 stage_cap=32768 access_stages=0 observer_writes=0')
         return '\n'.join(lines),prefix,mcu,stream
 
     def test_own_provenance_not_physical_meaning(self):
@@ -34,6 +34,26 @@ class ConfigProvenanceTest(unittest.TestCase):
                      (text,prefix,mcu[:-1]+b'\xff',stream),
                      (text,prefix,mcu,stream[:-2]),
                      (text,prefix,mcu,[r.replace('001a89','001a88') for r in stream])):
+            with self.subTest(args=args[0][-60:]),self.assertRaises(ValueError):check(*args)
+
+    def access_fixture(self,lead=0.0000012):
+        text,prefix,mcu,stream=self.fixture()
+        text=text.replace('access_stages=0','access_stages=1')
+        text+='\nnpe3_rf_config_access_stage: sequence=1 t=1.200000000 value=0502 mask=ffff owner=001a6e observer_writes=0'
+        issue=1.2+lead
+        stream=stream[:2]+[f'{issue:.9f} 001a85 0031 0502 ffff',f'{issue+1e-6:.9f} 001a89 0032 4a80 ffff']+stream[2:]
+        return text,prefix,mcu,stream
+
+    def test_access_staging_pairs_with_its_port_word(self):
+        result=check(*self.access_fixture())
+        self.assertEqual((result['staged_and_issued'],result['access_staged_and_issued']),(2,1))
+
+    def test_reject_unpaired_or_mistimed_access(self):
+        text,prefix,mcu,stream=self.access_fixture()
+        for args in ((text,prefix,mcu,stream[:2]+stream[4:]),
+                     (text.replace('t=1.200000000','t=1.300000000'),prefix,mcu,stream),
+                     (text.replace('access_stage: sequence=1 t=1.200000000 value=0502','access_stage: sequence=1 t=1.200000000 value=0308'),prefix,mcu,stream),
+                     self.access_fixture(lead=0.0002)):
             with self.subTest(args=args[0][-60:]),self.assertRaises(ValueError):check(*args)
 
     def test_direct_rx_buffered_rx_and_tx_are_distinct(self):
@@ -51,7 +71,7 @@ class ConfigProvenanceTest(unittest.TestCase):
             else:
                 for address,value in ((pointer,word&65535),(pointer+1,word>>16)):
                     lines.append(f'npe3_rf_formatter_store: sequence={n} t={n}.000003000 address={address:04x} value={value:04x} mask=ffff owner=0038c7 observer_writes=0')
-        lines.append('npe3_rf_formatter_complete: entries=3 cap=8192 observer_writes=0')
+        lines.append('npe3_rf_formatter_complete: entries=3 cap=32768 observer_writes=0')
         text='\n'.join(lines)
         with patch('tools.npe3_rf_config_check.FORMATTER_SHA256',digest):
             result=check_formatter(text,program,prefix,stream)

@@ -17,11 +17,14 @@ ADC_SCH_MENU_SHA256 = '81b207e77820f80f4844daeeebdbd260c1f2590888de1d0274ac67f7d
 ADC_P09_MENU_SHA256 = '748bea6093d040edebd9141c371983ad858fe1744d6f28403bb6605b79cd8638'
 # Full-SI acquisition changes the envelope animation phase, not menu text.
 ADC_BROADCAST_MENU_SHA256 = '8c7650fdb0514ec34c85b89795e529de062e6f141268a507bafc7eb77370df65'
-# Reviewed raw LU-Accept run: only envelope animation pixels25..48,33..39
-# differ from the preceding raw-UA oracle. Ordinary profiles stay unchanged.
-ADC_LU_MENU_SHA256 = '5adef93609b763a40d0e3c9dca356d388a910bb393a518e99a53eec2c7184202'
+# Reviewed raw LU-Accept run. It was 5adef936... (only envelope animation
+# pixels25..48,33..39 differ from the preceding raw-UA oracle) until ffb4d1b6
+# forwarded READA's RAM write per SPRU131G 7.3.2; that DSP correction moves
+# the envelope to the phase already reviewed for the frame-page experiment
+# below (pixels25..47,29..35 only). Bisected 2026-11-20 from d755dd86.
+ADC_LU_MENU_SHA256 = '1c3932a7ea93beb30fa751369fa457c164e6605fda68ab3f904ce4cb6ea84fa2'
 # Reviewed frame-page experiment: only envelope animation pixels25..47,29..35
-# differ from the ordinary LU menu. Do not replace its baseline oracle.
+# differed from the pre-ffb4d1b6 LU menu. Do not replace its baseline oracle.
 ADC_FRAME_PAGE_MENU_SHA256 = '1c3932a7ea93beb30fa751369fa457c164e6605fda68ab3f904ce4cb6ea84fa2'
 
 
