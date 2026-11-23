@@ -2073,7 +2073,7 @@ about 38 s: the untuned lab source answers every carrier the scan tries.
 
 The donor's records fail the DSP's validation and park it at `350a`, exactly
 as on the 6210 (`--acquired-records` is that negative control).
-`make_nsm2_record_profile.py` writes the same synthetic low records with the
+`make_rom6_record_profile.py` writes the same synthetic low records with the
 8850's own seed `12484cf6`. Its own type-70 inputs show the NPE-3 layout, and
 the sum at `11c` matches the acquired image. Two storage facts are 8850-local:
 
@@ -2098,6 +2098,23 @@ make verify-8850-lab-call
 # Negative control: rejects the reason-68 restart.
 .venv/bin/python tools/run_nsm2_native.py --seconds 34
 ```
+
+### 8890 Native ROM6 Compatibility Trial
+
+`nsb6r6` is the same trial with the 8890's own v12.20 uploads: an identical
+104-word bootstrap fragment, the same `2c75` hand-over and the board facts
+`nsb6hle` already records (BLB-2 samples, own scanner, CTSI+2 release bit 0).
+`nsb6ap5` adds the laboratory cell. `make verify-8890-lab-call` requires the
+8850 gate's complete exchange: registration, ringing with `5551234`, Send,
+speech both ways and End. The seed is `eca05beb`, its own final MCU bytes.
+
+After physical `12345` the firmware shows its **Uhrzeit** editor; the gate
+leaves that open and the call takes the screen over it. The reviewed ringing
+frame shows the number without the caller text. One FACCH Channel Release is
+retransmitted after T200. The laboratory cell is GSM900 ARFCN 35; the 8890's
+PCS1900 path is not exercised. Donor records stop at `350a`
+(`tools/run_rom6_lab_call.py nsb6 --acquired-records`). The 8850 trial's
+limits apply unchanged.
 
 ### 8850 Runtime Self-Test Contract
 

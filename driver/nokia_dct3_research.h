@@ -81,6 +81,8 @@ public:
 	void npe3tp5(machine_config &config);
 	void npe3ap5(machine_config &config);
 	void nsm2ap5(machine_config &config);
+	void nhm3ap5(machine_config &config);
+	void nsb6ap5(machine_config &config);
 	DECLARE_INPUT_CHANGED_MEMBER(bts_page_w);
 protected:
 	void machine_start() override;

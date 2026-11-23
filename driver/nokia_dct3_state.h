@@ -142,6 +142,9 @@ public:
 	void noki8850(machine_config &config);
 	void nsm2stage(machine_config &config);
 	void nsm2r6(machine_config &config);
+	void nhm3r6(machine_config &config);
+	void nsb6r6(machine_config &config);
+	void attach_acquired_rom6(machine_config &config);
 	void nsm2hle(machine_config &config);
 	void nsm3dr6(machine_config &config);
 	void nsm3dhle(machine_config &config);

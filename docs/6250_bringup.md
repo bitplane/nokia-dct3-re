@@ -1167,6 +1167,29 @@ The native CPU remains suspended at `2c75`. Validate the
 The expected MAME ROM checksum warning records that this is a derived input,
 not the acquired image.
 
+### Native ROM6 compatibility trial
+
+`nhm3r6` runs the own v5.03 MCU, PMM and DSP uploads on the acquired 8210 ROM6
+at its documented 45.5 MHz, as `npe3r6` and `nsm2r6` do. The 104-word
+bootstrap fragment is byte-identical to the 8850's and 8890's and hands over
+at the same `2c75`. CTSI+2 keeps release bit 2 and execution bit 0 across the
+firmware's read/modify/write (`readback_mask = 0x05`, the 6210's value).
+`nhm3ap5` adds the 6210's laboratory cell.
+
+`make verify-6250-lab-call` requires native registration and **DCT3 LAB**
+(about 13 s), a page answered, `5551234` **calling**, physical Send, lab tones
+both ways on TCH/F and End clearing. The first run measured 527 of 617
+earpiece blocks and 494 of 607 uplink blocks carrying the tones (the rest is
+ringing).
+
+The storage input is the initial-record fixture above with the synthetic low
+records of `make_rom6_record_profile.py` (own seed `d1e72385`). The acquired
+PMM renders `CONTACT SERVICE` natively, as under HLE
+(`tools/run_rom6_lab_call.py nhm3 --acquired-records`). The 6250 does not use
+the 8850's IMEI-bound security-code encoding and shows no code prompt.
+
+This establishes no fitted mask, DSP clock, RF timing, tuning or gains.
+
 ### Startup success and display lifecycle
 
 Flag `40` is retained success, not an outstanding wait. Initialization

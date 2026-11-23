@@ -211,6 +211,18 @@ void dct3_rf_adc_fixture_state::nsm2ap5(machine_config &config)
 	configure_rom6_lab_bts(config);
 }
 
+void dct3_rf_adc_fixture_state::nhm3ap5(machine_config &config)
+{
+	nhm3r6(config);
+	configure_rom6_lab_bts(config);
+}
+
+void dct3_rf_adc_fixture_state::nsb6ap5(machine_config &config)
+{
+	nsb6r6(config);
+	configure_rom6_lab_bts(config);
+}
+
 void dct3_rf_adc_fixture_state::configure_rom6_lab_bts(machine_config &config)
 {
 	configure_adc_lab(config);
@@ -1805,12 +1817,47 @@ void nokia_dct3_state::nsm2r6(machine_config &config)
 	native.simi_controller = true;
 	native.synthetic_sim_card = true;
 	apply_product_config(native);
-	// Acquired 8210 ROM6 program/data with the 8850's own MCU uploads. Its
-	// bootstrap fragment, 0880 control word and 2c75 entry match the 8210's;
-	// this is a compatibility trial, not identification of the fitted mask.
+	attach_acquired_rom6(config);
+}
+
+// NHM-3 and NSB-6 carry the 8850's and 8210's bootstrap fragment byte for
+// byte and hand over at the same 2c75; these are the same compatibility
+// trial with each product's own uploads.
+void nokia_dct3_state::nhm3r6(machine_config &config)
+{
+	noki6250(config);
+	nokia_product_config native = m_product;
+	// As the 6210's 4dc050: retain the release and execution controls.
+	native.dsp_reset_wiring.readback_mask = 0x05;
+	native.simi_controller = true;
+	native.synthetic_sim_card = true;
+	apply_product_config(native);
+	attach_acquired_rom6(config);
+}
+
+void nokia_dct3_state::nsb6r6(machine_config &config)
+{
+	noki8xxx(config);
+	nokia_product_config native = PRODUCT_8XXX;
+	native.flash_persistent_start = 0x003d0000;
+	native.dsp_reset_wiring = { 0x10, 0x01 };
+	native.dsp_reset_wiring.readback_mask = 0x01;
+	// Board facts shared with nsb6hle: BLB-2 samples and the own scanner.
+	native.ccont_board = ADC_5210;
+	native.keypad_wiring.row_pin_shift = 1;
+	native.keypad_wiring.column_irq_status = 0x2b;
+	native.simi_controller = true;
+	native.synthetic_sim_card = true;
+	apply_product_config(native);
+	attach_acquired_rom6(config);
+}
+
+// Acquired 8210 ROM6 program/data behind a product's own MCU uploads. The
+// rate is the mask's documented NSM-3 one (13 MHz x 3.5); it identifies
+// neither the product's fitted mask nor its multiplier.
+void nokia_dct3_state::attach_acquired_rom6(machine_config &config)
+{
 	config.device_remove("dsp_hle");
-	// The acquired mask's documented NSM-3 rate (13 MHz x 3.5). No NSM-2
-	// System Module page is retained to confirm the 8850's multiplier.
 	NOKIA_DSP_C54X(config, m_dsp_c54x, 45'500'000);
 	configure_native_dsp_attachments(*m_dsp_c54x);
 	m_dsp_c54x->set_overlay_end(0x2000);
