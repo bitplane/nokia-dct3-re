@@ -80,12 +80,14 @@ public:
 	void npe3sp9(machine_config &config);
 	void npe3tp5(machine_config &config);
 	void npe3ap5(machine_config &config);
+	void nsm2ap5(machine_config &config);
 	DECLARE_INPUT_CHANGED_MEMBER(bts_page_w);
 protected:
 	void machine_start() override;
 	void machine_reset() override;
 private:
 	void configure_adc_lab(machine_config &config);
+	void configure_rom6_lab_bts(machine_config &config);
 	enum class lab_band { gsm900, dcs1800, pcs1900 };
 	void configure_nse1_lab_bts(machine_config &config, lab_band band = lab_band::gsm900);
 	void control_w(offs_t port, u16 data);

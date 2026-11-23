@@ -1896,6 +1896,17 @@ this fixture's claim.
 The conditional, nondelayed and backward block-branch profiles, exclusion
 profile, saved-repeat and SQUR profiles pass as controls.
 
+### Short BANZD in a block
+
+The ROM6 traffic path has `BANZD c6f0,*AR0-` at `c708` inside `c6ed..c714`.
+Admission now includes the two-word delayed form when its target is inside
+the block and both delay words end strictly before REA. The Access-owned
+redirect already restored the fetch count from Decode-owned BRC for the
+undelayed form. `internal_banzd` owns 48 independent cases/restores:
+backward and forward targets, four outer counts, three inner counts and two
+pages, with the delay words counted on both outcomes. Long BANZD, delay spans
+reaching REA and targets outside the block stay excluded.
+
 ### Long BANZ in a block
 
 The original `6ce0 fffc a4d5` at `02:a4cb` tests the resolved `AR0-4`

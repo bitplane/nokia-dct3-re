@@ -2059,11 +2059,42 @@ policy, not a watchdog:
 In its first window the native DSP delivers only the four startup type-`74`
 replies; `nsm2hle` delivers 244 packets, including radio types `80`/`83`/`89`.
 The native 8850 therefore has no published radio activity without a sample
-source. Laboratory ADC compositions like the 6210's `npe3sp9` are the next
-step; native radio, registration and speech remain unqualified.
+source, and `nsm2r6` stays bounded. The laboratory cell below removes the cause.
+
+`nsm2ap5` adds the 6210's complete raw-AGCH laboratory chain
+(`configure_rom6_lab_bts`) to `nsm2r6`, with no 8850-specific tuning. It does
+not reset. `make verify-8850-lab-call` requires native registration (own
+SABM/Location Updating, UA, Accept, release), a page answered, `5551234`
+**calling** on the LCD, physical Send, the lab's 1 kHz tone at the earpiece
+and its 500 Hz tone on the uplink over TCH/F, and End clearing back to idle.
+The first native run measured 503 of 634 earpiece blocks and 498 of 622
+uplink blocks carrying the tones (the rest is ringing). Registration takes
+about 38 s: the untuned lab source answers every carrier the scan tries.
+
+The donor's records fail the DSP's validation and park it at `350a`, exactly
+as on the 6210 (`--acquired-records` is that negative control).
+`make_nsm2_record_profile.py` writes the same synthetic low records with the
+8850's own seed `12484cf6`. Its own type-70 inputs show the NPE-3 layout, and
+the sum at `11c` matches the acquired image. Two storage facts are 8850-local:
+
+- The base record's header check byte (`02`) does not follow the rule the
+  other 379 records satisfy, even as acquired. It is left unchanged.
+- Own `3002a8` stores the security code as packed digits XOR ASCII IMEI
+  digits 11..14 XOR `33f888` (NV item `0701`). With another IMEI, `12345` is a
+  code error and the handset clears calls from the prompt. The acquired
+  `d73339dc` is `12345` only for an IMEI ending `076` with check digit `0`, so
+  the example IMEI ends that way and the stored code is not edited.
+
+The traffic channel reaches `BANZD c6f0,*AR0-` at `c708`, inside the block
+`c6ed..c714`. The C54x core refused it; see
+[the execution contract](c54x_execution_contracts.md#short-banzd-in-a-block).
+
+This is laboratory execution of another product's DSP ROM with synthetic
+records. It establishes no fitted mask, RF timing, tuning or gains.
 
 ```sh
 make verify-8850-native-menu
+make verify-8850-lab-call
 # Negative control: rejects the reason-68 restart.
 .venv/bin/python tools/run_nsm2_native.py --seconds 34
 ```

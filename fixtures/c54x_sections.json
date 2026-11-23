@@ -469,6 +469,7 @@
   "internal_delayed_branch": 128,
   "internal_tc_branch": 128,
   "internal_banz": 192,
+  "internal_banzd": 48,
   "delayed_load": 1200,
   "delayed_paired_load": 1200,
   "delayed_shift_load": 1152,

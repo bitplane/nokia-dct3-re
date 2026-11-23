@@ -1993,6 +1993,11 @@ static INPUT_PORTS_START( noki8850 )
 	PORT_BIT( 0x10, IP_ACTIVE_LOW, IPT_KEYPAD ) PORT_NAME("Keypad #") PORT_CODE(KEYCODE_MINUS) PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(nokia_dct3_state::key_irq), 0)
 INPUT_PORTS_END
 
+static INPUT_PORTS_START( nsm2_raw_bts )
+	PORT_INCLUDE(noki8850)
+	PORT_INCLUDE(dct3_lab_bts)
+INPUT_PORTS_END
+
 static INPUT_PORTS_START( noki8890 )
 	// Own NSB-6 v12.20 table 339f4c has the same 25 decoded matrix
 	// entries, including Menu=19 and Send/End=0e/0f.
@@ -3279,6 +3284,8 @@ ROM_START( nsm2r6 )
 	ROM_LOAD("8850 virgin eeprom 003d0000.fls", 0x1d0000, 0x030000, CRC(4823f27e) SHA1(b09455302d98fbedf35072c9ecfd7721a04924b0))
 ROM_END
 
+#define rom_nsm2ap5 rom_nsm2r6
+
 ROM_START( nsm2hle )
 	DCT3_SHARED_MAD2_INTERNAL_ROMS
 	ROM_REGION16_BE(0x200000, "flash", ROMREGION_ERASEFF )
@@ -3390,6 +3397,7 @@ SYST( 2000, nsb7hle, noki8290, 0, nsb7hle, noki8290, nokia_dct3_state, empty_ini
 SYST( 1999, noki8850, 0,      0,      noki8850, noki8850, nokia_dct3_state, empty_init, "Nokia", "Nokia 8850", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 1999, nsm2stage, noki8850, 0, nsm2stage, noki8850, nokia_dct3_state, empty_init, "Nokia", "8850 product-local staged DSP (research fixture)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 1999, nsm2r6, noki8850, 0, nsm2r6, noki8850, nokia_dct3_state, empty_init, "Nokia", "8850 acquired ROM6 compatibility trial (research fixture)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
+SYST( 1999, nsm2ap5, noki8850, 0, nsm2ap5, nsm2_raw_bts, dct3_rf_adc_fixture_state, empty_init, "Nokia", "8850 acquired ROM6 raw AGCH candidate", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 1999, nsm2hle, noki8850, 0, nsm2hle, noki8850, nokia_dct3_state, empty_init, "Nokia", "8850 native uploads with runtime DSP HLE (research fixture)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2000, noki3310, 0,      0,      noki3310, noki3310, nokia_dct3_state, empty_init, "Nokia", "Nokia 3310", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2002, noki3610, 0,      0,      noki3610, noki3310, nokia_dct3_state, empty_init, "Nokia", "Nokia 3610 (NAM-1 bring-up)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )

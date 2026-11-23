@@ -1,0 +1,8 @@
+diff --git a/src/mame/mame.lst b/src/mame/mame.lst
+--- a/src/mame/mame.lst
++++ b/src/mame/mame.lst
+@@ -36237,3 +36237,4 @@
+ nsm2hle
+ nsm2r6
++nsm2ap5
+ noki6210

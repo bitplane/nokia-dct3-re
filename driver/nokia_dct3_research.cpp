@@ -203,6 +203,23 @@ void dct3_rf_adc_fixture_state::npe3ap5(machine_config &config)
 	subdevice<nokia_dsp_c54x_device>("dsp_c54x")->transfer_compare_cb().set(hagar,FUNC(nokia_hagar_device::compare_output_w));
 }
 
+// The 6210's complete raw-AGCH laboratory chain on the native 8850, which
+// shares its acquired ROM6 input. Not an 8850 RF or clock measurement.
+void dct3_rf_adc_fixture_state::nsm2ap5(machine_config &config)
+{
+	nsm2r6(config);
+	configure_rom6_lab_bts(config);
+}
+
+void dct3_rf_adc_fixture_state::configure_rom6_lab_bts(machine_config &config)
+{
+	configure_adc_lab(config);
+	m_burst = m_sch = m_compare_start = true;
+	m_bcch = m_full_broadcast = true;
+	m_p05_transmit = m_raw_agch = true;
+	subdevice<nokia_mfi_rx_device>("mfi_rx")->set_latched_block_requests(true);
+}
+
 void dct3_rf_adc_fixture_state::machine_start()
 {
 	nokia_dct3_state::machine_start();
