@@ -356,3 +356,34 @@ Measured on the lean call (30 emulated seconds, about 500 M DSP clocks):
   registers about 20 s late and fails its gate. Removing those writes
   needs an explicit scheduler quantum, so the coupling stops being
   incidental.
+
+### Restructurings that did not pay (2026-11-23)
+
+All on the 30 s lean 6210 call, total CPU, pinned to one core and interleaved
+(repeats within about 1 % on an idle host; earlier unpinned comparisons were
+not reliable to 5 %). None is committed. Where checked, the prototypes'
+terminal DSP cycle, mailbox and slot totals matched each other; the
+state-trace oracle was not run.
+
+| Change | Effect |
+| --- | --- |
+| Step a window back one slot per clock instead of moving five slots | 6 % slower |
+| 16-byte aligned slots | within 1 % |
+| Per-opcode "plain Decode" bit skipping Decode's always-run checks | 1.2 % faster |
+| A second `pipeline_step` instance for clocks with no control state | 3 % slower (code footprint) |
+| One specialised instance per opcode window, no profile | 11 % faster at 400 windows, 8 % at 2,500 |
+| The same with PGO on both sides | 4 % faster (18.6 to 17.8 s) |
+| Specialised instances jumping straight to the next | 6 % slower than a shared dispatcher |
+
+The window approach compiled `pipeline_step` with the Decode to Execute
+opcodes as template constants, keyed on those four words, their validity and
+the pending extension and delay counts. 1,000 windows cover 75 % of the
+call's clocks and 2,000 cover 85 %. A specialised clock costs roughly a
+quarter of a generic one, at about 2 KB of code each, so the windows compete
+for the instruction cache and the dispatch must predict among them. With PGO
+already laying out the generic step, most of the gain disappears.
+
+Two earlier ideas are also ruled out. A clock's cost does not depend on its
+position in the scheduler slice (first clock 276 TSC cycles, the rest about
+155), so longer slices would not help the core. The core runs about 232,000
+slices per emulated second, averaging 59 clocks.
