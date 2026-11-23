@@ -10,8 +10,10 @@ of 1.0 or more means a live call can keep up with real time on this host.
 CPU time is the figure to compare; wall time also counts other load.
 """
 import argparse
+import hashlib
 import os
 from pathlib import Path
+import platform
 import resource
 import shutil
 import subprocess
@@ -28,7 +30,47 @@ MODEL = 'npe3ap5'
 CONNECTED = 'npe3_tch_facch: kind=connect_acknowledge'
 
 
+INPUTS = {  # paths under roms/, with SHA-1s; see docs/6210_sip_quickstart.md
+    'noki6210/6210_556c.fls': '3d9ea319503e78ec69b60d72cda23e461e118ea9',
+    'noki6210/6210 virgin eeprom 005fa000.fls': 'b3a527ede1be87bd715fb3741a81eef5bd422efa',
+    'nsm3r6/nsm3_rom6_program.be16': 'd6b1f40eaa4b2c8a9f7adcb6cb5864d9cc1354fc',
+    'nsm3r6/nsm3_rom6_program_page1.be16': '51178fc69b3662a8a05291149832f04a1a2c6032',
+    'nsm3r6/nsm3_rom6_data.be16': '845133638256ed1f07e014437fdee3ececc4508f',
+}
+
+
+def input_errors(roms):
+    """What is missing or different among the files the 6210 call needs."""
+    errors = []
+    for name, sha1 in INPUTS.items():
+        path = roms / name
+        if not path.is_file():
+            errors.append(f'missing {path}')
+        elif hashlib.sha1(path.read_bytes()).hexdigest() != sha1:
+            errors.append(f'{path} is not the expected file (SHA-1 {sha1})')
+    return errors
+
+
+def host_summary():
+    """Compiler aside, what makes two hosts' figures comparable."""
+    cpu = platform.machine()
+    try:
+        for line in Path('/proc/cpuinfo').read_text().splitlines():
+            if line.startswith('model name'):
+                cpu = line.split(':', 1)[1].strip()
+                break
+    except OSError:
+        pass
+    revision = subprocess.run(['git', 'describe', '--always', '--dirty'], cwd=ROOT,
+                              capture_output=True, text=True).stdout.strip() or 'unknown'
+    return f'host: {cpu}, {os.cpu_count()} threads, {platform.system()} {platform.machine()}; source {revision}'
+
+
 def prepare(base):
+    errors = input_errors(ROOT / 'roms')
+    if errors:
+        raise SystemExit('the 6210 call needs its own inputs (docs/6210_sip_quickstart.md):\n  ' +
+                         '\n  '.join(errors))
     flash = (ROOT / 'roms/noki6210/6210_556c.fls').read_bytes()
     pmm = (ROOT / 'roms/noki6210/6210 virgin eeprom 005fa000.fls').read_bytes()
     pmm = make_profile(flash, pmm, (ROOT / 'roms/nsm3r6/nsm3_rom6_data.be16').read_bytes())
@@ -76,6 +118,7 @@ def main():
         if CONNECTED not in log:
             raise SystemExit(f'the call did not connect; evidence in {base}')
         cpu, wall = cpu30 - cpu20, wall30 - wall20
+        print(host_summary())
         print(f'boot to answer (20 emulated s): {cpu20:.2f} CPU s')
         print(f'connected call (10 emulated s): {cpu:.2f} CPU s, {wall:.2f} wall s')
         print(f'6210 call speed: {10 / cpu:.2f}x real time (CPU), {10 / wall:.2f}x (wall)')

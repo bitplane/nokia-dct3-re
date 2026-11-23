@@ -4,7 +4,7 @@
 The C54x pipeline model is about 80 % of a native ROM4 call's host time and
 its cost is spread over thousands of opcode tests, which suits branch
 profiles. This compiles only that object instrumented, trains it on the
-native lab traffic call (speech both ways), then recompiles it with the
+chosen native lab traffic call (speech both ways), then recompiles it with the
 profile and relinks. Profiles only reorder code: the emulation is unchanged.
 
 Run after `make build`; a later ordinary build of the core drops the profile.
@@ -18,6 +18,11 @@ import sys
 import tempfile
 
 SOURCE = 'src/devices/cpu/tms320c54x/tms320c54x.cpp'
+
+TRAINING = {
+    '5110': ['tools/run_rom4_lab_registration.py', 'nse1ap5', '--traffic-channel'],
+    '6210': ['tools/bench_6210_call.py'],
+}
 
 
 def core_command(dry_run):
@@ -49,8 +54,11 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--mame-dir', type=Path, default=Path('mame'))
     parser.add_argument('--python', default=sys.executable)
+    parser.add_argument('--train', choices=('5110', '6210'), default='5110',
+                        help='the lab traffic call to train on')
     args = parser.parse_args()
     root = Path(__file__).resolve().parents[1]
+    (root / 'tmp').mkdir(exist_ok=True)
     mame = (root / args.mame_dir).resolve()
     project = mame / 'build/projects/sdl/mame/gmake-linux'
     command = core_command(subprocess.run(['make', '-n', '-B', '-f', 'optional.make', 'config=release64'], cwd=project,
@@ -59,8 +67,7 @@ def main():
     try:
         build(mame, project, command, f'-fprofile-generate -fprofile-update=single -fprofile-dir={shlex.quote(str(profile))}',
               '-fprofile-generate')
-        subprocess.run([args.python, 'tools/run_rom4_lab_registration.py', 'nse1ap5', '--traffic-channel'],
-                       cwd=root, check=True)
+        subprocess.run([args.python] + TRAINING[args.train] + ['--mame', str(mame / 'mame')], cwd=root, check=True)
         if not any(profile.rglob('*.gcda')):
             raise SystemExit('training wrote no profile')
         build(mame, project, command, f'-fprofile-use -fprofile-dir={shlex.quote(str(profile))} -Wno-missing-profile')

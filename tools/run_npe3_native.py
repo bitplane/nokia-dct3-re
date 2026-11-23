@@ -525,7 +525,7 @@ def main():
             if args.clear_rejected_call:
                 from tools.npe3_raw_call_setup_check import check_call_clearing
                 report['call_clearing']=check_call_clearing(text,access['normal_control_blocks'])
-            print('Native6210 cell33: PASS native Paging Response from timed port bits; stable_camping=0 calls=0')
+            print('Native6210 cell33: PASS native Paging Response from timed port bits; stable_camping=0')
         (run/'cell-power-experiment.json').write_text(json.dumps(report,indent=2)+'\n')
         print('Native6210 cell-power experiment captured; other radio/UI outcomes remain unqualified')
         return

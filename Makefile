@@ -514,6 +514,9 @@ help:
 	@echo "make verify-5110-lab-traffic-state save, replay and reload that call while ringing, connected and clearing"
 	@echo "make verify-5110-lab-degraded-call  impair the traffic call both ways; native RXQUAL rises and speech recovers"
 	@echo "make verify-5110-lab-host-call a host-protocol remote places the traffic call, swaps GSM-FR speech and hangs up"
+	@echo "make build-mame      clone, overlay and build without installing ROMs"
+	@echo "make build-6210      build-mame plus the C54x core profiled on the 6210 call (needs only the 6210 inputs)"
+	@echo "make sip-build       build PJSIP and its Python binding under tmp/sip-build"
 	@echo "make build-pgo       build, then recompile the C54x core with profile-guided optimisation (real-time native calls)"
 	@echo "make bench-6210-call this host's speed for the native 6210 call, as a fraction of real time (1.0 keeps up)"
 	@echo "make run-6210-sip   the native 6210 as a live SIP phone in a MAME window (SIP_DIRECTION=incoming|outgoing, SIP_DESTINATION=uri)"
@@ -869,7 +872,12 @@ else ifneq ($(DCT3_TEST_DRIVERS),0)
 $(error DCT3_TEST_DRIVERS must be 0 or 1)
 endif
 
-build: overlay roms
+build: overlay roms build-mame
+
+# The same build without installing any ROMs, so it needs no 3210 image.
+# The live 6210 tools read roms/ directly (docs/6210_sip_quickstart.md).
+.PHONY: build-mame
+build-mame: overlay
 	$(MAKE) -C $(MAME_DIR) REGENIE=1 SOURCES=$(BUILD_MAME_SOURCES) USE_QTDEBUG=0 -j$(JOBS)
 
 # The same build with the C54x core recompiled under profile-guided
@@ -878,6 +886,19 @@ build: overlay roms
 .PHONY: build-pgo
 build-pgo: build
 	$(PYTHON) tools/build_pgo_core.py --mame-dir $(MAME_DIR)
+
+# The same for the 6210 alone: trained on its own lab call, no 5110 inputs.
+.PHONY: build-6210
+build-6210: build-mame
+	$(PYTHON) tools/build_pgo_core.py --mame-dir $(MAME_DIR) --train 6210
+
+# PJSIP and its Python binding, built in tmp/sip-build with no system install.
+# Upstream's object-directory creation races, so the build is serial.
+SIP_ARCHIVE_SHA256 := 3af2e481d51aaa095897820fa2ee26c30e530590c6ca56d23e4133bbdad369eb
+.PHONY: sip-build
+sip-build:
+	SIP_PROJECT_DIR="$(SIP_PROJECT_DIR)" SIP_ARCHIVE_SHA256=$(SIP_ARCHIVE_SHA256) \
+		VENV="$(abspath $(VENV))" sh tools/build_pjsip.sh
 
 # The connected 6210 call's speed on this host, without research observers
 # or the debugger. Measures the binary as built: run after build-pgo.

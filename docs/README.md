@@ -71,6 +71,7 @@ distinction.
 | `8290_bringup.md` | Own NSB-7 uploads and explicit research-HLE UI, SIM security/storage/Toolkit, laboratory registration, host call/SMS signaling and restoration; native DSP/speech remain unproved. |
 | `8xxx_bringup.md` | Acquired 8250/8850/8890 GENSIO contracts and bounded software-only frontiers. |
 | `8855_bringup.md` | Own NSM-4 MCU/storage, register/key/upload contracts and unacknowledged DSP ownership boundary. |
+| `6210_sip_quickstart.md` | Build, benchmark and run the native 6210 as a SIP phone with only its own inputs. |
 | `6210_bringup.md` | NPE-3 normal/native boundary, own-PMM research-HLE phone services, accessory audit and isolated restoration acceptance. |
 | `6250_bringup.md` | Product-local staged DSP boundary and research boot, input, SIM, phonebook, registration, call-signaling and SMS acceptance. |
 | `7110_bringup.md` | NSE-5 upload, SED1565/keypad/roller contracts, fail-closed product boundary and explicit ROM4 compatibility instrument. |

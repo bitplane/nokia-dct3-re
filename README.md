@@ -158,6 +158,9 @@ make verify
 make swap16
 ```
 
+To run the native 6210 as a SIP phone, which needs no 3210 files, follow
+[`docs/6210_sip_quickstart.md`](docs/6210_sip_quickstart.md).
+
 `make verify` boots the explicit missing-hardware profile and checks its semantic predicates.
 Normal product composition is typed machine configuration. Named `HWCFG` and
 `DIAGCFG` fixtures select negative-composition and controller-conformance tests;

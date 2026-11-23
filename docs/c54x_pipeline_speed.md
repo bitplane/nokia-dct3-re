@@ -306,6 +306,10 @@ all 528 conformance sections passing.
 | Before | 11.72, 11.95 CPU s | 0.84-0.85x |
 | Direct data RAM and direct pages | 11.11, 10.97 CPU s | 0.90-0.91x |
 
+A clean clone with only the 6210's inputs, on the same (not idle) host, ran
+the call at 0.82x without a profile. After `make build-6210`, which trains
+on this call instead of the 5110's, two runs gave 0.93x and 0.85x.
+
 This host is a Ryzen 9 9950X3D (5.7 GHz). The core is still about 80 % of
 the lean call at roughly 900 host instructions per DSP clock. Excluding
 the research traces (`make build-tracefree`) saves about 2 %; the ARM's
