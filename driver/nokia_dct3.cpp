@@ -2019,6 +2019,11 @@ static INPUT_PORTS_START( noki8210 )
 	// Own NSM-3 v5.31 normal decoder table 33ee78 matches all 25 entries.
 INPUT_PORTS_END
 
+static INPUT_PORTS_START( nsm3_raw_bts )
+	PORT_INCLUDE(noki8210)
+	PORT_INCLUDE(dct3_lab_bts)
+INPUT_PORTS_END
+
 static INPUT_PORTS_START( noki2100 )
 	PORT_INCLUDE(dct3_network_config)
 
@@ -3434,10 +3439,12 @@ SYST( 1999, nsm3r6, noki8210, 0, nsm3r6, noki8210, nokia_dct3_state, empty_init,
 #define rom_nsm3ad0 rom_nsm3r6
 #define rom_nsm3afb rom_nsm3r6
 #define rom_nsm3afs rom_nsm3r6
+#define rom_nsm3ap5 rom_nsm3r6
 SYST( 1999, nsm3adc, noki8210, 0, nsm3adc, noki8210, dct3_rf_adc_fixture_state, empty_init, "Nokia", "8210 ROM6 ADC tone experiment", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 1999, nsm3ad0, noki8210, 0, nsm3ad0, noki8210, dct3_rf_adc_fixture_state, empty_init, "Nokia", "8210 ROM6 ADC silence experiment", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 1999, nsm3afb, noki8210, 0, nsm3afb, noki8210, dct3_rf_adc_fixture_state, empty_init, "Nokia", "8210 ROM6 finite FCCH ADC experiment", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 1999, nsm3afs, noki8210, 0, nsm3afs, noki8210, dct3_rf_adc_fixture_state, empty_init, "Nokia", "8210 ROM6 FCCH and coded SCH ADC experiment", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
+SYST( 1999, nsm3ap5, noki8210, 0, nsm3ap5, nsm3_raw_bts, dct3_rf_adc_fixture_state, empty_init, "Nokia", "8210 ROM6 raw AGCH candidate", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 1999, nsm3hle, noki8210, 0, nsm3hle, noki8210, nokia_dct3_state, empty_init, "Nokia", "8210 native uploads with runtime HLE (research fixture)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2000, noki8290, 0,      0,      noki8290, noki8290, nokia_dct3_state, empty_init, "Nokia", "Nokia 8290 (NSB-7 research, no DSP completion)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2000, nsb7stage, noki8290, 0, nsb7stage, noki8290, nokia_dct3_state, empty_init, "Research", "NSB-7 own identity-6 staged uploads (resident DSP undumped)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )

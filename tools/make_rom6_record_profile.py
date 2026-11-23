@@ -39,6 +39,10 @@ PRODUCTS = {
     'nhm3': Product('noki6250/6250-503mcuppmc.fls', '95607ce39c383bda75f1e6aeae67a214b787b0a1',
                     'noki6250/6250 virgin eeprom 005fa000.fls', '57c29c8387caf864603d94a22bfb63ace427b7f9',
                     0x3fa000, 0, 0x2000, 1, 0xa28),
+    # The 8210 keeps the same encoding and key; d03438d4 is 12345 for 707/8.
+    'nsm3': Product('noki8210/8210_5.31ppm_c.fls', 'c1a0fe95cedb89a92b19654208cc4855e1a4988e',
+                    'noki8210/8210 virgin eeprom 003d0000.fls', '1c01ad3948ff9919890498a84f31052369d93e1d',
+                    0x1d0000, 0x10000, 0x10000, 100, 0x8000, '49015420622707'),
     'nsb6': Product('noki8890/8890_12.20_ppmc.fls', 'a214a0d69760ecd8eeca0b9d82f95c94bdfe70ed',
                     'noki8890/8890 virgin eeprom 003d0000.fls', 'cc0924cfd4c0ce796fca157c640fc3183c2b5f2c',
                     0x1d0000, 0, 0x10000, 50, 0x8000),
@@ -82,6 +86,9 @@ def make_profile(product, mcu, pmm, drom):
     if product is PRODUCTS['nhm3']:
         from tools.noki6250_pmm_check import initial_record_fixture
         pmm = initial_record_fixture(pmm)
+    elif product is PRODUCTS['nsm3']:
+        from tools.noki8210_pmm_check import base_record_fixture
+        pmm = base_record_fixture(pmm)
     records = low_records(mcu[-4:], OBSERVED_CHIP, product.imei14,
                           faid_table=drom[0xb74f * 2:0xb755 * 2],
                           identity_table=drom[0xb755 * 2:0xb75b * 2],

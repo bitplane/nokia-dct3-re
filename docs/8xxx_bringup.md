@@ -2089,6 +2089,20 @@ The traffic channel reaches `BANZD c6f0,*AR0-` at `c708`, inside the block
 `c6ed..c714`. The C54x core refused it; see
 [the execution contract](c54x_execution_contracts.md#short-banzd-in-a-block).
 
+The same four gates cover the 8850, 8890, 6250 and 8210:
+
+- `verify-N-lab-call`: the lab-tone call above.
+- `verify-N-lab-state`: it is saved, replayed for 200 ms with identical DSP
+  I/O, reloaded and completed while ringing, connected and clearing.
+- `verify-N-lab-sip-call` and `verify-N-lab-sip-outgoing-call`: real PJSUA
+  calls through `dct3_sip_bridge.py`, throttled. The remote hears the lab
+  microphone tone (0.83-0.94 of received energy), its tone reaches the
+  earpiece, and the host sees the dialled `1234567`.
+
+The SIP runs dropped 4-5 media frames incoming and 69-117 outgoing; the calls
+run below real time on the reference host. Retransmissions at T200 depend on
+input phase; repeat runs are byte-identical.
+
 This is laboratory execution of another product's DSP ROM with synthetic
 records. It establishes no fitted mask, RF timing, tuning or gains.
 
@@ -2108,10 +2122,8 @@ make verify-8850-lab-call
 8850 gate's complete exchange: registration, ringing with `5551234`, Send,
 speech both ways and End. The seed is `eca05beb`, its own final MCU bytes.
 
-After physical `12345` the firmware shows its **Uhrzeit** editor; the gate
-leaves that open and the call takes the screen over it. The reviewed ringing
-frame shows the number without the caller text. One FACCH Channel Release is
-retransmitted after T200. The laboratory cell is GSM900 ARFCN 35; the 8890's
+After physical `12345` the firmware shows its **Uhrzeit** editor; physical
+**Ende** at 28 s leaves **DCT3 LAB**, and the call rings as **ruft an**. The laboratory cell is GSM900 ARFCN 35; the 8890's
 PCS1900 path is not exercised. Donor records stop at `350a`
 (`tools/run_rom6_lab_call.py nsb6 --acquired-records`). The 8850 trial's
 limits apply unchanged.

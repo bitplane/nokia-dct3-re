@@ -223,6 +223,13 @@ void dct3_rf_adc_fixture_state::nsb6ap5(machine_config &config)
 	configure_rom6_lab_bts(config);
 }
 
+// The acquired ROM6's own product; its passive HAGAR observer stays attached.
+void dct3_rf_adc_fixture_state::nsm3ap5(machine_config &config)
+{
+	nsm3r6(config);
+	configure_rom6_lab_bts(config);
+}
+
 void dct3_rf_adc_fixture_state::configure_rom6_lab_bts(machine_config &config)
 {
 	configure_adc_lab(config);

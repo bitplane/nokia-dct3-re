@@ -2,7 +2,7 @@ import unittest
 
 from tools.make_rom6_record_profile import PRODUCTS, replace_low_records
 from tools.noki6250_pmm_check import record_checksum
-from tools.run_rom6_lab_call import MODELS, check_inputs, check_registration
+from tools.run_rom6_lab_call import MODELS, check_inputs, check_registration, schedule
 
 NSM2 = PRODUCTS['nsm2']
 EEPROM = NSM2.eeprom
@@ -36,7 +36,7 @@ class CallTest(unittest.TestCase):
 
     def test_inputs_must_complete(self):
         with self.assertRaises(ValueError):
-            check_inputs('rom6_call_input: key=Keypad 1 t=12.000', MODELS['nsm2'])
+            check_inputs('rom6_call_input: key=Keypad 1 t=12.000', schedule(MODELS['nsm2'], 'lab')[0])
 
     def test_replaces_only_low_records_and_sum(self):
         before = image()

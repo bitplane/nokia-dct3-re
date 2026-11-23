@@ -2353,3 +2353,22 @@ no matching raw bootstrap capture is available, so the normal machine keeps
 this boundary. The
 separate research-HLE profile has the product-local acceptance listed above;
 those results do not establish the missing native silicon publication.
+
+## Native laboratory call
+
+`nsm3ap5` adds the complete raw-AGCH laboratory cell
+(`configure_rom6_lab_bts`) to `nsm3r6`. This is the only product whose own MCU
+runs with a DSP mask captured from the same model. `make verify-8210-lab-call`
+requires native registration, **DCT3 LAB**, ringing with `5551234`, physical
+Send, lab tones both ways on TCH/F (446 earpiece and 489 uplink tone blocks on the first run)
+and End clearing. Downlink FACCH frames may be retransmitted at T200: the
+handset can acknowledge just before the lab's 40-frame timer expires.
+`verify-8210-lab-state` and the two `verify-8210-lab-sip*` gates extend it.
+
+Storage is the unchanged base-record fixture with the synthetic low records
+of `make_rom6_record_profile.py`. Its stored security code `d03438d4` is
+`12345` only for an IMEI ending `707` with check digit `8`, so the example
+ends that way. With the acquired PMM the handset shows `CONTACT SERVICE` and
+opens no receive window (`tools/run_rom6_lab_call.py nsm3 --acquired-records`).
+Synthetic records and the untuned direct-ADC cell establish no RF timing,
+tuning or gains.

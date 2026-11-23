@@ -61,6 +61,7 @@ public:
 	void nsm3ad0(machine_config &config);
 	void nsm3afb(machine_config &config);
 	void nsm3afs(machine_config &config);
+	void nsm3ap5(machine_config &config);
 	void npe3afs(machine_config &config);
 	void npe3ad0(machine_config &config);
 	void nse1ad0(machine_config &config);

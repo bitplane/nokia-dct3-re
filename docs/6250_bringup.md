@@ -1188,6 +1188,9 @@ PMM renders `CONTACT SERVICE` natively, as under HLE
 (`tools/run_rom6_lab_call.py nhm3 --acquired-records`). The 6250 does not use
 the 8850's IMEI-bound security-code encoding and shows no code prompt.
 
+`verify-6250-lab-state` and the two `verify-6250-lab-sip*` gates extend the
+same call; see [the 8850 section](8xxx_bringup.md#8850-native-rom6-compatibility-trial).
+
 This establishes no fitted mask, DSP clock, RF timing, tuning or gains.
 
 ### Startup success and display lifecycle
