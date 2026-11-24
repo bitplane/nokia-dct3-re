@@ -509,13 +509,18 @@ private:
 		u64 until = 0;
 		std::vector<u8> expected;
 		std::vector<std::pair<u16, u16>> memory;
-		u64 passed = 0;
+		bool bits = false;
+		std::array<u64, 2> passed{}; // butterfly, bit loop
 	};
 	std::unique_ptr<acs_check> m_acs_check;
 	std::vector<std::pair<u16, u16>> *m_acs_undo = nullptr;
 	u64 m_acs_clocks = 0;
-	void acs_loop();
+	void acs_loop(bool bits);
+	bool acs_quiet(unsigned words, unsigned fetched) const;
+	bool acs_plain(u16 first, unsigned words, bool write);
 	bool acs_ready(unsigned iterations);
+	bool bits_ready();
+	void bits_run(unsigned iterations);
 	void acs_run(unsigned iterations);
 	void acs_store(u16 address, u16 value);
 	void acs_verify();

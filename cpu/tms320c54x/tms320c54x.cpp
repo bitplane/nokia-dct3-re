@@ -8,6 +8,7 @@
 #include "tms320c54x_decode.h"
 #include "tms320c54x_gates.h"
 
+#include <bit>
 #include <cstdio>
 #include <cstring>
 #include <type_traits>
@@ -336,7 +337,8 @@ void tms320c54x_device::device_start()
 void tms320c54x_device::device_stop()
 {
 	if (m_acs_check)
-		osd_printf_info("C54x ACS kernel: %llu spans checked against the model\n", (unsigned long long)m_acs_check->passed);
+		osd_printf_info("C54x ACS kernel: %llu butterfly and %llu bit spans checked against the model\n",
+				(unsigned long long)m_acs_check->passed[0], (unsigned long long)m_acs_check->passed[1]);
 	if (m_state_trace)
 	{
 		std::fprintf(m_state_trace, "%llu %016llx end\n", (unsigned long long)m_pipeline_cycles, (unsigned long long)m_state_trace_hash);
@@ -5334,6 +5336,22 @@ static constexpr std::array<u16, 17> ACS_BODY = {
 	0x8089  // STL A,*AR1-
 };
 
+// Unpacking a word's bits: A shifts out one bit an iteration, AR0 counts
+// positions modulo 1024, and each set bit's position is stored and counted.
+// The words are nearly all zero. Only clear bits are done here, 15 clocks an
+// iteration; a set bit, a wrap of AR0, a carry or a nonzero T is left to the model.
+static constexpr unsigned BITS_CLOCKS = 15;
+static constexpr std::array<u16, 14> BITS_BODY = {
+	0x60f8, 0x0010, 0x03ff, // CMPM *(AR0),#03ffh
+	0xf490,                 // ROR A
+	0x6d90,                 // MAR *AR0+
+	0xf820, 0,              // BC $+4,NTC (the target, checked apart)
+	0x7710, 0x0000,         // STM #0,AR0
+	0xff0c,                 // XC 2,C
+	0x7093, 0x0010,         // MVKD AR0,*AR3+
+	0x07f8, 0x000e          // ADDC *(T),B
+};
+
 void tms320c54x_device::execute_run()
 {
 	++m_run_serial;
@@ -5356,7 +5374,8 @@ void tms320c54x_device::execute_run()
 			{
 				if (m_acs_check && m_acs_check->until == m_pipeline_cycles) acs_verify();
 				spin_backward(m_slot[5].address);
-				if (m_slot[5].word == ACS_BODY[0]) acs_loop();
+				if (m_slot[5].word == ACS_BODY[0]) acs_loop(false);
+				else if (m_slot[5].word == BITS_BODY[0]) acs_loop(true);
 			}
 			m_spin.last = m_slot[5].address;
 		}
@@ -5433,16 +5452,22 @@ bool tms320c54x_device::spin_state(bool compare)
 // other agents and interrupt lines only act between timeslices.
 //
 // C54X_ACS=off disables it; C54X_ACS=check runs both and compares them.
-void tms320c54x_device::acs_loop()
+void tms320c54x_device::acs_loop(bool bits)
 {
 	if (m_acs_mode == acs_mode::off) return;
 	if (m_acs_check && m_acs_check->until) return;
-	unsigned const iterations = std::min<unsigned>(m_brc, unsigned(m_icount) / ACS_BODY.size());
-	if (m_icount <= 0 || !iterations || !acs_ready(iterations)) return;
+	if (m_icount <= 0) return;
+	unsigned const period = bits ? BITS_CLOCKS : ACS_BODY.size();
+	unsigned iterations = std::min<unsigned>(m_brc, unsigned(m_icount) / period);
+	// The bit loop stops short of a wrap, where its branch falls through, and
+	// of a set bit.
+	if (bits) iterations = std::min<unsigned>({iterations, u16(0x3ff - m_slot[5].operand), unsigned(std::countr_zero(u32(m_a) | 0x80000000U))});
+	if (!iterations || !(bits ? bits_ready() : acs_ready(iterations))) return;
+	auto const run = [&] { if (bits) bits_run(iterations); else acs_run(iterations); };
 	if (m_acs_mode == acs_mode::on)
 	{
-		acs_run(iterations);
-		m_icount -= int(iterations * ACS_BODY.size());
+		run();
+		m_icount -= int(iterations * period);
 		m_spin.cycles = m_pipeline_cycles;
 		m_spin.effects = m_effects;
 		return;
@@ -5454,9 +5479,10 @@ void tms320c54x_device::acs_loop()
 	u64 const cycles = m_pipeline_cycles, effects = m_effects, clocks = m_acs_clocks;
 	std::vector<std::pair<u16, u16>> undo;
 	m_acs_undo = &undo;
-	acs_run(iterations);
+	run();
 	m_acs_undo = nullptr;
 	m_acs_check->until = m_pipeline_cycles;
+	m_acs_check->bits = bits;
 	m_acs_check->expected = acs_state();
 	m_acs_check->memory.clear();
 	for (auto const &[address, value] : undo) m_acs_check->memory.emplace_back(address, data_word_r(address));
@@ -5468,59 +5494,73 @@ void tms320c54x_device::acs_loop()
 	m_acs_clocks = clocks;
 }
 
-bool tms320c54x_device::acs_ready(unsigned iterations)
+// Whether the pipeline holds nothing but a block repeat this long, with
+// nothing else pending that could act on a later clock.
+bool tms320c54x_device::acs_quiet(unsigned words, unsigned fetched) const
 {
 	// A trace, observer, debugger or opcode census wants every clock.
 	if (m_state_trace || m_coverage || !m_instruction_observer_cb.isunset() || (machine().debug_flags & DEBUG_FLAG_ENABLED))
 		return false;
 	u32 const head = m_slot[5].address;
 	if (!m_pipeline_block_active || !m_pipeline_block_fetch_enabled || !(m_st1 & ST1_BRAF) ||
-		u16(head) != m_rsa || m_pipeline_block_start != head || m_pipeline_block_end_address != head + ACS_BODY.size() - 1 ||
-		u16(head + ACS_BODY.size() - 1) != m_rea || m_pipeline_block_fetch_remaining != u32(m_brc) + 1 ||
-		m_pipeline_fetch_address != head + 6)
+		u16(head) != m_rsa || m_pipeline_block_start != head || m_pipeline_block_end_address != head + words - 1 ||
+		u16(head + words - 1) != m_rea || m_pipeline_block_fetch_remaining != u32(m_brc) + 1 ||
+		m_pipeline_fetch_address != head + fetched)
 		return false;
-	// Sign extension and dual 16-bit arithmetic on; CMPT and store saturation off.
-	if ((m_st1 & 0x01a0) != 0x0180 || BIT(m_pmst, 0)) return false;
 	if (m_illegal || m_idle || m_nmi_pending || (!(m_st1 & ST1_INTM) && (m_ifr & m_imr)) ||
 		m_hold.any() || m_interrupt_entry_stage || m_vector_prefetch_valid || m_pipeline_vector_pending ||
 		m_pipeline_repeat_active || m_pipeline_repeat_stream || m_pipeline_repeat_body_latched || m_pipeline_repeat_redirect_pending ||
-		m_pipeline_xc_active || m_pipeline_xc_skip_words || m_pipeline_decode_remaining || m_pipeline_decode_flush ||
+		m_pipeline_xc_active || m_pipeline_xc_skip_words || m_pipeline_decode_flush ||
 		m_pipeline_flush_front || m_pipeline_control_words || m_pipeline_delay_decode_words || m_pipeline_bc_held ||
 		m_pipeline_retd_stage || m_pipeline_idle_barrier || m_pipeline_idle_resume_pending || m_pipeline_intm_follow ||
 		m_pipeline_peripheral_read_pending || m_pipeline_io_wait_remaining || m_pipeline_io_ready_required)
 		return false;
+	for (stage_slot const &slot : m_slot)
+		if (!slot.block_body || slot.block_end || slot.block_first_final || slot.annulled || slot.early_write_deferred ||
+			slot.peripheral_wait_paid || slot.io_wait_paid || slot.intm_protected || slot.cmpt)
+			return false;
+	return true;
+}
+
+// Whether every word of a range is plain memory, with no tap or handler.
+bool tms320c54x_device::acs_plain(u16 first, unsigned words, bool write)
+{
+	u32 const last = u32(first) + words - 1;
+	if (first < std::max<u32>(m_pure_data_start, 0x60) || last > 0xffff) return false;
+	if (write && first <= m_rea && last >= m_rsa) return false; // perhaps the loop itself, in overlay RAM
+	for (u32 page = first >> DIRECT_SHIFT; page <= last >> DIRECT_SHIFT; ++page)
+	{
+		u16 const address = u16(page << DIRECT_SHIFT);
+		direct_page const &read = m_data_read_pages[page];
+		if (!(read.generation == m_data_read_generation ? read.base : data_read_page(address))) return false;
+		if (!write) continue;
+		direct_page const &store = m_data_write_pages[page];
+		if (!(store.generation == m_data_write_generation ? store.base : data_write_page(address))) return false;
+	}
+	return true;
+}
+
+bool tms320c54x_device::acs_ready(unsigned iterations)
+{
+	u32 const head = m_slot[5].address;
+	if (!acs_quiet(ACS_BODY.size(), 6) || m_pipeline_decode_remaining) return false;
+	// Sign extension and dual 16-bit arithmetic on; CMPT and store saturation off.
+	if ((m_st1 & 0x01a0) != 0x0180 || BIT(m_pmst, 0)) return false;
 	for (unsigned stage = 0; stage < 6; ++stage)
 	{
 		stage_slot const &slot = m_slot[stage];
 		unsigned const index = 5 - stage;
-		if (!slot.valid || slot.address != head + index || (stage && slot.word != ACS_BODY[index]) ||
-			!slot.block_body || slot.block_end || slot.block_first_final || slot.annulled || slot.early_write_deferred ||
-			slot.peripheral_wait_paid || slot.io_wait_paid || slot.intm_protected || slot.cmpt)
-			return false;
+		if (!slot.valid || slot.address != head + index || (stage && slot.word != ACS_BODY[index])) return false;
 	}
 	if (m_slot[4].operand_address != m_slot[3].operand_address || u16(m_slot[4].operand_address + 2) != m_ar[5]) return false;
 	for (unsigned index = 0; index < ACS_BODY.size(); ++index)
 		if (fetch_word(physical_program_address(head + index)) != ACS_BODY[index]) return false;
-	// Every word touched must be plain memory, with no tap or handler.
-	auto const plain = [this] (u16 first, unsigned words, bool write) {
-		u32 const last = u32(first) + words - 1;
-		if (first < std::max<u32>(m_pure_data_start, 0x60) || last > 0xffff) return false;
-		for (u32 page = first >> DIRECT_SHIFT; page <= last >> DIRECT_SHIFT; ++page)
-		{
-			u16 const address = u16(page << DIRECT_SHIFT);
-			direct_page const &read = m_data_read_pages[page];
-			if (!(read.generation == m_data_read_generation ? read.base : data_read_page(address))) return false;
-			if (!write) continue;
-			direct_page const &store = m_data_write_pages[page];
-			if (!(store.generation == m_data_write_generation ? store.base : data_write_page(address))) return false;
-		}
-		return true;
-	};
+	// Every word touched must be plain memory.
 	u16 const source = m_ar[2], cell = m_ar[1];
 	if (BIT(source, 0) || BIT(m_ar[5], 0) ||
-		!plain(source, iterations * 2, false) || !plain(m_slot[4].operand_address, iterations * 2 + 2, false) ||
-		!plain(m_ar[3], iterations, true) || !plain(m_ar[4], iterations, true) ||
-		!plain(m_ar[6], 2, true) || !plain(cell, 2, true))
+		!acs_plain(source, iterations * 2, false) || !acs_plain(m_slot[4].operand_address, iterations * 2 + 2, false) ||
+		!acs_plain(m_ar[3], iterations, true) || !acs_plain(m_ar[4], iterations, true) ||
+		!acs_plain(m_ar[6], 2, true) || !acs_plain(cell, 2, true))
 		return false;
 	// The head reads its pair on the clock the last store writes: keep apart.
 	return cell + 1 < source || cell + 1 >= source + int(iterations) * 2;
@@ -5613,6 +5653,59 @@ void tms320c54x_device::acs_run(unsigned iterations)
 	++m_effects;
 }
 
+bool tms320c54x_device::bits_ready()
+{
+	u32 const head = m_slot[5].address;
+	if (!acs_quiet(BITS_BODY.size(), 8) || (m_st1 & 0x0020)) return false; // CMPT off
+	// Adding T and the carry then leaves B alone.
+	if (m_t || (s64(m_b << 24) >> 24) != s32(m_b)) return false;
+	// The compare has run, ROR and MAR follow it, the branch's target is in
+	// Decode, and its fall-through is being fetched.
+	static constexpr std::array<u8, 6> OFFSET = { 7, 6, 5, 4, 3, 0 };
+	for (unsigned stage = 0; stage < 6; ++stage)
+	{
+		stage_slot const &slot = m_slot[stage];
+		if (slot.valid != (stage != 2) || slot.address != head + OFFSET[stage]) return false;
+		if (stage > 1 && slot.word != BITS_BODY[OFFSET[stage]]) return false;
+	}
+	if (m_slot[1].word != u16(head + 9) || m_pipeline_decode_remaining != 1 || m_pipeline_decode_word != 0xf820 ||
+		m_pipeline_decode_address != head + 5 ||
+		(m_st0 & 0x1800) || m_slot[5].operand == 0x3ff || m_slot[5].immediate != 0x3ff || m_ar[0] != u16(m_slot[5].operand + 1))
+		return false;
+	for (unsigned index = 0; index < BITS_BODY.size(); ++index)
+		if (fetch_word(physical_program_address(head + index)) != (index == 6 ? u16(head + 9) : BITS_BODY[index])) return false;
+	return true;
+}
+
+void tms320c54x_device::bits_run(unsigned iterations)
+{
+	u32 const head = m_slot[5].address;
+	m_a = u32(m_a) >> iterations;
+	m_ar[0] += iterations;
+	u16 const compared = m_ar[0] - 1;
+	m_slot[5].operand = compared;
+	m_st0 = (m_st0 & ~u16(0x1000)) | (compared == 0x3ff ? 0x1000 : 0);
+	// What the branch and XC leave behind.
+	m_pipeline_control_address = head + 5;
+	m_pipeline_control_word = 0xf820;
+	m_pipeline_bc_address = head + 7;
+	m_pipeline_bc_word = 0x7710;
+	m_pipeline_bc_block_body = true;
+	m_pipeline_bc_block_end = m_pipeline_bc_block_first_final = false;
+	m_pipeline_xc_end = head + 11;
+	m_brc -= iterations;
+	m_pipeline_block_fetch_remaining -= iterations;
+	if (!m_brc) // the last iteration's head has left Decode
+	{
+		m_st1 &= ~ST1_BRAF;
+		m_slot[5].block_first_final = true;
+	}
+	u64 const clocks = u64(iterations) * BITS_CLOCKS;
+	m_pipeline_cycles += clocks;
+	m_acs_clocks += clocks;
+	++m_effects;
+}
+
 // Check mode: the model has now run the clocks the kernel predicted.
 void tms320c54x_device::acs_verify()
 {
@@ -5631,7 +5724,7 @@ void tms320c54x_device::acs_verify()
 		if (data_word_r(address) != value)
 			fatalerror("C54x ACS kernel: data word %04x differs at clock %llu\n", address, (unsigned long long)m_pipeline_cycles);
 	check.until = 0;
-	++check.passed;
+	++check.passed[check.bits];
 }
 
 // Development oracle for restructuring the pipeline model: with

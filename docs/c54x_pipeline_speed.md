@@ -376,9 +376,34 @@ PGO builds, pinned, six interleaved runs, minimum of each:
 | Before | 6.67 CPU s | 10.67 CPU s | 0.94x |
 | After | 6.42 CPU s | 10.00 CPU s | 1.00x |
 
+### The native bit-unpacking loop (2026-11-24)
+
+The loop at 4371 shifts a word out bit by bit, counts positions modulo 1024
+in AR0, and stores and counts the position of each set bit: 15 clocks an
+iteration, 16 iterations. The same mechanism and the same two `C54X_ACS`
+modes now cover it, under the same conditions.
+
+It covers clear bits only. An iteration with a set bit or an AR0 wrap, or a
+span starting with a carry or a nonzero T, is left to the pipeline: the 6210
+call never unpacks a set bit, so planted faults in a native version of that
+path went undetected by the check. Nothing untested ships.
+
+`make check-c54x-acs` matched 255,129 bit spans as well as the 431,536
+butterfly spans, and fails if either kind is never checked. Faults planted in
+the shift, the wrap flag and the leftover branch state were all caught.
+
+It skips 5.1 % of the connected call's clocks and up to 18 % of them while
+registered and idle. PGO builds, pinned, six interleaved runs:
+
+| | Boot to answer, min | Connected 10 s, min | Connected 10 s, median |
+| --- | ---: | ---: | ---: |
+| Before | 6.52 CPU s | 9.95 CPU s | 10.19 CPU s |
+| After | 6.10 CPU s | 9.86 CPU s | 10.06 CPU s |
+
+Boot gains 6 %. The connected call's 1 % is within the layout noise.
+
 The next largest block loops in the connected call, by share of clocks, are
-4371 (6.2 %), 2592 (3.9 %, in RAM), 8e35 (2.6 %), 796f (2.6 %) and 77b0
-(2.3 %). They could be handled the same way.
+2592 (3.9 %, in RAM), 8e35 (2.6 %), 796f (2.6 %) and 77b0 (2.3 %).
 
 ### Why the per-clock cost is hard to cut
 
