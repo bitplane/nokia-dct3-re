@@ -1484,6 +1484,10 @@ check-c54x-core:
 check-c54x-state-trace: build
 	$(VENV)/bin/python tools/c54x_state_trace.py
 
+.PHONY: check-c54x-acs
+check-c54x-acs: build
+	$(VENV)/bin/python tools/check_c54x_acs.py --mame $(MAME_DIR)/mame
+
 .PHONY: check-c54x-rom4-context
 check-c54x-rom4-context: build
 	$(PYTHON) tools/run_c54x_core.py --mame $(MAME_DIR)/mame --rompath $(MAME_DIR)/roms --profile rom4-context

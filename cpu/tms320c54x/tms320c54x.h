@@ -500,6 +500,26 @@ private:
 	unsigned m_spin_op_count = 0;
 	void spin_backward(u32 address);
 	bool spin_state(bool compare);
+	// Native add-compare-select loop (see acs_loop). The check mode runs the
+	// model over the same clocks and compares everything.
+	enum class acs_mode { off, on, check };
+	acs_mode m_acs_mode = acs_mode::on;
+	struct acs_check
+	{
+		u64 until = 0;
+		std::vector<u8> expected;
+		std::vector<std::pair<u16, u16>> memory;
+		u64 passed = 0;
+	};
+	std::unique_ptr<acs_check> m_acs_check;
+	std::vector<std::pair<u16, u16>> *m_acs_undo = nullptr;
+	u64 m_acs_clocks = 0;
+	void acs_loop();
+	bool acs_ready(unsigned iterations);
+	void acs_run(unsigned iterations);
+	void acs_store(u16 address, u16 value);
+	void acs_verify();
+	std::vector<u8> acs_state() const;
 	u16 data_word_r(u16 address)
 	{
 		m_effects += address < m_pure_data_start;

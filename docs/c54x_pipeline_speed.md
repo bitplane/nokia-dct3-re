@@ -341,6 +341,45 @@ scheduler and driver (under 1 %, within noise); the trace-free build (no
 difference). Omitting `-log`, as the live phone does, saves about 1 %. What
 is left outside the core is spread too thinly for another such change.
 
+### The native add-compare-select loop (2026-11-24)
+
+The equaliser's butterfly at 9015 is 17 one-word instructions in a block
+repeat, one clock each, entered about 31,000 times a second with seven
+iterations. When its first instruction finishes Execute, the pipeline holds
+only the loop, and nothing is pending, the state at the same point of a later
+iteration depends only on registers and RAM. `acs_loop` computes that state
+directly, advances the cycle count and moves on. It covers six of the seven
+iterations, about 10 % of the connected call's clocks.
+
+It is exact, not an approximation:
+
+- It never runs past the timeslice, and other agents and interrupt lines act
+  only between timeslices. (In the equaliser the slices are long: the median
+  had 382 clocks left.)
+- It refuses a pending interrupt, hold, flush, repeat or delay slot, memory
+  that is not plain RAM (so taps and watchpoints still see every access), an
+  overlap the pipeline could order differently, and runs with a debugger,
+  instruction observer, opcode census or state trace.
+- The loop is recognised by its words, not its address.
+
+`C54X_ACS=check` computes each span, then lets the model run the same clocks
+and compares the whole core state and every word written.
+`make check-c54x-acs` does that over the 6210 call (431,536 spans) and
+requires the call's log to be the same with the loop checked, on and off.
+`C54X_ACS=off` disables it. The state-trace oracle's taps disable it too, so
+that oracle does not cover it.
+
+PGO builds, pinned, six interleaved runs, minimum of each:
+
+| | Boot to answer (20 s) | Connected 10 s | Real time |
+| --- | ---: | ---: | ---: |
+| Before | 6.67 CPU s | 10.67 CPU s | 0.94x |
+| After | 6.42 CPU s | 10.00 CPU s | 1.00x |
+
+The next largest block loops in the connected call, by share of clocks, are
+4371 (6.2 %), 2592 (3.9 %, in RAM), 8e35 (2.6 %), 796f (2.6 %) and 77b0
+(2.3 %). They could be handled the same way.
+
 ### Why the per-clock cost is hard to cut
 
 Measured on the lean call (30 emulated seconds, about 500 M DSP clocks):
