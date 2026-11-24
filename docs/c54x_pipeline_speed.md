@@ -445,6 +445,29 @@ Measured on the lean call (30 emulated seconds, about 500 M DSP clocks):
   needs an explicit scheduler quantum, so the coupling stops being
   incidental.
 
+### An explicit ARM/DSP sync interval does not pay (2026-11-24)
+
+A prototype sent only real FIQ and IRQ changes and added a fixed scheduler
+quantum. One PGO binary, settings by environment variable, pinned, five
+interleaved runs of the lean 6210 call. CPU seconds for the whole 30 s:
+
+| Setting | DSP slices/s, connected | 30 s, min | 30 s, median | 5110 traffic call |
+| --- | ---: | ---: | ---: | --- |
+| Today | 258,000 | 15.83 | 16.13 | pass |
+| Real changes only | 209,000 | 15.62 | 15.65 | fail |
+| with a 20 us quantum | 231,000 | 15.49 | 15.85 | fail |
+| with a 10 us quantum | 279,000 | 15.98 | 16.21 | pass |
+| with a 5 us quantum | 365,000 | 16.36 | 16.47 | pass |
+| with a 2 us quantum | 626,000 | 16.88 | 16.91 | pass |
+
+The 6210 call connects at every setting. 50 and 100 us give the same slices
+and log as no quantum. Settings that keep the 5110 call working (one gate run
+each) are no faster than today, and the others gain at most about 3 %, with
+host noise of several per cent. Removing the redundant writes drops only a
+fifth of the slices. The connected minimums for no quantum and 2 us differ by
+about 0.6 s over 4.2 M slices, or 0.15 us a slice, so slice overhead is about
+3 % of the call in all. The redundant writes stay.
+
 ### Restructurings that did not pay (2026-11-23)
 
 All on the 30 s lean 6210 call, total CPU, pinned to one core and interleaved
