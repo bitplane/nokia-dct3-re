@@ -1,0 +1,46 @@
+diff --git a/src/devices/machine/intelfsh.h b/src/devices/machine/intelfsh.h
+--- a/src/devices/machine/intelfsh.h
++++ b/src/devices/machine/intelfsh.h
+@@ -81,6 +81,7 @@
+ 	bool                     m_fast_mode;
+ 	std::array<uint8_t, 256> m_block_locks{};
+ 	bool m_wp = false;
++	bool m_plain_array = true; // read_full returns the array itself in FM_NORMAL
+ };
+ 
+ 
+@@ -109,6 +110,14 @@
+ public:
+ 	// public interface
+ 	uint16_t read(offs_t offset) { return read_full(offset); }
++
++	// The array, high byte of each word first, while read() would return it
++	// unmodified; otherwise null. Valid only until the next write or timer.
++	uint8_t const *plain_array() const
++	{
++		return (m_plain_array && m_flash_mode == 0 /* FM_NORMAL */ && m_bank == 0) ? m_data.get() : nullptr;
++	}
++
+ 	void write(offs_t offset, uint16_t data) { write_full(offset, data); }
+ 
+ 	uint16_t read_raw(offs_t offset) { return m_data[offset*2] | (m_data[offset*2+1] << 8); }
+diff --git a/src/devices/machine/intelfsh.cpp b/src/devices/machine/intelfsh.cpp
+--- a/src/devices/machine/intelfsh.cpp
++++ b/src/devices/machine/intelfsh.cpp
+@@ -49,6 +49,8 @@
+ 	FM_READQUERY,
+ };
+ 
++static_assert(FM_NORMAL == 0); // intelfsh16_device::plain_array
++
+ 
+ enum
+ {
+@@ -287,6 +289,7 @@
+ 	m_top_boot_sector = true;
+ 	m_parameter_block_size = 8 * 1024;
+ 	m_parameter_block_count = 8;
++	m_plain_array = false; // its own read_full
+ }
+ 
+ void st_m28w320ect_device::device_start()

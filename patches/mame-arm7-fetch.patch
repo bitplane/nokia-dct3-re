@@ -1,0 +1,43 @@
+diff --git a/src/devices/cpu/arm7/arm7.cpp b/src/devices/cpu/arm7/arm7.cpp
+--- a/src/devices/cpu/arm7/arm7.cpp
++++ b/src/devices/cpu/arm7/arm7.cpp
+@@ -1209,7 +1209,9 @@
+ 	uint32_t pc = curr_pc + m_insn_prefetch_count * 4;
+ 	for (uint32_t i = 0; i < to_fetch; i++)
+ 	{
+-		uint32_t index = (i + start_index) % m_insn_prefetch_depth;
++		uint32_t index = i + start_index;
++		if (index >= m_insn_prefetch_depth)
++			index -= m_insn_prefetch_depth;
+ 		LOGMASKED(LOG_PREFETCH, "About to get prefetch index %d from addr %08x\n", index, pc);
+ 		m_insn_prefetch_valid[index] = true;
+ 		offs_t physical_pc = pc;
+@@ -1219,7 +1221,7 @@
+ 			m_insn_prefetch_valid[index] = false;
+ 			break;
+ 		}
+-		uint32_t op = m_pr32(physical_pc);
++		uint32_t op = (m_endian == ENDIANNESS_LITTLE) ? m_cachele.read_dword(physical_pc) : m_cachebe.read_dword(physical_pc);
+ 		LOGMASKED(LOG_PREFETCH, "Got op %08x\n", op);
+ 		//printf("ipb[%d] <- %08x(%08x)\n", index, op, pc);
+ 		m_insn_prefetch_buffer[index] = op;
+@@ -1235,7 +1237,8 @@
+ 	{
+ 		out_insn = (uint16_t)(m_insn_prefetch_buffer[m_insn_prefetch_index] >> m_prefetch_word1_shift);
+ 		bool valid = m_insn_prefetch_valid[m_insn_prefetch_index];
+-		m_insn_prefetch_index = (m_insn_prefetch_index + 1) % m_insn_prefetch_depth;
++		if (++m_insn_prefetch_index >= m_insn_prefetch_depth)
++			m_insn_prefetch_index = 0;
+ 		m_insn_prefetch_count--;
+ 		return valid;
+ 	}
+@@ -1249,7 +1252,8 @@
+ 	out_insn = m_insn_prefetch_buffer[m_insn_prefetch_index];
+ 	bool valid = m_insn_prefetch_valid[m_insn_prefetch_index];
+ 	LOGMASKED(LOG_PREFETCH, "Fetched op %08x for PC %08x with %s entry from %08x\n", out_insn, pc, valid ? "valid" : "invalid", m_insn_prefetch_address[m_insn_prefetch_index]);
+-	m_insn_prefetch_index = (m_insn_prefetch_index + 1) % m_insn_prefetch_depth;
++	if (++m_insn_prefetch_index >= m_insn_prefetch_depth)
++		m_insn_prefetch_index = 0;
+ 	m_insn_prefetch_count--;
+ 	return valid;
+ }

@@ -1544,12 +1544,12 @@ void nokia_dct3_state::dct3_nsm1_research_map(address_map &map)
 {
 	map.global_mask(0x00ffffff);
 	// Capacity-compatible decode; fitted aliases remain unproved.
-	map(0x000000, 0x00ffff).rw(FUNC(nokia_dct3_state::ram_r), FUNC(nokia_dct3_state::ram_w));
+	map(0x000000, 0x00ffff).r(FUNC(nokia_dct3_state::ram_r32)).w(FUNC(nokia_dct3_state::ram_w));
 	map(0x010000, 0x010fff).rw(FUNC(nokia_dct3_state::dsp_ram_r), FUNC(nokia_dct3_state::dsp_ram_w));
 	map(0x020000, 0x0200ff).rw(FUNC(nokia_dct3_state::mad2_io_r), FUNC(nokia_dct3_state::mad2_io_w));
 	map(0x030000, 0x030003).rw(FUNC(nokia_dct3_state::mad2_dspif_r), FUNC(nokia_dct3_state::mad2_dspif_w));
 	map(0x040000, 0x040003).rw(FUNC(nokia_dct3_state::mad2_mcuif_r), FUNC(nokia_dct3_state::mad2_mcuif_w));
-	map(0x100000, 0x11ffff).rw(FUNC(nokia_dct3_state::ram_r), FUNC(nokia_dct3_state::ram_w));
+	map(0x100000, 0x11ffff).r(FUNC(nokia_dct3_state::ram_r32)).w(FUNC(nokia_dct3_state::ram_w));
 	map(0x200000, 0x3fffff).r(FUNC(nokia_dct3_state::flash_r32)).w(FUNC(nokia_dct3_state::flash_w));
 }
 
@@ -1557,12 +1557,12 @@ void nokia_dct3_state::dct3_nse6_research_map(address_map &map)
 {
 	map.global_mask(0x00ffffff);
 	// NSE-6 service chapter: 256 KiB SRAM, 2 MiB flash. Aliases unproved.
-	map(0x000000, 0x00ffff).rw(FUNC(nokia_dct3_state::ram_r), FUNC(nokia_dct3_state::ram_w));
+	map(0x000000, 0x00ffff).r(FUNC(nokia_dct3_state::ram_r32)).w(FUNC(nokia_dct3_state::ram_w));
 	map(0x010000, 0x010fff).rw(FUNC(nokia_dct3_state::dsp_ram_r), FUNC(nokia_dct3_state::dsp_ram_w));
 	map(0x020000, 0x0200ff).rw(FUNC(nokia_dct3_state::mad2_io_r), FUNC(nokia_dct3_state::mad2_io_w));
 	map(0x030000, 0x030003).rw(FUNC(nokia_dct3_state::mad2_dspif_r), FUNC(nokia_dct3_state::mad2_dspif_w));
 	map(0x040000, 0x040003).rw(FUNC(nokia_dct3_state::mad2_mcuif_r), FUNC(nokia_dct3_state::mad2_mcuif_w));
-	map(0x100000, 0x13ffff).rw(FUNC(nokia_dct3_state::ram_r), FUNC(nokia_dct3_state::ram_w));
+	map(0x100000, 0x13ffff).r(FUNC(nokia_dct3_state::ram_r32)).w(FUNC(nokia_dct3_state::ram_w));
 	map(0x200000, 0x3fffff).r(FUNC(nokia_dct3_state::flash_r32)).w(FUNC(nokia_dct3_state::flash_w));
 }
 

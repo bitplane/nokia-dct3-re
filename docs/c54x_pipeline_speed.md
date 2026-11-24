@@ -311,11 +311,35 @@ the call at 0.82x without a profile. After `make build-6210`, which trains
 on this call instead of the 5110's, two runs gave 0.93x and 0.85x.
 
 This host is a Ryzen 9 9950X3D (5.7 GHz). The core is still about 80 % of
-the lean call at roughly 900 host instructions per DSP clock. Excluding
-the research traces (`make build-tracefree`) saves about 2 %; the ARM's
-flash reads cost about 4 %. Real time on ordinary hosts needs the
-pipeline model itself to become several times cheaper per clock.
+the lean call at roughly 900 host instructions per DSP clock. Real time on
+ordinary hosts needs the pipeline model itself to become several times
+cheaper per clock.
 
+### Outside the core (2026-11-24)
+
+A 4 kHz sample of the PGO build put about 77 % of the call in the C54x core.
+The rest was the ARM (with about 7 % in its flash reads), the scheduler, bus
+dispatch and the log. Each flash fetch went through a `std::function`, the
+dispatch, two `flash_r` calls and two virtual `read_full` calls. Now:
+
+- `flash_r32` reads the four array bytes directly while the flash is in
+  read-array mode (`intelfsh16_device::plain_array`). Other modes, and the
+  ST part, which has its own `read_full`, keep the ordinary path.
+- The ARM's prefetch reads its cache directly and wraps its index without
+  dividing. ARM RAM reads are one 32-bit handler.
+
+The 30 s call's log is byte-identical (320,528 lines). Pinned, six
+interleaved runs, minimum of each:
+
+| | Boot to answer (20 s) | Connected 10 s | Real time |
+| --- | ---: | ---: | ---: |
+| Before | 7.33 CPU s | 11.10 CPU s | 0.90x |
+| After | 6.63 CPU s | 10.59 CPU s | 0.94x |
+
+These did not help further: extending PGO to the ARM, memory dispatch,
+scheduler and driver (under 1 %, within noise); the trace-free build (no
+difference). Omitting `-log`, as the live phone does, saves about 1 %. What
+is left outside the core is spread too thinly for another such change.
 
 ### Why the per-clock cost is hard to cut
 

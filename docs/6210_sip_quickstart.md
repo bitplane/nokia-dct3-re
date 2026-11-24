@@ -41,7 +41,7 @@ instrumented, trained on the call, then recompiled. `bench-6210-call`
 prints the host and the connected call's speed. At 1.0x or more the host can
 hold a live call; below that, audio will break up. Please report the whole
 output; [`c54x_pipeline_speed.md`](c54x_pipeline_speed.md) has known figures. No host has yet been
-measured at 1.0x: a Ryzen 9 9950X3D gives 0.85-0.93x.
+measured at 1.0x: a Ryzen 9 9950X3D gives about 0.94x.
 
 ## Make a call
 

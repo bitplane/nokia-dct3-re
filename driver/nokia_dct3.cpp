@@ -31,6 +31,7 @@
 #include "speaker.h"
 #include "video/pcd8544.h"
 #include "video/sed1520.h"
+#include "multibyte.h"
 
 #include "nokia_ccont.h"
 #include "nokia_cobba.h"
@@ -899,10 +900,10 @@ TIMER_CALLBACK_MEMBER(nokia_dct3_state::timer_watchdog)
 	}
 }
 
-// Hardware RAM read entry point (registered in the address map).
-uint16_t nokia_dct3_state::ram_r(offs_t offset, uint16_t mem_mask)
+// Hardware RAM read entry point: the 32-bit bus in one call, without MAME's unit splitter.
+uint32_t nokia_dct3_state::ram_r32(offs_t offset, uint32_t mem_mask)
 {
-	return m_ram[offset] & mem_mask;
+	return ((uint32_t(m_ram[offset * 2]) << 16) | m_ram[offset * 2 + 1]) & mem_mask;
 }
 
 // Hardware RAM write entry point registered in the address map.
@@ -1034,6 +1035,9 @@ uint16_t nokia_dct3_state::flash_r(offs_t offset, uint16_t mem_mask)
 // each only when the access selects it.
 uint32_t nokia_dct3_state::flash_r32(offs_t offset, uint32_t mem_mask)
 {
+	// In read-array mode the device would return these same four bytes.
+	if (u8 const *const array = m_flash->plain_array(); array && !(DCT3_RESEARCH_TRACES && m_trace_enabled))
+		return get_u32be(array + offset * 4) & mem_mask;
 	uint32_t result = 0;
 	if (mem_mask & 0x0000ffff)
 		result |= flash_r(offset * 2 + 1, mem_mask & 0xffff);
@@ -1347,12 +1351,12 @@ void nokia_dct3_state::mad2_mcuif_w(offs_t offset, uint8_t data)
 void nokia_dct3_state::dct3_map(address_map &map)
 {
 	map.global_mask(0x00ffffff);
-	map(0x00000000, 0x0000ffff).mirror(0x80000).rw(FUNC(nokia_dct3_state::ram_r), FUNC(nokia_dct3_state::ram_w));                // boot ROM / RAM
+	map(0x00000000, 0x0000ffff).mirror(0x80000).r(FUNC(nokia_dct3_state::ram_r32)).w(FUNC(nokia_dct3_state::ram_w));                // boot ROM / RAM
 	map(0x00010000, 0x00010fff).mirror(0x8f000).rw(FUNC(nokia_dct3_state::dsp_ram_r), FUNC(nokia_dct3_state::dsp_ram_w));        // DSP shared memory
 	map(0x00020000, 0x000200ff).mirror(0x8ff00).rw(FUNC(nokia_dct3_state::mad2_io_r), FUNC(nokia_dct3_state::mad2_io_w));         // IO (Primary I/O range, configures peripherals)
 	map(0x00030000, 0x00030003).mirror(0x8fffc).rw(FUNC(nokia_dct3_state::mad2_dspif_r), FUNC(nokia_dct3_state::mad2_dspif_w));   // DSPIF (API control register)
 	map(0x00040000, 0x00040003).mirror(0x8fffc).rw(FUNC(nokia_dct3_state::mad2_mcuif_r), FUNC(nokia_dct3_state::mad2_mcuif_w));   // MCUIF (Secondary I/O range, configures memory ranges)
-	map(0x00100000, 0x0017ffff).rw(FUNC(nokia_dct3_state::ram_r), FUNC(nokia_dct3_state::ram_w));                                   // RAMSelX
+	map(0x00100000, 0x0017ffff).r(FUNC(nokia_dct3_state::ram_r32)).w(FUNC(nokia_dct3_state::ram_w));                                   // RAMSelX
 	map(0x00200000, 0x005fffff).r(FUNC(nokia_dct3_state::flash_r32)).w(FUNC(nokia_dct3_state::flash_w));     // ROM1SelX
 	map(0x00600000, 0x009fffff).rw(FUNC(nokia_dct3_state::rom2_mirror_r), FUNC(nokia_dct3_state::rom2_mirror_w));   // ROM2SelX mirror/window
 	// Supported boards have no parallel device attached to EEPROMSelX.
@@ -1389,14 +1393,14 @@ void nokia_dct3_state::dct3_nse2_map(address_map &map)
 void nokia_dct3_state::dct3_nse3_map(address_map &map)
 {
 	map.global_mask(0x00ffffff);
-	map(0x00000000, 0x0000ffff).mirror(0x80000).rw(FUNC(nokia_dct3_state::ram_r), FUNC(nokia_dct3_state::ram_w));                // boot ROM / RAM
+	map(0x00000000, 0x0000ffff).mirror(0x80000).r(FUNC(nokia_dct3_state::ram_r32)).w(FUNC(nokia_dct3_state::ram_w));                // boot ROM / RAM
 	map(0x00010000, 0x00010fff).mirror(0x8f000).rw(FUNC(nokia_dct3_state::dsp_ram_r), FUNC(nokia_dct3_state::dsp_ram_w));        // DSP shared memory
 	map(0x00020000, 0x000200ff).mirror(0x8ff00).rw(FUNC(nokia_dct3_state::mad2_io_r), FUNC(nokia_dct3_state::mad2_io_w));         // IO
 	map(0x00030000, 0x00030003).mirror(0x8fffc).rw(FUNC(nokia_dct3_state::mad2_dspif_r), FUNC(nokia_dct3_state::mad2_dspif_w));   // DSPIF
 	map(0x00040000, 0x00040003).mirror(0x8fffc).rw(FUNC(nokia_dct3_state::mad2_mcuif_r), FUNC(nokia_dct3_state::mad2_mcuif_w));   // MCUIF
 	// NSE-3's parts list establishes the physical extents. Undocumented
 	// ROM2/alias decode remains unmapped rather than borrowing a later board.
-	map(0x00100000, 0x0010ffff).rw(FUNC(nokia_dct3_state::ram_r), FUNC(nokia_dct3_state::ram_w));       // 64 KiB SRAM
+	map(0x00100000, 0x0010ffff).r(FUNC(nokia_dct3_state::ram_r32)).w(FUNC(nokia_dct3_state::ram_w));       // 64 KiB SRAM
 	map(0x00110000, 0x001fffff).unmaprw();
 	map(0x00200000, 0x002fffff).r(FUNC(nokia_dct3_state::flash_r32)).w(FUNC(nokia_dct3_state::flash_w));   // 1 MiB TE28F800
 	map(0x00300000, 0x009fffff).unmaprw();
