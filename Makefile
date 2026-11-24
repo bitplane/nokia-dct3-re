@@ -1183,14 +1183,15 @@ verify-2100-v521-bootstrap: normalize-2100 build
 	@echo 'NAM-2 v5.21 DSP ping-pong bootstrap and verdict publication: PASS'
 
 verify-2100-interactive: normalize-2100 build
+	@# Seed a fresh machine; the run must not reset the fixture again.
+	@rm -f $(addprefix "$(RUN_NVRAM_DIR)/noki2100"/,flash sim_card gsm_network ccont eeprom)
 	@mkdir -p "$(RUN_NVRAM_DIR)/noki2100"
 	$(PYTHON) tools/make_2100_pmm_profile.py \
 		roms/noki2100/2100f584e.fls roms/noki2100/2100f521sharp.fls \
 		"$(RUN_NVRAM_DIR)/noki2100/flash"
-	@rm -f "$(RUN_NVRAM_DIR)/noki2100/sim_card"
 	@rm -f "$(RUN_DIR)"/nokia_dct3_lcdmirror_*.pgm
 	@$(MAKE) --no-print-directory run-prebuilt PHONE=noki2100 BIOS=584e \
-		RUN_DIR=$(RUN_DIR) RUN_NVRAM_DIR=$(RUN_NVRAM_DIR) SECONDS=15 \
+		RUN_DIR=$(RUN_DIR) RUN_NVRAM_DIR=$(RUN_NVRAM_DIR) PRESERVE_NVRAM=1 SECONDS=15 \
 		RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=1,2,3,4,5,select NOKIA_DCT3_POST_READY_KEY_DELAY_MS=10000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=50 NOKIA_DCT3_POST_READY_KEY_GAP_MS=100'
 	test -f $(RUN_DIR)/error.log
 	@for key in 1 2 3 4 5 select; do grep -q "input-press: .* name=$$key" $(RUN_DIR)/error.log; done
