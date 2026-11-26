@@ -52,11 +52,16 @@ emulation, but do not call firmware handlers or write registration state.
 Firmware-PC conditions are confined to diagnostic traces; product provisioning
 enters through EEPROM and other ordinary device boundaries.
 
-Native DSP acceptance is tracked separately: the acquired ROM4 FR encoder and
-decoder match their independent 32-frame references on both atomic and staged
-CPU frontends, including per-frame RAM replay. These isolated codec gates do
-not yet establish a native handset speech stream or RF/call lifecycle; see
-[`docs/cobba_control_boundary.md`](docs/cobba_control_boundary.md).
+Native DSP execution is tracked separately. On a laboratory cell, the
+clean-room C54x core runs the phones' own DSP code: the 5110 on its ROM4, and
+the 6210, 8210, 8850, 6250 and 8890 on an acquired 8210 ROM6. The handsets
+register, receive and dial TCH/F calls with native GSM-FR speech both ways,
+including real SIP parties through a bridge. These are research compositions:
+the cell, the RF sample path and the 6210-family identity records are
+laboratory inputs, and only the 5110 and 8210 run their own model's DSP ROM. A connected 6210
+call runs at about real time on a fast host, with no headroom
+([`docs/6210_sip_quickstart.md`](docs/6210_sip_quickstart.md)). The
+[coverage matrix](docs/model_coverage.md) holds the per-product gates.
 
 ## Maturity
 
@@ -77,7 +82,7 @@ The labels below have precise meanings:
 | CCONT power/ADC/RTC | Partial hardware | Deterministic binary RTC, alarm IRQs, watchdog reload and power lifecycles are tested. Physical ADC/clock timing and board-level analogue quantities remain qualified separately. |
 | GENSIO serial/SELECT | Partial hardware | Extracted endpoint/status/LCD/CCONT transport passes two 3210 ROMs; physical timing and SELECT-attached peers remain open. |
 | SIMI controller and SIM card | Partial hardware | Separate controller/card devices support ordinary initialization, persistent contacts/SMS, CHV/PUK/FDN security and bounded Toolkit workflows. Physical timing/error sources and per-product application coverage remain scoped by their contracts. |
-| DSP mailbox/service corner | Partial | Bootstrap, service timing, packet rings, two firmware-programmed tone voices and GSM-FR speech work through HLE. The 5110 selects the clean-room C54x core for boot/menu/save-state; real-DSP RF acquisition, speech and DSP-local COBBA control interpretation remain incomplete. |
+| DSP mailbox/service corner | Partial | Bootstrap, service timing, packet rings, two firmware-programmed tone voices and GSM-FR speech work through HLE. The clean-room C54x core runs native RF acquisition, Location Updating and TCH/F speech on the 5110 and on the ROM6 lab machines; fitted masks for most products, the physical RF interface and DSP-local COBBA control interpretation remain open. |
 | Startup/service/radio peers | Partial HLE | Separate service, Nokia L1 and standards-shaped GSM devices support laboratory registration and phone services, including multi-cell mobility. This is not native DSP/RF execution. |
 | Interactive startup | Mapped | Provisioned boot reaches the idle screen and opens `Phone book` through a protected physical-keypad oracle. Mode 4 is compatible with the UI; cross-ROM presentation parity remains open. |
 | MMI/RTOS internals | Mapped | Firmware owns these; observe them rather than emulate them. |

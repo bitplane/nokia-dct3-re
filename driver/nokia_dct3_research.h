@@ -106,6 +106,7 @@ private:
 	void start_traffic_channel(u64 frame);
 	void set_tch_speech_source();
 	void stop_traffic_channel();
+	void end_call_dialogue();
 	bool page_subscriber();
 	// Host telephony (-http): incoming calls with GSM-FR media both ways.
 	TIMER_CALLBACK_MEMBER(poll_call_host);

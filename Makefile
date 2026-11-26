@@ -348,7 +348,7 @@ INTERACTIVE_EXTRA_ARGS ?=
 
 .PHONY: help venv download-mame overlay eeprom-profile normalize-2100 normalize-3330 normalize-3410 normalize-5210 roms build swap16 census gates gate-parity controller-census ccont-static-census ccont-runtime-census mad2-census mad2-static-census board-io-static-census dsp-census census-docs evidence-check test-tools prepare-run-files prepare-run-nvram run run-prebuilt run-captured run-prebuilt-captured run-frontier run-interactive call-bridge smoke smoke-3310-639 smoke-3330e smoke-3210-v501 audit-roms audit-dsp-roms audit-dsp-rom4 check-dsp-rom4-cosim frame watch verify verify-ccont verify-ccont-watchdog verify-ccont-rtc verify-ccont-mask verify-alarm verify-power-lifecycle verify-power-lifecycle-v501 verify-charger-lifecycle verify-charger-wake verify-gensio verify-display verify-dsp-transport verify-dsp-memory-upload verify-dsp-speech-control-static verify-cell-broadcast-static verify-gsm-fr-codec verify-gsm-tch-f-l1 verify-gsm-a5 verify-gsm-xcch-l1 verify-gsm-mobility verify-gsm-sms-transport verify-radio-periodic-location-update verify-radio-a5-1-incoming-call verify-radio-a5-1-state verify-dsp-bootstrap-3310 verify-3310-radio-boundary verify-3330-radio-boundary verify-3310-radio-registration verify-3330-radio-registration-preserved verify-3330-radio-registration-state verify-3330-radio-unsuitable-cells verify-3310-radio-paging verify-3330-radio-paging verify-3330-radio-paging-preserved verify-3330-radio-paging-state verify-3330-radio-paging-negatives verify-3310-radio-incoming-call-boundary verify-3310-radio-incoming-call-ui verify-3310-radio-incoming-call-lifecycle verify-3310-radio-media-resilience verify-3310-radio-physical-duplex verify-3310-frontier verify-3310-menu verify-3310-navigation verify-3330-frontier verify-3330-navigation verify-3410-frontier verify-3410-menu verify-3410-navigation verify-dsp-tone verify-radio-camp verify-radio-registration verify-radio-paging verify-radio-incoming-call verify-radio-incoming-ringing verify-radio-incoming-call-answered verify-radio-incoming-call-lifecycle verify-radio-incoming-call-lifecycle-v501 verify-radio-call-state-roundtrip verify-radio-pcm-missing verify-radio-degraded-speech verify-radio-physical-uplink verify-radio-physical-uplink-one verify-radio-incoming-sms verify-radio-incoming-smart-message verify-radio-operator verify-mad2 verify-mad2-interrupts verify-mad2-clocks verify-mad2-sleep verify-mad2-timer1 verify-mad2-reset verify-mbus verify-2100-mbus verify-buzzer verify-3210-v501 verify-frontier verify-frontier-stability verify-mmi-menu verify-mmi-menu-501 verify-sim-phonebook verify-structure verify-structure-subset clean clean-build
 .PHONY: verify-model-frontier-state verify-model-frontier-negative
-.PHONY: check-c54x-core prepare-c54x-rom4-fixture check-c54x-rom4-execute check-c54x-rom4-cold-execute check-c54x-rom4-coherent check-c54x-rom4-rf-boundary check-c54x-observed-coverage check-c54x-cross-rom verify-5110-menu verify-5110-lab-registration verify-5110i-lab-registration verify-5110-lab-incoming-call verify-5110-lab-traffic-call verify-5110-lab-traffic-state verify-5110-lab-host-call verify-5110-lab-sip-call verify-5110-lab-host-outgoing-call verify-5110-lab-sip-outgoing-call verify-6210-lab-sip-call verify-6210-lab-sip-outgoing-call verify-8850-native-menu verify-5110-save-state verify-5110-power-lifecycle verify-5110-late-input check-c54x-rom4-transform check-c54x-rom4-snapshot check-c54x-opcode-coverage
+.PHONY: check-c54x-core prepare-c54x-rom4-fixture check-c54x-rom4-execute check-c54x-rom4-cold-execute check-c54x-rom4-coherent check-c54x-rom4-rf-boundary check-c54x-observed-coverage check-c54x-cross-rom verify-5110-menu verify-5110-lab-registration verify-5110i-lab-registration verify-5110-lab-incoming-call verify-5110-lab-traffic-call verify-5110-lab-traffic-state verify-5110-lab-host-call verify-5110-lab-sip-call verify-5110-lab-host-outgoing-call verify-5110-lab-sip-outgoing-call verify-6210-lab-sip-call verify-6210-lab-sip-outgoing-call verify-6210-lab-sip-soak verify-8850-native-menu verify-5110-save-state verify-5110-power-lifecycle verify-5110-late-input check-c54x-rom4-transform check-c54x-rom4-snapshot check-c54x-opcode-coverage
 .PHONY: storage-static-census mad2-residual-census
 .PHONY: verify-eeprom
 .PHONY: smoke-5210e
@@ -524,12 +524,13 @@ help:
 	@echo "make sip-build       build PJSIP and its Python binding under tmp/sip-build"
 	@echo "make build-pgo       build, then recompile the C54x core with profile-guided optimisation (real-time native calls)"
 	@echo "make bench-6210-call this host's speed for the native 6210 call, as a fraction of real time (1.0 keeps up)"
-	@echo "make run-6210-sip   the native 6210 as a live SIP phone in a MAME window (SIP_DIRECTION=incoming|outgoing, SIP_DESTINATION=uri)"
+	@echo "make run-6210-sip   the native 6210 as a live SIP phone in a MAME window (SIP_DESTINATION=uri for dialled calls)"
 	@echo "make verify-5110-lab-sip-call a real PJSUA SIP call through dct3_sip_bridge.py to the native handset (needs make sip-build)"
 	@echo "make verify-5110-lab-host-outgoing-call the handset dials 123; a host-protocol remote answers; the handset hangs up"
 	@echo "make verify-5110-lab-sip-outgoing-call the same dialled call to a real PJSUA SIP remote through dct3_sip_bridge.py"
 	@echo "make verify-6210-lab-sip-call       a PJSUA SIP remote calls the 6210 on the ROM6 lab cell; it answers on TCH/F"
 	@echo "make verify-6210-lab-sip-outgoing-call the 6210 dials a PJSUA SIP remote, talks and hangs up with End"
+	@echo "make verify-6210-lab-sip-soak       ten SIP calls, alternating direction, in one lean 6210 session (about 10 min)"
 	@echo "make verify-6210-lab-traffic-state save, replay and reload the 6210's lab call while ringing, connected and clearing"
 	@echo "make verify-6210-lab-degraded-call  impair the 6210's traffic call both ways; native RXQUAL rises and speech recovers"
 	@echo "make verify-6210-lab-physical-duplex host audio into the native 6210's MIC2 and out of EAR on a lab call (PulseAudio, ffmpeg)"
@@ -912,11 +913,10 @@ sip-build:
 # or the debugger. Measures the binary as built: run after build-pgo.
 # The native 6210 as a live SIP phone: no observers or debugger, throttled,
 # with the handset in a MAME window. Not a gate; see tools/run_6210_sip.py.
-SIP_DIRECTION ?= incoming
 SIP_DESTINATION ?=
 .PHONY: run-6210-sip
 run-6210-sip:
-	$(VENV)/bin/python tools/run_6210_sip.py --mame $(MAME_DIR)/mame --direction $(SIP_DIRECTION) \
+	$(VENV)/bin/python tools/run_6210_sip.py --mame $(MAME_DIR)/mame \
 		$(if $(SIP_DESTINATION),--destination "$(SIP_DESTINATION)") --pjsua2 "$(SIP_PYTHON_PATH)"
 
 .PHONY: bench-6210-call
@@ -1962,6 +1962,9 @@ verify-6210-lab-sip-call: build
 
 verify-6210-lab-sip-outgoing-call: build
 	$(NPE3_LAB_SIP) --seconds 44 --scenario outgoing --accept-outgoing-service --proceed-outgoing-call --end-call-at 40
+
+verify-6210-lab-sip-soak: build
+	$(VENV)/bin/python tools/run_6210_sip_soak.py --pjsua "$(SIP_PJSUA_BIN)" --pjsua2 "$(SIP_PYTHON_PATH)"
 
 verify-6210-lab-traffic-state: build
 	@set -e; for at in 19.0 24.5 30.5; do \

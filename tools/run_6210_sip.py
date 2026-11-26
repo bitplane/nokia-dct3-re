@@ -10,8 +10,9 @@ SIP bridge (dct3_sip_bridge.py) joins MAME's call endpoint to SIP:
   outgoing  dial any number on the 6210 and press Send; the bridge calls
             --destination, and End hangs up.
 
-The lab cell supports one call direction per session, each exactly as its
-gate (verify-6210-lab-sip-call / -outgoing-call) configures it. The SIP party
+The lab cell takes any number of calls in either direction, one at a time
+(make verify-6210-lab-sip-soak). Without --destination, dialled calls fail
+at the bridge. The SIP party
 plays through the handset's earpiece (COBBA EAR) to MAME's sound output, and
 the host's default microphone feeds its MIC2 (verify-6210-lab-physical-duplex).
 With --headless there is no sound, and the microphone carries the lab tone.
@@ -34,16 +35,11 @@ from tools.run_npe3_native import configure_cell_power  # noqa: E402
 from tools.run_rom4_lab_sip_call import wait_for_http  # noqa: E402
 
 
-def lab_cell(directory, direction, host_microphone):
-    """The lab BTS configuration each SIP gate verifies, plus the MIC2 source."""
-    if direction == 'incoming':
-        configure_cell_power(directory, MODEL, 'handset33', incoming_call=True, traffic_assignment=True,
-                             call_ack=True, clear_call=True, sacch=True, speech=True,
-                             host_microphone=host_microphone)
-    else:
-        configure_cell_power(directory, MODEL, 'handset33', traffic_assignment=True, clear_call=True,
-                             sacch=True, accept_outgoing_service=True, proceed_outgoing_call=True,
-                             speech=True, host_microphone=host_microphone)
+def lab_cell(directory, host_microphone):
+    """The lab BTS configuration the SIP soak verifies, plus the MIC2 source."""
+    configure_cell_power(directory, MODEL, 'handset33', incoming_call=True, traffic_assignment=True,
+                         call_ack=True, clear_call=True, sacch=True, accept_outgoing_service=True,
+                         proceed_outgoing_call=True, speech=True, host_microphone=host_microphone)
 
 
 def handset_command(mame, base, directory, http_port, headless, script=None):
@@ -64,7 +60,7 @@ async def run(args):
     prepare(base)
     directory = base / 'handset'
     directory.mkdir()
-    lab_cell(directory, args.direction, host_microphone=not args.headless)
+    lab_cell(directory, host_microphone=not args.headless)
     environment = {k: v for k, v in os.environ.items() if not k.startswith('NOKIA_DCT3_')}
     bridge_environment = dict(os.environ, PYTHONPATH=os.pathsep.join(
         filter(None, (args.pjsua2, os.environ.get('PYTHONPATH')))))
@@ -84,12 +80,10 @@ async def run(args):
                 '--destination', destination, '--sip-port', str(args.sip_port),
                 '--calls', str(args.calls), env=bridge_environment)
             processes.append(bridge)
-            if args.direction == 'incoming':
-                print(f'6210 SIP: once the 6210 shows DCT3 LAB, call sip:dct3@<this host>:{args.sip_port}',
-                      flush=True)
-            else:
-                print(f'6210 SIP: once the 6210 shows DCT3 LAB, dial and press Send; the bridge calls '
-                      f'{destination}', flush=True)
+            print(f'6210 SIP: once the 6210 shows DCT3 LAB, call sip:dct3@<this host>:{args.sip_port}',
+                  flush=True)
+            if args.destination:
+                print(f'6210 SIP: or dial any number and press Send; the bridge calls {destination}', flush=True)
             done, _ = await asyncio.wait([asyncio.ensure_future(p.wait()) for p in processes],
                                          return_when=asyncio.FIRST_COMPLETED)
     finally:
@@ -106,8 +100,7 @@ async def run(args):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument('--direction', choices=('incoming', 'outgoing'), default='incoming')
-    parser.add_argument('--destination', help='SIP URI the bridge calls for outgoing calls')
+    parser.add_argument('--destination', help='SIP URI the bridge calls when the 6210 dials')
     parser.add_argument('--sip-port', type=int, default=25070, help="the bridge's SIP port")
     parser.add_argument('--http-port', type=int, default=18080, help="MAME's call endpoint port")
     parser.add_argument('--pjsua2', default=os.environ.get('SIP_PYTHON_PATH', ''),
@@ -118,8 +111,6 @@ def main():
     parser.add_argument('--calls', type=int, default=0, help='stop after this many calls; zero runs until interrupted')
     args = parser.parse_args()
     args.mame = args.mame.resolve()  # MAME runs from inside the run directory
-    if args.direction == 'outgoing' and not args.destination:
-        parser.error('outgoing calls need --destination')
     try:
         asyncio.run(run(args))
     except KeyboardInterrupt:

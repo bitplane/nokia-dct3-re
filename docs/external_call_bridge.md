@@ -1229,8 +1229,9 @@ the handset's 500 Hz microphone tone (runs give 0.86).
 `make verify-5110-lab-sip-outgoing-call` runs the other direction: the handset
 dials 123, the bridge calls a PJSUA remote that answers at once, and the
 handset's End clears the call. These are the only SIP gates in which
-native DSP firmware carries the speech. The lab takes one call per run and
-does not offer call waiting or restoration through the bridge. During the call the 5110 now runs at about real time,
+native DSP firmware carries the speech. The lab takes calls one at a time,
+any number per run and in either direction (`make verify-6210-lab-sip-soak`),
+but does not offer call waiting or restoration through the bridge. During the call the 5110 now runs at about real time,
 so the remote talks for six wall-clock seconds; the 6210 (ROM6 lab,
 `make verify-6210-lab-sip-call` and `verify-6210-lab-sip-outgoing-call`)
 runs a call at about 50 % of real time, so its remote talks for ten, and

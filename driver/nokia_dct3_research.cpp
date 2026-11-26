@@ -481,7 +481,7 @@ TIMER_CALLBACK_MEMBER(dct3_rf_adc_fixture_state::poll_call_host)
 	for (auto const &call:events.calls)
 	{
 		if (call.epoch!=epoch) continue;
-		// The lab cell serves one call per run; its dialogue state is not reset.
+		// One call at a time; a call's dialogue ends when its link is released.
 		bool const admissible=!m_host_request && host_registered() && m_setup_start_frame==~u64(0) &&
 				(ioport("LAB_BTS")->read()&0x2c)==0x2c;
 		if (!admissible)
@@ -877,6 +877,7 @@ void dct3_rf_adc_fixture_state::receive_normal_uplink(std::array<u16,15> const &
 			m_contention_active=false;
 			m_ua_start_frame=(frame/51+1)*51+22;
 			m_page_not_before=m_ua_start_frame+4;
+			end_call_dialogue();
 			auto const bursts=nokia_rf_lab::bcch_bits(*ua,0);
 			for (unsigned at=0;at<4;++at) m_ua_samples[at]=nokia_rf_lab::gmsk_samples(bursts[at]);
 			packed.clear();for (auto byte:*ua) packed+=util::string_format("%02x",byte);
@@ -1093,6 +1094,17 @@ bool dct3_rf_adc_fixture_state::tch_impaired(u64 frame) const
 		gsm::tch_f::full_rate_slot(u32(frame),1)!=gsm::tch_f::tdma_slot_kind::sacch;
 }
 
+void dct3_rf_adc_fixture_state::end_call_dialogue()
+{
+	// The released link's call is over: the next page or dialled call starts
+	// a new dialogue. Its replies have all been sent; nothing reads these
+	// frames again until the next access, which also clears them.
+	m_setup_start_frame=m_service_accept_start_frame=~u64(0);
+	m_call_proceeding_start_frame=m_assignment_start_frame=~u64(0);
+	m_call_release_start_frame=~u64(0);m_call_channel_release_sent=false;
+	m_call_rr_sequence=0xff;
+}
+
 void dct3_rf_adc_fixture_state::stop_traffic_channel()
 {
 	m_tch.stop();
@@ -1200,9 +1212,12 @@ void dct3_rf_adc_fixture_state::receive_facch(gsm::tch_f::packed_control_block c
 		send_facch(disc ? "disc_ua" : "ua",reply,frame);
 		if (disc)
 		{
-			// Two traffic blocks carry the UA; the handset then leaves TS1.
+			// Two traffic blocks carry the UA; the handset then leaves TS1,
+			// and the cell may page it again once it is back on the CCCH.
 			m_tch_stop_frame=frame+60;
 			m_contention_active=false;
+			m_page_not_before=m_tch_stop_frame+4;
+			end_call_dialogue();
 		}
 		return;
 	}

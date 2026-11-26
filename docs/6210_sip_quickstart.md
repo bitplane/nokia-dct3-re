@@ -47,9 +47,13 @@ measured above 1.0x: a Ryzen 9 9950X3D gives about 1.00x, with no headroom.
 
 ```sh
 make sip-build
-make run-6210-sip                                    # you call the 6210
-make run-6210-sip SIP_DIRECTION=outgoing SIP_DESTINATION=sip:someone@host
+make run-6210-sip SIP_DESTINATION=sip:someone@host
 ```
+
+Call `sip:dct3@<this host>:25070` and answer on the 6210 with Send (the S
+key), or dial any number on the 6210 and press Send to call
+`SIP_DESTINATION`; End (E) hangs up. One session takes any number of calls,
+one at a time, in either direction.
 
 This is a research composition: the DSP ROM is an 8210's, the cell is a
 laboratory one, and the handset's identity records are synthetic.
