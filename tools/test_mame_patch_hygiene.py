@@ -6,6 +6,7 @@ import unittest
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 
 
+@unittest.skipUnless((ROOT / 'mame/src').is_dir(), 'requires the overlaid MAME checkout')
 class MamePatchHygieneTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):

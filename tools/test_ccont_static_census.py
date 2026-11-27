@@ -22,6 +22,7 @@ class CcontStaticCensusTest(unittest.TestCase):
         self.assertEqual(2, ccont_static_census.physical_register(entries[2]))
         self.assertIsNone(ccont_static_census.physical_register(entries[0]))
 
+    @unittest.skipUnless(all(path.exists() for _, path in ccont_static_census.DEFAULT_ROMS), 'requires the census ROMs')
     def test_supported_rom_contract(self):
         payload = ccont_static_census.build_payload(ccont_static_census.DEFAULT_ROMS)
         self.assertTrue(payload["cross_rom_descriptor_identity"])
@@ -40,6 +41,7 @@ class CcontStaticCensusTest(unittest.TestCase):
             payload["roms"][0]["mapped_registers"],
         )
 
+    @unittest.skipUnless((ROOT / 'roms/noki8290/8290f522a.fls').exists(), 'requires the 8290 ROM')
     def test_nsb7_independent_read_write_alias(self):
         report = ccont_static_census.analyze(
             "8290-v5.22", ROOT / "roms/noki8290/8290f522a.fls"

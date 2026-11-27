@@ -1189,7 +1189,7 @@ verify-2100-v521-bootstrap: normalize-2100 build
 
 # Own NAM-2 v5.21 (nam2c3) keypad input at 20 s, after its idle loop has
 # stopped the clock and declined to sleep: the set-time prompt shows 12.
-verify-2100-late-input: build
+verify-2100-late-input: normalize-2100 build
 	@rm -rf "$(RUN_DIR)"; mkdir -p "$(RUN_DIR)/nvram/nam2c3_1"
 	$(PYTHON) tools/make_2100_v521_profile.py roms/noki2100/2100f521sharp.fls "$(RUN_DIR)/nvram/nam2c3_1/flash"
 	$(PYTHON) tools/run_mame_isolated.py --mame-dir $(MAME_DIR) --run-dir $(abspath $(RUN_DIR)) -- nam2c3 -bios 521sharp \

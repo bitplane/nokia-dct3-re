@@ -71,7 +71,8 @@ class DispatchFlowTests(unittest.TestCase):
             constant_alias(reader, root, 'missing')
 
 
-@unittest.skipUnless(shutil.which('g++'), 'compiled guard test requires g++ and MAME headers')
+@unittest.skipUnless(shutil.which('g++') and (Path(__file__).resolve().parents[1]/'mame/src/emu').is_dir(),
+                     'compiled guard test requires g++ and MAME headers')
 class CompiledGuardTests(unittest.TestCase):
     def test_actual_cpp_widths_and_decode_table_are_used(self):
         header = Path(__file__).resolve().parents[1]/'cpu/tms320c54x/tms320c54x_decode.h'

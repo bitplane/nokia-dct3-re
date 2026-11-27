@@ -1,0 +1,25 @@
+# ROM-less checks: no firmware, MAME checkout or build is available here.
+# Tests that need ROMs or MAME sources skip themselves; emulator gates run locally.
+name: tools
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  tools:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: Tool unit tests
+        run: python -m unittest discover -s tools -p 'test_*.py'
+      - name: Evidence ledger
+        run: python tools/validate_evidence.py
+      - name: Generated gate rules match gates.json
+        run: python tools/gate_generate.py --from-data --check

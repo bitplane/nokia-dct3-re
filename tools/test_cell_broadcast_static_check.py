@@ -7,6 +7,7 @@ from tools.cell_broadcast_static_check import FLASH_BASE, verify_contract
 ROM = Path(__file__).resolve().parent.parent / "roms/3210f600a_swap16.bin"
 
 
+@unittest.skipUnless(ROM.exists(), 'requires the byte-swapped 3210 v6.00 ROM')
 class CellBroadcastStaticCheckTests(unittest.TestCase):
 	@classmethod
 	def setUpClass(cls):

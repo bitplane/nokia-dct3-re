@@ -7,7 +7,7 @@
 # flow is not yet modelled by the gate matrix, so it is copied rather than
 # rebuilt. Those are the remaining migration work.
 
-# 875 gates: 653 generated from typed steps, 222 copied verbatim (shell).
+# 876 gates: 654 generated from typed steps, 222 copied verbatim (shell).
 
 # Shell guards shared by gates that rewrite provisioned state.
 #
@@ -50,18 +50,19 @@ DCT3_PRESS_240_350 := NOKIA_DCT3_POST_READY_KEY_DURATION_MS=240 NOKIA_DCT3_POST_
 	verify-8850-pin-host-ussd-network-restore \
 	verify-8850-pin-host-ussd-network-request verify-8850-pin-host-ussd-restore \
 	verify-8850-pin-host-outgoing-ussd verify-8850-pin-host-incoming-ussd \
-	verify-6210-mbus-service verify-6210-mbus-service-after-sleep verify-6210-mbus-byte-events \
-	verify-6210-mbus-version-ingress verify-8210-host-incoming-call \
-	verify-8210-host-outgoing-call verify-8210-host-incoming-sms \
-	verify-8210-host-outgoing-sms verify-8210-host-rejected-sms \
-	verify-8210-host-silent-sms verify-8210-sip-idle-restore \
-	verify-8210-sip-outgoing-busy verify-8210-sip-outgoing-unavailable \
-	verify-8890-pcs-incoming-speech-control verify-8890-pcs-speech-control \
-	verify-8890-incoming-speech-control verify-8890-speech-control \
-	verify-8850-sip-incoming-alerting-restore verify-8850-sip-incoming-restore \
-	verify-8850-sip-incoming-media verify-8850-sip-outgoing-pending-restore \
-	verify-8850-sip-outgoing-restore verify-8850-sip-outgoing-media \
-	verify-8210-sip-outgoing-media verify-8210-dcs-late-pin-sip-outgoing-media \
+	verify-6210-mbus-service verify-6210-mbus-service-after-sleep \
+	verify-6210-mbus-byte-events verify-6210-mbus-version-ingress \
+	verify-8210-host-incoming-call verify-8210-host-outgoing-call \
+	verify-8210-host-incoming-sms verify-8210-host-outgoing-sms \
+	verify-8210-host-rejected-sms verify-8210-host-silent-sms \
+	verify-8210-sip-idle-restore verify-8210-sip-outgoing-busy \
+	verify-8210-sip-outgoing-unavailable verify-8890-pcs-incoming-speech-control \
+	verify-8890-pcs-speech-control verify-8890-incoming-speech-control \
+	verify-8890-speech-control verify-8850-sip-incoming-alerting-restore \
+	verify-8850-sip-incoming-restore verify-8850-sip-incoming-media \
+	verify-8850-sip-outgoing-pending-restore verify-8850-sip-outgoing-restore \
+	verify-8850-sip-outgoing-media verify-8210-sip-outgoing-media \
+	verify-8210-dcs-late-pin-sip-outgoing-media \
 	verify-8210-dcs-late-pin-sip-incoming-media \
 	verify-8210-dcs-late-pin-sip-outgoing-restore \
 	verify-8210-dcs-late-pin-sip-pending-outgoing-restore \
