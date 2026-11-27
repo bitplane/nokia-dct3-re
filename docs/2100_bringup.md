@@ -88,7 +88,16 @@ idle, native DSP execution or the fitted-part hypothesis.
   roms/noki2100/2100f521sharp.fls RUN
 ```
 
-### Remaining idle/input boundary
+### Idle/input boundary (resolved in `nam2c3`, 2026-11-27)
+
+`nam2c3` now selects the sibling wake contract with its light stop
+([MAD2 fidelity](mad2_fidelity.md#rom4-sibling-wake-delivery-opt-in)): the
+guard-declined `304c2e(0)` write restores delivery when a locally unmasked
+source is pending. In the idle-key observer the Keypad-1 IRQ0 is serviced
+within a second (`irq=00` at 19 s) and the timer stamp keeps advancing.
+`make verify-2100-late-input` presses 1 and 2 at 20 s on the set-time
+prompt, which then shows `12:mm`. The findings below describe the unfixed
+composition.
 
 `tools/nam2_c3_idle_observe.lua` combines capped read-only breakpoints,
 one-second state samples and physical contacts; run it with the same debug

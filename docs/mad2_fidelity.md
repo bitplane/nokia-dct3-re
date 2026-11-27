@@ -230,8 +230,9 @@ spins awake with delivery disabled. Every other `0d` writer in NPE-3 updates
 its gate inside a critical section; that update completes before the
 restore, and the section's exit rewrites its saved control. Only the NSB-3
 (`nsb3r4t`), NSK-3 (`nsk3r4t`) and NSK-1 (`nsk1r4t`) research configurations,
-their `*ap5` laboratory machines and the clock-enabled NPE-3 `npe3mbus`
-select it. Every other product, including NAM-2, keeps wake without service.
+their `*ap5` laboratory machines, the clock-enabled NPE-3 `npe3mbus` and
+the own-ROM NAM-2 `nam2c3` select it. Every other product, including the
+`noki2100` candidate composition, keeps wake without service.
 With the light stop, the three ROM4 `*ap5` machines still run 120 s without
 a restart (2026-11-27).
 
@@ -271,9 +272,10 @@ delivery at its 12.0 s and 12.2 s wakes. Its deep-sleep guard then declines,
 however, and the ordinary loop never requests another stop. The late-input
 security fixture therefore still renders no digits. NAM-2's open boundary is
 the guard-declined arm (`304c2e(0)`, no `05`), not clock-stop wake. NPE-3's
-late no-sleep loop has the same shape; the light-stop rule above resolves it
-in `npe3mbus` ([MBUS controller](mbus_controller.md)). NAM-2 has not been
-re-run with it and still does not select the flag.
+late no-sleep loop has the same shape. The light-stop rule above resolves
+both: `npe3mbus` decodes End and answers MBUS after sleep
+([MBUS controller](mbus_controller.md)), and `nam2c3` services the pending
+keypad IRQ0 and renders late digits (`make verify-2100-late-input`).
 
 ### Archived interrupt reference
 

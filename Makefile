@@ -208,6 +208,8 @@ ORACLE_3330_DSP_MISSING_SHA ?= 7e3ade861af1e0e47c76100c7a7c7f8c7719c1c497e02d102
 ORACLE_3410_DSP_MISSING_SHA ?= dd5322bd6175d71dfea6d222d0572eab6fa787f3e2321f52fc6a7acd08600252
 ORACLE_2100_POST_SERVICE_SHA ?= 28b1f0c642a34dfcf5206859ced058646b115c908d0b05b5ef6201f796180c21
 ORACLE_2100_SECURITY_REJECT_SHA ?= 2b8b3e2b6cd7cfd8f6066bd98e8a996750aee9c056e40faeb8235a36df5d8f92
+ORACLE_2100_LATE_PROMPT_SHA ?= 7f1a17407a947069c2c714767ef4068ad21dd030cba848d754239100728f3737
+ORACLE_2100_LATE_DIGITS_SHA ?= b2c7b7615f8984081ec1aacd99f14291b99f82c9979abd3f3af0b0f35aee6e64
 ORACLE_3610_CONTACT_SERVICE_SHA ?= dd5322bd6175d71dfea6d222d0572eab6fa787f3e2321f52fc6a7acd08600252
 
 # The acquired virgin NHM-6 PMM legitimately requests its stored 12345 phone
@@ -364,7 +366,7 @@ INTERACTIVE_EXTRA_ARGS ?=
 .PHONY: verify-3410-radio-paging-state verify-3410-radio-paging-negatives
 .PHONY: normalize-3610 smoke-3610 verify-3610-frontier verify-3610-dsp-service verify-3610-discovery verify-3610-service-control verify-3610-application verify-3610-mbus verify-3610-storage-boundary
 .PHONY: smoke-2100
-.PHONY: verify-2100-frontier verify-2100-interactive verify-2100-v521-bootstrap
+.PHONY: verify-2100-frontier verify-2100-interactive verify-2100-v521-bootstrap verify-2100-late-input
 .PHONY: verify-radio-outgoing-call-lifecycle verify-radio-outgoing-call-state
 .PHONY: verify-radio-a5-1-outgoing-call
 .PHONY: verify-radio-a5-1-sdcch-state
@@ -1181,6 +1183,18 @@ verify-2100-v521-bootstrap: normalize-2100 build
 	@grep -q 'bootstrap publication offset=002 value=0001' $(RUN_DIR)/error.log
 	@grep -q 'bootstrap publication offset=004 value=0001' $(RUN_DIR)/error.log
 	@echo 'NAM-2 v5.21 DSP ping-pong bootstrap and verdict publication: PASS'
+
+# Own NAM-2 v5.21 (nam2c3) keypad input at 20 s, after its idle loop has
+# stopped the clock and declined to sleep: the set-time prompt shows 12.
+verify-2100-late-input: build
+	@rm -rf "$(RUN_DIR)"; mkdir -p "$(RUN_DIR)/nvram/nam2c3_1"
+	$(PYTHON) tools/make_2100_v521_profile.py roms/noki2100/2100f521sharp.fls "$(RUN_DIR)/nvram/nam2c3_1/flash"
+	$(PYTHON) tools/run_mame_isolated.py --mame-dir $(MAME_DIR) --run-dir $(abspath $(RUN_DIR)) -- nam2c3 -bios 521sharp \
+		-rompath $(abspath roms) -video none -sound none -nothrottle -seconds_to_run 23 -log \
+		-autoboot_delay 0 -autoboot_script $(abspath tools/nam2_c3_late_input.lua)
+	@echo "$(ORACLE_2100_LATE_PROMPT_SHA)  $(RUN_DIR)/snap/late_before.png" | sha256sum -c --quiet
+	@echo "$(ORACLE_2100_LATE_DIGITS_SHA)  $(RUN_DIR)/snap/late_after.png" | sha256sum -c --quiet
+	@echo 'NAM-2 v5.21 late input after clock stop: PASS'
 
 verify-2100-interactive: normalize-2100 build
 	@# Seed a fresh machine; the run must not reset the fixture again.

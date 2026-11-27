@@ -1721,6 +1721,11 @@ void nokia_dct3_state::nam2c3(machine_config &config)
 	// Own-ROM explicit 0089/88c2 support; fitted board part remains unproved.
 	noki2100(config);
 	INTEL_28F160C3T(config.replace(), "flash");
+	// Own supervisor stops the clock at 2f85f6 -> 304c2e(1) and declines
+	// at 2f85f4 -> 304c2e(0); neither writes 05 (as NPE-3 and NSB-3).
+	nokia_product_config research = m_product;
+	research.mad2_sleep_wake_enable = true;
+	apply_product_config(research);
 }
 
 void nokia_dct3_state::nhm9stage(machine_config &config)
