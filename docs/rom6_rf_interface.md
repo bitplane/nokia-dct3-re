@@ -31,6 +31,19 @@ alternates ten of them in one run. The SIP party plays through the
 handset's earpiece to MAME's sound output, and the host microphone feeds
 MIC2.
 
+SMS runs natively too. With LAB_BTS bit `0x4000` the lab cell hands its
+SDCCH to the GSM session and LAPDm link used by the HLE network, one
+subchannel-0 block per 51-multiframe: Location Updating, paging response,
+A5/0 cipher mode, network- or mobile-initiated SAPI 3, segmented I-frames
+and channel release. The lab page input then pages for the network's queued
+SMS, after registration if it comes earlier. `make verify-6210-lab-sms`
+(`tools/run_6210_lab_sms.py`) receives "hello" from 5551234 and reads it
+with the phone's own keys, then composes "A" to 5551234 and sends it. Each
+direction checks the CP/RP exchange on the air and a pinned screen
+("hello"; "Message sent"). Calls keep the original hand-built dialogue; the
+bit selects SMS instead of calls, and a session-mode dialogue is not yet
+save-state safe.
+
 `make verify-6210-lab-traffic-state` (`tools/run_npe3_call_roundtrip.py`)
 saves the early incoming call at 19.0 s (ringing), 24.5 s (connected) and
 30.5 s (clearing). Each run records 200 ms of DSP I/O, reloads, and requires

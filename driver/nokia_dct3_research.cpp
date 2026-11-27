@@ -332,6 +332,7 @@ void dct3_rf_adc_fixture_state::machine_reset()
 	m_call_host.new_epoch();
 	m_normal_count=0;m_contention_active=false;
 	m_page_identity_valid=m_page_pending=false;
+	m_session_blocks.clear();m_session_last_start=0;m_session_offset=0;m_session_sms_page=false;
 	m_page_identity.fill(0);m_page_phase=m_page_offset=0;
 	m_page_not_before=m_page_last_block=~u64(0);
 	m_frame_page_block=~u64(0);
@@ -418,7 +419,17 @@ void dct3_rf_adc_fixture_state::machine_reset()
 
 INPUT_CHANGED_MEMBER(dct3_rf_adc_fixture_state::bts_page_w)
 {
-	if (newval && m_raw_agch) page_subscriber();
+	if (!newval || !m_raw_agch) return;
+	if (session_mode())
+	{
+		// Page for the network's queued SMS; before registration, page after it.
+		if (subdevice<nokia_gsm_session_device>("gsm_session")->registered_mobile_identity_length()!=8 || m_contention_active)
+			m_session_sms_page=true;
+		else if (subdevice<nokia_gsm_session_device>("gsm_session")->queue_incoming_page(nokia_gsm_session_device::incoming_service::sms))
+			page_subscriber();
+		return;
+	}
+	page_subscriber();
 }
 
 bool dct3_rf_adc_fixture_state::page_subscriber()
@@ -691,6 +702,10 @@ TIMER_CALLBACK_MEMBER(dct3_rf_adc_fixture_state::candidate_transmit_start)
 				m_call_rr_start_frame=~u64(0);
 				m_call_rr_sequence=0xff;
 				m_call_release_start_frame=~u64(0);m_call_channel_release_sent=false;
+				if (session_mode())
+				{
+					subdevice<nokia_lapdm_link_device>("lapdm_link")->reset();m_session_blocks.clear();m_session_offset=0;
+				}
 				u64 const frame=machine().time().as_ticks(13'000'000)/60'000;
 				auto const assignment=subdevice<nokia_gsm_network_device>("gsm_network")->immediate_assignment(
 					*access,frame%nokia_rf_lab::hyperframe,m_lab_arfcn);
@@ -740,6 +755,11 @@ void dct3_rf_adc_fixture_state::receive_normal_uplink(std::array<u16,15> const &
 	for (auto byte:*block) packed+=util::string_format("%02x",byte);
 	machine().logerror("npe3_bts_uplink: start_frame=%u octets=%s exact_code=1 port_bits_only=1 physical_claim=0\n",
 		unsigned(m_normal_start_frame),packed);
+	if (session_mode())
+	{
+		receive_session_uplink(*block,frame);
+		return;
+	}
 	bool const late_assignment=bool(ioport("LAB_BTS")->read()&128);
 	if ((ioport("LAB_BTS")->read()&0x200) && m_service_accept_start_frame!=~u64(0) &&
 			m_call_proceeding_start_frame==~u64(0) && m_normal_start_frame>m_service_accept_start_frame+3 &&
@@ -1105,6 +1125,168 @@ void dct3_rf_adc_fixture_state::end_call_dialogue()
 	m_call_rr_sequence=0xff;
 }
 
+bool dct3_rf_adc_fixture_state::session_mode()
+{
+	return ioport("LAB_BTS")->read()&0x4000;
+}
+
+void dct3_rf_adc_fixture_state::queue_session_frame(std::array<u8,24> const &lapdm,char const *kind,u64 frame)
+{
+	// One SDCCH/4 subchannel-0 downlink block per 51-multiframe, in order.
+	gsm::tch_f::packed_control_block octets{};
+	std::copy_n(lapdm.begin(),octets.size(),octets.begin());
+	session_block block{};
+	block.start=std::max((frame/51+1)*51+22,m_session_last_start+51);
+	auto const bursts=nokia_rf_lab::bcch_bits(octets,0);
+	for (unsigned at=0;at<4;++at) block.samples[at]=nokia_rf_lab::gmsk_samples(bursts[at]);
+	m_session_last_start=block.start;
+	m_session_blocks.push_back(block);
+	std::string packed;for (auto byte:octets) packed+=util::string_format("%02x",byte);
+	machine().logerror("npe3_session_downlink: kind=%s start_frame=%u octets=%s raw_adc_only=1 physical_claim=0\n",
+		kind,unsigned(block.start),packed);
+}
+
+void dct3_rf_adc_fixture_state::queue_session_downlink(u64 frame)
+{
+	// The session's pending message: a SAPI 3 SABM, or its next I-frame
+	// segment (GSM 04.06 5.8.5: 20 octets per SDCCH frame, M set until last).
+	auto const &message=subdevice<nokia_gsm_session_device>("gsm_session")->pending_downlink();
+	auto const kind=nokia_gsm_session_device::downlink_kind(message.kind);
+	if (kind==nokia_gsm_session_device::downlink_kind::none) return;
+	if (kind==nokia_gsm_session_device::downlink_kind::sapi3_establishment)
+	{
+		queue_session_frame(subdevice<nokia_lapdm_link_device>("lapdm_link")->build_sabm_command(message.sapi),"sapi3_sabm",frame);
+		return;
+	}
+	unsigned const remaining=message.length-std::min(m_session_offset,message.length);
+	unsigned const length=std::min(remaining,nokia_lapdm_link_device::maximum_information_length);
+	auto const lapdm=subdevice<nokia_lapdm_link_device>("lapdm_link")->build_information_frame(message.sapi,message.data.data()+m_session_offset,length,
+		remaining>nokia_lapdm_link_device::maximum_information_length);
+	queue_session_frame(lapdm,util::string_format("information_%u",unsigned(message.kind)).c_str(),frame);
+}
+
+void dct3_rf_adc_fixture_state::end_session_dialogue(u64 frame)
+{
+	m_contention_active=false;
+	m_session_offset=0;
+	m_page_not_before=0;
+	bool const registered=subdevice<nokia_gsm_session_device>("gsm_session")->registered_mobile_identity_length()==8;
+	m_lu_completed=m_lu_completed || registered;
+	machine().logerror("npe3_session_released: registered=%d sms_page=%d t=%.9f physical_claim=0\n",
+		registered,m_session_sms_page,machine().time().as_double());
+	if (m_session_sms_page && registered && subdevice<nokia_gsm_session_device>("gsm_session")->queue_incoming_page(nokia_gsm_session_device::incoming_service::sms))
+	{
+		m_session_sms_page=false;
+		page_subscriber();
+	}
+	// Page only after the release UA has gone out.
+	m_page_not_before=std::max(m_page_not_before,m_session_last_start+4);
+}
+
+void dct3_rf_adc_fixture_state::receive_session_uplink(gsm::tch_f::packed_control_block const &block,u64 frame)
+{
+	using kind_t=nokia_gsm_session_device::downlink_kind;
+	using result_t=nokia_lapdm_link_device::uplink_result;
+	auto &link=*subdevice<nokia_lapdm_link_device>("lapdm_link");
+	auto &session=*subdevice<nokia_gsm_session_device>("gsm_session");
+	// T200 runs in TDMA frames; this block is the multiframe's only uplink.
+	for (unsigned at=0;at<51;++at)
+	{
+		auto const expiry=link.advance_frame();
+		if (expiry.kind!=nokia_lapdm_link_device::expiry_kind::none)
+			machine().logerror("npe3_session_t200: kind=%u sapi=%u frame=%u physical_claim=0\n",
+				unsigned(expiry.kind),expiry.sapi,unsigned(frame));
+	}
+	if (link.retransmission_pending()) queue_session_frame(link.take_retransmission(),"retransmission",frame);
+	unsigned const sapi=(block[0]>>2)&7;
+	if (m_contention_active && sapi==0 && (block[1]&0xef)==0x2f)
+	{
+		// A repeated SABM: the handset did not hear the UA. Resend it only.
+		if (std::equal(block.begin(),block.begin()+3+(block[2]>>2),m_contention_sabm.begin()))
+			queue_session_frame(link.build_ua(),"ua_repeat",frame);
+		return;
+	}
+	auto const result=link.receive_uplink(block.data(),block.size());
+	if (result==result_t::ignored) return;
+	auto const &information=link.layer3_information();
+	unsigned const length=link.layer3_length();
+	std::string packed;for (unsigned at=0;at<length;++at) packed+=util::string_format("%02x",information[at]);
+	machine().logerror("npe3_session_uplink: result=%u sapi=%u layer3=%s start_frame=%u physical_claim=0\n",
+		unsigned(result),link.layer3_sapi(),packed,unsigned(m_normal_start_frame));
+	auto acknowledge=[&]() { m_session_offset=0;return session.downlink_acknowledged(); };
+	switch (result)
+	{
+	case result_t::establish_indication:
+		if (link.layer3_sapi()==3)
+		{
+			if (session.awaiting_mobile_sms_sapi3()) session.mobile_sms_sapi3_established();
+			queue_session_frame(link.build_ua(),"sapi3_ua",frame);
+			return;
+		}
+		// A location update names the IMSI later pages address.
+		if (length==18 && information[0]==5 && information[1]==8 && information[9]==8 && (information[10]&7)==1)
+		{
+			std::copy_n(information.begin()+10,m_page_identity.size(),m_page_identity.begin());
+			m_page_identity_valid=true;
+		}
+		m_page_pending=false;
+		m_contention_sabm=block;m_contention_active=true;
+		session.establish_layer3(information.data(),length,m_lab_arfcn);
+		queue_session_frame(link.build_ua(),"ua",frame);
+		session.contention_resolution_delivered();
+		queue_session_downlink(frame);
+		return;
+	case result_t::information_indication:
+	{
+		if (link.last_downlink_acknowledged())
+		{
+			if (link.downlink_segmentation_pending(link.layer3_sapi()))
+				m_session_offset+=nokia_lapdm_link_device::maximum_information_length;
+			else
+				acknowledge();
+		}
+		session.receive_layer3(link.layer3_sapi(),information.data(),length);
+		auto const pending=session.pending_downlink_kind();
+		if (pending!=kind_t::none && pending!=kind_t::sapi3_establishment)
+			queue_session_downlink(frame);
+		else
+		{
+			// A SABM cannot carry N(R): acknowledge the I-frame first.
+			queue_session_frame(link.build_receive_ready(link.layer3_sapi()),"rr",frame);
+			if (pending==kind_t::sapi3_establishment) queue_session_downlink(frame);
+		}
+		return;
+	}
+	case result_t::information_segment:
+		queue_session_frame(link.build_receive_ready(link.layer3_sapi()),"rr_segment",frame);
+		return;
+	case result_t::establish_confirmation:
+		acknowledge();
+		queue_session_downlink(frame);
+		return;
+	case result_t::downlink_acknowledgement:
+	{
+		if (link.downlink_segmentation_pending(link.layer3_sapi()))
+		{
+			m_session_offset+=nokia_lapdm_link_device::maximum_information_length;
+			queue_session_downlink(frame);
+			return;
+		}
+		auto const action=acknowledge();
+		if (action==kind_t::release_complete) return;
+		if (action!=kind_t::none) queue_session_downlink(frame);
+		else if (session.awaiting_mobile_sms_sapi3()) link.begin_mobile_establishment(3);
+		return;
+	}
+	case result_t::release_indication:
+		queue_session_frame(link.build_release_ua(),"release_ua",frame);
+		end_session_dialogue(frame);
+		return;
+	default:
+		return;
+	}
+}
+
 void dct3_rf_adc_fixture_state::stop_traffic_channel()
 {
 	m_tch.stop();
@@ -1418,6 +1600,13 @@ u16 dct3_rf_adc_fixture_state::sample_r(offs_t component)
 	}
 	u64 const tick = machine().time().as_ticks(13'000'000);
 	u64 const frame=tick/60'000;
+	while (!m_session_blocks.empty() && frame>=m_session_blocks.front().start+4) m_session_blocks.pop_front();
+	if (m_raw_agch && !m_session_blocks.empty() && frame>=m_session_blocks.front().start && tick%60'000<148*48)
+	{
+		auto const &sample=m_session_blocks.front().samples[frame-m_session_blocks.front().start][(tick%60'000)/12];
+		m_q_latch=sample[1];
+		return u16(sample[0]);
+	}
 	if (m_raw_agch && frame>=m_service_accept_start_frame && frame-m_service_accept_start_frame<4 && tick%60'000<148*48)
 	{
 		auto const &sample=m_service_accept_samples[frame-m_service_accept_start_frame][(tick%60'000)/12];

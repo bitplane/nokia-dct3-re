@@ -108,6 +108,18 @@ private:
 	void stop_traffic_channel();
 	void end_call_dialogue();
 	bool page_subscriber();
+	// Session-driven SDCCH (LAB_BTS 0x4000): the GSM session and LAPDm link
+	// own the dialogue, one downlink block per 51-multiframe, in order.
+	bool session_mode();
+	void receive_session_uplink(gsm::tch_f::packed_control_block const &block,u64 frame);
+	void queue_session_frame(std::array<u8,24> const &lapdm,char const *kind,u64 frame);
+	void queue_session_downlink(u64 frame);
+	void end_session_dialogue(u64 frame);
+	struct session_block { u64 start; std::array<std::array<std::array<s16,2>,148*4>,4> samples; };
+	std::deque<session_block> m_session_blocks;
+	u64 m_session_last_start=0;
+	unsigned m_session_offset=0;
+	bool m_session_sms_page=false;
 	// Host telephony (-http): incoming calls with GSM-FR media both ways.
 	TIMER_CALLBACK_MEMBER(poll_call_host);
 	// Registered once Location Updating completes; later accesses keep it.

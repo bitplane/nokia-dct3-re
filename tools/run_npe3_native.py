@@ -37,7 +37,7 @@ def configure_cell_power(directory,model,policy,*,incoming_call=False,
                          traffic_assignment=False,call_ack=False,clear_call=False,
                          sacch=False,assignment_after_connect=False,
                          accept_outgoing_service=False,proceed_outgoing_call=False,frame_pages=False,
-                         speech=False,host_microphone=False,impair_traffic=False):
+                         speech=False,host_microphone=False,impair_traffic=False,sms=False):
     if policy=='legacy39':return
     if policy!='handset33':raise ValueError('unsupported cell power policy')
     config=ET.Element('mameconfig',version='10')
@@ -68,6 +68,8 @@ def configure_cell_power(directory,model,policy,*,incoming_call=False,
         ET.SubElement(ports,'port',tag=':LAB_BTS',type='CONFIG',mask='4096',defvalue='0',value='4096')
     if impair_traffic:
         ET.SubElement(ports,'port',tag=':LAB_BTS',type='CONFIG',mask='8192',defvalue='0',value='8192')
+    if sms:
+        ET.SubElement(ports,'port',tag=':LAB_BTS',type='CONFIG',mask='16384',defvalue='0',value='16384')
     destination=directory/'cfg';destination.mkdir()
     ET.ElementTree(config).write(destination/f'{model}.cfg',encoding='utf-8',xml_declaration=True)
 

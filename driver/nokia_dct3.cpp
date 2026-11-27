@@ -1897,6 +1897,9 @@ static INPUT_PORTS_START( dct3_lab_bts )
 	PORT_CONFNAME(0x2000, 0x00, "Laboratory BTS traffic-channel impairment (1/3 bit errors, 208 frames)")
 	PORT_CONFSETTING(0x0000, DEF_STR( Off ))
 	PORT_CONFSETTING(0x2000, DEF_STR( On ))
+	PORT_CONFNAME(0x4000, 0x00, "Laboratory BTS SMS (session-driven SDCCH; page delivers SMS)")
+	PORT_CONFSETTING(0x0000, DEF_STR( Off ))
+	PORT_CONFSETTING(0x4000, DEF_STR( On ))
 INPUT_PORTS_END
 
 static INPUT_PORTS_START( npe3_raw_bts )
