@@ -7,7 +7,10 @@ Each machine runs its own MCU and DSP uploads with the 6210's laboratory cell
 answer with Send, carry lab tones both ways on TCH/F and clear with End.
 --scenario sip-incoming or sip-outgoing runs the call against a real PJSUA
 party through the SIP bridge instead; --roundtrip-at saves, replays and
-reloads the lab call. --acquired-records is the negative control: the donor's records fail the
+reloads the lab call. --scenario sms-incoming or sms-outgoing switches the
+cell to its session-driven SDCCH (LAB_BTS 0x4000) and receives and reads
+"hello", or composes and sends "A" to 5551234, with the phone's own keys.
+--acquired-records is the negative control: the donor's records fail the
 DSP's own validation and the handset cannot register.
 """
 import argparse
@@ -28,17 +31,37 @@ from tools.make_rom6_record_profile import PRODUCTS, make_profile  # noqa: E402
 
 DIALLED = '1234567'
 ROUNDTRIPS = {'ringing': 3.4, 'connected': 8.5, 'clearing': 14.4}  # after the page
-MODELS = {  # page time, security code, Send field and reviewed LCD pixels
-    'nsm2': dict(name='8850', page=44, code=True, send='Call / Send', frames={
+MODELS = {  # page time, security code, Send field and reviewed LCD pixels (call; SMS "hello")
+    'nsm2': dict(name='8850', page=44, code=True, send='Call / Send',
+        sms_incoming_frames={'sms_read_2.png':
+                    '6a101291e5215012ec718748cca30958cf55e688c0075678c34bcd30c2c9eea3'},
+        sms_outgoing_frames={'sms_sent.png':
+                    '1eda22f78cde69cd4f9add1c90732b07254f3742ade7aede18cb818219712a78'},
+        frames={
         'idle.png': '08737c08772c99df2b41fc8560587820c2c209f5f74c12893a657bd6f623e555',
         'ringing.png': '5e45fce4598de194cdc1a2a5ceb3feb728bec391040a6ad52b28839f56213389'}),
-    'nhm3': dict(name='6250', page=24, code=False, send='Send', frames={
+    'nhm3': dict(name='6250', page=24, code=False, send='Send', softkey='Left Softkey / Menu',
+        sms_incoming_frames={'sms_read_1.png':
+                    'ab21e640456a297698ff12e89d315fb469eca215975b8ba4cc5a1a9cb2a41be3'},
+        sms_outgoing_frames={'sms_sent.png':
+                    '6572493289ae45122d886b82085470e74ecd45c5dfe057c83ef14a1dda9b6adb'},
+        frames={
         'idle.png': 'f130f1115e9561b5786c95fc6e8a47ff44b57156640b4b88a0510b170c7efa66',
         'ringing.png': '7d5d7b6fc9f9562faf52cfa1a7f3b9bfcaf56b1611d0fba626e976174225535d'}),
-    'nsm3': dict(name='8210', page=44, code=True, send='Call / Send', frames={
+    'nsm3': dict(name='8210', page=44, code=True, send='Call / Send',
+        sms_incoming_frames={'sms_read_2.png':
+                    '6a101291e5215012ec718748cca30958cf55e688c0075678c34bcd30c2c9eea3'},
+        sms_outgoing_frames={'sms_sent.png':
+                    'fcae4c528cb5e8382886e6516531cd14aae80fcbd91cc9c49112d0bb85dcd269'},
+        frames={
         'idle.png': '08737c08772c99df2b41fc8560587820c2c209f5f74c12893a657bd6f623e555',
         'ringing.png': '5e45fce4598de194cdc1a2a5ceb3feb728bec391040a6ad52b28839f56213389'}),
-    'nsb6': dict(name='8890', page=44, code=True, dismiss='Names / C', send='Call / Send', frames={
+    'nsb6': dict(name='8890', page=44, code=True, dismiss='Names / C', send='Call / Send',
+        sms_incoming_frames={'sms_read_2.png':
+                    '2e2f140c3d6784a75a5c2488c202ddbd4fcb4980f28e618ce7b3610f150b7dde'},
+        sms_outgoing_frames={'sms_sent.png':
+                    '2c5c80f7003469d6269bf63e497fd96f1a5c1578c7cad35881e113e5294cb560'},
+        frames={
         'idle.png': 'c36fbbdd8756ea5f1964222761b2c92624d46a7182f089157171a0808ed884bc',
         'ringing.png': 'a8fe20ecce53006a7ccd8b52c038d468bd7a9f81bff40f540a7872f9610cdc93'}),
 }
@@ -87,6 +110,24 @@ def schedule(model, scenario):
         keys = [f'Keypad {digit}' for digit in DIALLED] + [model['send']]
         events += [(page + n, key, 0.15) for n, key in enumerate(keys)]
         return events + [(page + 24, 'End', 0.15)], page + 30
+    if scenario == 'sms-incoming':
+        # The lab pages for its queued SMS; the phone reads it with its own keys.
+        softkey = model.get('softkey', 'Menu')
+        return events + [(page, 'Laboratory BTS page', 0.05), (page + 10, '@sms_received', 0),
+                         (page + 10.1, softkey, 0.15), (page + 12, '@sms_read_1', 0),
+                         (page + 12.1, softkey, 0.15), (page + 14, '@sms_read_2', 0)], page + 15
+    if scenario == 'sms-outgoing':
+        # Compose "A" to 5551234 with the phone's own keys and send it.
+        digits = [f'Keypad {d}' for d in '5551234']
+        if 'softkey' in model:  # 6210-style: Messages, Message list (Write first)
+            keys = [model['softkey']] * 3 + ['Keypad 2'] + [model['softkey']] * 2 + digits + [model['softkey']]
+        else:  # Navi key: Messages, Inbox, Outbox, Write messages; Options, Send
+            keys = (['Menu', 'Menu', 'Scroll Down', 'Scroll Down', 'Menu', 'Keypad 2', 'Menu', 'Menu'] +
+                    digits + ['Menu'])
+        events += [(page + n, key, 0.15) for n, key in enumerate(keys)]
+        done = page + len(keys)
+        # The phone's "Message sent" note follows the network's RP-ACK.
+        return events + [(done + 2.5, '@sms_sent', 0)], done + 3
     if scenario == 'sip-incoming':
         # The host pages once the bridge has registered; it hangs up too.
         return events + [(page + 4, model['send'], 0.15)], page + 24
@@ -123,6 +164,11 @@ def check(text, run, model, events, scenario, at):
         replay = re.search(r'rom4_codec_replay: result=pass reference_events=(\d+)', text)
         result['replayed_dsp_writes'] = int(replay[1])
     check_inputs(text, events)
+    if scenario.startswith('sms-'):
+        from tools.run_6210_lab_sms import check as check_sms
+        check_sms(text, scenario[4:])
+        check_frames(run / 'snap', model.get(scenario.replace('-', '_') + '_frames', {}))
+        return result
     if scenario.startswith('sip-'):
         from tools.run_rom4_lab_sip_call import check_sip_call
         outgoing = scenario == 'sip-outgoing'
@@ -141,7 +187,7 @@ def main():
     from tools.run_npe3_native import configure_cell_power
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument('model', choices=MODELS)
-    parser.add_argument('--scenario', choices=('lab', 'sip-incoming', 'sip-outgoing'), default='lab')
+    parser.add_argument('--scenario', choices=('lab', 'sip-incoming', 'sip-outgoing', 'sms-incoming', 'sms-outgoing'), default='lab')
     parser.add_argument('--roundtrip-at', choices=ROUNDTRIPS,
                         help='save, replay and reload the lab call in this phase')
     parser.add_argument('--mame', type=Path, default=ROOT / 'mame/mame')
@@ -152,7 +198,8 @@ def main():
     parser.add_argument('--pjsua2', default=os.environ.get('SIP_PYTHON_PATH', ''))
     parser.add_argument('--keep', action='store_true')
     args = parser.parse_args()
-    sip = args.scenario != 'lab'
+    sip = args.scenario.startswith('sip-')
+    sms = args.scenario.startswith('sms-')
     if sip and (args.roundtrip_at or not args.pjsua or not args.pjsua2):
         parser.error('SIP scenarios need --pjsua and --pjsua2, without --roundtrip-at')
     model = MODELS[args.model]
@@ -164,9 +211,12 @@ def main():
         run = base / 'run'
         run.mkdir()
         outgoing = args.scenario == 'sip-outgoing'
-        configure_cell_power(run, machine, 'handset33', incoming_call=not outgoing, traffic_assignment=True,
-                             call_ack=not outgoing, clear_call=True, sacch=True, speech=True,
-                             accept_outgoing_service=outgoing, proceed_outgoing_call=outgoing)
+        if sms:
+            configure_cell_power(run, machine, 'handset33', sacch=True, sms=True)
+        else:
+            configure_cell_power(run, machine, 'handset33', incoming_call=not outgoing, traffic_assignment=True,
+                                 call_ack=not outgoing, clear_call=True, sacch=True, speech=True,
+                                 accept_outgoing_service=outgoing, proceed_outgoing_call=outgoing)
         events, seconds = schedule(model, args.scenario)
         command = [str(args.mame), machine, '-rompath', f'{base / "roms"};{ROOT / "roms"}',
                    '-nvram_directory', str(base / 'nvram'), '-cfg_directory', 'cfg',

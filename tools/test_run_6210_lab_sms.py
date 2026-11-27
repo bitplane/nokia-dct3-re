@@ -2,7 +2,7 @@ import unittest
 
 from tools.run_6210_lab_sms import check, information
 
-BOOT = 'native_dsp_reset_line: x\n' * 3 + 'npe3_session_released: registered=1 \n' * 2
+BOOT = 'native_dsp_reset_line: released=1 t=0.2 x\n' * 3 + 'npe3_session_released: registered=1 \n' * 2
 
 
 def up(sapi, layer3):
@@ -35,7 +35,7 @@ class LabSmsCheckTest(unittest.TestCase):
 
     def test_rejects_a_dsp_reset_after_boot(self):
         with self.assertRaises(ValueError):
-            check(INCOMING + 'native_dsp_reset_line: y\n', 'incoming')
+            check(INCOMING + 'native_dsp_reset_line: released=0 t=30.5 y\n', 'incoming')
 
 
 if __name__ == '__main__':

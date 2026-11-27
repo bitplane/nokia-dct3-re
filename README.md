@@ -56,8 +56,7 @@ Native DSP execution is tracked separately. On a laboratory cell, the
 clean-room C54x core runs the phones' own DSP code: the 5110 on its ROM4, and
 the 6210, 8210, 8850, 6250 and 8890 on an acquired 8210 ROM6. The handsets
 register, receive and dial TCH/F calls with native GSM-FR speech both ways,
-including real SIP parties through a bridge. The 6210 also sends and
-receives SMS natively on the lab cell. These are research compositions:
+including real SIP parties through a bridge, and send and receive SMS. These are research compositions:
 the cell, the RF sample path and the 6210-family identity records are
 laboratory inputs, and only the 5110 and 8210 run their own model's DSP ROM. A connected 6210
 call runs at about real time on a fast host, with no headroom

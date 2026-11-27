@@ -40,7 +40,10 @@ SMS, after registration if it comes earlier. `make verify-6210-lab-sms`
 (`tools/run_6210_lab_sms.py`) receives "hello" from 5551234 and reads it
 with the phone's own keys, then composes "A" to 5551234 and sends it. Each
 direction checks the CP/RP exchange on the air and a pinned screen
-("hello"; "Message sent"). Calls keep the original hand-built dialogue; the
+("hello"; "Message sent"). The other ROM6 products do the same with their
+own keys: `make verify-{8850,6250,8210,8890}-lab-sms`
+(`run_rom6_lab_call.py --scenario sms-incoming|sms-outgoing`); the Navi-key
+phones write from Messages, third item. Calls keep the original hand-built dialogue; the
 bit selects SMS instead of calls, and a session-mode dialogue is not yet
 save-state safe.
 

@@ -2002,9 +2002,10 @@ verify-6210-lab-physical-duplex: build
 	$(VENV)/bin/python tools/run_npe3_physical_duplex.py $(RUN_DIR)
 
 # The ROM6 product calls: lab tones, the same call saved and reloaded while
-# ringing, connected and clearing, and real SIP calls both ways.
+# ringing, connected and clearing, real SIP calls both ways, and native SMS
+# both ways (receive and read "hello", send "A").
 define rom6_lab_call_targets
-.PHONY: verify-$(1)-lab-call verify-$(1)-lab-state verify-$(1)-lab-sip-call verify-$(1)-lab-sip-outgoing-call
+.PHONY: verify-$(1)-lab-call verify-$(1)-lab-state verify-$(1)-lab-sip-call verify-$(1)-lab-sip-outgoing-call verify-$(1)-lab-sms
 verify-$(1)-lab-call: build
 	$$(VENV)/bin/python tools/run_rom6_lab_call.py $(2) --mame $$(MAME_DIR)/mame
 verify-$(1)-lab-state: build
@@ -2014,6 +2015,9 @@ verify-$(1)-lab-sip-call: build
 	$$(VENV)/bin/python tools/run_rom6_lab_call.py $(2) --scenario sip-incoming --mame $$(MAME_DIR)/mame
 verify-$(1)-lab-sip-outgoing-call: build
 	$$(VENV)/bin/python tools/run_rom6_lab_call.py $(2) --scenario sip-outgoing --mame $$(MAME_DIR)/mame
+verify-$(1)-lab-sms: build
+	$$(VENV)/bin/python tools/run_rom6_lab_call.py $(2) --scenario sms-incoming --mame $$(MAME_DIR)/mame
+	$$(VENV)/bin/python tools/run_rom6_lab_call.py $(2) --scenario sms-outgoing --mame $$(MAME_DIR)/mame
 endef
 $(foreach product,8850:nsm2 6250:nhm3 8210:nsm3 8890:nsb6,$(eval $(call rom6_lab_call_targets,$(word 1,$(subst :, ,$(product))),$(word 2,$(subst :, ,$(product))))))
 

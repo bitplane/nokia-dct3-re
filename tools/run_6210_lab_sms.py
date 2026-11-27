@@ -47,7 +47,9 @@ def information(octets):
 def check(text, scenario):
     if text.count('npe3_session_released: registered=1') < 2:
         raise ValueError('registration and the SMS dialogue did not both release the channel')
-    if text.count('native_dsp_reset_line:') != 3:
+    # Each product loads its DSP within its first second; none may reset later.
+    if not re.search(r'native_dsp_reset_line: ', text) or any(
+            float(at) > 2 for at in re.findall(r'native_dsp_reset_line: released=\d t=([0-9.]+)', text)):
         raise ValueError('the DSP reset line moved after boot')
     sent = [information(octets) for kind, octets in downlinks(text) if kind.startswith('information')]
     heard = [layer3 for sapi, layer3 in uplinks(text) if sapi == '3']
