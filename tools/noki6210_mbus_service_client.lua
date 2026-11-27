@@ -4,6 +4,7 @@ local machine = manager.machine
 local memory = machine.devices[':maincpu'].spaces.program
 local port = assert(machine.ioport.ports[':MBUS_RX'])
 local buffer, pending = {}, nil
+local query_start = tonumber(os.getenv('NOKIA_MBUS_PROBE_START') or '20')
 local function hex(bytes)
     local result = {}
     for _, byte in ipairs(bytes) do result[#result + 1] = string.format('%02x', byte) end
@@ -11,7 +12,7 @@ local function hex(bytes)
 end
 _G.nokia_mbus_service_tap = memory:install_read_tap(0x20018, 0x2001b,
     'mbus_service_tx_echo', function(_, value, mask)
-        if machine.time:as_double() < 20 or mask & 0xff00 == 0 then return end
+        if machine.time:as_double() < query_start or mask & 0xff00 == 0 then return end
         -- Control reads are side-effect free; the mask guard prevents recursion.
         if memory:read_u8(0x20018) & 0x20 == 0 then return end
         local byte = (value >> 8) & 0xff

@@ -221,9 +221,19 @@ exactly as a firmware write of control `05` would. A clock-stop request
 refused because a locally unmasked source is already pending is treated as a
 zero-length stop and restores delivery the same way. It does not raise the
 separate IRQ3 wake report, so the 3310/3330 notification contract is
-unchanged. Only the NSB-3 (`nsb3r4t`), NSK-3 (`nsk3r4t`) and NSK-1
-(`nsk1r4t`) research configurations and their `*ap5` laboratory machines
+unchanged. A clock-control write without the stop bit (the idle helper's
+light stop, taken when the deadline guard declines to sleep) is likewise a
+zero-length stop when a locally unmasked source is pending, and restores
+delivery. Without it, a Timer 0 compare that arrives after the loop top's
+`0a` write is never serviced, so the deadline never passes and the loop
+spins awake with delivery disabled. Every other `0d` writer in NPE-3 updates
+its gate inside a critical section; that update completes before the
+restore, and the section's exit rewrites its saved control. Only the NSB-3
+(`nsb3r4t`), NSK-3 (`nsk3r4t`) and NSK-1 (`nsk1r4t`) research configurations,
+their `*ap5` laboratory machines and the clock-enabled NPE-3 `npe3mbus`
 select it. Every other product, including NAM-2, keeps wake without service.
+With the light stop, the three ROM4 `*ap5` machines still run 120 s without
+a restart (2026-11-27).
 
 Firmware evidence. The three task-0 idle loops share one shape. The loop top
 writes control `0a` and evaluates the idle predicates. The normal-idle arm
@@ -261,8 +271,9 @@ delivery at its 12.0 s and 12.2 s wakes. Its deep-sleep guard then declines,
 however, and the ordinary loop never requests another stop. The late-input
 security fixture therefore still renders no digits. NAM-2's open boundary is
 the guard-declined arm (`304c2e(0)`, no `05`), not clock-stop wake. NPE-3's
-documented late no-sleep loop has the same shape. Neither product selects
-the flag, and this result neither supports nor refutes the contract for them.
+late no-sleep loop has the same shape; the light-stop rule above resolves it
+in `npe3mbus` ([MBUS controller](mbus_controller.md)). NAM-2 has not been
+re-run with it and still does not select the flag.
 
 ### Archived interrupt reference
 

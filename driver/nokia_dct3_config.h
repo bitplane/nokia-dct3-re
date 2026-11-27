@@ -1147,9 +1147,10 @@ inline constexpr nokia_product_config make_6210_config()
 	// Verifier start 426c36..426c3e separately sets CTSI+2 bit 0.
 	result.dsp_reset_wiring = { 0x10, 0x04, 0x01 };
 	result.gensio_wiring = GENSIO_NPE3;
-	// Own 5046fc..50470e requires MBUSTIM, but enabling it exposes an
-	// unresolved post-wake input regression. npe3mbus retains that research
-	// path separately until the complete call/sleep contract is qualified.
+	// Own 5046fc..50470e requires MBUSTIM. Enabling it lets the idle loop
+	// stop the clock, which needs the sibling wake contract; npe3mbus selects
+	// both and passes End decode and the post-sleep MBUS query. They are not
+	// yet the default composition.
 	// 0x426c58 alternates the two shared-buffer ownership words. Keep
 	// transfer acknowledgements separate from the unresolved final verdict.
 	result.dsp_bootstrap = {

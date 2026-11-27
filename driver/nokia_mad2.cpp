@@ -198,6 +198,17 @@ void nokia_mad2_device::write(offs_t offset, u8 data)
 		m_simi_clock_cb(BIT(m_regs[offset], 5));
 		if (BIT(data, 1) && m_clock_stop_enabled)
 			enter_sleep();
+		else if (m_sleep_wake_enable && !m_sleeping && (fiq_pending_unmasked() || irq_pending_unmasked()))
+		{
+			// Opt-in, with the wake contract: a write without the stop bit
+			// is the idle helper's light stop. NPE-3 500a18(0) is taken when
+			// the deadline guard declines to sleep and returns to the 0a loop
+			// top, as NAM-2 2f85f4 does; with a source already pending the
+			// stop is zero-length and delivery resumes. Every other writer's
+			// gate update completes before this restore, and its critical
+			// section's exit then rewrites its saved control.
+			restore_delivery();
+		}
 		break;
 	case 0x0e:
 		// Read-only external pins; software writes have no electrical effect.

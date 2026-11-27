@@ -50,7 +50,7 @@ DCT3_PRESS_240_350 := NOKIA_DCT3_POST_READY_KEY_DURATION_MS=240 NOKIA_DCT3_POST_
 	verify-8850-pin-host-ussd-network-restore \
 	verify-8850-pin-host-ussd-network-request verify-8850-pin-host-ussd-restore \
 	verify-8850-pin-host-outgoing-ussd verify-8850-pin-host-incoming-ussd \
-	verify-6210-mbus-service verify-6210-mbus-byte-events \
+	verify-6210-mbus-service verify-6210-mbus-service-after-sleep verify-6210-mbus-byte-events \
 	verify-6210-mbus-version-ingress verify-8210-host-incoming-call \
 	verify-8210-host-outgoing-call verify-8210-host-incoming-sms \
 	verify-8210-host-outgoing-sms verify-8210-host-rejected-sms \
@@ -562,6 +562,9 @@ verify-8850-pin-host-incoming-ussd: build
 
 verify-6210-mbus-service: build
 	$(PYTHON) tools/run_noki6210_mbus_service.py $(RUN_DIR) --mame-dir $(MAME_DIR)
+
+verify-6210-mbus-service-after-sleep: build
+	$(PYTHON) tools/run_noki6210_mbus_service.py $(RUN_DIR) --after-sleep --mame-dir $(MAME_DIR)
 
 verify-6210-mbus-byte-events: build
 	$(PYTHON) tools/run_mame_isolated.py --mame-dir $(MAME_DIR) --run-dir $(RUN_DIR) -- npe3mbus -rompath $(abspath roms) -video none -sound none -nothrottle -seconds_to_run 10 -log -verbose -autoboot_delay 0 -autoboot_script $(abspath tools/mbus_input_probe.lua)

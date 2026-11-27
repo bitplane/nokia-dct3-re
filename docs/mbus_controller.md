@@ -98,10 +98,24 @@ MMIO observation. Fresh cross-ROM repeated-byte fixtures pass at1.1ms on
 NSE-8 v6.00/v5.01 (`tmp/nse8-mbus-1100us-v600` and
 `tmp/nse8-mbus-1100us-v501`); the NPE-3 repeated-byte gate also passes.
 
-### Open NPE-3 post-wake regression
+### NPE-3 post-wake regression (resolved in `npe3mbus`)
 
-**Unresolved:** what restores global interrupt delivery after organic
-clock-stop/wake in the clock-enabled NPE-3 composition?
+**Resolved (2026-11-27):** `npe3mbus` now selects the ROM4 sibling wake
+contract (`mad2_sleep_wake_enable`, [MAD2 fidelity](mad2_fidelity.md#rom4-sibling-wake-delivery-opt-in)),
+extended to the light stop. The idle loop has two exits that return to the
+`0a` loop top without writing `05`: the sleep arm (`4b03f6` -> `4cc4a4`,
+`500a18(1)`) and the deadline decline (`4b0410` -> `4b0368`, `500a18(0)`).
+Wake restores delivery after the first; the second is the stall below, and
+its clock-control write without the stop bit now restores delivery when a
+locally unmasked source is already pending (a zero-length stop). With both,
+physical End decodes (`run_noki6210_acceptance.py --scenario outgoing-call
+--trace-sleep` passes) and a version query sent at 40 s, after organic
+clock stop and wake, is answered: `make verify-6210-mbus-service-after-sleep`.
+That gate fails without the contract. The rest of this section is the
+investigation that located the boundary; it described the unfixed binary.
+
+The original question was: what restores global interrupt delivery after
+organic clock-stop/wake in the clock-enabled NPE-3 composition?
 
 The checked idle-body inventory in `noki6210_idle_contract.py` resolves R5
 to CTSI`20000` and the R8/R10 control constants to05/0a. Its two R5-relative

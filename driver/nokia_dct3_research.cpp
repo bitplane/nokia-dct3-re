@@ -2540,6 +2540,9 @@ void nokia_dct3_state::npe3mbus(machine_config &config)
 	npe3hle(config);
 	nokia_product_config research = m_product;
 	research.mbus_timer_enabled = true;
+	// Own sleep arm 4b03f6 -> 4cc4a4/500a18(1) loops to 4b036e without
+	// writing 05 (as NSB-3); its deadline decline 4b0368 is 500a18(0).
+	research.mad2_sleep_wake_enable = true;
 	apply_product_config(research);
 }
 

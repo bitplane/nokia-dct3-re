@@ -10,9 +10,9 @@ REPEATED = bytes.fromhex('1f0010d10006a5a5ffff000000d8')
 VERSION_QUERY = bytes.fromhex('1f0010d10005000100030001d8')
 
 
-def verify(text, *, version_query=False):
+def verify(text, *, version_query=False, start=None):
     expected = VERSION_QUERY if version_query else REPEATED
-    start = Decimal(20 if version_query else 8)
+    start = Decimal(start if start is not None else 20 if version_query else 8)
     if '[LUA ERROR]' in text or text.count('mbus_input_probe: complete') != 1:
         raise ValueError('MBUS byte probe did not complete')
     rows = list(re.finditer(r'mbus_input_probe: index=(\d+) data=([0-9a-f]{2}) t=([0-9.]+)', text))
