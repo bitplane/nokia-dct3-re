@@ -1227,6 +1227,20 @@ reset. After the physical phone code it shows its field-test display, camped
 on 35 (`CCCH`). `make verify-5110i-lab-registration` protects the dialogue and
 the absence of a restart over 70 s.
 
+Calls on the 5110i (2026-11-27, open): `run_rom4_lab_registration.py nse2ap5
+--incoming-call` or `--traffic-channel` runs the 5110's lab call (page at 20 s,
+Answer at 23 s, End at 27.2 s). The 5110i answers the page and takes SETUP,
+CALL CONFIRMED and the TCH/F assignment. On timeslot 1 its own DSP upload then
+reaches `DELAY *AR4` (`4d84` at `b6de`) inside the block-repeat body
+`b6d7..b6e7`, which the C54x core refuses (LTD/DELAY in a repeat, block or XC
+is unqualified); the 5110's upload never runs that loop. With the refusal
+lifted for a non-final block-body DELAY, an experiment not kept, the DSP runs on
+but the handset never decodes the downlink FACCH. It repeats the FACCH SABM six
+times against the lab's UAs, sends one SACCH report and drops the channel
+within about 0.9 s. Its timeslot-1 captures open one quarter-bit after the
+5110's (`1321` against `1320`). Next: qualify DELAY in a block body against the
+C54x reference, then follow the 5110i's TCH receive chain.
+
 These records are the 5110 profile's identity and lock contents, not a 5110i
 factory profile, and they are encrypted for the NSE-1 mask the machine
 substitutes; a real 5110i on its own mask would need records for that mask.

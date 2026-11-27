@@ -110,6 +110,18 @@ def command(root, run, machine, mame, call=False, traffic=False, roundtrip=None,
     # The 5110i runs past its former 62-second reason-68 reset.
     prepare_native(root, run, record_checksum=True, nominal_vbat=True, insert_sim=True,
                    phone_retry_zero=True, security_records=True, lab=True)
+    if call:
+        # The same lab call as the 5110: page at 20 s, Answer at 23 s, End 4 s on.
+        (run / 'snap').mkdir(exist_ok=True)
+        # Add the lab options beside the inserted SIM in the prepared configuration.
+        config = run / 'cfg' / f'{machine}.cfg'
+        ports = ''.join(f'<port tag=":LAB_BTS" type="CONFIG" mask="{bit}" defvalue="0" value="{bit}" />'
+                        for bit in (TRAFFIC_BTS_BITS if traffic else CALL_BTS_BITS))
+        config.write_text(config.read_text().replace('</input>', ports + '</input>', 1))
+        os.environ.update(CALL_INPUTS)
+        return [str(mame), machine, '-rompath', str(run / 'roms'), '-nvram_directory', str(run / 'nvram'),
+                '-cfg_directory', str(run / 'cfg'), '-seconds_to_run', '36', *HEADLESS,
+                '-autoboot_script', str(root / 'tools/rom4_lab_call_input.lua')]
     return [str(mame), machine, '-rompath', str(run / 'roms'), '-nvram_directory', str(run / 'nvram'),
             '-cfg_directory', str(run / 'cfg'), '-seconds_to_run', '70', *HEADLESS]
 
@@ -137,8 +149,9 @@ def main():
         args.host_call = args.host_outgoing_call
     args.traffic_channel |= args.state_roundtrip is not None or args.host_call is not None or args.degraded_frames
     args.incoming_call |= args.traffic_channel
-    if args.incoming_call and args.machine != 'nse1ap5':
-        parser.error('the incoming-call scenario is defined for nse1ap5')
+    if args.machine != 'nse1ap5' and (args.state_roundtrip is not None or args.host_call is not None or
+                                      args.degraded_frames):
+        parser.error('only the lab incoming call is defined for nse2ap5')
     root = Path(__file__).resolve().parents[1]
     scratch = root / 'tmp/native-gates'
     scratch.mkdir(parents=True, exist_ok=True)
